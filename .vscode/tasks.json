@@ -1,0 +1,242 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "frontend",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "serve"],
+      "options": {
+        "cwd": "${workspaceFolder}/frontend",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/c"]
+        }
+      },
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "webpack",
+        "pattern": {
+          "regexp": "^ERROR in (.*)\\((\\d+),(\\d+)\\): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\s*webpack",
+          "endsPattern": "Local:\\s+http://localhost:\\d+"
+        }
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      }
+    },
+    {
+      "label": "backend",
+      "type": "shell",
+      // uvicorn app:app --reload
+      "command": "${workspaceFolder}/venv/Scripts/python.exe",
+      "args": [
+        "-m",
+        "uvicorn",
+        "app:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5005"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "group": "build",
+      "isBackground": true,
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": {
+        "owner": "python",
+        "pattern": {
+          "regexp": "^\\s*File \"(.+)\", line (\\d+).*$",
+          "file": 1,
+          "line": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Serving Flask app.*",
+          "endsPattern": ".*Debugger PIN:.*"
+        }
+      }
+    },
+    {
+      "label": "⚡ 全栈开发 - 同时启动前后端",
+      "dependsOrder": "parallel",
+      "dependsOn": ["frontend", "backend"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": true
+      }
+    },
+    {
+      "label": "📦 安装前端依赖",
+      "type": "shell",
+      "command": "${workspaceFolder}\\node_modules\\.bin\\npm.cmd",
+      "args": ["install"],
+      "options": {
+        "cwd": "${workspaceFolder}/frontend",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/c"]
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🐍 安装后端依赖",
+      "type": "shell",
+      "command": "${workspaceFolder}\\venv\\Scripts\\pip.exe",
+      "args": ["install", "-r", "requirements.txt"],
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/c"]
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔧 安装所有依赖",
+      "dependsOrder": "parallel",
+      "dependsOn": ["📦 安装前端依赖", "🐍 安装后端依赖"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      }
+    },
+    {
+      "label": "🏗️ 构建前端项目",
+      "type": "shell",
+      "command": "${workspaceFolder}\\node_modules\\.bin\\npm.cmd",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/frontend",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/c"]
+        }
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "🐳 启动Docker Compose",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["up", "-d"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🛑 停止Docker Compose",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["down"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🧹 清理前端构建",
+      "type": "shell",
+      "command": "rmdir",
+      "args": ["/s", "/q", "dist"],
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}

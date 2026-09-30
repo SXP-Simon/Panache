@@ -1,0 +1,36 @@
+# Use an official Python runtime as a parent image
+FROM python:3.12-slim-bookworm
+
+# Set the working directory in the container to /app
+WORKDIR /app
+
+# Install system dependencies
+# Added 'pandoc' here to fix the "FileNotFoundError: [Errno 2] No such file or directory: 'ar'" error
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    pandoc \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first to leverage Docker cache
+COPY backend/requirements.txt /app/requirements.txt
+
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install gunicorn + uvicorn worker
+RUN pip install gunicorn uvicorn[standard]
+
+# Copy the backend source code into the container at /app
+# Do this last so code changes don't invalidate the pip install cache
+COPY backend /app
+
+# Copy default fonts into the image
+COPY ttf_files /app/font_assets
+
+# Make port 5005 available to the world outside this container
+EXPOSE 5005
+
+# Run gunicorn when the container launches
+CMD ["gunicorn", "app:app", "-b", "0.0.0.0:5005", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-"]
