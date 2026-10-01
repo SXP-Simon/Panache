@@ -1,8 +1,38 @@
 <template>
     <div id='text_file_select' class="d-flex justify-content-between">
-        <label class="text-field-label" for="textArea">{{ $t('message.text') }}:</label>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="text-field-label m-0" for="textArea">{{ $t('message.text') }}:</label>
+            <button 
+                type="button"
+                class="btn-latex-convert"
+                data-testid="convert-latex-btn"
+                :title="$t('message.convertLatex')"
+                @click="convertLatex">
+                <svg class="latex-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 2.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1H6.207l4.147 4.146a.5.5 0 0 1 0 .708L6.207 12H11.5a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.354-.854L8.793 7.5 4.146 2.854A.5.5 0 0 1 4 2.5z"/>
+                </svg>
+                <span>{{ $t('message.convertLatex') }}</span>
+            </button>
+        </div>
         <textarea id="textArea" class="form-control" v-model="text" data-testid="text-input" @input="handleManualInput"
+            ref="textAreaRef"
             :aria-label="$t('message.text')" :placeholder="$t('message.enterText')"></textarea>
+
+        <!-- 常用数学符号快捷栏 -->
+        <div class="math-quick-bar">
+            <span class="math-quick-label">{{ $t('message.mathSymbolsTitle') }}:</span>
+            <div class="math-chips-container">
+                <button 
+                    v-for="sym in quickSymbols" 
+                    :key="sym" 
+                    type="button" 
+                    class="math-chip-btn" 
+                    @click="insertSymbol(sym)"
+                    :title="sym">
+                    {{ sym }}
+                </button>
+            </div>
+        </div>
 
         <label for="textFileInput">{{ $t('message.orUploadDocument') }}:</label>
         <div class="file_select_container">
@@ -21,16 +51,25 @@
 
 
 <script>
+import { convertLatexToUnicode, hasLatexMarkup } from '@/utils/latexToUnicode';
+
 export default {
     name: 'TextInput',
     emits: ['childEvent', 'manual-input'],
+
+    computed: {
+        isLatexPresent() {
+            return hasLatexMarkup(this.text);
+        },
+    },
 
     data() {
         return {
             text: '',
             isLoading: false,
             selectedTextFileName: '',
-        }
+            quickSymbols: ['⇒', '→', '∈', 'Σ', 'α', 'β', 'π', '²', '³', '√', '≤', '≥', '≠', '|'],
+        };
     },
     //当输入框的值发生变化时，通知HomeView更新text_handwriting 7.4
     watch: {
@@ -52,6 +91,30 @@ export default {
     methods: {
         handleManualInput() {
             this.$emit('manual-input');
+        },
+        convertLatex() {
+            if (!this.text) return;
+            const converted = convertLatexToUnicode(this.text);
+            this.replaceText(converted);
+            this.$emit('childEvent', this.text);
+        },
+        insertSymbol(sym) {
+            const textarea = this.$refs.textAreaRef;
+            if (!textarea) {
+                this.text += sym;
+                return;
+            }
+            const start = textarea.selectionStart || this.text.length;
+            const end = textarea.selectionEnd || this.text.length;
+            const before = this.text.substring(0, start);
+            const after = this.text.substring(end);
+            this.text = before + sym + after;
+            this.$emit('manual-input');
+            this.$emit('childEvent', this.text);
+            this.$nextTick(() => {
+                textarea.focus();
+                textarea.setSelectionRange(start + sym.length, start + sym.length);
+            });
         },
         replaceText(value) {
             this.text = typeof value === 'string' ? value : '';
@@ -177,4 +240,85 @@ export default {
         transform: rotate(360deg);
     }
 }
-</style >
+
+.btn-latex-convert {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    color: #007BFF;
+    background-color: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-latex-convert:hover {
+    color: #0056b3;
+    background-color: #e3f2fd;
+    border-color: #007BFF;
+}
+
+.btn-latex-convert:active {
+    color: #003d73;
+    background-color: #bbdefb;
+    transform: scale(0.98);
+}
+
+.latex-icon {
+    flex-shrink: 0;
+}
+
+.math-quick-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    font-size: 0.8rem;
+}
+
+.math-quick-label {
+    font-size: 0.75rem !important;
+    color: #6c757d;
+    margin: 0 !important;
+    white-space: nowrap;
+}
+
+.math-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.math-chip-btn {
+    padding: 1px 7px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    color: #495057;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1.35;
+    transition: all 0.15s ease;
+}
+
+.math-chip-btn:hover {
+    background-color: #007BFF;
+    color: #ffffff;
+    border-color: #007BFF;
+}
+
+.math-chip-btn:active {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+</style>
