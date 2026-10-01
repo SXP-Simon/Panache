@@ -40,3 +40,4 @@ backend/pandoc-*-macOS.pkg
 # 桌面版打包产物
 desktop/build/
 desktop/dist/
+preview_outputs/
