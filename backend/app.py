@@ -45,10 +45,16 @@ import PyPDF2
 
 # 文件模块
 from docx import Document
-
-# 图片处理模块
-from identify import identify_distance
-from pdf import generate_pdf
+try:
+    from docx_extractor import extract_text_from_docx
+    from symbol_fallback import normalize_text_for_font
+    from identify import identify_distance
+    from pdf import generate_pdf
+except ImportError:
+    from backend.docx_extractor import extract_text_from_docx
+    from backend.symbol_fallback import normalize_text_for_font
+    from backend.identify import identify_distance
+    from backend.pdf import generate_pdf
 from werkzeug.utils import secure_filename
 
 
@@ -513,11 +519,9 @@ def create_notebook_image(
 
 
 def read_docx(file_path):
-    document = Document(file_path)
-    # 必须保留段落换行：正文里的 "---"（分页）与 ">>>"（右对齐）是按行匹配的标记，
-    # 用空格拼接会把整篇压成一行，标记永远不生效，而且不会报任何错
-    text = "\n".join([paragraph.text for paragraph in document.paragraphs])
-    return text
+    # 使用增强版 docx 提取器：提取段落（包含普通文本与 Word 原生 OMML 数学公式）及表格
+    # 同时保留段落换行，确保 "---"（分页）与 ">>>"（右对齐）等标记生效
+    return extract_text_from_docx(file_path)
 
 
 import pypandoc
@@ -545,15 +549,18 @@ except OSError:
             print(f"Pandoc download failed: {exc}. Falling back to python-docx.")
 
 def convert_docx_to_text(docx_file_path):
-    # 转换文件为纯文本格式，并返回转换后的文本内容
-    if not _pandoc_available:
+    # 优先使用原生 docx 提取器以完整提取 Word 公式 (OMML) 与表格内容
+    try:
+        return extract_text_from_docx(docx_file_path)
+    except Exception as e:
         logger.warning(
-            "pandoc 不可用，改用 python-docx 提取 %s（保留段落换行，但表格/列表等结构会丢失）",
+            "extract_text_from_docx 失败 (%s): %s，尝试 pandoc/python-docx 兜底",
             docx_file_path,
+            e,
         )
+        if _pandoc_available:
+            return pypandoc.convert_file(docx_file_path, 'plain')
         return read_docx(docx_file_path)
-    text = pypandoc.convert_file(docx_file_path, 'plain')
-    return text
     # return None
 
 
@@ -635,9 +642,15 @@ def apply_right_align(text, template):
     return "\n".join(output)
 
 
-def handwrite_with_page_breaks(text, template):
-    """Render text while honoring manual page-break and alignment markers."""
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+def handwrite_with_page_breaks(text, template, font_path=None):
+    """Render text while honoring manual page-break, alignment markers, and font glyph fallback."""
+    if font_path is None and hasattr(template, "get_font"):
+        font_obj = template.get_font()
+        font_path = getattr(font_obj, "path", None)
+
+    # 非侵入式字符清洗与基于当前字体的字形兜底（解决特殊空格、缺失数学符号等留白问题）
+    normalized = normalize_text_for_font(text, font_path)
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
     aligned = apply_right_align(normalized, template)
 
     if not _PAGE_BREAK_RE.search(aligned):
@@ -998,7 +1011,9 @@ async def generate_handwriting_impl(
         report_progress("rendering", "正在生成手写图像", 45)
         # handwrite() 返回惰性 map 对象，只做文本排版（毫秒级），
         # 真正的 CPU 密集渲染在下方 for 循环消费 images 时才触发
-        images = handwrite_with_page_breaks(text_to_generate, template)
+        images = handwrite_with_page_breaks(
+            text_to_generate, template, font_path=font_path
+        )
         logger.info("handwrite initial images generated successfully")
         # 创建项目内的临时目录，避免使用系统临时目录
         project_temp_base = "./temp"
@@ -1112,7 +1127,9 @@ async def generate_handwriting_impl(
         temp_pdf_file_path = None  # 初始化变量
         report_progress("rendering", "正在生成手写图像", 45)
         # handwrite() 返回惰性 map 对象，CPU 密集渲染在 generate_pdf 内部消费时才触发
-        images = handwrite_with_page_breaks(text_to_generate, template)
+        images = handwrite_with_page_breaks(
+            text_to_generate, template, font_path=font_path
+        )
         try:
             report_progress("packaging", "正在导出PDF文件", 92)
             # generate_pdf 会消费惰性 images，渲染在此函数内完成

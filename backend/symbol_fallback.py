@@ -1,0 +1,181 @@
+# -*- coding: utf-8 -*-
+"""
+符号规范化与真实字形层级回退引擎 (Symbol Normalization & True Glyph Fallback Engine)
+
+1. 清洗 Word 公式中的特殊空格（如 \u2005）与不可见字符；
+2. 动态挂载手写绘制引擎的字形 Fallback 机制：当主手写字体（如云烟体）缺失
+   下标（如 ₆）、上标（如 ²）、希腊字母（如 Σ、α、β）、数学符号（如 ⇒、∈、√、≤、≥、≠）时，
+   自动调用备用字库（如李国夫手写体）按相同字号在底图上直接绘制真实字形，
+   彻底告别降级为 "_6"、"Sigma"、"=>" 等破坏数学排版形态的问题。
+"""
+
+import functools
+import glob
+import logging
+import os
+from typing import Dict, List, Optional, Set, Tuple
+
+from PIL import ImageFont
+
+try:
+    from fontTools.ttLib import TTFont
+except ImportError:
+    TTFont = None
+
+logger = logging.getLogger(__name__)
+
+# 不可见字符、变体空格及特殊分隔符的通用清洗映射
+_INVISIBLE_AND_SPECIAL_SPACES = {
+    "\u00a0": " ",  # Non-breaking space
+    "\u2000": " ",  # En quad
+    "\u2001": " ",  # Em quad
+    "\u2002": " ",  # En space
+    "\u2003": " ",  # Em space
+    "\u2004": " ",  # Three-per-em space
+    "\u2005": " ",  # Four-per-em space (常见于 Word 公式)
+    "\u2006": " ",  # Six-per-em space
+    "\u2007": " ",  # Figure space
+    "\u2008": " ",  # Punctuation space
+    "\u2009": " ",  # Thin space
+    "\u200a": " ",  # Hair space
+    "\u202f": " ",  # Narrow no-break space
+    "\u205f": " ",  # Medium mathematical space
+    "\u3000": "  ",  # Full-width space
+    "\u200b": "",  # Zero-width space
+    "\u200c": "",  # Zero-width non-joiner
+    "\u200d": "",  # Zero-width joiner
+    "\ufeff": "",  # Byte order mark
+}
+
+# 普遍等价但易被生僻 Unicode 代替的符号映射
+_UNIVERSAL_CANONICAL_MAP = {
+    "\u2223": "|",  # Divides / Math bar (∣) -> ASCII Vertical Bar (|)
+    "\u2225": "||",  # Parallel to (∥) -> Double vertical bar
+    "\u2236": ":",  # Ratio (∶) -> Colon
+}
+
+# 缓存各字体的 cmap 码点集合
+_FONT_CMAP_CACHE: Dict[str, Set[int]] = {}
+_FALLBACK_FONTS_POOL: List[Tuple[str, Set[int]]] = []
+_ENGINE_INITIALIZED = False
+
+
+def _find_fallback_font_files() -> List[str]:
+    """寻找本地包含完整数学字形的手写字体或系统字体作为备用字库池。"""
+    candidates = []
+    # 优先选择本地手写体
+    possible_dirs = ["./ttf_files", "./backend/font_assets", "./font_assets", "../ttf_files", "../font_assets"]
+    for d in possible_dirs:
+        for f in glob.glob(os.path.join(d, "*.ttf")):
+            if f not in candidates:
+                candidates.append(f)
+
+    # Windows / Linux 系统高质量备用字体池（优先包含全量数学符号与上下标的字库）
+    system_candidates = [
+        "C:/Windows/Fonts/seguisym.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/calibri.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simsun.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+    ]
+    for sc in system_candidates:
+        if os.path.exists(sc) and sc not in candidates:
+            candidates.append(sc)
+
+    return candidates
+
+
+def init_glyph_fallback_engine():
+    """初始化底层 handright 绘制引擎的真实字形 Fallback 挂载。"""
+    global _ENGINE_INITIALIZED, _FALLBACK_FONTS_POOL
+    if _ENGINE_INITIALIZED:
+        return
+
+    if not TTFont:
+        logger.warning("未安装 fontTools，跳过真实字形 Fallback 挂载")
+        _ENGINE_INITIALIZED = True
+        return
+
+    # 1. 扫描并缓存备用字库的 cmap
+    for font_path in _find_fallback_font_files():
+        try:
+            f = TTFont(font_path)
+            cmap = f.getBestCmap()
+            f.close()
+            if cmap:
+                _FALLBACK_FONTS_POOL.append((font_path, set(cmap.keys())))
+        except Exception as e:
+            logger.debug(f"读取备用字体 cmap 失败 ({font_path}): {e}")
+
+    # 2. 挂载 handright._core._draw_char
+    try:
+        import handright._core as core
+
+        orig_draw_char = core._draw_char
+
+        def fallback_draw_char(draw, char: str, xy: Tuple[int, int], font) -> int:
+            if char in (" ", "\t", "\n"):
+                return orig_draw_char(draw, char, xy, font)
+
+            left, top, right, bottom = font.getbbox(char)
+            # 若主字体获取该非空格字符的宽度或高度为 0（即主字库缺失该 Glyph 或为空白占位符）
+            if (right - left == 0) or (bottom - top == 0):
+                cp = ord(char)
+                for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
+                    if cp in fb_cmap:
+                        try:
+                            # 选用匹配的字号在原坐标绘制真实字形
+                            fb_font = ImageFont.truetype(fb_path, size=font.size)
+                            f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
+                            # 确保备用字体在该字符上有实质可见像素（高度和宽度均大于0）
+                            if (f_right - f_left > 0) and (f_bottom - f_top > 0):
+                                draw.text(xy, char, fill=core._WHITE, font=fb_font)
+                                return max(1, f_right - f_left)
+                        except Exception:
+                            continue
+            return orig_draw_char(draw, char, xy, font)
+
+        core._draw_char = fallback_draw_char
+        logger.info(f"真实字形 Fallback 引擎挂载成功，已加载 {len(_FALLBACK_FONTS_POOL)} 款备用字库")
+    except Exception as e:
+        logger.warning(f"挂载字形 Fallback 引擎失败: {e}")
+
+    _ENGINE_INITIALIZED = True
+
+
+# 模块导入时自动初始化
+init_glyph_fallback_engine()
+
+
+def clean_invisible_and_special_characters(text: str) -> str:
+    """清理文本中的不可见字符、Word 公式特殊空格以及通用数学符号规范化。"""
+    if not text:
+        return ""
+
+    chars = []
+    for ch in text:
+        if ch in _INVISIBLE_AND_SPECIAL_SPACES:
+            chars.append(_INVISIBLE_AND_SPECIAL_SPACES[ch])
+        elif ch in _UNIVERSAL_CANONICAL_MAP:
+            chars.append(_UNIVERSAL_CANONICAL_MAP[ch])
+        else:
+            chars.append(ch)
+
+    return "".join(chars)
+
+
+def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
+    """对输入文本进行符号清洗，同时保留真实数学 Unicode 符号（₆、²、Σ、⇒、∈、≤、≥ 等），
+    由底层的 Glyph Fallback 引擎完成真实字形绘制，不再降级为 '_6' 或 'Sigma'。
+    """
+    if not text:
+        return ""
+    # 确保引擎已挂载
+    if not _ENGINE_INITIALIZED:
+        init_glyph_fallback_engine()
+
+    return clean_invisible_and_special_characters(text)

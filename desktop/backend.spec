@@ -70,6 +70,9 @@ hiddenimports = [
     "task_store",
     "task_types",
     "schedule_clean",
+    "symbol_fallback",
+    "docx_extractor",
+    "fontTools",
 ]
 
 excludes = [
