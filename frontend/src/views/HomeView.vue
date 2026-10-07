@@ -2184,6 +2184,16 @@ export default {
   overflow-y: auto;
 }
 
+.action-bar,
+.panel-settings,
+.panel-preview,
+.panel-title,
+.letter-format-actions,
+.footer {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .panel-title {
   margin: 0 0 12px;
   padding-bottom: 8px;

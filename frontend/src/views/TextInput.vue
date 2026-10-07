@@ -1,5 +1,5 @@
 <template>
-    <div id='text_file_select' class="d-flex justify-content-between">
+    <div id='text_file_select' class="d-flex justify-content-between" @keydown="handleContainerKeyDown">
         <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
             <label class="text-field-label m-0" for="textArea">{{ $t('message.text') }}:</label>
             <div class="text-tools-group d-flex gap-2">
@@ -27,7 +27,9 @@
                 </button>
             </div>
         </div>
-        <textarea id="textArea" class="form-control" v-model="text" data-testid="text-input" @input="handleManualInput"
+        <textarea id="textArea" class="form-control" v-model="text" data-testid="text-input" 
+            @input="handleManualInput"
+            @keydown="handleTextareaKeyDown"
             ref="textAreaRef"
             :aria-label="$t('message.text')" :placeholder="$t('message.enterText')"></textarea>
 
@@ -108,6 +110,32 @@ export default {
     methods: {
         handleManualInput() {
             this.$emit('manual-input');
+        },
+        handleTextareaKeyDown(e) {
+            // 当在输入框中按下 Ctrl+A (或 Mac 下 Cmd+A) 时，精准全选输入框内文本并阻止事件冒泡扩散到全页
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
+                e.stopPropagation();
+                const textarea = this.$refs.textAreaRef;
+                if (textarea) {
+                    textarea.focus();
+                    textarea.setSelectionRange(0, textarea.value.length);
+                }
+            }
+        },
+        handleContainerKeyDown(e) {
+            // 当焦点位于文字栏容器内按 Ctrl+A 时，阻止全局选区泄露并将选区锁定在当前输入框
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
+                if (e.target && e.target.tagName === 'INPUT') {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                const textarea = this.$refs.textAreaRef;
+                if (textarea) {
+                    textarea.focus();
+                    textarea.setSelectionRange(0, textarea.value.length);
+                }
+            }
         },
         cleanMarkdownText() {
             if (!this.text) return;
@@ -351,5 +379,17 @@ export default {
 .math-chip-btn:active {
     background-color: #0056b3;
     border-color: #0056b3;
+}
+
+#textArea {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.text-tools-group,
+.math-quick-bar,
+.file_select_container {
+    user-select: none;
+    -webkit-user-select: none;
 }
 </style>
