@@ -1,18 +1,31 @@
 <template>
     <div id='text_file_select' class="d-flex justify-content-between">
-        <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
             <label class="text-field-label m-0" for="textArea">{{ $t('message.text') }}:</label>
-            <button 
-                type="button"
-                class="btn-latex-convert"
-                data-testid="convert-latex-btn"
-                :title="$t('message.convertLatex')"
-                @click="convertLatex">
-                <svg class="latex-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M4 2.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1H6.207l4.147 4.146a.5.5 0 0 1 0 .708L6.207 12H11.5a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.354-.854L8.793 7.5 4.146 2.854A.5.5 0 0 1 4 2.5z"/>
-                </svg>
-                <span>{{ $t('message.convertLatex') }}</span>
-            </button>
+            <div class="text-tools-group d-flex gap-2">
+                <button 
+                    type="button"
+                    class="btn-text-tool"
+                    data-testid="clean-markdown-btn"
+                    :title="$t('message.cleanMarkdown')"
+                    @click="cleanMarkdownText">
+                    <svg class="tool-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M14.06 3.054a1.5 1.5 0 0 0-2.122 0l-.707.707 2.122 2.122.707-.707a1.5 1.5 0 0 0 0-2.122zM10.525 4.468 2.614 12.38a1.5 1.5 0 0 0-.41.74l-.64 2.56a.5.5 0 0 0 .606.606l2.56-.64a1.5 1.5 0 0 0 .74-.41l7.91-7.91-2.855-2.858z"/>
+                    </svg>
+                    <span>{{ $t('message.cleanMarkdown') }}</span>
+                </button>
+                <button 
+                    type="button"
+                    class="btn-text-tool"
+                    data-testid="convert-latex-btn"
+                    :title="$t('message.convertLatex')"
+                    @click="convertLatex">
+                    <svg class="tool-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 2.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1H6.207l4.147 4.146a.5.5 0 0 1 0 .708L6.207 12H11.5a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.354-.854L8.793 7.5 4.146 2.854A.5.5 0 0 1 4 2.5z"/>
+                    </svg>
+                    <span>{{ $t('message.convertLatex') }}</span>
+                </button>
+            </div>
         </div>
         <textarea id="textArea" class="form-control" v-model="text" data-testid="text-input" @input="handleManualInput"
             ref="textAreaRef"
@@ -52,6 +65,7 @@
 
 <script>
 import { convertLatexToUnicode, hasLatexMarkup } from '@/utils/latexToUnicode';
+import { cleanMarkdown, hasMarkdownMarkup } from '@/utils/cleanMarkdown';
 
 export default {
     name: 'TextInput',
@@ -60,6 +74,9 @@ export default {
     computed: {
         isLatexPresent() {
             return hasLatexMarkup(this.text);
+        },
+        isMarkdownPresent() {
+            return hasMarkdownMarkup(this.text);
         },
     },
 
@@ -92,10 +109,18 @@ export default {
         handleManualInput() {
             this.$emit('manual-input');
         },
+        cleanMarkdownText() {
+            if (!this.text) return;
+            const cleaned = cleanMarkdown(this.text);
+            this.replaceText(cleaned);
+            this.$emit('manual-input');
+            this.$emit('childEvent', this.text);
+        },
         convertLatex() {
             if (!this.text) return;
             const converted = convertLatexToUnicode(this.text);
             this.replaceText(converted);
+            this.$emit('manual-input');
             this.$emit('childEvent', this.text);
         },
         insertSymbol(sym) {
@@ -241,12 +266,18 @@ export default {
     }
 }
 
-.btn-latex-convert {
+.text-tools-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-text-tool {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 10px;
-    font-size: 0.8rem;
+    padding: 3px 8px;
+    font-size: 0.78rem;
     font-family: inherit;
     color: #007BFF;
     background-color: #ffffff;
@@ -257,19 +288,19 @@ export default {
     transition: all 0.2s ease;
 }
 
-.btn-latex-convert:hover {
+.btn-text-tool:hover {
     color: #0056b3;
     background-color: #e3f2fd;
     border-color: #007BFF;
 }
 
-.btn-latex-convert:active {
+.btn-text-tool:active {
     color: #003d73;
     background-color: #bbdefb;
     transform: scale(0.98);
 }
 
-.latex-icon {
+.tool-icon {
     flex-shrink: 0;
 }
 
