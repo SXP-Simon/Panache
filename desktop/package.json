@@ -1,6 +1,6 @@
 {
   "name": "handwriting-desktop",
-  "version": "1.32.2",
+  "version": "1.34.0",
   "private": true,
   "description": "手写体生成器桌面版（Electron 外壳 + 内置后端）",
   "author": "liuweiqing",
@@ -9,8 +9,8 @@
     "start": "electron .",
     "build": "bash build.sh",
     "build:app": "bash build.sh --app-only",
-    "pack": "electron-builder --win --dir",
-    "dist": "electron-builder --win"
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "devDependencies": {
     "electron": "^33.4.11",
@@ -60,6 +60,26 @@
     },
     "portable": {
       "artifactName": "HandwritingWeb-portable-${version}.exe"
+    },
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "HandwritingWeb-${version}-${arch}.${ext}",
+      "identity": null
     }
   }
 }

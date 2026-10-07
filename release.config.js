@@ -4,16 +4,20 @@ module.exports = {
     "@semantic-release/commit-analyzer", // 分析提交信息，确定版本更新类型（major/minor/patch）
     "@semantic-release/release-notes-generator", // 根据提交生成 changelog
     "@semantic-release/changelog", // 更新 CHANGELOG.md
+    // 不配 assets：原先写的 dist/**/*.{js,css} 在仓库根根本不存在那个目录
+    // （前端产物在 frontend/dist 且被 .gitignore 忽略），从来没匹配到东西；
+    // 而 docs/**/* 只会把仓库里的截图挂上去，属于噪音。
+    // 桌面版的安装包/便携版由 .github/workflows/desktop_release.yml 单独上传。
+    "@semantic-release/github", // 发布到 GitHub，生成 Release
     [
-      "@semantic-release/github", // 发布到 GitHub，生成 Release
+      "@semantic-release/exec",
       {
-        assets: ["dist/**/*.{js,css}", "docs/**/*"], // 可发布的构建文件
-      },
-    ],
-    [
-      "@semantic-release/exec", // 把发版号同步到 desktop/package.json、desktop/package-lock.json、backend/VERSION
-      {
+        // prepare：把发版号同步到 desktop/package.json、desktop/package-lock.json、backend/VERSION
         prepareCmd: "node scripts/sync-version.js ${nextRelease.version}",
+        // success：给 Release 正文补上「哪个机器下哪个包」。
+        // 用 successCmd 而不是 publishCmd —— success 阶段跑在所有 publish 之后，
+        // 这时 @semantic-release/github 一定已经建好 Release 了，不依赖插件顺序。
+        successCmd: "node scripts/append-release-notes.js ${nextRelease.gitTag}",
       },
     ],
     [

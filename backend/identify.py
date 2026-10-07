@@ -47,6 +47,10 @@ def identify_distance(filename):
 
     # 直线检测
     lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
+    if lines is None:
+        lines = np.empty((0, 1, 4), dtype=np.int32)
+    else:
+        lines = lines.reshape(-1, 1, 4)
 
     lines = sorted(lines, key=lambda x: x[0][1])
 
@@ -59,7 +63,7 @@ def identify_distance(filename):
             angles.append(angle)
 
     # 计算平均角度
-    avg_angle = np.mean(angles)
+    avg_angle = np.mean(angles) if angles else 0.0
 
     # 得到旋转矩阵
     (h, w) = image.shape[:2]
@@ -85,6 +89,10 @@ def identify_distance(filename):
 
     # 直线检测
     lines_rotated = cv2.HoughLinesP(edges_rotated, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
+    if lines_rotated is None:
+        lines_rotated = np.empty((0, 1, 4), dtype=np.int32)
+    else:
+        lines_rotated = lines_rotated.reshape(-1, 1, 4)
 
     # 对直线的y坐标进行排序
     lines_rotated = sorted(lines_rotated, key=lambda x: x[0][1])

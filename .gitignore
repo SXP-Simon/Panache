@@ -41,3 +41,5 @@ backend/pandoc-*-macOS.pkg
 desktop/build/
 desktop/dist/
 preview_outputs/
+# 文档站构建产物（mkdocs build 默认输出到 site/）
+site/
