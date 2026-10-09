@@ -2,7 +2,16 @@
     <div id='text_file_select' class="d-flex justify-content-between" @keydown="handleContainerKeyDown">
         <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
             <label class="text-field-label m-0" for="textArea">{{ $t('message.text') }}:</label>
-            <div class="text-tools-group d-flex gap-2">
+            <div class="text-tools-group d-flex gap-2 align-items-center">
+                <select 
+                    v-model="tableMode" 
+                    class="form-select form-select-sm table-mode-select" 
+                    data-testid="table-mode-select"
+                    :title="$t('message.tableMode')">
+                    <option value="list">{{ $t('message.tableModeList') }}</option>
+                    <option value="aligned">{{ $t('message.tableModeAligned') }}</option>
+                    <option value="raw_pipe">{{ $t('message.tableModeRawPipe') }}</option>
+                </select>
                 <button 
                     type="button"
                     class="btn-text-tool"
@@ -87,6 +96,7 @@ export default {
             text: '',
             isLoading: false,
             selectedTextFileName: '',
+            tableMode: 'list', // 'list' | 'aligned' | 'raw_pipe'
             quickSymbols: ['⇒', '→', '∈', 'Σ', 'α', 'β', 'π', '²', '³', '√', '≤', '≥', '≠', '|'],
         };
     },
@@ -94,18 +104,29 @@ export default {
     watch: {
         text: function (val) {
             this.$emit('childEvent', val);
+        },
+        tableMode: function (val) {
+            localStorage.setItem('markdownTableMode', JSON.stringify(val));
         }
     },
     created() {
-        const localStorageItems = ['selectedTextFileName','text']
+        const localStorageItems = ['selectedTextFileName','text'];
         localStorageItems.forEach(item => {
             const value = localStorage.getItem(item);
             if (value !== null && value !== "undefined") {
                 this[item] = JSON.parse(value);
             } else {
-                console.log('localstorage缺失item:' + item)
+                console.log('localstorage缺失item:' + item);
             }
         });
+        const savedTableMode = localStorage.getItem('markdownTableMode');
+        if (savedTableMode) {
+            try {
+                this.tableMode = JSON.parse(savedTableMode);
+            } catch (e) {
+                this.tableMode = 'list';
+            }
+        }
     },
     methods: {
         handleManualInput() {
@@ -139,7 +160,7 @@ export default {
         },
         cleanMarkdownText() {
             if (!this.text) return;
-            const cleaned = cleanMarkdown(this.text);
+            const cleaned = cleanMarkdown(this.text, { tableMode: this.tableMode });
             this.replaceText(cleaned);
             this.$emit('manual-input');
             this.$emit('childEvent', this.text);
@@ -298,6 +319,24 @@ export default {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.table-mode-select {
+    padding: 2px 20px 2px 6px;
+    font-size: 0.76rem;
+    height: 26px;
+    border-radius: 5px;
+    border-color: #ced4da;
+    color: #495057;
+    background-color: #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.table-mode-select:focus {
+    border-color: #007BFF;
+    outline: none;
+    box-shadow: 0 0 0 0.15rem rgba(0, 123, 255, 0.25);
 }
 
 .btn-text-tool {
