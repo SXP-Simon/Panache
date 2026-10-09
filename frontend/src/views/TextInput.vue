@@ -39,6 +39,7 @@
         <textarea id="textArea" class="form-control" v-model="text" data-testid="text-input" 
             @input="handleManualInput"
             @keydown="handleTextareaKeyDown"
+            @paste="handlePaste"
             ref="textAreaRef"
             :aria-label="$t('message.text')" :placeholder="$t('message.enterText')"></textarea>
 
@@ -131,6 +132,28 @@ export default {
     methods: {
         handleManualInput() {
             this.$emit('manual-input');
+        },
+        handlePaste(e) {
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData || !clipboardData.items) return;
+
+            const items = clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile();
+                    if (file) {
+                        e.preventDefault();
+                        const reader = new FileReader();
+                        reader.onload = (uploadEvent) => {
+                            const base64Data = uploadEvent.target.result;
+                            const imageMarker = `\n![插图](${base64Data})\n`;
+                            this.insertSymbol(imageMarker);
+                        };
+                        reader.readAsDataURL(file);
+                        break;
+                    }
+                }
+            }
         },
         handleTextareaKeyDown(e) {
             // 当在输入框中按下 Ctrl+A (或 Mac 下 Cmd+A) 时，精准全选输入框内文本并阻止事件冒泡扩散到全页
