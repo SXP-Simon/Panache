@@ -167,12 +167,51 @@ const SUBSCRIPT_MAP = {
  * @param {string} text 输入文本（可包含 $...$、\mid、\frac、\sqrt 等）
  * @returns {string} 转换后的文本
  */
+// 只在线性化的数学区域中移除对齐符，避免删除正文中的 R&D 等文本。
+function cleanMathLayout(text) {
+  return text
+    .replace(/\\(?:text|mathrm|mathbf|mathit|operatorname)\{[^{}]*\}|\\&|&/g, token => token === '&' ? '' : token)
+    .replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n)?/g, '\n');
+}
+
+function stripMathLayout(text) {
+  // 这里只支持线性公式环境，不负责矩阵或分段函数的二维布局。
+  const environment = /\\begin\{(aligned|align\*?|equation\*?|gather\*?|gathered|multline\*?|split)\}(?:\[(?:t|c|b)\])?([\s\S]*?)\\end\{\1\}/g;
+  let s = text.replace(environment, (_, name, body) => cleanMathLayout(stripMathLayout(body)).trim());
+  s = s.replace(/\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$\$([\s\S]*?)\$\$|\$([^$\n]*?)\$/g,
+    (_, display, inline, dollars, single) => cleanMathLayout(display ?? inline ?? dollars ?? single).trim());
+  // 单独粘贴的公式行也可能没有 $ 包裹，行尾的 \\\\ 是换行而非正文。
+  return s.replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n|$)/g, '\n');
+}
+
+function unwrapBoxes(text) {
+  // 用括号深度匹配参数，支持 \\boxed{\\frac{a}{b}} 和多层 boxed。
+  const command = /\\(?:boxed|fbox)(?![a-zA-Z])\s*\{/g;
+  let result = '';
+  let cursor = 0;
+  let match;
+  while ((match = command.exec(text))) {
+    let depth = 1;
+    let end = command.lastIndex;
+    for (; end < text.length && depth > 0; end++) {
+      if (text[end] === '\\') { end++; continue; }
+      if (text[end] === '{') depth++;
+      if (text[end] === '}') depth--;
+    }
+    if (depth !== 0) continue; // 不完整的参数保留，不能截掉后续正文。
+    result += text.slice(cursor, match.index) + unwrapBoxes(text.slice(command.lastIndex, end - 1));
+    cursor = end;
+    command.lastIndex = end;
+  }
+  return result + text.slice(cursor);
+}
+
 export function convertLatexToUnicode(text) {
   if (!text || typeof text !== 'string') {
     return '';
   }
 
-  let s = text;
+  let s = unwrapBoxes(stripMathLayout(text));
 
   // 1. 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
   s = s.replace(/\\(text|mathrm|mathbf|mathit|operatorname|textbf|textit|textsf|texttt)\{([^{}]+)\}/g, '$2');
@@ -227,7 +266,7 @@ export function convertLatexToUnicode(text) {
   // 9. 清理孤立的反斜杠与多余空格
   s = s.replace(/\\([a-zA-Z]+)/g, '$1');
 
-  return s;
+  return s.replace(/\\&/g, '&');
 }
 
 /**
@@ -237,5 +276,5 @@ export function convertLatexToUnicode(text) {
  */
 export function hasLatexMarkup(text) {
   if (!text || typeof text !== 'string') return false;
-  return /\$|\\(mid|frac|sqrt|alpha|beta|Rightarrow|rightarrow|to|sum|prod|in|leq|geq|neq|text|mathrm)|\^\{|_\{/.test(text);
+  return /\$|\\(?:begin\{|end\{|boxed\b|fbox\b|[()[\]]|\\)|\\(mid|frac|sqrt|alpha|beta|Rightarrow|rightarrow|to|sum|prod|in|leq|geq|neq|text|mathrm)|\^\{|_\{/.test(text);
 }

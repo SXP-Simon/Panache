@@ -7,7 +7,8 @@
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint",
     "test:letter-format": "node tests/chineseLetterFormatter.test.js",
-    "test:clean-markdown": "node tests/cleanMarkdown.test.js"
+    "test:clean-markdown": "node tests/cleanMarkdown.test.js",
+    "test:latex-unicode": "node tests/latexToUnicode.test.js"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
