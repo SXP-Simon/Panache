@@ -42,10 +42,26 @@ test("strips blockquote markers and preserves text", async () => {
   assert.equal(output, "第一行引用\n第二行嵌套引用\n正常正文");
 });
 
-test("strips markdown table separators and neatly formats rows", async () => {
+test("strips markdown table separators and neatly formats rows in default list mode", async () => {
   const { cleanMarkdown } = await cleanModule;
   const input = "| 序号 | 名称 | 状态 |\n|:---|:---:|---:|\n| 1 | 产生式 | 正常 |\n| 2 | 文法 | 结束 |";
   const output = cleanMarkdown(input);
+  assert.equal(output, "【序号：1】 名称：产生式，状态：正常\n【序号：2】 名称：文法，状态：结束");
+});
+
+test("formats table in aligned mode", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const input = "| 序号 | 名称 | 状态 |\n|:---|:---:|---:|\n| 1 | 产生式 | 正常 |\n| 2 | 文法 | 结束 |";
+  const output = cleanMarkdown(input, { tableMode: "aligned" });
+  assert.ok(output.includes("序号"));
+  assert.ok(output.includes("产生式"));
+  assert.ok(!output.includes("|"));
+});
+
+test("formats table in raw_pipe mode", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const input = "| 序号 | 名称 | 状态 |\n|:---|:---:|---:|\n| 1 | 产生式 | 正常 |\n| 2 | 文法 | 结束 |";
+  const output = cleanMarkdown(input, { tableMode: "raw_pipe" });
   assert.equal(output, "序号 | 名称 | 状态\n1 | 产生式 | 正常\n2 | 文法 | 结束");
 });
 

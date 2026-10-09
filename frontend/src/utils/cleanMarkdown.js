@@ -5,14 +5,105 @@
  */
 
 /**
+ * 表格清洗格式化处理函数
+ * @param {string[]} tableLines 属于同一个表格的一组原始行
+ * @param {'list'|'aligned'|'raw_pipe'|'clean'} mode 处理模式
+ *  - 'list': 结构化清单展开模式（推荐抄写/笔记：【表头】项1: 值1，项2: 值2）
+ *  - 'aligned': 纯净对齐文本模式（剔除竖线，利用空格保持整齐排列）
+ *  - 'raw_pipe': 传统竖线分隔模式（列1 | 列2）
+ *  - 'clean': 彻底清除表格结构线，平铺内容
+ * @returns {string[]}
+ */
+export function formatMarkdownTable(tableLines, mode = 'list') {
+  if (!tableLines || tableLines.length === 0) return [];
+
+  const parsedRows = [];
+  for (const line of tableLines) {
+    // 忽略 Markdown 表格分隔线（如 |---|:---:|---:|）
+    if (/^[ \t]*\|?(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*:?-+:?[ \t]*\|?[ \t]*$/.test(line)) {
+      continue;
+    }
+    // 提取单元格文本
+    const rowContent = line
+      .replace(/^[ \t]*\|/, '')
+      .replace(/\|[ \t]*$/, '');
+    const cells = rowContent.split('|').map(c => c.trim());
+    if (cells.some(c => c.length > 0)) {
+      parsedRows.push(cells);
+    }
+  }
+
+  if (parsedRows.length === 0) return [];
+  if (parsedRows.length === 1 || mode === 'clean') {
+    return parsedRows.map(row => row.join('  '));
+  }
+
+  const headers = parsedRows[0];
+  const dataRows = parsedRows.slice(1);
+
+  if (mode === 'list') {
+    // 结构化清单展开：
+    // 第一列作为主项标题，其余列以键值对展开
+    return dataRows.map((row, rowIndex) => {
+      const primaryKey = headers[0] ? `${headers[0]}：${row[0] || (rowIndex + 1)}` : (row[0] || '');
+      const otherFields = [];
+      for (let i = 1; i < Math.max(headers.length, row.length); i++) {
+        const headerName = headers[i] || `列${i + 1}`;
+        const val = row[i] || '-';
+        otherFields.push(`${headerName}：${val}`);
+      }
+      return otherFields.length > 0
+        ? `【${primaryKey}】 ${otherFields.join('，')}`
+        : `【${primaryKey}】`;
+    });
+  }
+
+  if (mode === 'aligned') {
+    // 空格对齐模式：计算每列在东亚字符宽度下的最大宽度，用全角/半角空格填充
+    const colCount = Math.max(...parsedRows.map(r => r.length));
+    const colWidths = new Array(colCount).fill(0);
+
+    const getCharWidth = (str) => {
+      let width = 0;
+      for (let i = 0; i < str.length; i++) {
+        // 全角字符与中文字符记为 2，半角记为 1
+        width += str.charCodeAt(i) > 255 ? 2 : 1;
+      }
+      return width;
+    };
+
+    parsedRows.forEach(row => {
+      row.forEach((cell, colIndex) => {
+        colWidths[colIndex] = Math.max(colWidths[colIndex], getCharWidth(cell));
+      });
+    });
+
+    return parsedRows.map(row => {
+      return row.map((cell, colIndex) => {
+        const curWidth = getCharWidth(cell);
+        const padding = Math.max(0, colWidths[colIndex] - curWidth + 2);
+        return cell + ' '.repeat(padding);
+      }).join('').trimEnd();
+    });
+  }
+
+  // 默认为 raw_pipe 模式
+  return parsedRows.map(row => row.join(' | '));
+}
+
+/**
  * 清洗字符串中的 Markdown 标记，返回适合手写渲染的纯文本
  * @param {string} text 输入的 Markdown 文本
+ * @param {Object} [options] 清洗配置项
+ * @param {'list'|'aligned'|'raw_pipe'|'clean'} [options.tableMode='list'] 表格处理模式
  * @returns {string} 清洗后的纯文本
  */
-export function cleanMarkdown(text) {
+export function cleanMarkdown(text, options = {}) {
   if (!text || typeof text !== 'string') {
     return '';
   }
+
+  const tableMode = options.tableMode || 'list';
 
   let s = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -37,11 +128,32 @@ export function cleanMarkdown(text) {
   s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
   s = s.replace(/<([a-zA-Z]+:\/\/[^>]+)>/g, '$1');
 
-  // 6. 处理标题、引用、任务列表与表格行
+  // 6. 处理标题、引用、任务列表与表格
   const lines = s.split('\n');
   const cleanedLines = [];
+  let currentTableLines = [];
+
+  const flushTable = () => {
+    if (currentTableLines.length > 0) {
+      const formatted = formatMarkdownTable(currentTableLines, tableMode);
+      cleanedLines.push(...formatted);
+      currentTableLines = [];
+    }
+  };
+
+  const isTableRow = (line) => {
+    return /^[ \t]*\|.*\|[ \t]*$/.test(line) ||
+      /^[ \t]*\|?(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*:?-+:?[ \t]*\|?[ \t]*$/.test(line);
+  };
 
   for (let line of lines) {
+    if (isTableRow(line)) {
+      currentTableLines.push(line);
+      continue;
+    } else {
+      flushTable();
+    }
+
     // 6.1 剥离 Markdown 标题开头的 # 符号：# 标题 -> 标题
     line = line.replace(/^[ \t]*#{1,6}[ \t]+/, '');
 
@@ -51,28 +163,14 @@ export function cleanMarkdown(text) {
     // 6.3 剥离任务列表标记：- [ ] 待办 / - [x] 已办 -> - 待办
     line = line.replace(/^([ \t]*[-*+])[ \t]+\[[ xX]\][ \t]+/, '$1 ');
 
-    // 6.4 过滤 Markdown 表格分隔线（如 |---|---| 或 |:---:|---:|）
-    if (/^[ \t]*\|?(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*:?-+:?[ \t]*\|?[ \t]*$/.test(line)) {
-      continue;
-    }
-
-    // 6.5 规范化 Markdown 表格内容行：| 列1 | 列2 | -> 列1 | 列2
-    if (/^[ \t]*\|.*\|[ \t]*$/.test(line)) {
-      const cells = line
-        .replace(/^[ \t]*\|/, '')
-        .replace(/\|[ \t]*$/, '')
-        .split('|')
-        .map(c => c.trim());
-      line = cells.join(' | ');
-    }
-
-    // 6.6 保留独立分页标记 ---，其余形式的分隔线规范化为 ---
+    // 6.4 保留独立分页标记 ---，其余形式的分隔线规范化为 ---
     if (/^[ \t]*([*_-][ \t]*){3,}[ \t]*$/.test(line)) {
       line = '---';
     }
 
     cleanedLines.push(line);
   }
+  flushTable();
 
   s = cleanedLines.join('\n');
 
