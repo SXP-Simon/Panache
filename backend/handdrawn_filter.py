@@ -17,6 +17,29 @@ import numpy as np
 from PIL import Image
 
 
+def fit_image_to_layout(
+    image: Image.Image,
+    max_width: int,
+    max_height: int,
+) -> Image.Image:
+    """根据页面版心最大可用宽高，智能等比例缩放图片，避免超大图撑爆页面或侵占过多行数。
+
+    :param image: PIL 图像对象
+    :param max_width: 允许的最大宽度（如版心可用宽度）
+    :param max_height: 允许的最大高度（如页面可用高度的 40%~50%）
+    :return: 缩放后的 PIL.Image
+    """
+    w, h = image.size
+    if w <= max_width and h <= max_height:
+        return image
+
+    ratio = min(max_width / float(w), max_height / float(h))
+    new_w = max(1, int(w * ratio))
+    new_h = max(1, int(h * ratio))
+
+    return image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+
 def process_image_to_handdrawn(
     image_input: Union[bytes, Image.Image, np.ndarray],
     ink_color: Tuple[int, int, int] = (20, 20, 25),

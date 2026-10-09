@@ -25,3 +25,22 @@ def test_process_image_to_handdrawn_basic():
     assert np.count_nonzero(alpha == 0) > 10000
     # 线条像素应有非零 Alpha
     assert np.count_nonzero(alpha > 100) > 500
+
+
+def test_fit_image_to_layout():
+    from handdrawn_filter import fit_image_to_layout
+
+    # 1. 较小图片不缩放
+    small_img = Image.new("RGB", (300, 200))
+    res_small = fit_image_to_layout(small_img, max_width=800, max_height=600)
+    assert res_small.size == (300, 200)
+
+    # 2. 超大宽度图片按比例缩放
+    large_w_img = Image.new("RGB", (2000, 1000))
+    res_w = fit_image_to_layout(large_w_img, max_width=1000, max_height=800)
+    assert res_w.size == (1000, 500)
+
+    # 3. 超大高度图片按比例缩放
+    large_h_img = Image.new("RGB", (800, 1600))
+    res_h = fit_image_to_layout(large_h_img, max_width=1000, max_height=800)
+    assert res_h.size == (400, 800)
