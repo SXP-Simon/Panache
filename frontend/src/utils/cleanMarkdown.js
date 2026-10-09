@@ -42,19 +42,20 @@ export function formatMarkdownTable(tableLines, mode = 'list') {
   const dataRows = parsedRows.slice(1);
 
   if (mode === 'list') {
-    // 结构化清单展开：
-    // 第一列作为主项标题，其余列以键值对展开
+    // 结构化清单展开：符合手写笔记习惯，不使用印刷体粗黑中括号【】
+    // 格式如：1. 项名 (列1: 值1; 列2: 值2) 或直接自然短语
     return dataRows.map((row, rowIndex) => {
-      const primaryKey = headers[0] ? `${headers[0]}：${row[0] || (rowIndex + 1)}` : (row[0] || '');
+      const primaryVal = row[0] || (rowIndex + 1);
       const otherFields = [];
       for (let i = 1; i < Math.max(headers.length, row.length); i++) {
         const headerName = headers[i] || `列${i + 1}`;
         const val = row[i] || '-';
-        otherFields.push(`${headerName}：${val}`);
+        otherFields.push(`${headerName}: ${val}`);
       }
+      const prefix = `${rowIndex + 1}. ${headers[0] || '项'}: ${primaryVal}`;
       return otherFields.length > 0
-        ? `【${primaryKey}】 ${otherFields.join('，')}`
-        : `【${primaryKey}】`;
+        ? `${prefix} (${otherFields.join('; ')})`
+        : prefix;
     });
   }
 
