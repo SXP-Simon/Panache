@@ -89,6 +89,71 @@ def _find_fallback_font_files() -> List[str]:
     return candidates
 
 
+# 标准真分数及常用手写竖式分数字符与 (分子, 分母) 映射表
+_VULGAR_FRACTION_MAP = {
+    "½": ("1", "2"),
+    "⅓": ("1", "3"),
+    "⅔": ("2", "3"),
+    "¼": ("1", "4"),
+    "¾": ("3", "4"),
+    "⅕": ("1", "5"),
+    "⅖": ("2", "5"),
+    "⅗": ("3", "5"),
+    "⅘": ("4", "5"),
+    "⅙": ("1", "6"),
+    "⅚": ("5", "6"),
+    "⅛": ("1", "8"),
+    "⅜": ("3", "8"),
+    "⅝": ("5", "8"),
+    "⅞": ("7", "8"),
+    # PUA 扩充手写常用分数：⁴⁄₃, ⅑, ⅒ 等
+    "\ue001": ("4", "3"),
+    "\ue002": ("1", "9"),
+    "\ue003": ("1", "10"),
+}
+
+
+def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
+    """按真实手写规范绘制上下结构的竖式分数（分子、居中分数横线、分母）。"""
+    import handright._core as core
+
+    num, denom = _VULGAR_FRACTION_MAP[char]
+    font_path = getattr(font, "path", None)
+    font_size = getattr(font, "size", 30)
+
+    # 分子和分母采用缩小子号（约 0.58 倍主字号），符合手写行内竖式分数比例
+    sub_size = max(10, int(font_size * 0.58))
+    try:
+        f_sub = ImageFont.truetype(font_path, sub_size) if font_path else font
+    except Exception:
+        f_sub = font
+
+    nb = f_sub.getbbox(num)
+    nw, nh = nb[2] - nb[0], nb[3] - nb[1]
+    db = f_sub.getbbox(denom)
+    dw, dh = db[2] - db[0], db[3] - db[1]
+
+    line_w = max(nw, dw) + 6
+    x, y = xy
+
+    # 分数线位置: 位于当前字符单元的垂直黄金分割位置（对齐文字基线）
+    line_y = y + int(font_size * 0.52)
+    line_thickness = max(1, int(font_size * 0.05))
+    draw.line([(x, line_y), (x + line_w, line_y)], fill=core._WHITE, width=line_thickness)
+
+    # 分子: 紧挨分数线正上方
+    nx = x + (line_w - nw) // 2 - nb[0]
+    ny = line_y - nh - 1 - nb[1]
+    draw.text((nx, ny), num, fill=core._WHITE, font=f_sub)
+
+    # 分母: 紧挨分数线正下方
+    dx = x + (line_w - dw) // 2 - db[0]
+    dy = line_y + line_thickness + 1 - db[1]
+    draw.text((dx, dy), denom, fill=core._WHITE, font=f_sub)
+
+    return line_w + 4
+
+
 def init_glyph_fallback_engine():
     """初始化底层 handright 绘制引擎的真实字形 Fallback 挂载。"""
     global _ENGINE_INITIALIZED, _FALLBACK_FONTS_POOL
@@ -121,6 +186,10 @@ def init_glyph_fallback_engine():
             if char in (" ", "\t", "\n"):
                 return orig_draw_char(draw, char, xy, font)
 
+            # 优先拦截上下结构的真实手写分数
+            if char in _VULGAR_FRACTION_MAP:
+                return _draw_vertical_fraction(draw, char, xy, font)
+
             left, top, right, bottom = font.getbbox(char)
             # 若主字体获取该非空格字符的宽度或高度为 0（即主字库缺失该 Glyph 或为空白占位符）
             if (right - left == 0) or (bottom - top == 0):
@@ -145,6 +214,7 @@ def init_glyph_fallback_engine():
         logger.warning(f"挂载字形 Fallback 引擎失败: {e}")
 
     _ENGINE_INITIALIZED = True
+
 
 
 # 模块导入时自动初始化

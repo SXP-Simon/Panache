@@ -232,6 +232,28 @@ function unwrapBoxes(text) {
   return result + text.slice(cursor);
 }
 
+// 常见数字手写真分数映射（映射到底层手写竖式分数渲染器）
+const VULGAR_FRACTION_MAP = {
+  '1/2': '½',
+  '1/3': '⅓',
+  '2/3': '⅔',
+  '1/4': '¼',
+  '3/4': '¾',
+  '1/5': '⅕',
+  '2/5': '⅖',
+  '3/5': '⅗',
+  '4/5': '⅘',
+  '1/6': '⅙',
+  '5/6': '⅚',
+  '1/8': '⅛',
+  '3/8': '⅜',
+  '5/8': '⅝',
+  '7/8': '⅞',
+  '4/3': '\ue001',
+  '1/9': '\ue002',
+  '1/10': '\ue003',
+};
+
 function unwrapFractions(text) {
   // 基于深度平衡匹配参数，彻底解决多层嵌套分式解析失败的问题：\frac{4\pi R^2 dR}{\frac{4}{3}\pi R^3}
   const fracPattern = /\\(?:frac|dfrac|tfrac)(?![a-zA-Z])\s*\{/g;
@@ -269,16 +291,21 @@ function unwrapFractions(text) {
     const denominator = text.slice(denomStart + 1, denomEnd - 1);
 
     // 递归解析分子和分母内部的嵌套分式
-    const parsedNum = unwrapFractions(numerator);
-    const parsedDenom = unwrapFractions(denominator);
+    const parsedNum = unwrapFractions(numerator).trim();
+    const parsedDenom = unwrapFractions(denominator).trim();
 
-    result += text.slice(cursor, match.index) + `(${parsedNum})/(${parsedDenom})`;
+    // 若分子分母属于常见手写简单分数，直接转换为真分数上下竖式字形
+    const fracKey = `${parsedNum}/${parsedDenom}`;
+    const replacement = VULGAR_FRACTION_MAP[fracKey] || `(${parsedNum})/(${parsedDenom})`;
+
+    result += text.slice(cursor, match.index) + replacement;
     cursor = denomEnd;
     fracPattern.lastIndex = denomEnd;
   }
 
   return result + text.slice(cursor);
 }
+
 
 export function convertLatexToUnicode(text) {
   if (!text || typeof text !== 'string') {
