@@ -17,6 +17,8 @@ async function run() {
     ['literal ampersand', String.raw`$\text{R&D}\quad A\&B$`, 'R&D   A&B'],
     ['plain prose', 'R&D，https://example.com/a//b，a/b，普通正文。', 'R&D，https://example.com/a//b，a/b，普通正文。'],
     ['invalid box retains content', String.raw`\boxed{x+1 后面的正文`, 'boxed{x+1 后面的正文'],
+    ['pmatrix matrix', String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`, '( 1  2 ; 3  4 )'],
+    ['bmatrix matrix', String.raw`\begin{bmatrix}a & b \\ c & d\end{bmatrix}`, '[ a  b ; c  d ]'],
   ];
   for (const [name, input, expected] of cases) {
     assert.equal(convert(input), expected, name);

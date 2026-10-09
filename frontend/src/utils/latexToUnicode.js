@@ -174,10 +174,36 @@ function cleanMathLayout(text) {
     .replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n)?/g, '\n');
 }
 
+// 处理矩阵环境：将二维 & 与 \\ 布局转为带括号或方括号的数学表达
+function flattenMatrixLayout(name, body) {
+  const openBracket = name === 'pmatrix' ? '(' : name === 'bmatrix' ? '[' : name === 'Bmatrix' ? '{' : name === 'vmatrix' || name === 'Vmatrix' ? '|' : '[';
+  const closeBracket = name === 'pmatrix' ? ')' : name === 'bmatrix' ? ']' : name === 'Bmatrix' ? '}' : name === 'vmatrix' || name === 'Vmatrix' ? '|' : ']';
+  
+  // 替换矩阵内部换行符 \\
+  const cleanedRowsText = body.replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n)?/g, '\n');
+  const rows = cleanedRowsText.split('\n')
+    .map(r => r.trim())
+    .filter(r => r.length > 0);
+  
+  if (rows.length === 0) return `${openBracket}${closeBracket}`;
+  
+  const formattedRows = rows.map(r => {
+    // 按列分割 &
+    const cols = r.split('&').map(c => c.trim()).filter(c => c.length > 0);
+    return cols.join('  ');
+  });
+
+  return `${openBracket} ${formattedRows.join(' ; ')} ${closeBracket}`;
+}
+
 function stripMathLayout(text) {
-  // 这里只支持线性公式环境，不负责矩阵或分段函数的二维布局。
+  // 1. 矩阵环境降级平铺：matrix, pmatrix, bmatrix, Bmatrix, vmatrix, Vmatrix
+  const matrixEnv = /\\begin\{(matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix)\}(?:\[(?:t|c|b)\])?([\s\S]*?)\\end\{\1\}/g;
+  let s = text.replace(matrixEnv, (_, name, body) => flattenMatrixLayout(name, body));
+
+  // 2. 线性多行公式环境
   const environment = /\\begin\{(aligned|align\*?|equation\*?|gather\*?|gathered|multline\*?|split)\}(?:\[(?:t|c|b)\])?([\s\S]*?)\\end\{\1\}/g;
-  let s = text.replace(environment, (_, name, body) => cleanMathLayout(stripMathLayout(body)).trim());
+  s = s.replace(environment, (_, name, body) => cleanMathLayout(stripMathLayout(body)).trim());
   s = s.replace(/\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$\$([\s\S]*?)\$\$|\$([^$\n]*?)\$/g,
     (_, display, inline, dollars, single) => cleanMathLayout(display ?? inline ?? dollars ?? single).trim());
   // 单独粘贴的公式行也可能没有 $ 包裹，行尾的 \\\\ 是换行而非正文。
