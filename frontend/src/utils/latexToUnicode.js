@@ -232,12 +232,61 @@ function unwrapBoxes(text) {
   return result + text.slice(cursor);
 }
 
+function unwrapFractions(text) {
+  // 基于深度平衡匹配参数，彻底解决多层嵌套分式解析失败的问题：\frac{4\pi R^2 dR}{\frac{4}{3}\pi R^3}
+  const fracPattern = /\\(?:frac|dfrac|tfrac)(?![a-zA-Z])\s*\{/g;
+  let result = '';
+  let cursor = 0;
+  let match;
+
+  while ((match = fracPattern.exec(text))) {
+    // 1. 匹配分子
+    let depth = 1;
+    let numEnd = fracPattern.lastIndex;
+    for (; numEnd < text.length && depth > 0; numEnd++) {
+      if (text[numEnd] === '\\') { numEnd++; continue; }
+      if (text[numEnd] === '{') depth++;
+      if (text[numEnd] === '}') depth--;
+    }
+    if (depth !== 0) continue;
+    const numerator = text.slice(fracPattern.lastIndex, numEnd - 1);
+
+    // 2. 匹配分母（紧跟在后面的花括号）
+    let denomStart = numEnd;
+    while (denomStart < text.length && /\s/.test(text[denomStart])) {
+      denomStart++;
+    }
+    if (text[denomStart] !== '{') continue;
+
+    depth = 1;
+    let denomEnd = denomStart + 1;
+    for (; denomEnd < text.length && depth > 0; denomEnd++) {
+      if (text[denomEnd] === '\\') { denomEnd++; continue; }
+      if (text[denomEnd] === '{') depth++;
+      if (text[denomEnd] === '}') depth--;
+    }
+    if (depth !== 0) continue;
+    const denominator = text.slice(denomStart + 1, denomEnd - 1);
+
+    // 递归解析分子和分母内部的嵌套分式
+    const parsedNum = unwrapFractions(numerator);
+    const parsedDenom = unwrapFractions(denominator);
+
+    result += text.slice(cursor, match.index) + `(${parsedNum})/(${parsedDenom})`;
+    cursor = denomEnd;
+    fracPattern.lastIndex = denomEnd;
+  }
+
+  return result + text.slice(cursor);
+}
+
 export function convertLatexToUnicode(text) {
   if (!text || typeof text !== 'string') {
     return '';
   }
 
   let s = unwrapBoxes(stripMathLayout(text));
+  s = unwrapFractions(s);
 
   // 1. 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
   s = s.replace(/\\(text|mathrm|mathbf|mathit|operatorname|textbf|textit|textsf|texttt)\{([^{}]+)\}/g, '$2');
@@ -248,17 +297,13 @@ export function convertLatexToUnicode(text) {
 
   // 3. 替换标准宏命令与特殊符号
   for (const [cmd, sym] of Object.entries(LATEX_SYMBOL_MAP)) {
-    const escapedCmd = cmd.replace(/([\\|{}])/g, '\\$1');
-    // 对于字母结尾的命令，使用单词边界；非字母结尾直接替换
-    const isWordCmd = /[a-zA-Z]$/.test(cmd);
-    const regex = isWordCmd ? new RegExp(escapedCmd + '(?![a-zA-Z])', 'g') : new RegExp(escapedCmd, 'g');
+    // 准确匹配形如 \varepsilon, \pi, \le, \| 的宏命令
+    const cleanCmd = cmd.replace(/^\\+/, '');
+    const isWordCmd = /[a-zA-Z]$/.test(cleanCmd);
+    const escaped = cleanCmd.replace(/([|{}[\]()])/g, '\\$1');
+    const regex = isWordCmd ? new RegExp('\\\\' + escaped + '(?![a-zA-Z])', 'g') : new RegExp('\\\\' + escaped, 'g');
     s = s.replace(regex, sym);
   }
-
-  // 4. 替换分式 \frac{a}{b} -> (a)/(b)
-  s = s.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '($1)/($2)');
-  s = s.replace(/\\dfrac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '($1)/($2)');
-  s = s.replace(/\\tfrac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '($1)/($2)');
 
   // 5. 替换根号 \sqrt{x} -> √(x), \sqrt[n]{x} -> ⁿ√(x)
   s = s.replace(/\\sqrt\s*\[([^{}]+)\]\s*\{([^{}]+)\}/g, (match, n, inner) => {
@@ -289,7 +334,8 @@ export function convertLatexToUnicode(text) {
   // 8. 清理多余的 LaTeX 空格调整符（如 \, \: \; \! 等）
   s = s.replace(/\\[,;:! ]/g, ' ');
 
-  // 9. 清理孤立的反斜杠与多余空格
+  // 9. 清理转义百分号与其它转义符号
+  s = s.replace(/\\%/g, '%');
   s = s.replace(/\\([a-zA-Z]+)/g, '$1');
 
   return s.replace(/\\&/g, '&');
