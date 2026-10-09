@@ -43,9 +43,11 @@ from uuid import uuid4
 
 try:
     from docx_extractor import extract_text_from_docx
+    from handdrawn_filter import render_inline_markdown_images
     from symbol_fallback import normalize_text_for_font
 except ImportError:
     from backend.docx_extractor import extract_text_from_docx
+    from backend.handdrawn_filter import render_inline_markdown_images
     from backend.symbol_fallback import normalize_text_for_font
 from werkzeug.utils import secure_filename
 
@@ -660,7 +662,7 @@ def handwrite_with_page_breaks(text, template, font_path=None):
     aligned = apply_right_align(normalized, template)
 
     if not _PAGE_BREAK_RE.search(aligned):
-        return handwrite(aligned, template)
+        return render_inline_markdown_images(aligned, template, handwrite)
 
     raw_chunks = _PAGE_BREAK_RE.split(aligned)
     chunks = []
@@ -677,10 +679,11 @@ def handwrite_with_page_breaks(text, template, font_path=None):
     logger.info("manual page break detected: %s chunk(s)", len(chunks))
 
     if not chunks:
-        return handwrite("", template)
+        return render_inline_markdown_images("", template, handwrite)
     return itertools.chain.from_iterable(
-        handwrite(chunk, template) for chunk in chunks
+        render_inline_markdown_images(chunk, template, handwrite) for chunk in chunks
     )
+
 
 
 def handle_exceptions(f):

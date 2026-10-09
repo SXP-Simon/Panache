@@ -9,12 +9,26 @@
 4. 将白色/浅色背景透明化（RGBA），便于自然贴合在背景纸张或手写排版流中。
 """
 
+import base64
 import io
 import random
-from typing import Tuple, Union
+import re
+from typing import Optional, Tuple, Union
 import cv2
 import numpy as np
 from PIL import Image
+
+
+def decode_base64_image(image_str: str) -> Optional[Image.Image]:
+    """从 Markdown 图片中包含的 base64 编码字符串或 Data URL 中安全解码 PIL.Image。"""
+    try:
+        if "," in image_str:
+            image_str = image_str.split(",", 1)[1]
+        raw_bytes = base64.b64decode(image_str)
+        return Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+    except Exception:
+        return None
+
 
 
 def fit_image_to_layout(
@@ -125,3 +139,140 @@ def process_image_to_handdrawn(
 
     rgba = np.dstack([r_channel, g_channel, b_channel, alpha_channel])
     return Image.fromarray(rgba, mode="RGBA")
+
+
+def get_rendered_ink_bottom_y(image: Image.Image, background: Image.Image) -> int:
+    """对比渲染结果与原始底图，检测当前页面最后一行墨迹字符的最低 Y 坐标。"""
+    try:
+        im_arr = np.array(image)
+        bg_arr = np.array(background)
+        # 计算 RGB 差异
+        diff = np.abs(im_arr.astype(np.int16) - bg_arr.astype(np.int16))
+        # 差异显著的点即为绘制的墨迹
+        ink_mask = np.any(diff > 15, axis=2)
+        y_indices, _ = np.where(ink_mask)
+        if len(y_indices) > 0:
+            return int(np.max(y_indices))
+    except Exception:
+        pass
+    return 0
+
+
+# 匹配 Markdown 图片标记 ![alt](data:image/... 或 url/base64)
+MARKDOWN_IMAGE_RE = re.compile(
+    r"!\[(.*?)\]\(((?:data:image\/[^;]+;base64,)?[A-Za-z0-9+/=\s]+)\)",
+    re.DOTALL,
+)
+
+
+def render_inline_markdown_images(
+    text: str,
+    template,
+    handwrite_fn,
+) -> list:
+    """解析 Markdown 中的插图标记，将文本与插图进行手写与墨水线稿智能排版合成。
+    
+    当文本不包含图片标记时，直接调用 handwrite_fn(text, template)。
+    当文本包含图片标记时，按图片将内容划分为多个片段，并在上一段文本下方对齐贴合插图，
+    消除文字与插图重叠碰撞问题。
+    """
+    if not MARKDOWN_IMAGE_RE.search(text):
+        return handwrite_fn(text, template)
+
+    # 解析文本片段与图片列表
+    parts = []
+    last_end = 0
+    for match in MARKDOWN_IMAGE_RE.finditer(text):
+        before_text = text[last_end:match.start()]
+        img_data = match.group(2).strip()
+        parts.append(("text", before_text))
+        parts.append(("image", img_data))
+        last_end = match.end()
+    remaining = text[last_end:]
+    if remaining:
+        parts.append(("text", remaining))
+
+    bg_orig = template.get_background()
+    width, height = bg_orig.size
+    top_margin_orig = template.get_top_margin()
+    bottom_margin = template.get_bottom_margin()
+    left_margin = template.get_left_margin()
+    right_margin = template.get_right_margin()
+    line_spacing = template.get_line_spacing()
+
+    usable_width = width - left_margin - right_margin
+    max_img_height = int((height - top_margin_orig - bottom_margin) * 0.45)
+
+    all_pages = []
+    current_canvas = bg_orig.copy()
+    current_top = top_margin_orig
+    page_dirty = False
+
+    def clone_template_with_top(base_tpl, canvas, top_val):
+        new_tpl = copy.copy(base_tpl)
+        new_tpl.set_background(canvas)
+        new_tpl.set_top_margin(top_val)
+        return new_tpl
+
+    import copy
+
+    for part_type, content in parts:
+        if part_type == "text":
+            if not content.strip():
+                continue
+            # 渲染当前文本片段
+            sub_tpl = clone_template_with_top(template, current_canvas, current_top)
+            rendered_sub = list(handwrite_fn(content, sub_tpl))
+            if not rendered_sub:
+                continue
+
+            if len(rendered_sub) == 1:
+                # 仍在当前页
+                current_canvas = rendered_sub[0]
+                page_dirty = True
+                ink_bottom = get_rendered_ink_bottom_y(current_canvas, bg_orig)
+                current_top = max(current_top, ink_bottom + line_spacing)
+            else:
+                # 文本跨页，已填满前面页面
+                all_pages.extend(rendered_sub[:-1])
+                current_canvas = rendered_sub[-1]
+                page_dirty = True
+                ink_bottom = get_rendered_ink_bottom_y(current_canvas, bg_orig)
+                current_top = max(top_margin_orig, ink_bottom + line_spacing)
+
+        elif part_type == "image":
+            raw_img = decode_base64_image(content)
+            if raw_img is None:
+                continue
+
+            # 转换为透明墨水手绘风格
+            hd_img = process_image_to_handdrawn(raw_img)
+            # 自适应页面版心缩放
+            fitted_img = fit_image_to_layout(
+                hd_img, max_width=usable_width, max_height=max_img_height
+            )
+            img_w, img_h = fitted_img.size
+
+            # 检查当前页剩余空间是否放得下该图片
+            if current_top + img_h > height - bottom_margin:
+                # 空间不足，当前页落版翻页
+                if page_dirty:
+                    all_pages.append(current_canvas)
+                current_canvas = bg_orig.copy()
+                current_top = top_margin_orig
+                page_dirty = False
+
+            # 将图片居中粘贴在版心横向区域
+            paste_x = left_margin + max(0, (usable_width - img_w) // 2)
+            paste_y = current_top
+            current_canvas.paste(fitted_img, (paste_x, paste_y), fitted_img)
+            page_dirty = True
+
+            # 更新下一段文字的起始 top_margin，向下推移图片高度加上整行行间距
+            current_top = paste_y + img_h + line_spacing
+
+    if page_dirty:
+        all_pages.append(current_canvas)
+
+    return all_pages if all_pages else [bg_orig.copy()]
+
