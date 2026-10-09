@@ -237,7 +237,8 @@ Release 上只剩 Windows 的两个 exe。脚本按**单个文件**退避重试�
 
 ## 编码约定
 
-- **Commit message**: 必须遵循 [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` / `fix:` / `chore:` 等)，semantic-release 靠它决定版本号
+- **Commit message**: 必须遵循 [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` / `fix:` / `chore:` / `test:` / `refactor:` 等)，建议冒号后使用**清晰的中文描述**（例如：`feat(markdown): 支持表格多模式转换与条目列表清洗`、`fix(latex): 修复复杂矩阵环境降级换行`），semantic-release 依靠前缀类型自动计算版本号
+- **原子化提交 (Atomic Commits)**: 每个提交只聚焦一个独立的逻辑变更或功能点，避免将无关改动混在同一提交中；每次提交需保证测试绿灯，便于 code review、cherry-pick 和回滚
 - **分支**: 只推到 `main`，不要直接 push（通过 PR）
 - **i18n**: 所有用户可见文字必须同时提供中英文翻译，在 `frontend/src/i18n.js` 中添加
 - **UI 风格**: 新增/改版的界面必须复用站点既有设计语言，不要自带一套配色 —— 主按钮 `#007BFF`（hover `#0056b3`、active `#003d73`）、圆角 `5px`、字体沿用全局 `Avenir, Helvetica, Arial, sans-serif`、面板阴影 `0 2px 5px rgba(0,0,0,0.1)`、输入框边框 `1px solid #ddd`。参考 `HomeView.vue` 的 `.action-btn`（顶栏按钮）与 `.letter-format-button`
