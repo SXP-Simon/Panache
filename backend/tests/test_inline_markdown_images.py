@@ -50,6 +50,23 @@ class InlineMarkdownImageTest(unittest.TestCase):
         self.assertLessEqual(fitted.size[0], 500)
         self.assertLessEqual(fitted.size[1], 300)
 
+    def test_fit_image_to_layout_enlarges_small_image(self):
+        small_img = Image.new("RGB", (100, 60), (255, 255, 255))
+        # 放大 1.5 倍
+        fitted = fit_image_to_layout(small_img, max_width=500, max_height=300, scale=1.5)
+        self.assertEqual(fitted.size[0], 150)
+        self.assertEqual(fitted.size[1], 90)
+
+        # 放大 2.0 倍
+        fitted_2x = fit_image_to_layout(small_img, max_width=500, max_height=300, scale=2.0)
+        self.assertEqual(fitted_2x.size[0], 200)
+        self.assertEqual(fitted_2x.size[1], 120)
+
+        # 放大超过版心时截断在版心内
+        fitted_clamped = fit_image_to_layout(small_img, max_width=120, max_height=300, scale=2.0)
+        self.assertEqual(fitted_clamped.size[0], 120)
+        self.assertEqual(fitted_clamped.size[1], 72)
+
     def test_render_inline_markdown_images_with_handwrite(self):
         bg = Image.new("RGB", (600, 800), (255, 255, 255))
 
@@ -98,6 +115,9 @@ class InlineMarkdownImageTest(unittest.TestCase):
         self.assertAlmostEqual(_parse_image_scale("插图 1|30%"), 0.3)
         self.assertAlmostEqual(_parse_image_scale("插图 1|scale=0.75"), 0.75)
         self.assertAlmostEqual(_parse_image_scale("插图 1|100%"), 1.0)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|150%"), 1.5)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|200%"), 2.0)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|scale=1.8"), 1.8)
 
 
 

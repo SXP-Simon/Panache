@@ -35,23 +35,33 @@ def fit_image_to_layout(
     image: Image.Image,
     max_width: int,
     max_height: int,
+    scale: float = 1.0,
 ) -> Image.Image:
-    """根据页面版心最大可用宽高，智能等比例缩放图片，避免超大图撑爆页面或侵占过多行数。
+    """根据目标缩放比例及页面版心最大可用宽高，智能等比例缩放图片（支持放大与缩小）。
 
     :param image: PIL 图像对象
-    :param max_width: 允许的最大宽度（如版心可用宽度）
-    :param max_height: 允许的最大高度（如页面可用高度的 40%~50%）
+    :param max_width: 版心允许的最大物理宽度
+    :param max_height: 页面允许的最大物理高度
+    :param scale: 用户指定的尺寸比例因子（例如 0.5 缩小，1.5 放大，默认 1.0）
     :return: 缩放后的 PIL.Image
     """
     w, h = image.size
-    if w <= max_width and h <= max_height:
+    if w <= 0 or h <= 0:
         return image
 
-    ratio = min(max_width / float(w), max_height / float(h))
-    new_w = max(1, int(w * ratio))
-    new_h = max(1, int(h * ratio))
+    # 首先根据用户指定的 scale 缩放原始图
+    target_w = float(w) * scale
+    target_h = float(h) * scale
 
-    return image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    # 接着以版心可用宽高为硬性上限进行限制，确保绝不撑爆版面
+    ratio = min(max_width / target_w, max_height / target_h, 1.0)
+    final_w = max(1, int(target_w * ratio))
+    final_h = max(1, int(target_h * ratio))
+
+    if final_w == w and final_h == h:
+        return image
+
+    return image.resize((final_w, final_h), Image.Resampling.LANCZOS)
 
 
 def process_image_to_handdrawn(
@@ -166,7 +176,7 @@ MARKDOWN_IMAGE_RE = re.compile(
 
 
 def _parse_image_scale(alt_text: str) -> float:
-    """从 alt 文本中解析缩放比例（如 '插图 1|50%'、'插图 1|scale=0.6' 或 '30%'），默认 1.0 (100%)。"""
+    """从 alt 文本中解析缩放比例（如 '插图 1|50%'、'插图 1|150%'、'插图 1|scale=1.5' 或 '200%'），默认 1.0 (100%)。"""
     if not alt_text or "|" not in alt_text:
         return 1.0
     try:
@@ -176,16 +186,16 @@ def _parse_image_scale(alt_text: str) -> float:
             pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", param)
             if pct_match:
                 pct = float(pct_match.group(1))
-                return max(0.1, min(1.0, pct / 100.0))
+                return max(0.1, min(2.5, pct / 100.0))
         scale_match = re.search(r"(?:scale\s*=\s*|w\s*=\s*)?(\d+(?:\.\d+)?)", param)
         if scale_match:
             val = float(scale_match.group(1))
-            if val > 1.0:
-                # 可能是百分比整数如 50
-                if val <= 100.0:
-                    return max(0.1, min(1.0, val / 100.0))
+            if val > 2.5:
+                # 可能是百分比整数如 150 或 200
+                if val <= 250.0:
+                    return max(0.1, min(2.5, val / 100.0))
             else:
-                return max(0.1, min(1.0, val))
+                return max(0.1, min(2.5, val))
     except Exception:
         pass
     return 1.0
@@ -275,11 +285,12 @@ def render_inline_markdown_images(
 
             # 转换为透明墨水手绘风格
             hd_img = process_image_to_handdrawn(raw_img)
-            # 自适应页面版心缩放，根据 scale 调节最大允许宽度
-            target_max_width = max(50, int(usable_width * scale))
-            target_max_height = max(50, int(max_img_height * scale))
+            # 自适应页面版心缩放（支持放大/缩小），同时不超过版心可用边界
             fitted_img = fit_image_to_layout(
-                hd_img, max_width=target_max_width, max_height=target_max_height
+                hd_img,
+                max_width=usable_width,
+                max_height=max_img_height,
+                scale=scale,
             )
             img_w, img_h = fitted_img.size
 

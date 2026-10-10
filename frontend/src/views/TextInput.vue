@@ -145,12 +145,12 @@
                                     type="range" 
                                     class="form-range flex-grow-1" 
                                     min="20" 
-                                    max="100" 
+                                    max="200" 
                                     step="5"
                                     :value="numericScaleValue"
                                     @input="handleScaleSliderChange"
                                     data-testid="scale-slider" />
-                                <span class="small text-muted font-monospace">100%</span>
+                                <span class="small text-muted font-monospace">200%</span>
                             </div>
                         </div>
                     </div>
@@ -243,6 +243,8 @@ export default {
                 { label: '50%', value: '50%' },
                 { label: '75%', value: '75%' },
                 { label: '100%', value: '100%' },
+                { label: '150%', value: '150%' },
+                { label: '200%', value: '200%' },
             ],
         };
     },
