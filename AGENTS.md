@@ -62,24 +62,23 @@ handwriting-web/
 
 ```bash
 # 前端 (端口 8080, 自动代理 /api 到后端)
-cd frontend && npm run serve
+pnpm --filter handwrite run serve
+# 或者在 frontend 目录下: cd frontend && pnpm run serve
 
 # 后端 (端口 5005, 热重载)
-# 下面是 bash / Git Bash 写法 (本项目 .vscode/tasks.json 用的 cmd.exe 同样支持 &&;
-# PowerShell 5.1 不支持 &&, 需要把每条命令拆开单独执行)
-# 首次先在仓库根建 venv 并装依赖:
-#   Windows:      python -m venv venv && venv/Scripts/python.exe -m pip install -r backend/requirements.txt
-#   Linux/macOS:  python3 -m venv venv && venv/bin/python -m pip install -r backend/requirements.txt
-# 启动时必须用这个 venv, 不要用系统 Python —— 系统环境 fastapi 0.115.6 + starlette 1.3.1 起不来,
-# 报 TypeError: Router.__init__() got an unexpected keyword argument 'on_startup'
-cd backend && ../venv/Scripts/python.exe -m uvicorn app:app --reload --host 0.0.0.0 --port 5005
-#            Linux/macOS 换成 ../venv/bin/python
+# 首次在仓库根目录使用 uv 一键同步依赖与虚拟环境:
+#   uv sync
+# 启动后端:
+#   Windows:      cd backend && ../.venv/Scripts/python.exe -m uvicorn app:app --reload --host 0.0.0.0 --port 5005
+#   Linux/macOS:  cd backend && ../.venv/bin/python -m uvicorn app:app --reload --host 0.0.0.0 --port 5005
+# 或者使用 uv 托管执行:
+#   cd backend && uv run --directory .. uvicorn app:app --reload --host 0.0.0.0 --port 5005
 
 # 或使用 VS Code Tasks:
 #   "⚡ 全栈开发 - 同时启动前后端"
 
-# E2E 测试 (Playwright, 自动拉起前后端; 首次先 npm install && npx playwright install chromium)
-cd e2e && npm test
+# E2E 测试 (Playwright, 自动拉起前后端; 首次先 pnpm --filter handwriting-web-e2e exec playwright install chromium)
+pnpm --filter handwriting-web-e2e run test
 ```
 
 ## 桌面版 (Windows / macOS)

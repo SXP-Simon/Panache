@@ -13,10 +13,11 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^33.4.11",
+    "electron": "33.4.11",
     "electron-builder": "^25.1.8"
   },
   "build": {
+    "electronVersion": "33.4.11",
     "appId": "top.liuweiqing.handwriting",
     "productName": "HandwritingWeb",
     "directories": {

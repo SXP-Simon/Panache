@@ -4,14 +4,10 @@
     {
       "label": "frontend",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "serve"],
+      "command": "pnpm",
+      "args": ["--filter", "handwrite", "run", "serve"],
       "options": {
-        "cwd": "${workspaceFolder}/frontend",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "group": "build",
       "isBackground": true,
@@ -43,7 +39,7 @@
       "label": "backend",
       "type": "shell",
       // uvicorn app:app --reload
-      "command": "${workspaceFolder}/venv/Scripts/python.exe",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
       "args": [
         "-m",
         "uvicorn",
@@ -101,14 +97,10 @@
     {
       "label": "📦 安装前端依赖",
       "type": "shell",
-      "command": "${workspaceFolder}\\node_modules\\.bin\\npm.cmd",
+      "command": "pnpm",
       "args": ["install"],
       "options": {
-        "cwd": "${workspaceFolder}/frontend",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "group": "build",
       "presentation": {
@@ -124,14 +116,10 @@
     {
       "label": "🐍 安装后端依赖",
       "type": "shell",
-      "command": "${workspaceFolder}\\venv\\Scripts\\pip.exe",
-      "args": ["install", "-r", "requirements.txt"],
+      "command": "uv",
+      "args": ["sync"],
       "options": {
-        "cwd": "${workspaceFolder}/backend",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "group": "build",
       "presentation": {
@@ -161,14 +149,10 @@
     {
       "label": "🏗️ 构建前端项目",
       "type": "shell",
-      "command": "${workspaceFolder}\\node_modules\\.bin\\npm.cmd",
-      "args": ["run", "build"],
+      "command": "pnpm",
+      "args": ["--filter", "handwrite", "run", "build"],
       "options": {
-        "cwd": "${workspaceFolder}/frontend",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/c"]
-        }
+        "cwd": "${workspaceFolder}"
       },
       "group": "build",
       "presentation": {

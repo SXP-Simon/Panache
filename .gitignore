@@ -8,6 +8,7 @@ backend/env
 # backend/font_assets/*
 # !backend/font_assets/.gitkeep
 venv
+.venv
 backend/flask_session/*
 backend/_pycache__/*
 原始handwrite.py
