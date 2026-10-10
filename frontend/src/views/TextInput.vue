@@ -347,10 +347,24 @@ export default {
     gap: 6px;
 }
 
-.table-mode-select {
-    padding: 2px 20px 2px 6px;
+.table-mode-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.table-mode-label {
     font-size: 0.76rem;
-    height: 26px;
+    white-space: nowrap;
+}
+
+.table-mode-select {
+    padding: 2px 24px 2px 8px;
+    font-size: 0.78rem;
+    height: 28px;
+    width: auto;
+    min-width: 140px;
+    max-width: 165px;
     border-radius: 5px;
     border-color: #ced4da;
     color: #495057;
