@@ -141,10 +141,10 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     p1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
     text = p1.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
 
-    # 2. 匹配数值分式与微分比值：如 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
+    # 2. 匹配数值分式与微分比值：如 1/2, 3/4, 4/3, 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
     # 限制前驱与后继字符，防止误伤 2026.03.18 日期或 URL
     p2 = re.compile(
-        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][stVR]|[εa-z][0-9₁₂₃₄]?)\s*\/\s*([0-9.]+|[stVR]|[xX][0-9₁₂₃₄]?)(?![0-9a-zA-Z._])"
+        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][stVR]|[εa-z][0-9₁₂₃₄]?)\s*\/\s*([0-9.]+|[stVR]|[xX][0-9₁₂₃₄]?)(?![0-9a-zA-Z._/])"
     )
     text = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
 
