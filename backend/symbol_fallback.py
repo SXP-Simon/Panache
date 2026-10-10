@@ -116,6 +116,24 @@ _VULGAR_FRACTION_MAP: Dict[str, Tuple[str, str]] = {
 
 _DYNAMIC_PUA_COUNTER = 0xE200
 
+# 动态根式映射表：PUA 码点 -> (被开方数, 根指数)
+_RADICAL_MAP: Dict[str, Tuple[str, Optional[str]]] = {}
+_DYNAMIC_RADICAL_COUNTER = 0xE400
+
+
+def register_dynamic_radical(radicand: str, root_index: Optional[str] = None) -> str:
+    """动态注册一个新的手写带封顶横线的根式并分配 PUA 码点。"""
+    global _DYNAMIC_RADICAL_COUNTER
+    clean_idx = root_index.strip() if root_index else None
+    key = (radicand.strip(), clean_idx)
+    for ch, v in _RADICAL_MAP.items():
+        if v == key:
+            return ch
+    ch = chr(_DYNAMIC_RADICAL_COUNTER)
+    _DYNAMIC_RADICAL_COUNTER += 1
+    _RADICAL_MAP[ch] = key
+    return ch
+
 
 def register_dynamic_fraction(num: str, denom: str) -> str:
     """动态注册一个新的手写分式并分配 PUA 码点。"""
@@ -261,6 +279,88 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     return text
 
 
+def convert_radicals_to_drawn(text: str) -> str:
+    """将文本中出现的根式 \\sqrt[n]{...}, \\sqrt{...}, [n]√(...), √(...) 或单项根式 √x 转换为带上方封顶横线的手写根式字符。"""
+    if not text:
+        return ""
+
+    # 1. 深度平衡解析 LaTeX \\sqrt[n]{...} 和 \\sqrt{...}
+    def _resolve_latex_sqrt(s: str) -> str:
+        p_sqrt = re.compile(r"\\sqrt(?:\s*\[([^{}]+)\])?\s*\{")
+        changed = True
+        while changed:
+            changed = False
+            m = p_sqrt.search(s)
+            if not m:
+                break
+            root_idx = m.group(1)
+            start_brace = m.end() - 1
+            depth = 1
+            end_brace = -1
+            for p in range(start_brace + 1, len(s)):
+                if s[p] == '\\':
+                    continue
+                if s[p] == '{':
+                    depth += 1
+                elif s[p] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end_brace = p
+                        break
+            if end_brace != -1:
+                inner = s[start_brace + 1 : end_brace].strip()
+                inner_cleaned = convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(inner))
+                dyn_char = register_dynamic_radical(inner_cleaned, root_idx)
+                s = s[:m.start()] + dyn_char + s[end_brace + 1:]
+                changed = True
+        return s
+
+    text = _resolve_latex_sqrt(text)
+
+    # 2. 深度平衡解析 [⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ0-9a-zA-Z]*√\s*\(...\)
+    def _resolve_unicode_paren_sqrt(s: str) -> str:
+        p_rad = re.compile(r"([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿa-zA-Z0-9]*)√\s*\(")
+        changed = True
+        while changed:
+            changed = False
+            m = p_rad.search(s)
+            if not m:
+                break
+            root_idx = m.group(1) or None
+            open_paren = m.end() - 1
+            depth = 1
+            close_paren = -1
+            for p in range(open_paren + 1, len(s)):
+                if s[p] == '(':
+                    depth += 1
+                elif s[p] == ')':
+                    depth -= 1
+                    if depth == 0:
+                        close_paren = p
+                        break
+            if close_paren != -1:
+                inner = s[open_paren + 1 : close_paren].strip()
+                inner_cleaned = convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(inner))
+                dyn_char = register_dynamic_radical(inner_cleaned, root_idx)
+                s = s[:m.start()] + dyn_char + s[close_paren + 1:]
+                changed = True
+        return s
+
+    text = _resolve_unicode_paren_sqrt(text)
+
+    # 3. 匹配单项无括号根式，例如 √x, √2, ³√8, √y₁
+    p_single_sqrt = re.compile(r"([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿa-zA-Z0-9]*)√([0-9a-zA-Zα-ωΑ-Ω₁-₉²³⁴]+)")
+
+    def _replace_single_sqrt(m):
+        root_idx = m.group(1) or None
+        inner = m.group(2)
+        return register_dynamic_radical(inner, root_idx)
+
+    text = p_single_sqrt.sub(_replace_single_sqrt, text)
+
+    return text
+
+
 def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple[Any, Tuple[int, int, int, int], int]:
     """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance。
     支持主字体与备用字库（Fallback fonts）的精确匹配，彻底避免缺失字符（如 ε、₁、·、²）返回虚假宽度的留白问题。
@@ -293,8 +393,29 @@ def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple
         return (font, bb, w)
 
 
+def _measure_radical(char: str, font, font_path: Optional[str]) -> Tuple[int, int]:
+    """测量带封顶横线的根式整体宽度与高度"""
+    radicand, root_index = _RADICAL_MAP[char]
+    font_size = getattr(font, "size", 30)
+
+    rw = 0
+    if root_index:
+        root_size = max(8, int(font_size * 0.5))
+        try:
+            f_root = ImageFont.truetype(font_path, root_size) if (font_path and os.path.exists(font_path)) else font
+        except Exception:
+            f_root = font
+        rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
+
+    _, _, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
+    w_inner, _ = _measure_text_or_fraction(radicand, font, font_path)
+
+    total_w = rw + adv_sqrt + w_inner + max(2, int(font_size * 0.1))
+    return total_w, font_size
+
+
 def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path: Optional[str]) -> Tuple[int, int]:
-    """绘制一段可能包含真分数/普通文本的子串，返回 (总宽度, 最大高度)"""
+    """绘制一段可能包含真分数/带封顶根式/普通文本的子串，返回 (总宽度, 最大高度)"""
     import handright._core as core
     x, y = xy
     start_x = x
@@ -306,6 +427,10 @@ def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path
             # 嵌套递归绘制更小字号的子分数
             w = _draw_vertical_fraction(draw, ch, (x, y), font)
             x += w
+        elif ch in _RADICAL_MAP:
+            # 嵌套递归绘制带封顶横线的根式
+            w = _draw_radical_with_vinculum(draw, ch, (x, y), font)
+            x += w
         else:
             fb_font, bb, adv = _get_char_glyph_and_bbox(ch, font, font_path)
             draw.text((x, y), ch, fill=core._WHITE, font=fb_font)
@@ -314,12 +439,11 @@ def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path
 
 
 def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tuple[int, int]:
-    """测量可能包含真分数的子串尺寸 (宽度, 高度)"""
+    """测量可能包含真分数或带封顶根式的子串尺寸 (宽度, 高度)"""
     total_w = 0
     font_size = getattr(font, "size", 30)
     for ch in text:
         if ch in _VULGAR_FRACTION_MAP:
-            # 预估子分数宽度
             n, d = _VULGAR_FRACTION_MAP[ch]
             sub_s = max(8, int(font_size * 0.58))
             try:
@@ -329,6 +453,9 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
             nw, _ = _measure_text_or_fraction(n, f_sub, font_path)
             dw, _ = _measure_text_or_fraction(d, f_sub, font_path)
             total_w += max(nw, dw) + 10
+        elif ch in _RADICAL_MAP:
+            rw, _ = _measure_radical(ch, font, font_path)
+            total_w += rw
         else:
             _, _, adv = _get_char_glyph_and_bbox(ch, font, font_path)
             total_w += adv
@@ -336,8 +463,7 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
 
 
 def _get_rendered_text_bbox(text: str, font, font_path: Optional[str]) -> Tuple[int, int, int, int]:
-    """计算一段可能包含嵌套真分数字符的复合文本的真实边界框 (min_x, min_y, max_x, max_y)"""
-    # 逐字累计边界，排除 PUA 码点在主字体中返回的假 bbox
+    """计算一段可能包含嵌套真分数字符或根式的复合文本的真实边界框 (min_x, min_y, max_x, max_y)"""
     min_x, min_y, max_x, max_y = 0, 9999, 0, -9999
     curr_x = 0
     has_valid = False
@@ -345,8 +471,13 @@ def _get_rendered_text_bbox(text: str, font, font_path: Optional[str]) -> Tuple[
 
     for ch in text:
         if ch in _VULGAR_FRACTION_MAP:
-            # 嵌套分数的尺寸
             w, h = _measure_text_or_fraction(ch, font, font_path)
+            has_valid = True
+            min_y = min(min_y, 0)
+            max_y = max(max_y, fs)
+            curr_x += w
+        elif ch in _RADICAL_MAP:
+            w, h = _measure_radical(ch, font, font_path)
             has_valid = True
             min_y = min(min_y, 0)
             max_y = max(max_y, fs)
@@ -365,6 +496,64 @@ def _get_rendered_text_bbox(text: str, font, font_path: Optional[str]) -> Tuple[
         return (0, 0, max(1, len(text) * int(fs * 0.6)), fs)
 
     return (0, min_y if min_y != 9999 else 0, curr_x, max_y if max_y != -9999 else fs)
+
+
+def _draw_radical_with_vinculum(draw, char: str, xy: Tuple[int, int], font) -> int:
+    """按真实手写规范绘制带封顶横线的根式：
+    1. 若有根指数（如 ³√），使用小字号在根号钩子上部绘制根指数；
+    2. 绘制根号符号 √；
+    3. 从根号右上角延伸出一条水平封顶横线（vinculum），完全覆盖被开方表达式；
+    4. 在横线下方紧凑绘制被开方表达式（去除原有的外层括号）；
+    5. 返回整体 advance 宽度。
+    """
+    import handright._core as core
+
+    radicand, root_index = _RADICAL_MAP[char]
+    font_path = getattr(font, "path", None)
+    font_size = getattr(font, "size", 30)
+    x, y = xy
+
+    # 1. 绘制根指数 (如有)
+    rw = 0
+    if root_index:
+        root_size = max(8, int(font_size * 0.48))
+        try:
+            f_root = ImageFont.truetype(font_path, root_size) if (font_path and os.path.exists(font_path)) else font
+        except Exception:
+            f_root = font
+        rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
+        root_y = y + int(font_size * 0.1)
+        _draw_text_or_fraction(draw, root_index, (x, root_y), f_root, font_path)
+        x += rw
+
+    # 2. 绘制根号 √
+    fb_font, bb_sqrt, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
+    draw.text((x, y), "√", fill=core._WHITE, font=fb_font)
+
+    # 根号右上端起点 vx
+    sqrt_right = max(adv_sqrt, bb_sqrt[2] if bb_sqrt else adv_sqrt)
+    vx = x + sqrt_right - max(1, int(font_size * 0.05))
+
+    # 3. 测量被开方表达式尺寸与边界
+    w_inner, _ = _measure_text_or_fraction(radicand, font, font_path)
+    ib = _get_rendered_text_bbox(radicand, font, font_path)
+
+    # 横线高度位置: 位于根号顶部右上端，且略高于被开方表达式的文字顶部
+    line_thickness = max(1, int(font_size * 0.045))
+    rad_top = ib[1] if (ib[1] is not None and ib[1] < 9999) else int(font_size * 0.15)
+    vinculum_y = y + max(1, min(int(font_size * 0.14), rad_top - 2))
+
+    # 横线长度：覆盖被开方数并在右侧留出少量余量
+    vinculum_w = w_inner + max(3, int(font_size * 0.08))
+    draw.line([(vx, vinculum_y), (vx + vinculum_w, vinculum_y)], fill=core._WHITE, width=line_thickness)
+
+    # 4. 绘制被开方表达式
+    rad_x = vx + max(1, int(font_size * 0.04))
+    _draw_text_or_fraction(draw, radicand, (rad_x, y), font, font_path)
+
+    # 5. 总 advance
+    total_w = (vx + vinculum_w + max(2, int(font_size * 0.04))) - xy[0]
+    return total_w
 
 
 def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
@@ -406,7 +595,6 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     _draw_text_or_fraction(draw, num, (nx, ny), f_sub, font_path)
 
     # 分母: 顶部紧挨分数线下方 3 像素处
-    # db[1] 为分母文字相对于绘制原点的顶部 offset (对于 y 等字母，可能会有微小顶部空白)
     d_top = db[1] if (db[1] is not None and db[1] >= 0) else 0
     dx = x + max(0, (line_w - dw) // 2)
     dy = line_y + line_thickness + 3 - d_top
@@ -488,6 +676,10 @@ def init_glyph_fallback_engine():
             if char in _VULGAR_FRACTION_MAP:
                 return _draw_vertical_fraction(draw, char, xy, font)
 
+            # 优先拦截带封顶横线的真实手写根式
+            if char in _RADICAL_MAP:
+                return _draw_radical_with_vinculum(draw, char, xy, font)
+
             # 1. 首先通过 cmap 精确检测主字体是否真正支持该字符
             # （许多中文字体在缺失生僻字符或上下标时，不会返回空尺寸，而是会画出一个带问号的框 .notdef）
             font_path = getattr(font, "path", None)
@@ -549,8 +741,9 @@ def clean_invisible_and_special_characters(text: str) -> str:
 
 
 def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
-    """对输入文本进行符号清洗与分式转换，同时保留真实数学 Unicode 符号（₆、²、Σ、⇒、∈、≤、≥ 等），
+    """对输入文本进行符号清洗、分式与带封顶横线根式转换，同时保留真实数学 Unicode 符号（₆、²、Σ、⇒、∈、≤、≥ 等），
     自动将形如 (A)/(B) 或 数值/数值 转换为上下结构的真实手写竖式分数，
+    自动将 \\sqrt{...}、√( ... ) 转换为带上方横线封顶的真实手写根式，
     由底层的 Glyph Fallback 引擎完成真实字形绘制，不再降级为 '_6' 或 'Sigma'。
     """
     if not text:
@@ -560,5 +753,7 @@ def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
         init_glyph_fallback_engine()
 
     cleaned = clean_invisible_and_special_characters(text)
-    return convert_slashed_fractions_to_vertical(cleaned)
+    with_fractions = convert_slashed_fractions_to_vertical(cleaned)
+    with_radicals = convert_radicals_to_drawn(with_fractions)
+    return with_radicals
 

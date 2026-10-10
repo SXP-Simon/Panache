@@ -125,3 +125,57 @@ def test_fallback_glyph_bbox_proportions():
     w_sub = bbox_sub1[2] - bbox_sub1[0]
     assert 3 <= w_sub <= 20
 
+
+def test_radical_vinculum_conversion_and_rendering():
+    # 测试根式转换与横线封顶手写渲染：\\sqrt{...}, √( ... ), ³√( ... ), √x 均无外层括号并完成绘制
+    from backend.symbol_fallback import _RADICAL_MAP
+    sample_text = "计算 \\sqrt{x^2 + 1} 与 √(y₁ - y₂) 以及 ³√(8) 和 √x"
+    converted = normalize_text_for_font(sample_text, "ttf_files/云烟体.ttf")
+
+    # 确认原始带括号的根号模式已被替换为动态根式 PUA 码点，且括号被剥离
+    assert "\\sqrt{" not in converted
+    assert "√(y₁ - y₂)" not in converted
+    assert "³√(8)" not in converted
+    assert len(_RADICAL_MAP) > 0
+
+    # 验证在 handwrite 流程中渲染无异常
+    bg = Image.new("RGB", (700, 200), (255, 255, 255))
+    font = ImageFont.truetype("ttf_files/云烟体.ttf", size=30) if os.path.exists("ttf_files/云烟体.ttf") else ImageFont.load_default()
+    template = Template(
+        background=bg,
+        font=font,
+        line_spacing=40,
+        fill=(0, 0, 0),
+        left_margin=20,
+        top_margin=20,
+        right_margin=20,
+        bottom_margin=20,
+    )
+    images = list(handwrite(converted, template))
+    assert len(images) > 0
+    # 验证确实绘制了包含横线与字形的墨水像素
+    pixels = list(images[0].getdata())
+    drawn_count = sum(1 for p in pixels if p != (255, 255, 255))
+    assert drawn_count > 100
+
+
+def test_nested_radical_and_fraction_rendering():
+    # 测试嵌套根式与分式组合：\\sqrt{\\frac{1}{2}} 与 \\frac{\\sqrt{x+1}}{2}
+    text = "复杂公式：\\sqrt{\\frac{1}{2}} 与 \\frac{\\sqrt{x+1}}{2}"
+    converted = normalize_text_for_font(text, "ttf_files/云烟体.ttf")
+    bg = Image.new("RGB", (700, 200), (255, 255, 255))
+    font = ImageFont.truetype("ttf_files/云烟体.ttf", size=30) if os.path.exists("ttf_files/云烟体.ttf") else ImageFont.load_default()
+    template = Template(
+        background=bg,
+        font=font,
+        line_spacing=40,
+        fill=(0, 0, 0),
+        left_margin=20,
+        top_margin=20,
+        right_margin=20,
+        bottom_margin=20,
+    )
+    images = list(handwrite(converted, template))
+    assert len(images) > 0
+
+
