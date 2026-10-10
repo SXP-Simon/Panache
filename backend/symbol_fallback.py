@@ -151,8 +151,50 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     return text
 
 
+def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path: Optional[str]) -> Tuple[int, int]:
+    """绘制一段可能包含真分数/普通文本的子串，返回 (总宽度, 最大高度)"""
+    import handright._core as core
+    x, y = xy
+    start_x = x
+    font_size = getattr(font, "size", 30)
+    max_h = font_size
+
+    for ch in text:
+        if ch in _VULGAR_FRACTION_MAP:
+            # 嵌套递归绘制更小字号的子分数
+            w = _draw_vertical_fraction(draw, ch, (x, y), font)
+            x += w
+        else:
+            bb = font.getbbox(ch)
+            draw.text((x, y), ch, fill=core._WHITE, font=font)
+            w = max(1, bb[2] - bb[0] + 1)
+            x += w
+    return x - start_x, max_h
+
+
+def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tuple[int, int]:
+    """测量可能包含真分数的子串尺寸 (宽度, 高度)"""
+    total_w = 0
+    font_size = getattr(font, "size", 30)
+    for ch in text:
+        if ch in _VULGAR_FRACTION_MAP:
+            # 预估子分数宽度
+            n, d = _VULGAR_FRACTION_MAP[ch]
+            sub_s = max(8, int(font_size * 0.58))
+            f_sub = ImageFont.truetype(font_path, sub_s) if font_path else font
+            nb = f_sub.getbbox(n)
+            db = f_sub.getbbox(d)
+            total_w += max(nb[2] - nb[0], db[2] - db[0]) + 10
+        else:
+            bb = font.getbbox(ch)
+            total_w += max(1, bb[2] - bb[0] + 1)
+    return total_w, font_size
+
+
 def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
-    """按真实手写规范绘制上下结构的竖式分数（分子、居中分数横线、分母）。"""
+    """按真实手写规范绘制上下结构的竖式分数（分子、居中分数横线、分母）。
+    若分子或分母内部含有 ½、⅓ 等符号，均以真实上下竖式嵌套绘制，绝不出现斜杠！
+    """
     import handright._core as core
 
     num, denom = _VULGAR_FRACTION_MAP[char]
@@ -166,10 +208,8 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     except Exception:
         f_sub = font
 
-    nb = f_sub.getbbox(num)
-    nw, nh = nb[2] - nb[0], nb[3] - nb[1]
-    db = f_sub.getbbox(denom)
-    dw, dh = db[2] - db[0], db[3] - db[1]
+    nw, nh = _measure_text_or_fraction(num, f_sub, font_path)
+    dw, dh = _measure_text_or_fraction(denom, f_sub, font_path)
 
     line_w = max(nw, dw) + 6
     x, y = xy
@@ -179,15 +219,15 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     line_thickness = max(1, int(font_size * 0.05))
     draw.line([(x, line_y), (x + line_w, line_y)], fill=core._WHITE, width=line_thickness)
 
-    # 分子: 紧挨分数线正上方
-    nx = x + (line_w - nw) // 2 - nb[0]
-    ny = line_y - nh - 1 - nb[1]
-    draw.text((nx, ny), num, fill=core._WHITE, font=f_sub)
+    # 分子: 紧挨分数线正上方（保证分子底部距离分数线至少 2px）
+    nx = x + (line_w - nw) // 2
+    ny = line_y - nh - 2
+    _draw_text_or_fraction(draw, num, (nx, ny), f_sub, font_path)
 
-    # 分母: 紧挨分数线正下方
-    dx = x + (line_w - dw) // 2 - db[0]
-    dy = line_y + line_thickness + 1 - db[1]
-    draw.text((dx, dy), denom, fill=core._WHITE, font=f_sub)
+    # 分母: 紧挨分数线正下方（保证分母顶部距离分数线至少 2px）
+    dx = x + (line_w - dw) // 2
+    dy = line_y + line_thickness + 2
+    _draw_text_or_fraction(draw, denom, (dx, dy), f_sub, font_path)
 
     return line_w + 4
 
