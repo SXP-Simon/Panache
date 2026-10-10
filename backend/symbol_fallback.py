@@ -135,26 +135,11 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     if not text:
         return ""
 
-    # 0. 将前缀真分数字符（如 ½gt², ⅓x）解构为统一的上下竖式分式 (1)/(2gt²)，避免分母与字母分离
-    for vulgar_char, (v_num, v_denom) in list(_VULGAR_FRACTION_MAP.items()):
-        # 仅针对 ½, ⅓ 等标准 Unicode 真分数，若后紧跟字母或代数项（如 ½gt²）
-        if len(vulgar_char) == 1 and ord(vulgar_char) < 0xE000:
-            pattern = re.compile(re.escape(vulgar_char) + r"([a-zA-Z][0-9a-zA-Z_²³₁₂₃₄\.]*)")
-            text = pattern.sub(
-                lambda m, n=v_num, d=v_denom: register_dynamic_fraction(n, f"{d}{m.group(1)}"),
-                text,
-            )
-
+    # 0. 将前缀真分数字符紧跟代数项（如 s = ½gt²）中保留真分数或转换为标准表达式
     # 1. 匹配带括号的公式型分式：(分子)/(分母)，如 (ε(x₁))/(|x₁|), (gt · dt)/(½gt²), (0.00005)/(1.1062)
-    # 若分母中含 ½ 等真分数，先还原为易读形式如 1/2gt² 或 0.5gt²，避免 PUA 码点在子字符串中引起绘制异常
-    def _clean_denom_expr(expr: str) -> str:
-        for v_char, (vn, vd) in _VULGAR_FRACTION_MAP.items():
-            if v_char in expr:
-                expr = expr.replace(v_char, f"{vn}/{vd}")
-        return expr
-
+    # 若分母中含 ½ 等真分数，直接保留真分数字符（如 ½gt²）而不是写成 1/2gt² 斜杠，保持书写自然
     p1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
-    text = p1.sub(lambda m: register_dynamic_fraction(m.group(1), _clean_denom_expr(m.group(2))), text)
+    text = p1.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
 
     # 2. 匹配数值分式与微分比值：如 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
     # 限制前驱与后继字符，防止误伤 2026.03.18 日期或 URL
