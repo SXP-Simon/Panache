@@ -131,27 +131,41 @@ def register_dynamic_fraction(num: str, denom: str) -> str:
 
 
 def convert_slashed_fractions_to_vertical(text: str) -> str:
-    """自动将文本中出现的 (A)/(B) 复杂代数分式以及数值、导数单项分式转换为上下竖式分式。"""
+    """自动将文本中出现的 (A)/(B) 复杂代数分式以及数值、导数、倒数单项分式转换为上下竖式分式。"""
     if not text:
         return ""
 
-    # 1. 匹配数值分式与微分比值：如 1/2, 3/4, 4/3, 1/3, 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
-    # 先把基础数值分式与单项式分式转换为竖式分数
-    p2 = re.compile(
-        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][stVR]|[εa-z][0-9₁₂₃₄]?)\s*\/\s*([0-9.]+|[stVR]|[xX][0-9₁₂₃₄]?)(?![0-9a-zA-Z._/])"
+    # 1. 匹配单项式分式（包含数值、微分、变量倒数、带下标变量等）：
+    # 例如：1/2, 3/4, 4/3, 1/3, 1/300, 1/y, 1/y₁, 1/y₂, 2/t, 0.2/t, dt/t, ds/s, dV/V, dR/R, 0.00005/0.9863
+    p_single = re.compile(
+        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][a-zA-Z]|[εa-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀]?)\s*\/\s*([0-9.]+|[dD]?[a-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀%²³]?)(?![0-9a-zA-Z._/])"
     )
-    text = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
 
-    # 2. 匹配带括号的复杂公式型分式：(分子)/(分母)，如 (ε(x₁))/(|x₁|), (gt · dt)/(½gt²), (4π R² · dR)/(4/3 π R³)
-    # 在分子分母内部再次递归处理可能存在的任何斜杠分式，杜绝分母中残留 1/2 或 4/3
-    def _clean_and_register_complex(num_expr: str, denom_expr: str) -> str:
-        # 对分子分母内部可能遗留的未闭合/孤立斜杠分式进行二次转换
-        num_clean = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), num_expr.strip())
-        denom_clean = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), denom_expr.strip())
+    # 2. 匹配复合分式：带括号的分式，如 (A)/(B), (1/y² · y)/(1/y), (gt · dt)/(½gt²), |(A)/(B)| 等
+    p_paren = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
+
+    # 3. 匹配半带括号的分式：如 (A)/B 或 A/(B)
+    p_half_paren_1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*([a-zA-Z0-9.%₁₂₃₄]+)(?![0-9a-zA-Z._/])")
+    p_half_paren_2 = re.compile(r"(?<![0-9a-zA-Z._])([a-zA-Z0-9.%₁₂₃₄]+)\s*\/\s*\(([^\(\)\n\r]+?)\)")
+
+    def _clean_and_register(num_expr: str, denom_expr: str) -> str:
+        # 对分子与分母内部的子项进行递归转换
+        num_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), num_expr.strip())
+        denom_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), denom_expr.strip())
         return register_dynamic_fraction(num_clean, denom_clean)
 
-    p1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
-    text = p1.sub(lambda m: _clean_and_register_complex(m.group(1), m.group(2)), text)
+    # 依次执行替换：先括号复合，再半括号，最后单项式
+    # 循环多次直到所有嵌套/并列的括号分式都被处理完
+    for _ in range(3):
+        prev = text
+        text = p_paren.sub(lambda m: _clean_and_register(m.group(1), m.group(2)), text)
+        text = p_half_paren_1.sub(lambda m: _clean_and_register(m.group(1), m.group(2)), text)
+        text = p_half_paren_2.sub(lambda m: _clean_and_register(m.group(1), m.group(2)), text)
+        if text == prev:
+            break
+
+    # 最后替换剩余的纯单项分式
+    text = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
 
     return text
 
@@ -190,18 +204,50 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
                 f_sub = ImageFont.truetype(font_path, sub_s) if (font_path and os.path.exists(font_path)) else font
             except Exception:
                 f_sub = font
-            nb = f_sub.getbbox(n)
-            db = f_sub.getbbox(d)
-            total_w += max(nb[2] - nb[0], db[2] - db[0]) + 10
+            nw, _ = _measure_text_or_fraction(n, f_sub, font_path)
+            dw, _ = _measure_text_or_fraction(d, f_sub, font_path)
+            total_w += max(nw, dw) + 10
         else:
             bb = font.getbbox(ch)
             total_w += max(1, bb[2] - bb[0] + 1)
     return total_w, font_size
 
 
+def _get_rendered_text_bbox(text: str, font, font_path: Optional[str]) -> Tuple[int, int, int, int]:
+    """计算一段可能包含嵌套真分数字符的复合文本的真实边界框 (min_x, min_y, max_x, max_y)"""
+    # 逐字累计边界，排除 PUA 码点在主字体中返回的假 bbox
+    min_x, min_y, max_x, max_y = 0, 9999, 0, -9999
+    curr_x = 0
+    has_valid = False
+    fs = getattr(font, "size", 30)
+
+    for ch in text:
+        if ch in _VULGAR_FRACTION_MAP:
+            # 嵌套分数的尺寸
+            w, h = _measure_text_or_fraction(ch, font, font_path)
+            has_valid = True
+            min_y = min(min_y, 0)
+            max_y = max(max_y, fs)
+            curr_x += w
+        else:
+            bb = font.getbbox(ch)
+            if bb and (bb[2] > bb[0] or bb[3] > bb[1]):
+                has_valid = True
+                min_y = min(min_y, bb[1])
+                max_y = max(max_y, bb[3])
+                curr_x += max(1, bb[2] - bb[0] + 1)
+            else:
+                curr_x += int(fs * 0.5)
+
+    if not has_valid:
+        return (0, 0, max(1, len(text) * int(fs * 0.6)), fs)
+
+    return (0, min_y if min_y != 9999 else 0, curr_x, max_y if max_y != -9999 else fs)
+
+
 def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     """按真实手写规范绘制上下结构的竖式分数（分子、居中分数横线、分母）。
-    若分子或分母内部含有 ½、⅓ 等符号，均以真实上下竖式嵌套绘制，绝不出现斜杠！
+    若分子或分母内部含有真分数符号，均以真实上下竖式嵌套绘制，绝不出现斜杠！
     """
     import handright._core as core
 
@@ -212,7 +258,7 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     # 分子和分母采用缩小子号（约 0.58 倍主字号），符合手写行内竖式分数比例
     sub_size = max(10, int(font_size * 0.58))
     try:
-        f_sub = ImageFont.truetype(font_path, sub_size) if font_path else font
+        f_sub = ImageFont.truetype(font_path, sub_size) if (font_path and os.path.exists(font_path)) else font
     except Exception:
         f_sub = font
 
@@ -222,25 +268,26 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     line_w = max(nw, dw) + 6
     x, y = xy
 
-    # 分数线位置: 严格对齐当前主字符单元中轴线
-    line_y = y + int(font_size * 0.46)
+    # 分数线位置: 严格对齐当前行内西文/数字文本的垂直中轴基线 (约 0.52 ~ 0.54)
+    line_y = y + int(font_size * 0.52)
     line_thickness = max(1, int(font_size * 0.045))
     draw.line([(x, line_y), (x + line_w, line_y)], fill=core._WHITE, width=line_thickness)
 
     # 测量分子与分母整体实际文本边界
-    nb = f_sub.getbbox(num)
-    db = f_sub.getbbox(denom)
-    # 分子高度与底部偏移
-    n_bottom = nb[3]
-    # 分子: 底部严格位于 line_y - 2 处
-    nx = x + (line_w - nw) // 2
-    ny = line_y - n_bottom - 2
+    nb = _get_rendered_text_bbox(num, f_sub, font_path)
+    db = _get_rendered_text_bbox(denom, f_sub, font_path)
+
+    # 分子: 底部紧挨分数线上方 3 像素处
+    n_bottom = nb[3] if nb[3] > 0 else int(sub_size * 0.8)
+    nx = x + max(0, (line_w - nw) // 2)
+    ny = line_y - n_bottom - 3
     _draw_text_or_fraction(draw, num, (nx, ny), f_sub, font_path)
 
-    # 分母: 顶部严格位于 line_y + line_thickness + 2 处
-    d_top = db[1]
-    dx = x + (line_w - dw) // 2
-    dy = line_y + line_thickness + 2 - d_top
+    # 分母: 顶部紧挨分数线下方 3 像素处
+    # db[1] 为分母文字相对于绘制原点的顶部 offset (对于 y 等字母，可能会有微小顶部空白)
+    d_top = db[1] if (db[1] is not None and db[1] >= 0) else 0
+    dx = x + max(0, (line_w - dw) // 2)
+    dy = line_y + line_thickness + 3 - d_top
     _draw_text_or_fraction(draw, denom, (dx, dy), f_sub, font_path)
 
     return line_w + 4
