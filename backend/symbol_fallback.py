@@ -260,9 +260,11 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
                                     r_end = f_arg[1]
                                     r_content = s[r_start:r_end]
 
-                        # 对提取出的分子分母递归清洗内部可能含有的简单单项式或真分数
-                        num_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), l_content.strip())
-                        denom_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), r_content.strip())
+                        # 对提取出的分子分母递归清洗内部可能含有的简单单项式、根式或真分数
+                        num_inner = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), l_content.strip())
+                        denom_inner = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), r_content.strip())
+                        num_clean = convert_radicals_to_drawn(num_inner)
+                        denom_clean = convert_radicals_to_drawn(denom_inner)
                         dyn_char = register_dynamic_fraction(num_clean, denom_clean)
 
                         s = s[:l_start] + dyn_char + s[r_end:]
