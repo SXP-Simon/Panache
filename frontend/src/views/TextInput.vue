@@ -62,6 +62,32 @@
             </div>
         </div>
 
+        <!-- 已插入插图缩略图列表栏 -->
+        <div v-if="referencedImages.length > 0" class="inline-images-toolbar d-flex flex-wrap align-items-center gap-2 mt-2 mb-2 p-2 bg-light rounded border" data-testid="inline-images-bar">
+            <span class="inline-images-label small text-muted d-flex align-items-center gap-1">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                    <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
+                </svg>
+                {{ $t('message.inlineImagesTitle') }} ({{ referencedImages.length }}):
+            </span>
+            <div 
+                v-for="img in referencedImages" 
+                :key="img.id" 
+                class="inline-img-card badge bg-white text-dark border d-flex align-items-center gap-2 p-1 pe-2 shadow-sm"
+                :title="img.alt">
+                <img :src="img.data" class="inline-img-thumbnail" :alt="img.alt" />
+                <span class="inline-img-tag font-monospace">{{ img.alt }}</span>
+                <button 
+                    type="button" 
+                    class="btn-inline-img-remove" 
+                    :title="$t('message.delete')" 
+                    @click="removeInlineImage(img.id, img.index)">
+                    &times;
+                </button>
+            </div>
+        </div>
+
         <label for="textFileInput">{{ $t('message.orUploadDocument') }}:</label>
         <div class="file_select_container">
             <button @click="triggerTextFileInput" data-testid="text-file-btn">{{ $t('message.chooseFile') }}</button>
@@ -81,6 +107,7 @@
 <script>
 import { convertLatexToUnicode, hasLatexMarkup } from '@/utils/latexToUnicode';
 import { cleanMarkdown, hasMarkdownMarkup } from '@/utils/cleanMarkdown';
+import { collapseInlineImages, expandInlineImages, getReferencedImages } from '@/utils/inlineImageManager';
 
 export default {
     name: 'TextInput',
@@ -93,6 +120,9 @@ export default {
         isMarkdownPresent() {
             return hasMarkdownMarkup(this.text);
         },
+        referencedImages() {
+            return getReferencedImages(this.text, this.inlineImageStore);
+        },
     },
 
     data() {
@@ -102,12 +132,19 @@ export default {
             selectedTextFileName: '',
             tableMode: 'list', // 'list' | 'aligned' | 'raw_pipe'
             quickSymbols: ['⇒', '→', '∈', 'Σ', 'α', 'β', 'π', '²', '³', '√', '≤', '≥', '≠', '|'],
+            inlineImageStore: {},
         };
     },
     //当输入框的值发生变化时，通知HomeView更新text_handwriting 7.4
     watch: {
         text: function (val) {
-            this.$emit('childEvent', val);
+            if (val && val.includes('data:image/')) {
+                const { collapsedText, imageStore } = collapseInlineImages(val, this.inlineImageStore);
+                this.inlineImageStore = imageStore;
+                this.text = collapsedText;
+                return;
+            }
+            this.emitExpandedText();
         },
         tableMode: function (val) {
             localStorage.setItem('markdownTableMode', JSON.stringify(val));
@@ -123,6 +160,11 @@ export default {
                 console.log('localstorage缺失item:' + item);
             }
         });
+        if (this.text && this.text.includes('data:image/')) {
+            const { collapsedText, imageStore } = collapseInlineImages(this.text, this.inlineImageStore);
+            this.text = collapsedText;
+            this.inlineImageStore = imageStore;
+        }
         const savedTableMode = localStorage.getItem('markdownTableMode');
         if (savedTableMode) {
             try {
@@ -133,6 +175,11 @@ export default {
         }
     },
     methods: {
+        emitExpandedText() {
+            const fullText = expandInlineImages(this.text, this.inlineImageStore);
+            this.$emit('childEvent', fullText);
+            localStorage.setItem('text', JSON.stringify(fullText));
+        },
         handleManualInput() {
             this.$emit('manual-input');
         },
@@ -149,7 +196,10 @@ export default {
                         const reader = new FileReader();
                         reader.onload = (uploadEvent) => {
                             const base64Data = uploadEvent.target.result;
-                            const imageMarker = `\n![插图](${base64Data})\n`;
+                            const nextIdx = Object.keys(this.inlineImageStore).length + 1;
+                            const id = `img_${nextIdx}`;
+                            this.inlineImageStore[id] = base64Data;
+                            const imageMarker = `\n![插图 ${nextIdx}]\n`;
                             this.insertSymbol(imageMarker);
                         };
                         reader.readAsDataURL(file);
@@ -157,6 +207,12 @@ export default {
                     }
                 }
             }
+        },
+        removeInlineImage(id, index) {
+            delete this.inlineImageStore[id];
+            const regex = new RegExp(`!\\[(插图[ \\t]*[#:_-]?[ \\t]*${index}|[^\\]]*\\(img:?_?${index}\\))\\]`, 'g');
+            this.text = this.text.replace(regex, '');
+            this.emitExpandedText();
         },
         handleTextareaKeyDown(e) {
             // 当在输入框中按下 Ctrl+A (或 Mac 下 Cmd+A) 时，精准全选输入框内文本并阻止事件冒泡扩散到全页
@@ -460,6 +516,63 @@ export default {
     border-color: #0056b3;
 }
 
+.inline-images-toolbar {
+    background: #fdfdfd;
+    border-color: #e2e8f0 !important;
+}
+
+.inline-images-label {
+    font-size: 0.76rem !important;
+    font-weight: 500;
+}
+
+.inline-img-card {
+    display: inline-flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #ced4da !important;
+    border-radius: 4px;
+    padding: 2px 6px 2px 4px !important;
+    font-size: 0.78rem;
+    color: #333;
+    transition: all 0.15s ease;
+}
+
+.inline-img-card:hover {
+    border-color: #007BFF !important;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.12) !important;
+}
+
+.inline-img-thumbnail {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid #e9ecef;
+}
+
+.inline-img-tag {
+    font-size: 0.76rem;
+    color: #495057;
+}
+
+.btn-inline-img-remove {
+    background: transparent;
+    border: none;
+    color: #dc3545;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.1s;
+}
+
+.btn-inline-img-remove:hover {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
 #textArea {
     user-select: text;
     -webkit-user-select: text;
@@ -467,6 +580,7 @@ export default {
 
 .text-tools-group,
 .math-quick-bar,
+.inline-images-toolbar,
 .file_select_container {
     user-select: none;
     -webkit-user-select: none;

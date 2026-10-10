@@ -124,10 +124,19 @@ export function cleanMarkdown(text, options = {}) {
   // 4. 剥离行内代码反引号 `code` -> code
   s = s.replace(/`([^`\n]+)`/g, '$1');
 
-  // 5. 剥离图片与超链接：![alt](url) -> alt，[text](url) -> text
+  // 5. 剥离普通外部网页图片与超链接，同时精准保护本地手绘插图（包含 Base64 数据与短占位符 ![插图 1]）
+  // 5.1 暂存受保护的插图标记
+  s = s.replace(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+|img:[^)]+)\)/g, '<<<INLINE_IMG_START>>>$1<<<INLINE_IMG_MID>>>$2<<<INLINE_IMG_END>>>');
+  s = s.replace(/!\[(插图(?:[ \t]*[#:_-]?[ \t]*\d+)?)\]/g, '<<<SHORT_IMG_START>>>$1<<<SHORT_IMG_END>>>');
+
+  // 5.2 剥离普通外部链接与普通非手绘网页图片：![alt](http://...) -> alt，[text](url) -> text
   s = s.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
   s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
   s = s.replace(/<([a-zA-Z]+:\/\/[^>]+)>/g, '$1');
+
+  // 5.3 恢复受保护的插图标记
+  s = s.replace(/<<<INLINE_IMG_START>>>(.*?)<<<INLINE_IMG_MID>>>(.*?)<<<INLINE_IMG_END>>>/g, '![$1]($2)');
+  s = s.replace(/<<<SHORT_IMG_START>>>(.*?)<<<SHORT_IMG_END>>>/g, '![$1]');
 
   // 6. 处理标题、引用、任务列表与表格
   const lines = s.split('\n');
