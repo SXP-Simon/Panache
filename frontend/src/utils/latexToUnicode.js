@@ -307,6 +307,41 @@ function unwrapFractions(text) {
 }
 
 
+// 深度平衡匹配解析根号：支持 \sqrt{...} 以及多层嵌套如 \sqrt{\sum (x_i - \bar{x})^2}
+function unwrapSqrt(text) {
+  const sqrtPattern = /\\sqrt(?:\s*\[([^{}]+)\])?\s*\{/g;
+  let result = '';
+  let cursor = 0;
+  let match;
+
+  while ((match = sqrtPattern.exec(text))) {
+    const rootIndex = match[1];
+    let depth = 1;
+    let end = sqrtPattern.lastIndex;
+    for (; end < text.length && depth > 0; end++) {
+      if (text[end] === '\\') { end++; continue; }
+      if (text[end] === '{') depth++;
+      if (text[end] === '}') depth--;
+    }
+    if (depth !== 0) continue;
+
+    const inner = text.slice(sqrtPattern.lastIndex, end - 1);
+    // 递归解析根号内部可能嵌套的内容
+    const parsedInner = unwrapSqrt(inner);
+    let replacement = `√(${parsedInner})`;
+    if (rootIndex) {
+      const supN = rootIndex.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
+      replacement = `${supN}√(${parsedInner})`;
+    }
+
+    result += text.slice(cursor, match.index) + replacement;
+    cursor = end;
+    sqrtPattern.lastIndex = end;
+  }
+
+  return result + text.slice(cursor);
+}
+
 export function convertLatexToUnicode(text) {
   if (!text || typeof text !== 'string') {
     return '';
@@ -314,15 +349,22 @@ export function convertLatexToUnicode(text) {
 
   let s = unwrapBoxes(stripMathLayout(text));
   s = unwrapFractions(s);
+  s = unwrapSqrt(s);
 
-  // 1. 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
+  // 1. 处理常见统计与代数修饰符：\bar{x} -> x̄, \hat{x} -> x̂, \vec{x} -> x⃗
+  s = s.replace(/\\(bar|overline)\{([a-zA-Z0-9])\}/g, '$2̄');
+  s = s.replace(/\\(bar|overline)\{([^{}]+)\}/g, '($2)̄');
+  s = s.replace(/\\hat\{([a-zA-Z0-9])\}/g, '$1̂');
+  s = s.replace(/\\vec\{([a-zA-Z0-9])\}/g, '$1⃗');
+
+  // 2. 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
   s = s.replace(/\\(text|mathrm|mathbf|mathit|operatorname|textbf|textit|textsf|texttt)\{([^{}]+)\}/g, '$2');
 
-  // 2. 剥离 \left 和 \right 前缀（如 \left| -> |, \left( -> (），注意不能误伤 \rightarrow / \leftarrow 等
+  // 3. 剥离 \left 和 \right 前缀（如 \left| -> |, \left( -> (），注意不能误伤 \rightarrow / \leftarrow 等
   s = s.replace(/\\left(?![a-zA-Z])\s*([([{|.])?/g, '$1');
   s = s.replace(/\\right(?![a-zA-Z])\s*([)\]}|.])?/g, '$1');
 
-  // 3. 替换标准宏命令与特殊符号
+  // 4. 替换标准宏命令与特殊符号
   for (const [cmd, sym] of Object.entries(LATEX_SYMBOL_MAP)) {
     // 准确匹配形如 \varepsilon, \pi, \le, \| 的宏命令
     const cleanCmd = cmd.replace(/^\\+/, '');
@@ -332,14 +374,7 @@ export function convertLatexToUnicode(text) {
     s = s.replace(regex, sym);
   }
 
-  // 5. 替换根号 \sqrt{x} -> √(x), \sqrt[n]{x} -> ⁿ√(x)
-  s = s.replace(/\\sqrt\s*\[([^{}]+)\]\s*\{([^{}]+)\}/g, (match, n, inner) => {
-    const supN = n.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
-    return `${supN}√(${inner})`;
-  });
-  s = s.replace(/\\sqrt\s*\{([^{}]+)\}/g, '√($1)');
-
-  // 6. 替换上标与下标：x^{2} -> x²，x_1 -> x₁，A_{1} -> A₁
+  // 5. 替换上标与下标：x^{2} -> x²，x_1 -> x₁，A_{1} -> A₁
   s = s.replace(/\^\{([0-9+\-=()nixykm]+)\}/g, (match, p1) => {
     return p1.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
   });
@@ -354,14 +389,14 @@ export function convertLatexToUnicode(text) {
     return SUBSCRIPT_MAP[p1] || match;
   });
 
-  // 7. 清理包裹公式的 $ 与 $$ 标记
+  // 6. 清理包裹公式的 $ 与 $$ 标记
   s = s.replace(/\$\$(.*?)\$\$/gs, '$1');
   s = s.replace(/\$(.*?)\$/g, '$1');
 
-  // 8. 清理多余的 LaTeX 空格调整符（如 \, \: \; \! 等）
+  // 7. 清理多余的 LaTeX 空格调整符（如 \, \: \; \! 等）
   s = s.replace(/\\[,;:! ]/g, ' ');
 
-  // 9. 清理转义百分号与其它转义符号
+  // 8. 清理转义百分号与其它未识别命令
   s = s.replace(/\\%/g, '%');
   s = s.replace(/\\([a-zA-Z]+)/g, '$1');
 
