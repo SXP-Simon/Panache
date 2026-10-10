@@ -79,6 +79,39 @@ test("detects markdown markup correctly", async () => {
   assert.equal(hasMarkdownMarkup("这里有 **粗体** 文字"), true);
 });
 
+test("handles asterisk lists and preserves arithmetic multiplication without stripping", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const input = "* 步骤一: 计算 3 * 4 * 5 = 60\n* 步骤二: **重要提示** *注意斜体* 乘法 a * b";
+  const output = cleanMarkdown(input);
+  assert.equal(
+    output,
+    "- 步骤一: 计算 3 * 4 * 5 = 60\n- 步骤二: 重要提示 注意斜体 乘法 a * b"
+  );
+});
+
+test("handles discrete math markdown content with tables, lists, and formulas cleanly", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const input = [
+    "# 离散数学：真值表与命题演算",
+    "> 结论：该公式为可满足式。",
+    "* 变元定义：$p, q, r$",
+    "* 乘法与集合：A * B 与 2 * 3",
+    "",
+    "| p | q | p -> q |",
+    "|---|---|---|",
+    "| 0 | 0 | 1 |",
+    "| 0 | 1 | 1 |"
+  ].join("\n");
+  const output = cleanMarkdown(input, { tableMode: "aligned" });
+  assert.ok(output.includes("离散数学：真值表与命题演算"));
+  assert.ok(output.includes("结论：该公式为可满足式。"));
+  assert.ok(!output.includes("> 结论"));
+  assert.ok(output.includes("- 变元定义：$p, q, r$"));
+  assert.ok(output.includes("A * B 与 2 * 3"));
+  assert.ok(!output.includes("#"));
+  assert.ok(!output.includes("|"));
+});
+
 async function runAll() {
   let passed = 0;
   for (const { name, run } of tests) {
