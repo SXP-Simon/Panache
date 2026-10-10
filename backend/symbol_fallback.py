@@ -59,7 +59,73 @@ _UNIVERSAL_CANONICAL_MAP = {
 # 缓存各字体的 cmap 码点集合
 _FONT_CMAP_CACHE: Dict[str, Set[int]] = {}
 _FALLBACK_FONTS_POOL: List[Tuple[str, Set[int]]] = []
+_CHAR_FALLBACK_CACHE: Dict[int, Optional[str]] = {}
 _ENGINE_INITIALIZED = False
+
+
+@functools.lru_cache(maxsize=128)
+def _get_font_cmap(font_source: Any) -> Set[int]:
+    """获取或从缓存中读取字体的 cmap 码点集合，支持文件路径、BytesIO 或字节数据。"""
+    if not font_source or not TTFont:
+        return set()
+
+    # 1. 字符串文件路径
+    if isinstance(font_source, (str, bytes, os.PathLike)):
+        try:
+            if not os.path.exists(font_source):
+                return set()
+            norm_path = os.path.normpath(os.path.abspath(font_source))
+            f = TTFont(norm_path)
+            cmap = f.getBestCmap()
+            f.close()
+            return set(cmap.keys()) if cmap else set()
+        except Exception as e:
+            logger.debug(f"读取字体 cmap 失败 ({font_source}): {e}")
+            return set()
+
+    # 2. BytesIO 或其他文件流
+    try:
+        import io
+        if isinstance(font_source, io.BytesIO):
+            pos = font_source.tell()
+            font_source.seek(0)
+            f = TTFont(font_source)
+            cmap = f.getBestCmap()
+            f.close()
+            font_source.seek(pos)
+            return set(cmap.keys()) if cmap else set()
+    except Exception as e:
+        logger.debug(f"读取内存流字体 cmap 失败: {e}")
+
+    return set()
+
+
+@functools.lru_cache(maxsize=256)
+def _get_cached_image_font(font_path: Any, size: int) -> ImageFont.FreeTypeFont:
+    """带 LRU 缓存的 FreeTypeFont 加载器，彻底避免在排版绘制热路径中重复从磁盘读字体。"""
+    if font_path and isinstance(font_path, (str, bytes, os.PathLike)) and os.path.exists(font_path):
+        try:
+            return ImageFont.truetype(font_path, size=size)
+        except Exception:
+            pass
+    for fb_path, _ in _FALLBACK_FONTS_POOL:
+        try:
+            return ImageFont.truetype(fb_path, size=size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def _find_fallback_font_for_char(cp: int) -> Optional[str]:
+    """快速 O(1) 查找覆盖指定码点的备用字库路径。"""
+    if cp in _CHAR_FALLBACK_CACHE:
+        return _CHAR_FALLBACK_CACHE[cp]
+    for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
+        if cp in fb_cmap:
+            _CHAR_FALLBACK_CACHE[cp] = fb_path
+            return fb_path
+    _CHAR_FALLBACK_CACHE[cp] = None
+    return None
 
 
 def _find_fallback_font_files() -> List[str]:
@@ -363,12 +429,12 @@ def convert_radicals_to_drawn(text: str) -> str:
     return text
 
 
-def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple[Any, Tuple[int, int, int, int], int]:
-    """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance。
-    支持主字体与备用字库（Fallback fonts）的精确匹配，彻底避免缺失字符（如 ε、₁、·、²）返回虚假宽度的留白问题。
-    """
-    main_cmap = _get_font_cmap(font_path)
+@functools.lru_cache(maxsize=4096)
+def _get_char_glyph_and_bbox_cached(char: str, font_path: Optional[str], font_size: int) -> Tuple[Any, Tuple[int, int, int, int], int]:
+    main_cmap = _get_font_cmap(font_path) if font_path else set()
     cp = ord(char)
+    font = _get_cached_image_font(font_path, font_size)
+
     is_missing = False
     if main_cmap and (cp not in main_cmap):
         is_missing = True
@@ -378,21 +444,26 @@ def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple
             is_missing = True
 
     if is_missing:
-        for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
-            if cp in fb_cmap:
-                try:
-                    fb_font = ImageFont.truetype(fb_path, size=font.size)
-                    f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
-                    if (f_right - f_left > 0) and (f_bottom - f_top > 0):
-                        return (fb_font, (f_left, f_top, f_right, f_bottom), max(1, f_right - f_left))
-                except Exception:
-                    continue
-        fs = getattr(font, "size", 30)
-        return (font, (0, 0, int(fs * 0.4), fs), int(fs * 0.4))
+        fb_path = _find_fallback_font_for_char(cp)
+        if fb_path:
+            fb_font = _get_cached_image_font(fb_path, font_size)
+            f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
+            if (f_right - f_left > 0) and (f_bottom - f_top > 0):
+                return (fb_font, (f_left, f_top, f_right, f_bottom), max(1, f_right - f_left))
+        return (font, (0, 0, int(font_size * 0.4), font_size), int(font_size * 0.4))
     else:
         bb = font.getbbox(char)
         w = max(1, bb[2] - bb[0] + 1)
         return (font, bb, w)
+
+
+def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple[Any, Tuple[int, int, int, int], int]:
+    """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance。
+    支持主字体与备用字库（Fallback fonts）的精确匹配，彻底避免缺失字符（如 ε、₁、·、²）返回虚假宽度的留白问题。
+    """
+    f_path = font_path or getattr(font, "path", None)
+    f_size = getattr(font, "size", 30)
+    return _get_char_glyph_and_bbox_cached(char, f_path, f_size)
 
 
 def _measure_radical(char: str, font, font_path: Optional[str]) -> Tuple[int, int]:
@@ -403,10 +474,7 @@ def _measure_radical(char: str, font, font_path: Optional[str]) -> Tuple[int, in
     rw = 0
     if root_index:
         root_size = max(8, int(font_size * 0.5))
-        try:
-            f_root = ImageFont.truetype(font_path, root_size) if (font_path and os.path.exists(font_path)) else font
-        except Exception:
-            f_root = font
+        f_root = _get_cached_image_font(font_path, root_size)
         rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
 
     _, _, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
@@ -448,10 +516,7 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
         if ch in _VULGAR_FRACTION_MAP:
             n, d = _VULGAR_FRACTION_MAP[ch]
             sub_s = max(8, int(font_size * 0.58))
-            try:
-                f_sub = ImageFont.truetype(font_path, sub_s) if (font_path and os.path.exists(font_path)) else font
-            except Exception:
-                f_sub = font
+            f_sub = _get_cached_image_font(font_path, sub_s)
             nw, _ = _measure_text_or_fraction(n, f_sub, font_path)
             dw, _ = _measure_text_or_fraction(d, f_sub, font_path)
             total_w += max(nw, dw) + 10
@@ -519,10 +584,7 @@ def _draw_radical_with_vinculum(draw, char: str, xy: Tuple[int, int], font) -> i
     rw = 0
     if root_index:
         root_size = max(8, int(font_size * 0.48))
-        try:
-            f_root = ImageFont.truetype(font_path, root_size) if (font_path and os.path.exists(font_path)) else font
-        except Exception:
-            f_root = font
+        f_root = _get_cached_image_font(font_path, root_size)
         rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
         root_y = y + int(font_size * 0.1)
         _draw_text_or_fraction(draw, root_index, (x, root_y), f_root, font_path)
@@ -570,10 +632,7 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
 
     # 分子和分母采用缩小子号（约 0.58 倍主字号），符合手写行内竖式分数比例
     sub_size = max(10, int(font_size * 0.58))
-    try:
-        f_sub = ImageFont.truetype(font_path, sub_size) if (font_path and os.path.exists(font_path)) else font
-    except Exception:
-        f_sub = font
+    f_sub = _get_cached_image_font(font_path, sub_size)
 
     nw, nh = _measure_text_or_fraction(num, f_sub, font_path)
     dw, dh = _measure_text_or_fraction(denom, f_sub, font_path)
@@ -603,45 +662,6 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     _draw_text_or_fraction(draw, denom, (dx, dy), f_sub, font_path)
 
     return line_w + 4
-
-
-
-def _get_font_cmap(font_source: Any) -> Set[int]:
-    """获取或从缓存中读取字体的 cmap 码点集合，支持文件路径、BytesIO 或字节数据。"""
-    if not font_source or not TTFont:
-        return set()
-
-    # 1. 字符串文件路径
-    if isinstance(font_source, (str, bytes, os.PathLike)):
-        try:
-            if not os.path.exists(font_source):
-                return set()
-            norm_path = os.path.normpath(os.path.abspath(font_source))
-            if norm_path not in _FONT_CMAP_CACHE:
-                f = TTFont(norm_path)
-                cmap = f.getBestCmap()
-                f.close()
-                _FONT_CMAP_CACHE[norm_path] = set(cmap.keys()) if cmap else set()
-            return _FONT_CMAP_CACHE[norm_path]
-        except Exception as e:
-            logger.debug(f"读取字体 cmap 失败 ({font_source}): {e}")
-            return set()
-
-    # 2. BytesIO 或其他文件流
-    try:
-        import io
-        if isinstance(font_source, io.BytesIO):
-            pos = font_source.tell()
-            font_source.seek(0)
-            f = TTFont(font_source)
-            cmap = f.getBestCmap()
-            f.close()
-            font_source.seek(pos)
-            return set(cmap.keys()) if cmap else set()
-    except Exception as e:
-        logger.debug(f"读取内存流字体 cmap 失败: {e}")
-
-    return set()
 
 
 def init_glyph_fallback_engine():
@@ -682,33 +702,12 @@ def init_glyph_fallback_engine():
             if char in _RADICAL_MAP:
                 return _draw_radical_with_vinculum(draw, char, xy, font)
 
-            # 1. 首先通过 cmap 精确检测主字体是否真正支持该字符
-            # （许多中文字体在缺失生僻字符或上下标时，不会返回空尺寸，而是会画出一个带问号的框 .notdef）
             font_path = getattr(font, "path", None)
-            main_cmap = _get_font_cmap(font_path)
-            cp = ord(char)
-
-            # 若主字体存在且明确不含该码点，或者主字体尺寸检测为零宽/零高，触发字形回退
-            is_missing = False
-            if main_cmap and (cp not in main_cmap):
-                is_missing = True
-            else:
-                left, top, right, bottom = font.getbbox(char)
-                if (right - left <= 0) or (bottom - top <= 0):
-                    is_missing = True
-
-            if is_missing:
-                for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
-                    if cp in fb_cmap:
-                        try:
-                            # 选用匹配的字号在原坐标绘制真实字形
-                            fb_font = ImageFont.truetype(fb_path, size=font.size)
-                            f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
-                            if (f_right - f_left > 0) and (f_bottom - f_top > 0):
-                                draw.text(xy, char, fill=core._WHITE, font=fb_font)
-                                return max(1, f_right - f_left)
-                        except Exception:
-                            continue
+            font_size = getattr(font, "size", 30)
+            fb_font, bb, adv = _get_char_glyph_and_bbox_cached(char, font_path, font_size)
+            if fb_font is not font:
+                draw.text(xy, char, fill=core._WHITE, font=fb_font)
+                return adv
 
             return orig_draw_char(draw, char, xy, font)
 
