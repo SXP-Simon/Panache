@@ -1,5 +1,8 @@
+import katex from 'katex';
+
 /**
  * LaTeX 公式转 Unicode 数学文本工具模块
+ * 采用 KaTeX 工业级词法/语法树（AST）解析器 + 正则兼容兜底的双层设计
  * 将用户输入或粘贴的 LaTeX 语法 ($...$、\mid、\frac、\sqrt、\alpha、产生式等) 转换为排版清晰的 Unicode 字符
  */
 
@@ -342,31 +345,235 @@ function unwrapSqrt(text) {
   return result + text.slice(cursor);
 }
 
+/**
+ * 基于 KaTeX AST 将语法树节点递归转换为清晰的 Unicode 文本
+ * @param {object|array} node KaTeX AST 节点或节点列表
+ * @returns {string}
+ */
+function astNodeToUnicode(node) {
+  if (!node) return '';
+  if (Array.isArray(node)) {
+    return node.map(astNodeToUnicode).join('');
+  }
+
+  switch (node.type) {
+    case 'mathord':
+    case 'textord':
+    case 'atom': {
+      const text = node.text || '';
+      if (text === '\\|') return '||';
+      if (text === '\\{') return '{';
+      if (text === '\\}') return '}';
+      if (text === '\\&') return '&';
+      if (text === '\\%') return '%';
+      if (text === '\\$') return '$';
+      if (LATEX_SYMBOL_MAP[text]) return LATEX_SYMBOL_MAP[text];
+      if (text.startsWith('\\')) {
+        const cmdName = text.slice(1);
+        return LATEX_SYMBOL_MAP[text] || cmdName;
+      }
+      return text;
+    }
+
+    case 'op': {
+      if (node.name && LATEX_SYMBOL_MAP[node.name]) {
+        return LATEX_SYMBOL_MAP[node.name];
+      }
+      if (node.name) {
+        return node.name.replace(/^\\/, '');
+      }
+      return node.body ? astNodeToUnicode(node.body) : '';
+    }
+
+    case 'genfrac': {
+      const num = astNodeToUnicode(node.numer).trim();
+      const den = astNodeToUnicode(node.denom).trim();
+      // 常见手写真分数映射（映射到底层手写竖式分数渲染器）
+      const fracKey = `${num}/${den}`;
+      if (VULGAR_FRACTION_MAP[fracKey]) {
+        return VULGAR_FRACTION_MAP[fracKey];
+      }
+      return `(${num})/(${den})`;
+    }
+
+    case 'sqrt': {
+      const body = astNodeToUnicode(node.body);
+      if (node.index) {
+        const idx = astNodeToUnicode(node.index);
+        const supIdx = idx.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
+        return `${supIdx}√(${body})`;
+      }
+      return `√(${body})`;
+    }
+
+    case 'supsub': {
+      let base = astNodeToUnicode(node.base);
+      if (node.sub) {
+        const subText = astNodeToUnicode(node.sub);
+        base += subText.split('').map(c => SUBSCRIPT_MAP[c] || c).join('');
+      }
+      if (node.sup) {
+        const supText = astNodeToUnicode(node.sup);
+        base += supText.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
+      }
+      return base;
+    }
+
+    case 'accent': {
+      const base = astNodeToUnicode(node.base);
+      if (node.label === '\\bar' || node.label === '\\overline') {
+        return base.length === 1 ? `${base}\u0304` : `(${base})\u0304`;
+      }
+      if (node.label === '\\hat') {
+        return base.length === 1 ? `${base}\u0302` : `(${base})\u0302`;
+      }
+      if (node.label === '\\vec') {
+        return base.length === 1 ? `${base}\u20D7` : `(${base})\u20D7`;
+      }
+      return base;
+    }
+
+    case 'overline': {
+      const base = astNodeToUnicode(node.body);
+      return base.length === 1 ? `${base}\u0304` : `(${base})\u0304`;
+    }
+
+    case 'underline': {
+      return astNodeToUnicode(node.body);
+    }
+
+    case 'array': {
+      // 矩阵或多行公式环境
+      if (node.colSeparationType === 'align') {
+        // 对齐环境（如 aligned）：行与行之间换行，列之间直接拼接
+        const rows = node.body.map(row => {
+          return row.map(cell => astNodeToUnicode(cell)).join('').trim();
+        });
+        return rows.filter(r => r.length > 0).join('\n');
+      }
+      // 矩阵环境：列用双空格，行用分号
+      const rows = node.body.map(row => {
+        return row.map(cell => astNodeToUnicode(cell).trim()).filter(c => c.length > 0).join('  ');
+      });
+      return ` ${rows.join(' ; ')} `;
+    }
+
+    case 'leftright': {
+      let l = node.left || '';
+      let r = node.right || '';
+      if (l === '.') l = '';
+      if (r === '.') r = '';
+      if (LATEX_SYMBOL_MAP[l]) l = LATEX_SYMBOL_MAP[l];
+      if (LATEX_SYMBOL_MAP[r]) r = LATEX_SYMBOL_MAP[r];
+      return `${l}${astNodeToUnicode(node.body)}${r}`;
+    }
+
+    case 'text':
+    case 'styling':
+    case 'ordgroup':
+    case 'color':
+    case 'enclose':
+      return astNodeToUnicode(node.body);
+
+    case 'htmlmathml':
+      if (node.mathml) return astNodeToUnicode(node.mathml);
+      return astNodeToUnicode(node.html);
+
+    case 'mclass':
+      return astNodeToUnicode(node.body);
+
+    case 'spacing':
+      return node.text || ' ';
+
+    case 'kern':
+      return node.dimension && node.dimension.number >= 1 ? '  ' : ' ';
+
+    default:
+      if (node.body) return astNodeToUnicode(node.body);
+      return node.text || '';
+  }
+}
+
+/**
+ * 尝试通过 KaTeX AST 将一段纯公式转换为 Unicode 数学文本
+ * 若解析失败则返回 null
+ * @param {string} formulaText
+ * @returns {string|null}
+ */
+function tryConvertFormulaViaKatex(formulaText) {
+  if (!formulaText || typeof formulaText !== 'string') return null;
+  const trimmed = formulaText.trim();
+  if (!trimmed) return '';
+
+  try {
+    const ast = katex.__parse(trimmed, { throwOnError: false, displayMode: true });
+    if (ast && ast.length > 0) {
+      return astNodeToUnicode(ast);
+    }
+  } catch (e) {
+    // 忽略 KaTeX 解析异常，回退至正则流水线
+  }
+  return null;
+}
+
 export function convertLatexToUnicode(text) {
   if (!text || typeof text !== 'string') {
     return '';
   }
 
+  // 1. 先进行盒模型展开与数学环境降级（aligned、矩阵、行尾换行符）
   let s = unwrapBoxes(stripMathLayout(text));
+
+  // 2. 如果包含 $...$, $$...$$, \[...\], \(...\)，优先用 KaTeX AST 解析公式块
+  const mathDelimRegex = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^$\n]+?)\$/g;
+  if (mathDelimRegex.test(s)) {
+    s = s.replace(mathDelimRegex, (match, d1, d2, d3, d4) => {
+      const expr = (d1 ?? d2 ?? d3 ?? d4 ?? '').trim();
+      if (!expr) return '';
+      const astResult = tryConvertFormulaViaKatex(expr);
+      if (astResult !== null) {
+        return astResult;
+      }
+      return expr;
+    });
+  }
+
+  // 3. 针对未加 $ 包裹但含有明确复合公式（如整行 r = \frac{...}{...} 或 \sqrt{...}）的行进行 KaTeX AST 解析
+  const lines = s.split('\n');
+  const processedLines = lines.map(line => {
+    const trimmed = line.trim();
+    if (
+      trimmed.length > 0 &&
+      /\\(?:frac|dfrac|tfrac|sqrt|sum|prod|int|cos|sin|tan|lim)\b/.test(trimmed)
+    ) {
+      const astResult = tryConvertFormulaViaKatex(trimmed);
+      if (astResult !== null) {
+        return astResult;
+      }
+    }
+    return line;
+  });
+  s = processedLines.join('\n');
+
+  // 4. 正则流水线保底：处理未进入 AST 或分散在正文中的零散标记
   s = unwrapFractions(s);
   s = unwrapSqrt(s);
 
-  // 1. 处理常见统计与代数修饰符：\bar{x} -> x̄, \hat{x} -> x̂, \vec{x} -> x⃗
-  s = s.replace(/\\(bar|overline)\{([a-zA-Z0-9])\}/g, '$2̄');
-  s = s.replace(/\\(bar|overline)\{([^{}]+)\}/g, '($2)̄');
-  s = s.replace(/\\hat\{([a-zA-Z0-9])\}/g, '$1̂');
-  s = s.replace(/\\vec\{([a-zA-Z0-9])\}/g, '$1⃗');
+  // 4.1 处理统计与代数修饰符：\bar{x} -> x̄, \hat{x} -> x̂, \vec{x} -> x⃗
+  s = s.replace(/\\(bar|overline)\{([a-zA-Z0-9])\}/g, '$2\u0304');
+  s = s.replace(/\\(bar|overline)\{([^{}]+)\}/g, '($2)\u0304');
+  s = s.replace(/\\hat\{([a-zA-Z0-9])\}/g, '$1\u0302');
+  s = s.replace(/\\vec\{([a-zA-Z0-9])\}/g, '$1\u20D7');
 
-  // 2. 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
+  // 4.2 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
   s = s.replace(/\\(text|mathrm|mathbf|mathit|operatorname|textbf|textit|textsf|texttt)\{([^{}]+)\}/g, '$2');
 
-  // 3. 剥离 \left 和 \right 前缀（如 \left| -> |, \left( -> (），注意不能误伤 \rightarrow / \leftarrow 等
+  // 4.3 剥离 \left 和 \right 前缀
   s = s.replace(/\\left(?![a-zA-Z])\s*([([{|.])?/g, '$1');
   s = s.replace(/\\right(?![a-zA-Z])\s*([)\]}|.])?/g, '$1');
 
-  // 4. 替换标准宏命令与特殊符号
+  // 4.4 替换标准宏命令与特殊符号
   for (const [cmd, sym] of Object.entries(LATEX_SYMBOL_MAP)) {
-    // 准确匹配形如 \varepsilon, \pi, \le, \| 的宏命令
     const cleanCmd = cmd.replace(/^\\+/, '');
     const isWordCmd = /[a-zA-Z]$/.test(cleanCmd);
     const escaped = cleanCmd.replace(/([|{}[\]()])/g, '\\$1');
@@ -374,7 +581,7 @@ export function convertLatexToUnicode(text) {
     s = s.replace(regex, sym);
   }
 
-  // 5. 替换上标与下标：x^{2} -> x²，x_1 -> x₁，A_{1} -> A₁
+  // 4.5 替换上标与下标：x^{2} -> x²，x_1 -> x₁，A_{1} -> A₁
   s = s.replace(/\^\{([0-9+\-=()nixykm]+)\}/g, (match, p1) => {
     return p1.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
   });
@@ -389,14 +596,14 @@ export function convertLatexToUnicode(text) {
     return SUBSCRIPT_MAP[p1] || match;
   });
 
-  // 6. 清理包裹公式的 $ 与 $$ 标记
+  // 4.6 清理多余的 $ 与 $$ 标记
   s = s.replace(/\$\$(.*?)\$\$/gs, '$1');
   s = s.replace(/\$(.*?)\$/g, '$1');
 
-  // 7. 清理多余的 LaTeX 空格调整符（如 \, \: \; \! 等）
+  // 4.7 清理多余的 LaTeX 空格调整符
   s = s.replace(/\\[,;:! ]/g, ' ');
 
-  // 8. 清理转义百分号与其它未识别命令
+  // 4.8 清理转义百分号与其它未识别命令
   s = s.replace(/\\%/g, '%');
   s = s.replace(/\\([a-zA-Z]+)/g, '$1');
 

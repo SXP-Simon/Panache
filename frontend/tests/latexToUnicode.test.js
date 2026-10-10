@@ -19,6 +19,9 @@ async function run() {
     ['invalid box retains content', String.raw`\boxed{x+1 后面的正文`, 'boxed{x+1 后面的正文'],
     ['pmatrix matrix', String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`, '( 1  2 ; 3  4 )'],
     ['bmatrix matrix', String.raw`\begin{bmatrix}a & b \\ c & d\end{bmatrix}`, '[ a  b ; c  d ]'],
+    ['pearson complex formula', String.raw`$r = \frac{\sum (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum(x_i - \bar{x})^2}\sqrt{\sum(y_i - \bar{y})^2}}$`, 'r=(∑(xᵢ-x̄)(yᵢ-ȳ))/(√(∑(xᵢ-x̄)²)√(∑(yᵢ-ȳ)²))'],
+    ['euclidean distance formula', String.raw`$d(x, y) = \sqrt{(1-2)^2 + (1-2)^2} = \sqrt{4} = 2$`, 'd(x,y)=√((1-2)²+(1-2)²)=√(4)=2'],
+    ['cosine similarity fraction', String.raw`$\cos(x, y) = \frac{x \cdot y}{\|x\|_2 \|y\|_2}$`, 'cos(x,y)=(x·y)/(||x||₂||y||₂)'],
   ];
   for (const [name, input, expected] of cases) {
     assert.equal(convert(input), expected, name);
