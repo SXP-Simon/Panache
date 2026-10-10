@@ -970,6 +970,7 @@ async def generate_handwriting_impl(
             font = ImageFont.truetype(
                 io.BytesIO(font_content), size=int(data["font_size"])
             )
+            font.path = font_path
         else:
             return JSONResponse(
                 {

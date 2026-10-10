@@ -14,7 +14,7 @@ import glob
 import logging
 import os
 import re
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 from PIL import ImageFont
@@ -247,6 +247,44 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
 
 
 
+def _get_font_cmap(font_source: Any) -> Set[int]:
+    """获取或从缓存中读取字体的 cmap 码点集合，支持文件路径、BytesIO 或字节数据。"""
+    if not font_source or not TTFont:
+        return set()
+
+    # 1. 字符串文件路径
+    if isinstance(font_source, (str, bytes, os.PathLike)):
+        try:
+            if not os.path.exists(font_source):
+                return set()
+            norm_path = os.path.normpath(os.path.abspath(font_source))
+            if norm_path not in _FONT_CMAP_CACHE:
+                f = TTFont(norm_path)
+                cmap = f.getBestCmap()
+                f.close()
+                _FONT_CMAP_CACHE[norm_path] = set(cmap.keys()) if cmap else set()
+            return _FONT_CMAP_CACHE[norm_path]
+        except Exception as e:
+            logger.debug(f"读取字体 cmap 失败 ({font_source}): {e}")
+            return set()
+
+    # 2. BytesIO 或其他文件流
+    try:
+        import io
+        if isinstance(font_source, io.BytesIO):
+            pos = font_source.tell()
+            font_source.seek(0)
+            f = TTFont(font_source)
+            cmap = f.getBestCmap()
+            f.close()
+            font_source.seek(pos)
+            return set(cmap.keys()) if cmap else set()
+    except Exception as e:
+        logger.debug(f"读取内存流字体 cmap 失败: {e}")
+
+    return set()
+
+
 def init_glyph_fallback_engine():
     """初始化底层 handright 绘制引擎的真实字形 Fallback 挂载。"""
     global _ENGINE_INITIALIZED, _FALLBACK_FONTS_POOL
@@ -261,11 +299,9 @@ def init_glyph_fallback_engine():
     # 1. 扫描并缓存备用字库的 cmap
     for font_path in _find_fallback_font_files():
         try:
-            f = TTFont(font_path)
-            cmap = f.getBestCmap()
-            f.close()
+            cmap = _get_font_cmap(font_path)
             if cmap:
-                _FALLBACK_FONTS_POOL.append((font_path, set(cmap.keys())))
+                _FALLBACK_FONTS_POOL.append((font_path, cmap))
         except Exception as e:
             logger.debug(f"读取备用字体 cmap 失败 ({font_path}): {e}")
 
@@ -283,22 +319,34 @@ def init_glyph_fallback_engine():
             if char in _VULGAR_FRACTION_MAP:
                 return _draw_vertical_fraction(draw, char, xy, font)
 
-            left, top, right, bottom = font.getbbox(char)
-            # 若主字体获取该非空格字符的宽度或高度为 0（即主字库缺失该 Glyph 或为空白占位符）
-            if (right - left == 0) or (bottom - top == 0):
-                cp = ord(char)
+            # 1. 首先通过 cmap 精确检测主字体是否真正支持该字符
+            # （许多中文字体在缺失生僻字符或上下标时，不会返回空尺寸，而是会画出一个带问号的框 .notdef）
+            font_path = getattr(font, "path", None)
+            main_cmap = _get_font_cmap(font_path)
+            cp = ord(char)
+
+            # 若主字体存在且明确不含该码点，或者主字体尺寸检测为零宽/零高，触发字形回退
+            is_missing = False
+            if main_cmap and (cp not in main_cmap):
+                is_missing = True
+            else:
+                left, top, right, bottom = font.getbbox(char)
+                if (right - left <= 0) or (bottom - top <= 0):
+                    is_missing = True
+
+            if is_missing:
                 for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
                     if cp in fb_cmap:
                         try:
                             # 选用匹配的字号在原坐标绘制真实字形
                             fb_font = ImageFont.truetype(fb_path, size=font.size)
                             f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
-                            # 确保备用字体在该字符上有实质可见像素（高度和宽度均大于0）
                             if (f_right - f_left > 0) and (f_bottom - f_top > 0):
                                 draw.text(xy, char, fill=core._WHITE, font=fb_font)
                                 return max(1, f_right - f_left)
                         except Exception:
                             continue
+
             return orig_draw_char(draw, char, xy, font)
 
         core._draw_char = fallback_draw_char
