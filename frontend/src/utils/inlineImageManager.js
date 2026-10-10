@@ -18,7 +18,6 @@ export function collapseInlineImages(text, existingStore = {}) {
   }
 
   const imageStore = { ...existingStore };
-  const imageList = [];
   let counter = Object.keys(imageStore).length;
 
   // 正则匹配 ![alt](data:image/...;base64,...) 或 ![alt|scale](data:...)
@@ -79,7 +78,7 @@ export function expandInlineImages(text, imageStore = {}) {
   }
 
   // 1. 替换形如 ![插图 1]、![插图: 1]、![插图 1|50%] 等
-  let result = text.replace(/!\[(插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|([^\]]+))?)\]/g, (match, fullAlt, numStr, scaleStr) => {
+  let result = text.replace(/!\[(插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|[^\]]+)?)\]/g, (match, fullAlt, numStr) => {
     const id = `img_${numStr}`;
     const base64Data = imageStore[id] || imageStore[numStr];
     if (base64Data) {
