@@ -214,19 +214,25 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     line_w = max(nw, dw) + 6
     x, y = xy
 
-    # 分数线位置: 位于当前字符单元的垂直黄金分割位置（对齐文字基线）
-    line_y = y + int(font_size * 0.52)
-    line_thickness = max(1, int(font_size * 0.05))
+    # 分数线位置: 严格对齐当前主字符单元中轴线
+    line_y = y + int(font_size * 0.46)
+    line_thickness = max(1, int(font_size * 0.045))
     draw.line([(x, line_y), (x + line_w, line_y)], fill=core._WHITE, width=line_thickness)
 
-    # 分子: 紧挨分数线正上方（保证分子底部距离分数线至少 2px）
+    # 测量分子与分母整体实际文本边界
+    nb = f_sub.getbbox(num)
+    db = f_sub.getbbox(denom)
+    # 分子高度与底部偏移
+    n_bottom = nb[3]
+    # 分子: 底部严格位于 line_y - 2 处
     nx = x + (line_w - nw) // 2
-    ny = line_y - nh - 2
+    ny = line_y - n_bottom - 2
     _draw_text_or_fraction(draw, num, (nx, ny), f_sub, font_path)
 
-    # 分母: 紧挨分数线正下方（保证分母顶部距离分数线至少 2px）
+    # 分母: 顶部严格位于 line_y + line_thickness + 2 处
+    d_top = db[1]
     dx = x + (line_w - dw) // 2
-    dy = line_y + line_thickness + 2
+    dy = line_y + line_thickness + 2 - d_top
     _draw_text_or_fraction(draw, denom, (dx, dy), f_sub, font_path)
 
     return line_w + 4
