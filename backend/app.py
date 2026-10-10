@@ -44,11 +44,11 @@ from uuid import uuid4
 try:
     from docx_extractor import extract_text_from_docx
     from handdrawn_filter import render_inline_markdown_images
-    from symbol_fallback import normalize_text_for_font
+    from symbol_fallback import normalize_text_for_font, _get_cached_image_font
 except ImportError:
     from backend.docx_extractor import extract_text_from_docx
     from backend.handdrawn_filter import render_inline_markdown_images
-    from backend.symbol_fallback import normalize_text_for_font
+    from backend.symbol_fallback import normalize_text_for_font, _get_cached_image_font
 from werkzeug.utils import secure_filename
 
 # 2026-10-03：PyPDF2 / python-docx / identify（opencv + sklearn）/ pdf（PyMuPDF）原本都在
@@ -650,7 +650,7 @@ def apply_right_align(text, template):
     return "\n".join(output)
 
 
-def handwrite_with_page_breaks(text, template, font_path=None):
+def handwrite_with_page_breaks(text, template, font_path=None, is_single_page_preview=False):
     """Render text while honoring manual page-break, alignment markers, and font glyph fallback."""
     if font_path is None and hasattr(template, "get_font"):
         font_obj = template.get_font()
@@ -667,9 +667,6 @@ def handwrite_with_page_breaks(text, template, font_path=None):
     raw_chunks = _PAGE_BREAK_RE.split(aligned)
     chunks = []
     for index, chunk in enumerate(raw_chunks):
-        # Splitting a marker-only line leaves one delimiter newline on each
-        # side. Remove exactly those two newlines, preserving any additional
-        # blank lines the user intentionally placed around the page break.
         if index > 0 and chunk.startswith("\n"):
             chunk = chunk[1:]
         if index < len(raw_chunks) - 1 and chunk.endswith("\n"):
@@ -680,6 +677,11 @@ def handwrite_with_page_breaks(text, template, font_path=None):
 
     if not chunks:
         return render_inline_markdown_images("", template, handwrite)
+
+    if is_single_page_preview:
+        # 单页预览只需处理第 1 个 chunk
+        return render_inline_markdown_images(chunks[0], template, handwrite)
+
     return itertools.chain.from_iterable(
         render_inline_markdown_images(chunk, template, handwrite) for chunk in chunks
     )
@@ -960,16 +962,10 @@ async def generate_handwriting_impl(
         logger.info(f"font_option: {font_option}")
         logger.info(f"font_file_names: {font_file_names}")
         if font_option in font_file_names:
-            # 确定字体文件的完整路径
             font_path = os.path.join(font_assets_dir, font_option)
             logger.info(f"font_path: {font_path}")
-            # 打开字体文件并读取其内容为字节
-            with open(font_path, "rb") as f:
-                font_content = f.read()
-            # 通过 io.BytesIO 创建一个 BytesIO 对象，然后使用 ImageFont.truetype 从字节中加载字体
-            font = ImageFont.truetype(
-                io.BytesIO(font_content), size=int(data["font_size"])
-            )
+            # 使用带 LRU 缓存的字体实例加载器，避免重复从磁盘读几十兆字体
+            font = _get_cached_image_font(font_path, int(data["font_size"]))
             font.path = font_path
         else:
             return JSONResponse(
@@ -1018,27 +1014,56 @@ async def generate_handwriting_impl(
     # 创建一个BytesIO对象，用于保存.zip文件的内容
     logger.info(f"data[pdf_save]: {data['pdf_save']}")
     if not data["pdf_save"] == "true":
+        # 预览模式：检查是否为完整预览模式（本地开发）或单页预览模式（生产环境）
+        is_preview = data["preview"] == "true"
+        full_preview = data.get("full_preview", "true") if is_preview else None
+        is_single_preview = is_preview and (full_preview == "false")
+
         report_progress("rendering", "正在生成手写图像", 45)
         # handwrite() 返回惰性 map 对象，只做文本排版（毫秒级），
-        # 真正的 CPU 密集渲染在下方 for 循环消费 images 时才触发
+        # 真正的 CPU 密集渲染在下方消费 images 时才触发
         images = handwrite_with_page_breaks(
-            text_to_generate, template, font_path=font_path
+            text_to_generate, template, font_path=font_path, is_single_page_preview=is_single_preview
         )
         logger.info("handwrite initial images generated successfully")
-        # 创建项目内的临时目录，避免使用系统临时目录
+
+        # ⚡ 极致加速 1：单页快速预览（内存直接编码输出，0 磁盘 I/O，0 临时目录锁等待）
+        if is_single_preview:
+            first_im = next(iter(images), None)
+            if first_im is None:
+                first_im = background_image_obj
+            buf = io.BytesIO()
+            first_im.save(buf, format="PNG", compress_level=1)
+            image_data = buf.getvalue()
+            logger.info("Single preview image generated directly in memory (0 disk I/O)")
+            report_progress("finalizing", "正在返回预览结果", 100)
+            return Response(
+                content=image_data,
+                media_type="image/png",
+            )
+
+        # ⚡ 极致加速 2：多页预览（直接在内存中转为 Base64，无需中间临时文件写入与二次读回）
+        if is_preview:
+            preview_images_base64 = []
+            for i, im in enumerate(images):
+                buf = io.BytesIO()
+                im.save(buf, format="PNG", compress_level=1)
+                base64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+                preview_images_base64.append(base64_str)
+            logger.info(f"Full preview ({len(preview_images_base64)} pages) generated directly in memory")
+            report_progress("finalizing", "正在返回预览结果", 100)
+            return JSONResponse(
+                {"status": "success", "images": preview_images_base64}
+            )
+
+        # 打包导出 ZIP 路径
         project_temp_base = "./temp"
         os.makedirs(project_temp_base, exist_ok=True)
         temp_dir = tempfile.mkdtemp(dir=project_temp_base)
         unique_filename = "images_" + str(time.time())
         zip_path = f"./temp/{unique_filename}.zip"
-        # 预览模式：检查是否为完整预览模式（本地开发）或单页预览模式（生产环境）
-        is_preview = data["preview"] == "true"
-        full_preview = data.get("full_preview", "true") if is_preview else None
-        if is_preview:
-            logger.info(f"Preview mode enabled, full_preview: {full_preview}")
 
         try:
-            preview_images_base64 = []
             try:
                 total_images = len(images)
                 if total_images <= 0:
@@ -1047,7 +1072,6 @@ async def generate_handwriting_impl(
                 total_images = None
             for i, im in enumerate(images):
                 if total_images is None:
-                    # 兼容 handwrite 返回 map/generator 等无长度可迭代对象
                     dynamic_progress = min(90, 60 + min(i, 30))
                     report_progress("rendering", f"正在处理第 {i + 1} 页", dynamic_progress)
                 else:
@@ -1064,72 +1088,35 @@ async def generate_handwriting_impl(
 
                 del im  # 释放内存
 
-                if is_preview:
-                    # 预览模式：读取文件内容到内存
-                    with open(image_path, "rb") as f:
-                        image_data = f.read()
+            report_progress("packaging", "正在打包ZIP文件", 92)
+            shutil.make_archive(zip_path[:-4], "zip", temp_dir)
 
-                    if full_preview == "false":
-                        # 单页预览模式（生产环境）：只返回第一张图片，立即返回
-                        safe_remove_directory(temp_dir)
-                        report_progress("finalizing", "正在返回预览结果", 100)
-                        return Response(
-                            content=image_data,
-                            media_type="image/png",
-                        )
+            try:
+                with open(zip_path, "rb") as f:
+                    zip_data = f.read()
 
-                    # 完整预览模式（本地开发）：将图片转换为Base64字符串
-                    base64_str = base64.b64encode(image_data).decode('utf-8')
-                    preview_images_base64.append(base64_str)
-
-            if is_preview:
-                # 完整预览模式：返回包含所有图片Base64字符串的JSON
-                # 立即清理整个临时目录
-                safe_remove_directory(temp_dir)
-                report_progress("finalizing", "正在返回预览结果", 100)
-
-                return JSONResponse(
-                    {"status": "success", "images": preview_images_base64}
+                safe_remove_file(zip_path)
+                report_progress("finalizing", "正在返回ZIP结果", 100)
+                return Response(
+                    content=zip_data,
+                    media_type="application/zip",
+                    headers={
+                        "Content-Disposition": "attachment; filename=images.zip"
+                    },
                 )
-
-            if not is_preview:
-                report_progress("packaging", "正在打包ZIP文件", 92)
-                # 创建ZIP文件
-                shutil.make_archive(zip_path[:-4], "zip", temp_dir)
-
-                # 读取ZIP文件到内存，然后立即删除文件
-                try:
-                    with open(zip_path, "rb") as f:
-                        zip_data = f.read()
-
-                    # 立即删除ZIP文件
-                    safe_remove_file(zip_path)
-
-                    # 从内存发送文件
-                    report_progress("finalizing", "正在返回ZIP结果", 100)
-                    response = Response(
-                        content=zip_data,
-                        media_type="application/zip",
-                        headers={
-                            "Content-Disposition": "attachment; filename=images.zip"
-                        },
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to read ZIP file: {e}")
-                    # 降级到直接读文件发送
-                    with open(zip_path, "rb") as f:
-                        zip_data = f.read()
-                    report_progress("finalizing", "正在返回ZIP结果", 100)
-                    response = Response(
-                        content=zip_data,
-                        media_type="application/zip",
-                        headers={
-                            "Content-Disposition": "attachment; filename=images.zip"
-                        },
-                    )
-            return response
+            except Exception as e:
+                logger.error(f"Failed to read ZIP file: {e}")
+                with open(zip_path, "rb") as f:
+                    zip_data = f.read()
+                report_progress("finalizing", "正在返回ZIP结果", 100)
+                return Response(
+                    content=zip_data,
+                    media_type="application/zip",
+                    headers={
+                        "Content-Disposition": "attachment; filename=images.zip"
+                    },
+                )
         finally:
-            # 使用改进的安全删除函数
             safe_remove_directory(temp_dir)
             # ZIP文件已在上面删除，这里只是保险
     else:
