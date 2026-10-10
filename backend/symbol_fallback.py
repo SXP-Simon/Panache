@@ -177,8 +177,9 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
 
     # 1. 基础单项式分式正则（数值、导数、单字母变量、带下标变量等）：
     # 例如：1/2, 3/4, 4/3, 1/3, 1/300, 1/y, 1/y₁, 1/y₂, 2/t, 0.2/t, dt/t, ds/s, dV/V, dR/R, 0.00005/0.9863
+    # 注意：负向前瞻禁止跟随 '('，防止将 f'(y) · y / f(y) 中的 y / f 误切分为分式！
     p_single = re.compile(
-        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][a-zA-Z]|[εa-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀]?)\s*\/\s*([0-9.]+|[dD]?[a-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀%²³]?)(?![0-9a-zA-Z._/])"
+        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][a-zA-Z]|[εa-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀]?)\s*\/\s*([0-9.]+|[dD]?[a-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀%²³]?)(?![0-9a-zA-Z._/(])"
     )
 
     # 2. 深度平衡括号分式扫描：能够精准匹配 (ε*(s))/(s), (gt · ε*(t))/(1/2 gt²), (2ε*(t))/t 等任意嵌套函数括号！
@@ -214,7 +215,7 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
                         if right_info:
                             r_start, r_end, r_content = right_info
                         else:
-                            # 尝试匹配右侧紧挨的单 token
+                            # 尝试匹配右侧紧挨的单 token，并检查是否为函数调用形如 f(y)
                             suffix = s[i + 1:].lstrip()
                             m_right = p_denom_token.match(suffix)
                             if not m_right:
@@ -223,6 +224,12 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
                             r_start = i + 1 + skip_spaces + m_right.start()
                             r_end = i + 1 + skip_spaces + m_right.end()
                             r_content = m_right.group(1)
+                            # 如果紧接着括号 (y)，则将函数参数一并纳为分母整体：f(y)
+                            if r_end < len(s) and s[r_end] == '(':
+                                f_arg = _extract_balanced_paren_forward(s, r_end - 1)
+                                if f_arg:
+                                    r_end = f_arg[1]
+                                    r_content = s[r_start:r_end]
 
                         # 对提取出的分子分母递归清洗内部可能含有的简单单项式或真分数
                         num_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), l_content.strip())
@@ -243,6 +250,38 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     return text
 
 
+def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple[Any, Tuple[int, int, int, int], int]:
+    """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance。
+    支持主字体与备用字库（Fallback fonts）的精确匹配，彻底避免缺失字符（如 ε、₁、·、²）返回虚假宽度的留白问题。
+    """
+    main_cmap = _get_font_cmap(font_path)
+    cp = ord(char)
+    is_missing = False
+    if main_cmap and (cp not in main_cmap):
+        is_missing = True
+    else:
+        left, top, right, bottom = font.getbbox(char)
+        if (right - left <= 0) or (bottom - top <= 0):
+            is_missing = True
+
+    if is_missing:
+        for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
+            if cp in fb_cmap:
+                try:
+                    fb_font = ImageFont.truetype(fb_path, size=font.size)
+                    f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
+                    if (f_right - f_left > 0) and (f_bottom - f_top > 0):
+                        return (fb_font, (f_left, f_top, f_right, f_bottom), max(1, f_right - f_left))
+                except Exception:
+                    continue
+        fs = getattr(font, "size", 30)
+        return (font, (0, 0, int(fs * 0.4), fs), int(fs * 0.4))
+    else:
+        bb = font.getbbox(char)
+        w = max(1, bb[2] - bb[0] + 1)
+        return (font, bb, w)
+
+
 def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path: Optional[str]) -> Tuple[int, int]:
     """绘制一段可能包含真分数/普通文本的子串，返回 (总宽度, 最大高度)"""
     import handright._core as core
@@ -257,10 +296,9 @@ def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path
             w = _draw_vertical_fraction(draw, ch, (x, y), font)
             x += w
         else:
-            bb = font.getbbox(ch)
-            draw.text((x, y), ch, fill=core._WHITE, font=font)
-            w = max(1, bb[2] - bb[0] + 1)
-            x += w
+            fb_font, bb, adv = _get_char_glyph_and_bbox(ch, font, font_path)
+            draw.text((x, y), ch, fill=core._WHITE, font=fb_font)
+            x += adv
     return x - start_x, max_h
 
 
@@ -281,8 +319,8 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
             dw, _ = _measure_text_or_fraction(d, f_sub, font_path)
             total_w += max(nw, dw) + 10
         else:
-            bb = font.getbbox(ch)
-            total_w += max(1, bb[2] - bb[0] + 1)
+            _, _, adv = _get_char_glyph_and_bbox(ch, font, font_path)
+            total_w += adv
     return total_w, font_size
 
 
@@ -303,12 +341,12 @@ def _get_rendered_text_bbox(text: str, font, font_path: Optional[str]) -> Tuple[
             max_y = max(max_y, fs)
             curr_x += w
         else:
-            bb = font.getbbox(ch)
+            _, bb, adv = _get_char_glyph_and_bbox(ch, font, font_path)
             if bb and (bb[2] > bb[0] or bb[3] > bb[1]):
                 has_valid = True
                 min_y = min(min_y, bb[1])
                 max_y = max(max_y, bb[3])
-                curr_x += max(1, bb[2] - bb[0] + 1)
+                curr_x += adv
             else:
                 curr_x += int(fs * 0.5)
 
