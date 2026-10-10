@@ -85,7 +85,7 @@ test("handles asterisk lists and preserves arithmetic multiplication without str
   const output = cleanMarkdown(input);
   assert.equal(
     output,
-    "- 步骤一: 计算 3 * 4 * 5 = 60\n- 步骤二: 重要提示 注意斜体 乘法 a * b"
+    "步骤一: 计算 3 * 4 * 5 = 60\n步骤二: 重要提示 注意斜体 乘法 a * b"
   );
 });
 
@@ -95,6 +95,7 @@ test("handles discrete math markdown content with tables, lists, and formulas cl
     "# 离散数学：真值表与命题演算",
     "> 结论：该公式为可满足式。",
     "* 变元定义：$p, q, r$",
+    "- 负号计算：-0.5 与 -x-x̄",
     "* 乘法与集合：A * B 与 2 * 3",
     "",
     "| p | q | p -> q |",
@@ -106,7 +107,8 @@ test("handles discrete math markdown content with tables, lists, and formulas cl
   assert.ok(output.includes("离散数学：真值表与命题演算"));
   assert.ok(output.includes("结论：该公式为可满足式。"));
   assert.ok(!output.includes("> 结论"));
-  assert.ok(output.includes("- 变元定义：$p, q, r$"));
+  assert.ok(output.includes("变元定义：$p, q, r$"));
+  assert.ok(output.includes("负号计算：-0.5 与 -x-x̄"));
   assert.ok(output.includes("A * B 与 2 * 3"));
   assert.ok(!output.includes("#"));
   assert.ok(!output.includes("|"));
