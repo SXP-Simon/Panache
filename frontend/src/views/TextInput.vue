@@ -75,16 +75,103 @@
                 v-for="img in referencedImages" 
                 :key="img.id" 
                 class="inline-img-card badge bg-white text-dark border d-flex align-items-center gap-2 p-1 pe-2 shadow-sm"
-                :title="img.alt">
+                :title="img.alt"
+                data-testid="inline-img-card"
+                @click="openImageModal(img)">
                 <img :src="img.data" class="inline-img-thumbnail" :alt="img.alt" />
                 <span class="inline-img-tag font-monospace">{{ img.alt }}</span>
+                <span class="badge bg-secondary-subtle text-secondary border px-1 font-monospace" style="font-size: 0.7rem;">{{ img.scale || '100%' }}</span>
                 <button 
                     type="button" 
                     class="btn-inline-img-remove" 
                     :title="$t('message.delete')" 
-                    @click="removeInlineImage(img.id, img.index)">
+                    data-testid="inline-img-remove-btn"
+                    @click.stop="removeInlineImage(img.id, img.index)">
                     &times;
                 </button>
+            </div>
+        </div>
+
+        <!-- 图片预览与尺寸调节弹窗 Modal -->
+        <div v-if="isImageModalOpen" class="modal-overlay image-preview-overlay" data-testid="image-preview-modal" @click.self="closeImageModal">
+            <div class="modal-dialog modal-dialog-centered image-preview-dialog">
+                <div class="modal-content shadow border-0">
+                    <div class="modal-header border-bottom py-2 px-3 d-flex justify-content-between align-items-center bg-light">
+                        <h6 class="modal-title m-0 d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="#007BFF">
+                                <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                                <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
+                            </svg>
+                            <span>{{ activeImage ? activeImage.alt : $t('message.imagePreviewTitle') }}</span>
+                        </h6>
+                        <button type="button" class="btn-close" aria-label="Close" @click="closeImageModal"></button>
+                    </div>
+
+                    <div class="modal-body p-3 text-center d-flex flex-column align-items-center">
+                        <!-- 大图预览展示区 -->
+                        <div class="image-preview-stage d-flex justify-content-center align-items-center p-2 rounded mb-3">
+                            <img v-if="activeImage" :src="activeImage.data" class="image-preview-full img-fluid rounded" :alt="activeImage.alt" />
+                        </div>
+
+                        <!-- 尺寸调节控制条 -->
+                        <div class="image-size-control-panel w-100 p-2 bg-light rounded border text-start">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-semibold text-secondary m-0 d-flex align-items-center gap-1">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M5.828 10.172a.5.5 0 0 0-.707 0l-4.096 4.096V11.5a.5.5 0 0 0-1 0v3.975a.5.5 0 0 0 .5.5H4.5a.5.5 0 0 0 0-1H1.732l4.096-4.096a.5.5 0 0 0 0-.707zm4.344 0a.5.5 0 0 1 .707 0l4.096 4.096V11.5a.5.5 0 1 1 1 0v3.975a.5.5 0 0 1-.5.5H11.5a.5.5 0 0 1 0-1h2.768l-4.096-4.096a.5.5 0 0 1 0-.707zm0-4.344a.5.5 0 0 0 .707 0l4.096-4.096V4.5a.5.5 0 1 0 1 0V.525a.5.5 0 0 0-.5-.5H11.5a.5.5 0 0 0 0 1h2.768l-4.096 4.096a.5.5 0 0 0 0 .707zm-4.344 0a.5.5 0 0 1-.707 0L1.732 1.732V4.5a.5.5 0 1 1-1 0V.525a.5.5 0 0 1 .5-.5H4.5a.5.5 0 0 1 0 1H1.732l4.096 4.096a.5.5 0 0 1 0 .707z"/>
+                                    </svg>
+                                    {{ $t('message.imageSize') }}
+                                </label>
+                                <span class="badge bg-primary px-2 font-monospace" data-testid="active-scale-badge">{{ currentSelectedScale }}</span>
+                            </div>
+
+                            <!-- 预设档位按钮 -->
+                            <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                <button 
+                                    v-for="scaleOption in scalePresets" 
+                                    :key="scaleOption.value"
+                                    type="button" 
+                                    class="btn"
+                                    :class="currentSelectedScale === scaleOption.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @click="changeImageScale(scaleOption.value)">
+                                    {{ scaleOption.label }}
+                                </button>
+                            </div>
+
+                            <!-- 平滑滑块微调 -->
+                            <div class="d-flex align-items-center gap-2 px-1">
+                                <span class="small text-muted font-monospace">20%</span>
+                                <input 
+                                    type="range" 
+                                    class="form-range flex-grow-1" 
+                                    min="20" 
+                                    max="100" 
+                                    step="5"
+                                    :value="numericScaleValue"
+                                    @input="handleScaleSliderChange"
+                                    data-testid="scale-slider" />
+                                <span class="small text-muted font-monospace">100%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-between align-items-center">
+                        <button 
+                            type="button" 
+                            class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                            data-testid="modal-delete-btn"
+                            @click="removeActiveImage">
+                            {{ $t('message.delete') }}
+                        </button>
+                        <button 
+                            type="button" 
+                            class="btn btn-sm btn-primary px-3" 
+                            data-testid="modal-close-btn"
+                            @click="closeImageModal">
+                            {{ $t('message.close') }}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -123,6 +210,22 @@ export default {
         referencedImages() {
             return getReferencedImages(this.text, this.inlineImageStore);
         },
+        currentSelectedScale() {
+            if (!this.activeImage) return '100%';
+            // 从文本中提取当前图片的 scale
+            const regex = new RegExp(`!\\[(?:插图[ \\t]*[#:_-]?[ \\t]*${this.activeImage.index}(?:\\|([^\\]]+))?)\\]`);
+            const m = regex.exec(this.text);
+            if (m && m[1]) {
+                const s = m[1].trim();
+                return s.includes('%') ? s : `${s}%`;
+            }
+            return '100%';
+        },
+        numericScaleValue() {
+            const raw = this.currentSelectedScale.replace('%', '').trim();
+            const val = parseInt(raw, 10);
+            return isNaN(val) ? 100 : val;
+        },
     },
 
     data() {
@@ -133,6 +236,14 @@ export default {
             tableMode: 'list', // 'list' | 'aligned' | 'raw_pipe'
             quickSymbols: ['⇒', '→', '∈', 'Σ', 'α', 'β', 'π', '²', '³', '√', '≤', '≥', '≠', '|'],
             inlineImageStore: {},
+            isImageModalOpen: false,
+            activeImage: null,
+            scalePresets: [
+                { label: '30%', value: '30%' },
+                { label: '50%', value: '50%' },
+                { label: '75%', value: '75%' },
+                { label: '100%', value: '100%' },
+            ],
         };
     },
     //当输入框的值发生变化时，通知HomeView更新text_handwriting 7.4
@@ -208,11 +319,46 @@ export default {
                 }
             }
         },
+        openImageModal(img) {
+            this.activeImage = img;
+            this.isImageModalOpen = true;
+        },
+        closeImageModal() {
+            this.isImageModalOpen = false;
+            this.activeImage = null;
+        },
+        changeImageScale(newScale) {
+            if (!this.activeImage) return;
+            const index = this.activeImage.index;
+            // 匹配并替换当前图片占位符中的比例后缀
+            const regex = new RegExp(`!\\[(插图[ \\t]*[#:_-]?[ \\t]*${index})(?:\\|[^\\n\\]]+)?\\]`, 'g');
+            const targetTag = newScale === '100%' ? `![插图 ${index}]` : `![插图 ${index}|${newScale}]`;
+            this.text = this.text.replace(regex, targetTag);
+            this.emitExpandedText();
+            // 同步更新 activeImage
+            this.activeImage = {
+                ...this.activeImage,
+                scale: newScale,
+            };
+        },
+        handleScaleSliderChange(e) {
+            const val = e.target.value;
+            this.changeImageScale(`${val}%`);
+        },
+        removeActiveImage() {
+            if (!this.activeImage) return;
+            const { id, index } = this.activeImage;
+            this.removeInlineImage(id, index);
+            this.closeImageModal();
+        },
         removeInlineImage(id, index) {
             delete this.inlineImageStore[id];
-            const regex = new RegExp(`!\\[(插图[ \\t]*[#:_-]?[ \\t]*${index}|[^\\]]*\\(img:?_?${index}\\))\\]`, 'g');
+            const regex = new RegExp(`!\\[(插图[ \\t]*[#:_-]?[ \\t]*${index}(?:\\|[^\\n\\]]+)?|[^\\]]*\\(img:?_?${index}\\))\\]`, 'g');
             this.text = this.text.replace(regex, '');
             this.emitExpandedText();
+            if (this.activeImage && this.activeImage.id === id) {
+                this.closeImageModal();
+            }
         },
         handleTextareaKeyDown(e) {
             // 当在输入框中按下 Ctrl+A (或 Mac 下 Cmd+A) 时，精准全选输入框内文本并阻止事件冒泡扩散到全页
@@ -535,6 +681,7 @@ export default {
     padding: 2px 6px 2px 4px !important;
     font-size: 0.78rem;
     color: #333;
+    cursor: pointer;
     transition: all 0.15s ease;
 }
 
@@ -571,6 +718,46 @@ export default {
 .btn-inline-img-remove:hover {
     background-color: #fee2e2;
     color: #b91c1c;
+}
+
+/* 插图预览弹窗样式 */
+.image-preview-overlay {
+    z-index: 1050;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.image-preview-dialog {
+    max-width: 520px;
+    width: 90%;
+    margin: auto;
+}
+
+.image-preview-stage {
+    background-color: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    min-height: 180px;
+    max-height: 380px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.image-preview-full {
+    max-height: 360px;
+    object-fit: contain;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.image-size-control-panel {
+    border-color: #dee2e6 !important;
 }
 
 #textArea {

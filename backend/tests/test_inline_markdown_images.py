@@ -91,6 +91,14 @@ class InlineMarkdownImageTest(unittest.TestCase):
         self.assertEqual(len(pages), 1)
         self.assertEqual(pages[0].size, (600, 800))
 
+    def test_parse_image_scale(self):
+        from handdrawn_filter import _parse_image_scale
+        self.assertAlmostEqual(_parse_image_scale("插图 1"), 1.0)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|50%"), 0.5)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|30%"), 0.3)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|scale=0.75"), 0.75)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|100%"), 1.0)
+
 
 
 if __name__ == "__main__":

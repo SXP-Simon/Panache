@@ -21,7 +21,7 @@ export function collapseInlineImages(text, existingStore = {}) {
   const imageList = [];
   let counter = Object.keys(imageStore).length;
 
-  // 正则匹配 ![alt](data:image/...;base64,...)
+  // 正则匹配 ![alt](data:image/...;base64,...) 或 ![alt|scale](data:...)
   const base64ImgRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
 
   const collapsedText = text.replace(base64ImgRegex, (match, alt, base64Data) => {
@@ -42,36 +42,25 @@ export function collapseInlineImages(text, existingStore = {}) {
 
     const indexMatch = foundId.match(/\d+/);
     const indexNum = indexMatch ? parseInt(indexMatch[0], 10) : counter;
-    const cleanAlt = (alt && alt.trim() && alt.trim() !== '插图') ? alt.trim() : `插图 ${indexNum}`;
+    
+    // 如果 alt 中携带了 |50% 等参数，予以提取
+    let scaleSuffix = '';
+    let baseAlt = alt ? alt.trim() : '';
+    if (baseAlt.includes('|')) {
+      const parts = baseAlt.split('|');
+      baseAlt = parts[0].trim();
+      scaleSuffix = `|${parts[1].trim()}`;
+    }
+    // 统一以 "插图 <index>" 为标准标记，便于双向索引与跨组件管理
+    const cleanAlt = `插图 ${indexNum}${scaleSuffix}`;
 
     return `![${cleanAlt}]`;
   });
 
-  // 扫描当前文本中所有短占位符与图片引用
-  const shortPlaceholderRegex = /!\[(插图(?:[ \t]*[#:\d]+)?|[^\]]+)\]/g;
-  let placeholderMatch;
-  while ((placeholderMatch = shortPlaceholderRegex.exec(collapsedText)) !== null) {
-    const rawTag = placeholderMatch[1].trim();
-    // 匹配 "插图 1", "插图: 1", "插图 #1", "插图-1" 或数字
-    const numMatch = rawTag.match(/\d+/);
-    if (numMatch) {
-      const idx = parseInt(numMatch[0], 10);
-      const id = `img_${idx}`;
-      if (imageStore[id] && !imageList.some(item => item.id === id)) {
-        imageList.push({
-          id,
-          index: idx,
-          alt: rawTag,
-          data: imageStore[id]
-        });
-      }
-    }
-  }
-
   return {
     collapsedText,
     imageStore,
-    imageList
+    imageList: getReferencedImages(collapsedText, imageStore)
   };
 }
 
@@ -89,8 +78,8 @@ export function expandInlineImages(text, imageStore = {}) {
     return text;
   }
 
-  // 1. 替换形如 ![插图 1]、![插图: 1]、![插图#1]、![插图-1]
-  let result = text.replace(/!\[(插图[ \t]*[#:_-]?[ \t]*(\d+))\]/g, (match, fullAlt, numStr) => {
+  // 1. 替换形如 ![插图 1]、![插图: 1]、![插图 1|50%] 等
+  let result = text.replace(/!\[(插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|([^\]]+))?)\]/g, (match, fullAlt, numStr, scaleStr) => {
     const id = `img_${numStr}`;
     const base64Data = imageStore[id] || imageStore[numStr];
     if (base64Data) {
@@ -99,7 +88,7 @@ export function expandInlineImages(text, imageStore = {}) {
     return match;
   });
 
-  // 2. 替换形如 ![插图](img:1) 或 ![alt](img_1)
+  // 2. 替换形如 ![插图](img:1) 或 ![alt|50%](img_1)
   result = result.replace(/!\[([^\]]*)\]\(img:?_?(\d+)\)/g, (match, alt, numStr) => {
     const id = `img_${numStr}`;
     const base64Data = imageStore[id] || imageStore[numStr];
@@ -116,15 +105,17 @@ export function expandInlineImages(text, imageStore = {}) {
  * 获取当前文本中正在引用的图片列表
  * @param {string} text 文本内容
  * @param {Object.<string, string>} imageStore 图片映射字典
- * @returns {Array<{ id: string, index: number, alt: string, data: string }>}
+ * @returns {Array<{ id: string, index: number, alt: string, scale: string, data: string }>}
  */
 export function getReferencedImages(text, imageStore = {}) {
   if (!text || !imageStore) return [];
   const list = [];
-  const regex = /!\[(?:插图[ \t]*[#:_-]?[ \t]*(\d+)|[^\]]*\(img:?_?(\d+)\))\]/g;
+  // 匹配 ![插图 1]、![插图 1|50%]、![插图: 1|75%]
+  const regex = /!\[(?:插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|([^\]]+))?|([^\]]*)\(img:?_?(\d+)\))\]/g;
   let m;
   while ((m = regex.exec(text)) !== null) {
-    const num = m[1] || m[2];
+    const num = m[1] || m[4];
+    const scaleStr = (m[2] ? m[2].trim() : '') || '100%';
     if (num) {
       const id = `img_${num}`;
       if (imageStore[id] && !list.some(item => item.id === id)) {
@@ -132,6 +123,7 @@ export function getReferencedImages(text, imageStore = {}) {
           id,
           index: parseInt(num, 10),
           alt: `插图 ${num}`,
+          scale: scaleStr,
           data: imageStore[id]
         });
       }

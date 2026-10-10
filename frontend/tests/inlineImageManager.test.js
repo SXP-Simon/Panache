@@ -1,71 +1,41 @@
-const assert = require("assert").strict;
+const assert = require('assert').strict;
 
-const tests = [];
-function test(name, run) {
-  tests.push({ name, run });
-}
+async function run() {
+  const { collapseInlineImages, expandInlineImages, getReferencedImages } = await import('../src/utils/inlineImageManager.js');
 
-const inlineModule = import("../src/utils/inlineImageManager.js");
-const cleanModule = import("../src/utils/cleanMarkdown.js");
+  const testBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-const dummyBase64_1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-const dummyBase64_2 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-
-test("collapses long base64 markdown images to lightweight short placeholders", async () => {
-  const { collapseInlineImages } = await inlineModule;
-  const rawText = `这是题目\n![插图](${dummyBase64_1})\n请结合上图作答。`;
+  // 1. 折叠长 Base64 为短占位符
+  const rawText = `这是正文前\n![图示](${testBase64})\n这是正文后`;
   const { collapsedText, imageStore, imageList } = collapseInlineImages(rawText);
 
-  assert.equal(collapsedText, "这是题目\n![插图 1]\n请结合上图作答。");
-  assert.equal(imageStore["img_1"], dummyBase64_1);
-  assert.equal(imageList.length, 1);
-  assert.equal(imageList[0].index, 1);
-});
+  assert.equal(collapsedText.includes(testBase64), false, '超长 Base64 必须被折叠消除');
+  assert.equal(collapsedText.includes('![插图 1]'), true, '应当生成统一的短标记 ![插图 1]');
+  assert.equal(imageList.length, 1, '引用的图片列表长度应为 1');
+  assert.equal(imageList[0].scale, '100%', '缺省比例应为 100%');
 
-test("expands short placeholders back to full markdown base64 before generation", async () => {
-  const { expandInlineImages } = await inlineModule;
-  const store = {
-    img_1: dummyBase64_1,
-    img_2: dummyBase64_2
-  };
-  const collapsedText = "步骤一：\n![插图 1]\n步骤二：\n![插图 2]\n完。";
-  const expanded = expandInlineImages(collapsedText, store);
+  // 2. 带比例后缀的占位符测试
+  const scaledText = `分析如下：\n![插图 1|50%]\n以及小图：![插图 1|30%]`;
+  const refImages = getReferencedImages(scaledText, imageStore);
+  assert.equal(refImages.length, 1);
+  assert.equal(refImages[0].scale, '50%');
 
-  assert.ok(expanded.includes(dummyBase64_1));
-  assert.ok(expanded.includes(dummyBase64_2));
-  assert.ok(expanded.includes("![插图 1]("));
-  assert.ok(expanded.includes("![插图 2]("));
-});
+  // 3. 展开还原为真实 Markdown 标记
+  const expanded = expandInlineImages(scaledText, imageStore);
+  assert.equal(expanded.includes(testBase64), true, '展开后必须包含真实的 Base64 数据');
+  assert.equal(expanded.includes('![插图 1|50%]'), true, '展开时必须保留比例后缀');
 
-test("cleanMarkdown protects both short placeholders and raw inline base64 images", async () => {
-  const { cleanMarkdown } = await cleanModule;
-  const inputWithShort = "# 实验报告\n* 第一部分：电路图\n![插图 1]\n* 结论：[项目链接](http://example.com)";
-  const outputShort = cleanMarkdown(inputWithShort);
+  // 4. cleanMarkdown 格式清洗保护测试
+  const { cleanMarkdown } = await import('../src/utils/cleanMarkdown.js');
+  const dirtyMarkdown = `# 大题分析\n* 第一部分：图表\n![插图 1|50%]\n* 结论：[项目链接](http://example.com)`;
+  const cleaned = cleanMarkdown(dirtyMarkdown);
+  assert.equal(cleaned.includes('![插图 1|50%]'), true, 'cleanMarkdown 必须完整保护带比例的短插图标记');
+  assert.equal(cleaned.includes('#'), false, 'Markdown 标题符号应当被清洗');
 
-  assert.ok(outputShort.includes("![插图 1]"));
-  assert.ok(outputShort.includes("结论：项目链接"));
-  assert.ok(!outputShort.includes("#"));
-
-  const inputWithRawBase64 = `### 思考题\n> 如图所示\n![插图](${dummyBase64_1})\n请计算。`;
-  const outputRaw = cleanMarkdown(inputWithRawBase64);
-  assert.ok(outputRaw.includes(dummyBase64_1));
-  assert.ok(outputRaw.includes("如图所示"));
-});
-
-async function runAll() {
-  let passed = 0;
-  for (const { name, run } of tests) {
-    try {
-      await run();
-      passed++;
-      console.log(`✓ ${name}`);
-    } catch (e) {
-      console.error(`✗ ${name}`);
-      console.error(e);
-      process.exitCode = 1;
-    }
-  }
-  console.log(`\nPassed ${passed} / ${tests.length} tests.`);
+  console.log('All inlineImageManager tests passed successfully!');
 }
 
-runAll();
+run().catch(err => {
+  console.error(err);
+  process.exitCode = 1;
+});

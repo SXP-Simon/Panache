@@ -165,6 +165,32 @@ MARKDOWN_IMAGE_RE = re.compile(
 )
 
 
+def _parse_image_scale(alt_text: str) -> float:
+    """从 alt 文本中解析缩放比例（如 '插图 1|50%'、'插图 1|scale=0.6' 或 '30%'），默认 1.0 (100%)。"""
+    if not alt_text or "|" not in alt_text:
+        return 1.0
+    try:
+        parts = alt_text.split("|", 1)
+        param = parts[1].strip().lower()
+        if "%" in param:
+            pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", param)
+            if pct_match:
+                pct = float(pct_match.group(1))
+                return max(0.1, min(1.0, pct / 100.0))
+        scale_match = re.search(r"(?:scale\s*=\s*|w\s*=\s*)?(\d+(?:\.\d+)?)", param)
+        if scale_match:
+            val = float(scale_match.group(1))
+            if val > 1.0:
+                # 可能是百分比整数如 50
+                if val <= 100.0:
+                    return max(0.1, min(1.0, val / 100.0))
+            else:
+                return max(0.1, min(1.0, val))
+    except Exception:
+        pass
+    return 1.0
+
+
 def render_inline_markdown_images(
     text: str,
     template,
@@ -184,13 +210,15 @@ def render_inline_markdown_images(
     last_end = 0
     for match in MARKDOWN_IMAGE_RE.finditer(text):
         before_text = text[last_end:match.start()]
+        alt_text = match.group(1).strip()
         img_data = match.group(2).strip()
-        parts.append(("text", before_text))
-        parts.append(("image", img_data))
+        scale = _parse_image_scale(alt_text)
+        parts.append(("text", before_text, 1.0))
+        parts.append(("image", img_data, scale))
         last_end = match.end()
     remaining = text[last_end:]
     if remaining:
-        parts.append(("text", remaining))
+        parts.append(("text", remaining, 1.0))
 
     bg_orig = template.get_background()
     width, height = bg_orig.size
@@ -216,7 +244,7 @@ def render_inline_markdown_images(
 
     import copy
 
-    for part_type, content in parts:
+    for part_type, content, scale in parts:
         if part_type == "text":
             if not content.strip():
                 continue
@@ -247,9 +275,11 @@ def render_inline_markdown_images(
 
             # 转换为透明墨水手绘风格
             hd_img = process_image_to_handdrawn(raw_img)
-            # 自适应页面版心缩放
+            # 自适应页面版心缩放，根据 scale 调节最大允许宽度
+            target_max_width = max(50, int(usable_width * scale))
+            target_max_height = max(50, int(max_img_height * scale))
             fitted_img = fit_image_to_layout(
-                hd_img, max_width=usable_width, max_height=max_img_height
+                hd_img, max_width=target_max_width, max_height=target_max_height
             )
             img_w, img_h = fitted_img.size
 
