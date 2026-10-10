@@ -13,7 +13,9 @@ import functools
 import glob
 import logging
 import os
+import re
 from typing import Dict, List, Optional, Set, Tuple
+
 
 from PIL import ImageFont
 
@@ -90,7 +92,7 @@ def _find_fallback_font_files() -> List[str]:
 
 
 # 标准真分数及常用手写竖式分数字符与 (分子, 分母) 映射表
-_VULGAR_FRACTION_MAP = {
+_VULGAR_FRACTION_MAP: Dict[str, Tuple[str, str]] = {
     "½": ("1", "2"),
     "⅓": ("1", "3"),
     "⅔": ("2", "3"),
@@ -111,6 +113,57 @@ _VULGAR_FRACTION_MAP = {
     "\ue002": ("1", "9"),
     "\ue003": ("1", "10"),
 }
+
+_DYNAMIC_PUA_COUNTER = 0xE200
+
+
+def register_dynamic_fraction(num: str, denom: str) -> str:
+    """动态注册一个新的手写分式并分配 PUA 码点。"""
+    global _DYNAMIC_PUA_COUNTER
+    key = (num.strip(), denom.strip())
+    for ch, v in _VULGAR_FRACTION_MAP.items():
+        if v == key:
+            return ch
+    ch = chr(_DYNAMIC_PUA_COUNTER)
+    _DYNAMIC_PUA_COUNTER += 1
+    _VULGAR_FRACTION_MAP[ch] = key
+    return ch
+
+
+def convert_slashed_fractions_to_vertical(text: str) -> str:
+    """自动将文本中出现的 (A)/(B) 复杂代数分式以及数值、导数单项分式转换为上下竖式分式。"""
+    if not text:
+        return ""
+
+    # 0. 将前缀真分数字符（如 ½gt², ⅓x）解构为统一的上下竖式分式 (1)/(2gt²)，避免分母与字母分离
+    for vulgar_char, (v_num, v_denom) in list(_VULGAR_FRACTION_MAP.items()):
+        # 仅针对 ½, ⅓ 等标准 Unicode 真分数，若后紧跟字母或代数项（如 ½gt²）
+        if len(vulgar_char) == 1 and ord(vulgar_char) < 0xE000:
+            pattern = re.compile(re.escape(vulgar_char) + r"([a-zA-Z][0-9a-zA-Z_²³₁₂₃₄\.]*)")
+            text = pattern.sub(
+                lambda m, n=v_num, d=v_denom: register_dynamic_fraction(n, f"{d}{m.group(1)}"),
+                text,
+            )
+
+    # 1. 匹配带括号的公式型分式：(分子)/(分母)，如 (ε(x₁))/(|x₁|), (gt · dt)/(½gt²), (0.00005)/(1.1062)
+    # 若分母中含 ½ 等真分数，先还原为易读形式如 1/2gt² 或 0.5gt²，避免 PUA 码点在子字符串中引起绘制异常
+    def _clean_denom_expr(expr: str) -> str:
+        for v_char, (vn, vd) in _VULGAR_FRACTION_MAP.items():
+            if v_char in expr:
+                expr = expr.replace(v_char, f"{vn}/{vd}")
+        return expr
+
+    p1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
+    text = p1.sub(lambda m: register_dynamic_fraction(m.group(1), _clean_denom_expr(m.group(2))), text)
+
+    # 2. 匹配数值分式与微分比值：如 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
+    # 限制前驱与后继字符，防止误伤 2026.03.18 日期或 URL
+    p2 = re.compile(
+        r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][stVR]|[εa-z][0-9₁₂₃₄]?)\s*\/\s*([0-9.]+|[stVR]|[xX][0-9₁₂₃₄]?)(?![0-9a-zA-Z._])"
+    )
+    text = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
+
+    return text
 
 
 def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
@@ -152,6 +205,7 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
     draw.text((dx, dy), denom, fill=core._WHITE, font=f_sub)
 
     return line_w + 4
+
 
 
 def init_glyph_fallback_engine():
@@ -239,7 +293,8 @@ def clean_invisible_and_special_characters(text: str) -> str:
 
 
 def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
-    """对输入文本进行符号清洗，同时保留真实数学 Unicode 符号（₆、²、Σ、⇒、∈、≤、≥ 等），
+    """对输入文本进行符号清洗与分式转换，同时保留真实数学 Unicode 符号（₆、²、Σ、⇒、∈、≤、≥ 等），
+    自动将形如 (A)/(B) 或 数值/数值 转换为上下结构的真实手写竖式分数，
     由底层的 Glyph Fallback 引擎完成真实字形绘制，不再降级为 '_6' 或 'Sigma'。
     """
     if not text:
@@ -248,4 +303,6 @@ def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
     if not _ENGINE_INITIALIZED:
         init_glyph_fallback_engine()
 
-    return clean_invisible_and_special_characters(text)
+    cleaned = clean_invisible_and_special_characters(text)
+    return convert_slashed_fractions_to_vertical(cleaned)
+
