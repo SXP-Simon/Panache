@@ -135,18 +135,23 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     if not text:
         return ""
 
-    # 0. 将前缀真分数字符紧跟代数项（如 s = ½gt²）中保留真分数或转换为标准表达式
-    # 1. 匹配带括号的公式型分式：(分子)/(分母)，如 (ε(x₁))/(|x₁|), (gt · dt)/(½gt²), (0.00005)/(1.1062)
-    # 若分母中含 ½ 等真分数，直接保留真分数字符（如 ½gt²）而不是写成 1/2gt² 斜杠，保持书写自然
-    p1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
-    text = p1.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
-
-    # 2. 匹配数值分式与微分比值：如 1/2, 3/4, 4/3, 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
-    # 限制前驱与后继字符，防止误伤 2026.03.18 日期或 URL
+    # 1. 匹配数值分式与微分比值：如 1/2, 3/4, 4/3, 1/3, 0.00005/1.1062, 0.0005/0.947, 1/x₁, 1/x₂, dt/t, ds/s, dV/V, dR/R
+    # 先把基础数值分式与单项式分式转换为竖式分数
     p2 = re.compile(
         r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][stVR]|[εa-z][0-9₁₂₃₄]?)\s*\/\s*([0-9.]+|[stVR]|[xX][0-9₁₂₃₄]?)(?![0-9a-zA-Z._/])"
     )
     text = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
+
+    # 2. 匹配带括号的复杂公式型分式：(分子)/(分母)，如 (ε(x₁))/(|x₁|), (gt · dt)/(½gt²), (4π R² · dR)/(4/3 π R³)
+    # 在分子分母内部再次递归处理可能存在的任何斜杠分式，杜绝分母中残留 1/2 或 4/3
+    def _clean_and_register_complex(num_expr: str, denom_expr: str) -> str:
+        # 对分子分母内部可能遗留的未闭合/孤立斜杠分式进行二次转换
+        num_clean = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), num_expr.strip())
+        denom_clean = p2.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), denom_expr.strip())
+        return register_dynamic_fraction(num_clean, denom_clean)
+
+    p1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
+    text = p1.sub(lambda m: _clean_and_register_complex(m.group(1), m.group(2)), text)
 
     return text
 
@@ -181,7 +186,10 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
             # 预估子分数宽度
             n, d = _VULGAR_FRACTION_MAP[ch]
             sub_s = max(8, int(font_size * 0.58))
-            f_sub = ImageFont.truetype(font_path, sub_s) if font_path else font
+            try:
+                f_sub = ImageFont.truetype(font_path, sub_s) if (font_path and os.path.exists(font_path)) else font
+            except Exception:
+                f_sub = font
             nb = f_sub.getbbox(n)
             db = f_sub.getbbox(d)
             total_w += max(nb[2] - nb[0], db[2] - db[0]) + 10
