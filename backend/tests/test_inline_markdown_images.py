@@ -117,7 +117,19 @@ class InlineMarkdownImageTest(unittest.TestCase):
         self.assertAlmostEqual(_parse_image_scale("插图 1|100%"), 1.0)
         self.assertAlmostEqual(_parse_image_scale("插图 1|150%"), 1.5)
         self.assertAlmostEqual(_parse_image_scale("插图 1|200%"), 2.0)
-        self.assertAlmostEqual(_parse_image_scale("插图 1|scale=1.8"), 1.8)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|500%"), 5.0)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|700%"), 7.0)
+        self.assertAlmostEqual(_parse_image_scale("插图 1|scale=6.5"), 6.5)
+
+    def test_fit_image_to_layout_5_to_7_times(self):
+        tiny_img = Image.new("RGB", (40, 20), (255, 255, 255))
+        # 放大 5 倍
+        fitted_5x = fit_image_to_layout(tiny_img, max_width=500, max_height=300, scale=5.0)
+        self.assertEqual(fitted_5x.size, (200, 100))
+
+        # 放大 7 倍
+        fitted_7x = fit_image_to_layout(tiny_img, max_width=500, max_height=300, scale=7.0)
+        self.assertEqual(fitted_7x.size, (280, 140))
 
 
 

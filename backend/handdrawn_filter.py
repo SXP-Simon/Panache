@@ -176,7 +176,7 @@ MARKDOWN_IMAGE_RE = re.compile(
 
 
 def _parse_image_scale(alt_text: str) -> float:
-    """从 alt 文本中解析缩放比例（如 '插图 1|50%'、'插图 1|150%'、'插图 1|scale=1.5' 或 '200%'），默认 1.0 (100%)。"""
+    """从 alt 文本中解析缩放比例（如 '插图 1|50%'、'插图 1|200%'、'插图 1|500%'、'插图 1|scale=7.0'），默认 1.0 (100%)。"""
     if not alt_text or "|" not in alt_text:
         return 1.0
     try:
@@ -186,16 +186,16 @@ def _parse_image_scale(alt_text: str) -> float:
             pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", param)
             if pct_match:
                 pct = float(pct_match.group(1))
-                return max(0.1, min(2.5, pct / 100.0))
+                return max(0.1, min(7.0, pct / 100.0))
         scale_match = re.search(r"(?:scale\s*=\s*|w\s*=\s*)?(\d+(?:\.\d+)?)", param)
         if scale_match:
             val = float(scale_match.group(1))
-            if val > 2.5:
-                # 可能是百分比整数如 150 或 200
-                if val <= 250.0:
-                    return max(0.1, min(2.5, val / 100.0))
+            if val > 7.0:
+                # 可能是百分比整数如 150、200、500 或 700
+                if val <= 700.0:
+                    return max(0.1, min(7.0, val / 100.0))
             else:
-                return max(0.1, min(2.5, val))
+                return max(0.1, min(7.0, val))
     except Exception:
         pass
     return 1.0
