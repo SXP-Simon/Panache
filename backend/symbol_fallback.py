@@ -130,41 +130,114 @@ def register_dynamic_fraction(num: str, denom: str) -> str:
     return ch
 
 
+def _extract_balanced_paren_backward(text: str, slash_pos: int):
+    """从 slash_pos 向左寻找平衡匹配的括号 (分子)"""
+    p = slash_pos - 1
+    while p >= 0 and text[p].isspace():
+        p -= 1
+    if p < 0 or text[p] != ')':
+        return None
+    end = p
+    depth = 0
+    while p >= 0:
+        if text[p] == ')':
+            depth += 1
+        elif text[p] == '(':
+            depth -= 1
+            if depth == 0:
+                return (p, end + 1, text[p + 1:end])
+        p -= 1
+    return None
+
+
+def _extract_balanced_paren_forward(text: str, slash_pos: int):
+    """从 slash_pos 向右寻找平衡匹配的括号 (分母)"""
+    p = slash_pos + 1
+    while p < len(text) and text[p].isspace():
+        p += 1
+    if p >= len(text) or text[p] != '(':
+        return None
+    start = p
+    depth = 0
+    while p < len(text):
+        if text[p] == '(':
+            depth += 1
+        elif text[p] == ')':
+            depth -= 1
+            if depth == 0:
+                return (start, p + 1, text[start + 1:p])
+        p += 1
+    return None
+
+
 def convert_slashed_fractions_to_vertical(text: str) -> str:
     """自动将文本中出现的 (A)/(B) 复杂代数分式以及数值、导数、倒数单项分式转换为上下竖式分式。"""
     if not text:
         return ""
 
-    # 1. 匹配单项式分式（包含数值、微分、变量倒数、带下标变量等）：
+    # 1. 基础单项式分式正则（数值、导数、单字母变量、带下标变量等）：
     # 例如：1/2, 3/4, 4/3, 1/3, 1/300, 1/y, 1/y₁, 1/y₂, 2/t, 0.2/t, dt/t, ds/s, dV/V, dR/R, 0.00005/0.9863
     p_single = re.compile(
         r"(?<![0-9a-zA-Z._])([0-9.]+|[dD][a-zA-Z]|[εa-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀]?)\s*\/\s*([0-9.]+|[dD]?[a-zA-Z][0-9₁₂₃₄₅₆₇₈₉₀%²³]?)(?![0-9a-zA-Z._/])"
     )
 
-    # 2. 匹配复合分式：带括号的分式，如 (A)/(B), (1/y² · y)/(1/y), (gt · dt)/(½gt²), |(A)/(B)| 等
-    p_paren = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*\(([^\(\)\n\r]+?)\)")
+    # 2. 深度平衡括号分式扫描：能够精准匹配 (ε*(s))/(s), (gt · ε*(t))/(1/2 gt²), (2ε*(t))/t 等任意嵌套函数括号！
+    # 只要存在形如 (A)/(B) 或 (A)/b 或 a/(B) 的斜杠，均精准剥离外层并注册为手写竖式分式
+    def _resolve_balanced_fractions(s: str) -> str:
+        p_denom_token = re.compile(r"^([a-zA-Z0-9.%₁₂₃₄₅₆₇₈₉₀²³]+)(?![0-9a-zA-Z._/])")
+        p_numer_token = re.compile(r"([a-zA-Z0-9.%₁₂₃₄₅₆₇₈₉₀²³]+)$")
 
-    # 3. 匹配半带括号的分式：如 (A)/B 或 A/(B)
-    p_half_paren_1 = re.compile(r"\(([^\(\)\n\r]+?)\)\s*\/\s*([a-zA-Z0-9.%₁₂₃₄]+)(?![0-9a-zA-Z._/])")
-    p_half_paren_2 = re.compile(r"(?<![0-9a-zA-Z._])([a-zA-Z0-9.%₁₂₃₄]+)\s*\/\s*\(([^\(\)\n\r]+?)\)")
+        changed = True
+        while changed:
+            changed = False
+            # 从右往左寻找未被转化的斜杠
+            for i in range(len(s) - 1, -1, -1):
+                if s[i] == '/':
+                    # 检查左侧：是括号 (A) 还是单 token a
+                    left_info = _extract_balanced_paren_backward(s, i)
+                    right_info = _extract_balanced_paren_forward(s, i)
 
-    def _clean_and_register(num_expr: str, denom_expr: str) -> str:
-        # 对分子与分母内部的子项进行递归转换
-        num_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), num_expr.strip())
-        denom_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), denom_expr.strip())
-        return register_dynamic_fraction(num_clean, denom_clean)
+                    # 只要左右两侧至少有一侧是括号复合结构，或者两侧均为括号
+                    if left_info or right_info:
+                        if left_info:
+                            l_start, l_end, l_content = left_info
+                        else:
+                            # 尝试匹配左侧紧挨的单 token
+                            prefix = s[:i].rstrip()
+                            m_left = p_numer_token.search(prefix)
+                            if not m_left:
+                                continue
+                            l_start = m_left.start()
+                            l_end = i
+                            l_content = m_left.group(1)
 
-    # 依次执行替换：先括号复合，再半括号，最后单项式
-    # 循环多次直到所有嵌套/并列的括号分式都被处理完
-    for _ in range(3):
-        prev = text
-        text = p_paren.sub(lambda m: _clean_and_register(m.group(1), m.group(2)), text)
-        text = p_half_paren_1.sub(lambda m: _clean_and_register(m.group(1), m.group(2)), text)
-        text = p_half_paren_2.sub(lambda m: _clean_and_register(m.group(1), m.group(2)), text)
-        if text == prev:
-            break
+                        if right_info:
+                            r_start, r_end, r_content = right_info
+                        else:
+                            # 尝试匹配右侧紧挨的单 token
+                            suffix = s[i + 1:].lstrip()
+                            m_right = p_denom_token.match(suffix)
+                            if not m_right:
+                                continue
+                            skip_spaces = len(s[i + 1:]) - len(suffix)
+                            r_start = i + 1 + skip_spaces + m_right.start()
+                            r_end = i + 1 + skip_spaces + m_right.end()
+                            r_content = m_right.group(1)
 
-    # 最后替换剩余的纯单项分式
+                        # 对提取出的分子分母递归清洗内部可能含有的简单单项式或真分数
+                        num_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), l_content.strip())
+                        denom_clean = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), r_content.strip())
+                        dyn_char = register_dynamic_fraction(num_clean, denom_clean)
+
+                        s = s[:l_start] + dyn_char + s[r_end:]
+                        changed = True
+                        break
+        return s
+
+    # 2.1 先执行深度平衡括号分式解析
+    text = _resolve_balanced_fractions(text)
+
+    # 2.2 最后兜底转换纯平铺的单项分式 (如 0.2/t, 1/y 等)
     text = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), text)
 
     return text
