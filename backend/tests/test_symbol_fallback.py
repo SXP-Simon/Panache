@@ -179,3 +179,51 @@ def test_nested_radical_and_fraction_rendering():
     assert len(images) > 0
 
 
+def test_font_switching_no_fallback_leak():
+    # 测试切换不同字体时，主字库支持的常规字符（如汉字、英文字母、数字）不被 fallback 覆盖
+    from backend.symbol_fallback import _get_char_glyph_and_bbox_cached
+    font_path_1 = "font_assets/云烟体.ttf" if os.path.exists("font_assets/云烟体.ttf") else "ttf_files/云烟体.ttf"
+    font_path_2 = "font_assets/李国夫手写体.ttf" if os.path.exists("font_assets/李国夫手写体.ttf") else "ttf_files/李国夫手写体.ttf"
+    if not os.path.exists(font_path_1) or not os.path.exists(font_path_2):
+        pytest.skip("Test fonts not available")
+
+    # 1. 汉字 '你' 在两款字体中均存在
+    _, _, _, is_fb_1 = _get_char_glyph_and_bbox_cached("你", font_path_1, 30)
+    assert not is_fb_1, "主字体1支持的字符绝不能被 fallback"
+
+    _, _, _, is_fb_2 = _get_char_glyph_and_bbox_cached("你", font_path_2, 30)
+    assert not is_fb_2, "主字体2支持的字符绝不能被 fallback"
+
+
+def test_large_font_and_heavy_rendering_no_oom():
+    # 测试大体积字体（如悠哉手写体 15MB）配合 font_size_sigma 大量字符渲染时，变体缓存生效且无 OOM
+    font_path = "font_assets/悠哉手写体.ttf"
+    if not os.path.exists(font_path):
+        font_path = "font_assets/云烟体.ttf"
+    if not os.path.exists(font_path):
+        pytest.skip("No test font")
+
+    font = ImageFont.truetype(font_path, size=30)
+    font.path = font_path
+    bg = Image.new("RGB", (800, 1000), (255, 255, 255))
+    template = Template(
+        background=bg,
+        font=font,
+        line_spacing=40,
+        fill=(0, 0, 0),
+        left_margin=20,
+        top_margin=20,
+        right_margin=20,
+        bottom_margin=20,
+        font_size_sigma=2,
+    )
+    long_text = "5、向量相似性与距离度量计算\n余弦相似度：cos(x,y)=(x·y)/(||x||₂||y||₂)\n" * 20
+    converted = normalize_text_for_font(long_text, font_path)
+    images = list(handwrite(converted, template))
+    assert len(images) > 0
+    # 验证 font 变体缓存被成功创建与复用
+    assert hasattr(font, "_variant_cache")
+    assert len(font._variant_cache) > 0
+
+
+

@@ -429,41 +429,64 @@ def convert_radicals_to_drawn(text: str) -> str:
     return text
 
 
-@functools.lru_cache(maxsize=4096)
-def _get_char_glyph_and_bbox_cached(char: str, font_path: Optional[str], font_size: int) -> Tuple[Any, Tuple[int, int, int, int], int]:
-    main_cmap = _get_font_cmap(font_path) if font_path else set()
+@functools.lru_cache(maxsize=8192)
+def _get_char_glyph_and_bbox_cached(
+    char: str, font_path: Optional[str], font_size: int
+) -> Tuple[Any, Tuple[int, int, int, int], int, bool]:
+    """返回 (font_object, bbox, advance, is_fallback)。
+    仅当主字体缺失该字符时才回退至备用字库，绝不误伤用户选中的主字体。
+    """
     cp = ord(char)
-    font = _get_cached_image_font(font_path, font_size)
+    main_font = _get_cached_image_font(font_path, font_size) if font_path else None
+    main_cmap = _get_font_cmap(font_path) if font_path else set()
 
     is_missing = False
-    if main_cmap and (cp not in main_cmap):
-        is_missing = True
-    else:
-        left, top, right, bottom = font.getbbox(char)
-        if (right - left <= 0) or (bottom - top <= 0):
+    if font_path and main_cmap:
+        if cp not in main_cmap:
             is_missing = True
+        else:
+            bb = main_font.getbbox(char)
+            if (bb[2] - bb[0] <= 0) or (bb[3] - bb[1] <= 0):
+                is_missing = True
+            else:
+                w = max(1, bb[2] - bb[0] + 1)
+                return (main_font, bb, w, False)
+    elif main_font:
+        bb = main_font.getbbox(char)
+        if (bb[2] - bb[0] <= 0) or (bb[3] - bb[1] <= 0):
+            is_missing = True
+        else:
+            w = max(1, bb[2] - bb[0] + 1)
+            return (main_font, bb, w, False)
+    else:
+        is_missing = True
 
     if is_missing:
         fb_path = _find_fallback_font_for_char(cp)
-        if fb_path:
+        if fb_path and fb_path != font_path:
             fb_font = _get_cached_image_font(fb_path, font_size)
-            f_left, f_top, f_right, f_bottom = fb_font.getbbox(char)
-            if (f_right - f_left > 0) and (f_bottom - f_top > 0):
-                return (fb_font, (f_left, f_top, f_right, f_bottom), max(1, f_right - f_left))
-        return (font, (0, 0, int(font_size * 0.4), font_size), int(font_size * 0.4))
-    else:
-        bb = font.getbbox(char)
-        w = max(1, bb[2] - bb[0] + 1)
-        return (font, bb, w)
+            f_bb = fb_font.getbbox(char)
+            if (f_bb[2] - f_bb[0] > 0) and (f_bb[3] - f_bb[1] > 0):
+                w = max(1, f_bb[2] - f_bb[0] + 1)
+                return (fb_font, f_bb, w, True)
+
+        # 没有任何 fallback 字体支持，回退到主字体或默认占位
+        font_to_use = main_font or ImageFont.load_default()
+        return (font_to_use, (0, 0, int(font_size * 0.4), font_size), int(font_size * 0.4), False)
+
+    bb = main_font.getbbox(char)
+    w = max(1, bb[2] - bb[0] + 1)
+    return (main_font, bb, w, False)
 
 
-def _get_char_glyph_and_bbox(char: str, font, font_path: Optional[str]) -> Tuple[Any, Tuple[int, int, int, int], int]:
-    """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance。
-    支持主字体与备用字库（Fallback fonts）的精确匹配，彻底避免缺失字符（如 ε、₁、·、²）返回虚假宽度的留白问题。
-    """
+def _get_char_glyph_and_bbox(
+    char: str, font, font_path: Optional[str] = None
+) -> Tuple[Any, Tuple[int, int, int, int], int]:
+    """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance。"""
     f_path = font_path or getattr(font, "path", None)
     f_size = getattr(font, "size", 30)
-    return _get_char_glyph_and_bbox_cached(char, f_path, f_size)
+    fb_font, bb, adv, _ = _get_char_glyph_and_bbox_cached(char, f_path, f_size)
+    return (fb_font, bb, adv)
 
 
 def _measure_radical(char: str, font, font_path: Optional[str]) -> Tuple[int, int]:
@@ -502,8 +525,9 @@ def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path
             w = _draw_radical_with_vinculum(draw, ch, (x, y), font)
             x += w
         else:
-            fb_font, bb, adv = _get_char_glyph_and_bbox(ch, font, font_path)
-            draw.text((x, y), ch, fill=core._WHITE, font=fb_font)
+            fb_font, bb, adv, is_fb = _get_char_glyph_and_bbox_cached(ch, font_path, font_size)
+            font_to_draw = fb_font if is_fb else font
+            draw.text((x, y), ch, fill=core._WHITE, font=font_to_draw)
             x += adv
     return x - start_x, max_h
 
@@ -591,8 +615,9 @@ def _draw_radical_with_vinculum(draw, char: str, xy: Tuple[int, int], font) -> i
         x += rw
 
     # 2. 绘制根号 √
-    fb_font, bb_sqrt, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
-    draw.text((x, y), "√", fill=core._WHITE, font=fb_font)
+    fb_font, bb_sqrt, adv_sqrt, is_fb = _get_char_glyph_and_bbox_cached("√", font_path, font_size)
+    font_sqrt = fb_font if is_fb else font
+    draw.text((x, y), "√", fill=core._WHITE, font=font_sqrt)
 
     # 根号右上端起点 vx
     sqrt_right = max(adv_sqrt, bb_sqrt[2] if bb_sqrt else adv_sqrt)
@@ -665,7 +690,7 @@ def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
 
 
 def init_glyph_fallback_engine():
-    """初始化底层 handright 绘制引擎的真实字形 Fallback 挂载。"""
+    """初始化底层 handright 绘制引擎的真实字形 Fallback 挂载与变体缓存优化。"""
     global _ENGINE_INITIALIZED, _FALLBACK_FONTS_POOL
     if _ENGINE_INITIALIZED:
         return
@@ -684,7 +709,7 @@ def init_glyph_fallback_engine():
         except Exception as e:
             logger.debug(f"读取备用字体 cmap 失败 ({font_path}): {e}")
 
-    # 2. 挂载 handright._core._draw_char
+    # 2. 挂载 handright._core._draw_char 与 handright._core._get_font
     try:
         import handright._core as core
 
@@ -704,14 +729,36 @@ def init_glyph_fallback_engine():
 
             font_path = getattr(font, "path", None)
             font_size = getattr(font, "size", 30)
-            fb_font, bb, adv = _get_char_glyph_and_bbox_cached(char, font_path, font_size)
-            if fb_font is not font:
+            fb_font, bb, adv, is_fallback = _get_char_glyph_and_bbox_cached(char, font_path, font_size)
+            if is_fallback:
                 draw.text(xy, char, fill=core._WHITE, font=fb_font)
                 return adv
 
             return orig_draw_char(draw, char, xy, font)
 
         core._draw_char = fallback_draw_char
+
+        # 挂载带缓存的 _get_font，彻底解决 FreeType 每字重复重载导致的内存溢出 (Out Of Memory)
+        def cached_get_font(template, rand) -> ImageFont:
+            font = template.get_font()
+            sigma = template.get_font_size_sigma()
+            if not sigma:
+                return font
+            actual_font_size = max(int(rand.gauss(font.size, sigma)), 1)
+            if actual_font_size == font.size:
+                return font
+
+            if not hasattr(font, "_variant_cache"):
+                font._variant_cache = {}
+            variant = font._variant_cache.get(actual_font_size)
+            if variant is None:
+                variant = font.font_variant(size=actual_font_size)
+                if hasattr(font, "path"):
+                    variant.path = font.path
+                font._variant_cache[actual_font_size] = variant
+            return variant
+
+        core._get_font = cached_get_font
         logger.info(f"真实字形 Fallback 引擎挂载成功，已加载 {len(_FALLBACK_FONTS_POOL)} 款备用字库")
     except Exception as e:
         logger.warning(f"挂载字形 Fallback 引擎失败: {e}")
