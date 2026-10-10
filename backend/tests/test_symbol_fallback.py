@@ -92,3 +92,36 @@ def test_vertical_fraction_conversion_and_rendering():
     images = list(handwrite(converted, template))
     assert len(images) > 0
 
+
+def test_function_division_not_corrupted():
+    # 验证复合函数除法如 f'(y) · y / f(y) 不会被粗暴截断或破坏
+    text = "由于 f'(y) · y / f(y)，相对误差 ε*(y₁) = 0.05"
+    converted = normalize_text_for_font(text, "ttf_files/云烟体.ttf")
+    # 竖式转换应保留分子与完整的分母 f(y)，而不是留下孤立的 /
+    assert "/ f" not in converted
+    assert "ε*(y₁)" in converted
+
+
+def test_fallback_glyph_bbox_proportions():
+    # 验证缺失字符 (ε, ₁, ·) fallback 到备用字体时，字形包围盒按实际比例计算，不会虚高撑大空白
+    from backend.symbol_fallback import _get_char_glyph_and_bbox
+    init_glyph_fallback_engine()
+    font_path = "ttf_files/云烟体.ttf"
+    if not os.path.exists(font_path):
+        pytest.skip(f"Font not found: {font_path}")
+    base_font = ImageFont.truetype(font_path, size=30)
+    
+    # 希腊字母 ε
+    glyph_eps, bbox_eps, adv_eps = _get_char_glyph_and_bbox("ε", base_font, font_path)
+    assert glyph_eps is not None
+    left, top, right, bottom = bbox_eps
+    width = right - left
+    # 30px 字号下，小写希腊字母宽度应在合理范围 (8~25px)，绝不能像默认方块一样达到 30px 以上甚至撑大空白
+    assert 5 <= width <= 25
+
+    # 下标 ₁
+    glyph_sub1, bbox_sub1, adv_sub1 = _get_char_glyph_and_bbox("₁", base_font, font_path)
+    assert glyph_sub1 is not None
+    w_sub = bbox_sub1[2] - bbox_sub1[0]
+    assert 3 <= w_sub <= 20
+

@@ -23,6 +23,10 @@ async function run() {
     ['euclidean distance formula', String.raw`$d(x, y) = \sqrt{(1-2)^2 + (1-2)^2} = \sqrt{4} = 2$`, 'd(x,y)=√((1-2)²+(1-2)²)=√(4)=2'],
     ['cosine similarity fraction', String.raw`$\cos(x, y) = \frac{x \cdot y}{\|x\|_2 \|y\|_2}$`, 'cos(x,y)=(x·y)/(||x||₂||y||₂)'],
     ['implies and long arrows', String.raw`$$0 \implies \cos(x, y) = 0$$`, '0  ⇒  cos(x,y)=0'],
+    ['relations and sets', String.raw`$x \in A \cap B \cup C \subseteq D \neq \emptyset$`, 'x ∈ A ∩ B ∪ C ⊆ D ≠ ∅'],
+    ['multiline full homework paragraph', String.raw`- 余弦相似度：
+$$x \cdot y = 0\times 1 + 1\times 0 = 0 \implies \cos(x, y) = 0$$`, `- 余弦相似度：
+x·y=0×1+1×0=0  ⇒  cos(x,y)=0`],
   ];
   for (const [name, input, expected] of cases) {
     assert.equal(convert(input), expected, name);

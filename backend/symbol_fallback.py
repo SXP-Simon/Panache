@@ -194,12 +194,21 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
             # 从右往左寻找未被转化的斜杠
             for i in range(len(s) - 1, -1, -1):
                 if s[i] == '/':
-                    # 检查左侧：是括号 (A) 还是单 token a
+                    # 检查左侧与右侧
                     left_info = _extract_balanced_paren_backward(s, i)
                     right_info = _extract_balanced_paren_forward(s, i)
 
-                    # 只要左右两侧至少有一侧是括号复合结构，或者两侧均为括号
-                    if left_info or right_info:
+                    # 检查右侧是否是形如 f(...) 的复合函数调用
+                    suffix_peek = s[i + 1:].lstrip()
+                    m_peek = p_denom_token.match(suffix_peek)
+                    right_is_func = False
+                    if m_peek:
+                        after_peek = suffix_peek[m_peek.end():].lstrip()
+                        if after_peek.startswith('('):
+                            right_is_func = True
+
+                    # 只要左右两侧至少有一侧是括号复合结构，或右侧为函数调用 f(y)
+                    if left_info or right_info or right_is_func:
                         if left_info:
                             l_start, l_end, l_content = left_info
                         else:
@@ -225,8 +234,10 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
                             r_end = i + 1 + skip_spaces + m_right.end()
                             r_content = m_right.group(1)
                             # 如果紧接着括号 (y)，则将函数参数一并纳为分母整体：f(y)
-                            if r_end < len(s) and s[r_end] == '(':
-                                f_arg = _extract_balanced_paren_forward(s, r_end - 1)
+                            rem = s[r_end:].lstrip()
+                            if rem.startswith('('):
+                                paren_offset = len(s[r_end:]) - len(rem)
+                                f_arg = _extract_balanced_paren_forward(s, r_end + paren_offset - 1)
                                 if f_arg:
                                     r_end = f_arg[1]
                                     r_content = s[r_start:r_end]

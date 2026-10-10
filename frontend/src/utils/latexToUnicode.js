@@ -537,8 +537,7 @@ export function convertLatexToUnicode(text) {
 
   // 2. 如果包含 $...$, $$...$$, \[...\], \(...\)，优先用 KaTeX AST 解析公式块
   const mathDelimRegex = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^$\n]+?)\$/g;
-  if (mathDelimRegex.test(s)) {
-    s = s.replace(mathDelimRegex, (match, d1, d2, d3, d4) => {
+  s = s.replace(mathDelimRegex, (match, d1, d2, d3, d4) => {
       const expr = (d1 ?? d2 ?? d3 ?? d4 ?? '').trim();
       if (!expr) return '';
       const astResult = tryConvertFormulaViaKatex(expr);
@@ -547,7 +546,6 @@ export function convertLatexToUnicode(text) {
       }
       return expr;
     });
-  }
 
   // 3. 针对未加 $ 包裹但含有明确复合公式（如整行 r = \frac{...}{...} 或 \sqrt{...}）的行进行 KaTeX AST 解析
   const lines = s.split('\n');
@@ -571,10 +569,23 @@ export function convertLatexToUnicode(text) {
   s = unwrapSqrt(s);
 
   // 4.1 处理统计与代数修饰符：\bar{x} -> x̄, \hat{x} -> x̂, \vec{x} -> x⃗
-  s = s.replace(/\\(bar|overline)\{([a-zA-Z0-9])\}/g, '$2\u0304');
-  s = s.replace(/\\(bar|overline)\{([^{}]+)\}/g, '($2)\u0304');
-  s = s.replace(/\\hat\{([a-zA-Z0-9])\}/g, '$1\u0302');
-  s = s.replace(/\\vec\{([a-zA-Z0-9])\}/g, '$1\u20D7');
+  const resolveAccentContent = (raw) => {
+    const trimmed = raw.trim();
+    if (LATEX_SYMBOL_MAP[trimmed]) return LATEX_SYMBOL_MAP[trimmed];
+    return trimmed;
+  };
+  s = s.replace(/\\(bar|overline)\{([^{}]+)\}/g, (_, type, content) => {
+    const base = resolveAccentContent(content);
+    return base.length === 1 ? `${base}\u0304` : `(${base})\u0304`;
+  });
+  s = s.replace(/\\hat\{([^{}]+)\}/g, (_, content) => {
+    const base = resolveAccentContent(content);
+    return base.length === 1 ? `${base}\u0302` : `(${base})\u0302`;
+  });
+  s = s.replace(/\\vec\{([^{}]+)\}/g, (_, content) => {
+    const base = resolveAccentContent(content);
+    return base.length === 1 ? `${base}\u20D7` : `(${base})\u20D7`;
+  });
 
   // 4.2 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
   s = s.replace(/\\(text|mathrm|mathbf|mathit|operatorname|textbf|textit|textsf|texttt)\{([^{}]+)\}/g, '$2');
