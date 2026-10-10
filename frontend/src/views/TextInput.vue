@@ -3,15 +3,18 @@
         <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
             <label class="text-field-label m-0" for="textArea">{{ $t('message.text') }}:</label>
             <div class="text-tools-group d-flex gap-2 align-items-center">
-                <select 
-                    v-model="tableMode" 
-                    class="form-select form-select-sm table-mode-select" 
-                    data-testid="table-mode-select"
-                    :title="$t('message.tableMode')">
-                    <option value="list">{{ $t('message.tableModeList') }}</option>
-                    <option value="aligned">{{ $t('message.tableModeAligned') }}</option>
-                    <option value="raw_pipe">{{ $t('message.tableModeRawPipe') }}</option>
-                </select>
+                <div class="table-mode-wrap d-flex align-items-center gap-1">
+                    <span class="text-muted small table-mode-label">表格处理:</span>
+                    <select 
+                        v-model="tableMode" 
+                        class="form-select form-select-sm table-mode-select" 
+                        data-testid="table-mode-select"
+                        :title="$t('message.tableMode')">
+                        <option value="list">{{ $t('message.tableModeList') }}</option>
+                        <option value="aligned">{{ $t('message.tableModeAligned') }}</option>
+                        <option value="raw_pipe">{{ $t('message.tableModeRawPipe') }}</option>
+                    </select>
+                </div>
                 <button 
                     type="button"
                     class="btn-text-tool"
