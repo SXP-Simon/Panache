@@ -1,0 +1,242 @@
+[English](README_en.md) | [中文](README.md)
+
+# 手写文字生成网站
+
+[![star](https://atomgit.com/liuweiqing147/handwriting-web/star/badge.svg)](https://atomgit.com/liuweiqing147/handwriting-web)
+
+欢迎来到我的手写文字生成网站！这个平台允许你使用现有的字体来创建模拟手写文字的图片。
+
+网址：https://handwrite.sixiangjia.de
+视频介绍： https://www.bilibili.com/video/BV1DM4y1W7fp/
+电报讨论群组：https://t.me/+zFImOziSNullOTE1
+
+新版界面把工作区分成三栏 —— 左边调参数、中间输入文字、右边看预览：
+
+![新版界面](image-new-ui.png)
+
+顶栏的「旧版界面」按钮可以切回老版式，两种界面改的是同一份内容：
+
+![旧版界面](image-generate.png)
+
+📖 **完整文档（使用指南 / 自部署 / 开发）：https://mygithub.sixiangjia.de/handwriting-web/**
+
+## 功能
+
+### 自定义字体
+
+你可以上传自己的字体来生成符合你需求的独特手写风格。
+
+### 背景图片
+
+上传你想要的背景图片，为你的手写文字添加个人风格。如果你没有背景图片，别担心！只需指定图片的宽度和高度，我的网站将自动为你生成带有横线的背景图片。
+
+### 可调参数
+
+你可以完全控制各种参数，如边距（上、下、左、右），字符间的随机扰动，笔画的旋转偏移，墨水的深度变化，涂改痕迹。这使你可以微调你的手写文字的外观。
+
+### 文本排版标记
+
+在文字输入区中，可以用独占一行的简单标记控制排版：
+
+- `---`（三个或更多短横线）从下一段开始强制分页。
+- `>>>` 放在行首，可将这一行靠右排版，适合署名和日期。
+
+例如：
+
+```text
+第一页内容
+---
+第二页内容
+>>>署名
+>>>2026 年 7 月 27 日
+```
+
+这些标记只控制排版，不会出现在生成的手写图片中。
+
+### 从各种文件类型中提取文本
+
+我的网站可以从各种文件类型中提取文本内容（如 pdf，docs），使你能够方便地上传文本。
+
+### 预览功能
+
+我在网站的右侧添加了预览功能。这使你可以在最终确定之前方便地查看你的手写文字图片的效果。
+
+### 完整图片生成
+
+一旦你对预览满意，你可以生成一整套图片。这些图片将被方便地打包成一个 zip 文件，以便于下载。
+
+### pdf 导出功能
+
+一键生成 pdf，不用再手动粘贴图片
+
+## 自己搭建的方法
+
+克隆项目，在项目目录中使用`docker-compose up -d`，默认端口为 2345
+
+若要添加字体，字体文件放在项目根目录下的 ttf_files 中
+
+### CPU 限制配置
+
+默认配置中对容器进行了 CPU 限制：
+
+- frontend 容器：使用 50%的 CPU
+- backend 容器：使用 80%的 CPU
+
+如果不想限制 CPU 使用，可以在 `docker-compose.yml` 文件中删除以下配置：
+
+```yaml
+cpu_count: 1
+cpu_quota: 50000 # 或 80000
+cpu_period: 100000
+```
+
+或者可以调整 `cpu_quota` 的值来设置不同的 CPU 使用限制。
+
+## 本地运行
+
+### 环境要求
+
+- **Python 版本**: 3.8 - 3.13（推荐 3.10 或 3.11）
+- **Node.js 版本**: 14.x 或更高
+
+### 方法一：使用 VS Code 一键启动（推荐）
+
+1. 克隆项目到本地
+2. 使用 VS Code 打开项目文件夹
+3. 按 `Ctrl+Shift+B` 快捷键，自动并行启动前端和后端开发服务器
+4. 打开浏览器，输入 http://localhost:8080 ，即可访问网站
+
+**其他可用任务**（通过 `Ctrl+Shift+P` → `Tasks: Run Task` 访问）：
+
+- 🔧 安装所有依赖
+- 📦 安装前端依赖
+- 🐍 安装后端依赖
+- 🏗️ 构建前端项目
+- 🐳 启动/停止 Docker Compose
+- 🧹 清理前端构建
+
+### 方法二：手动启动
+
+1. 克隆项目到本地
+2. 进入 backend 文件夹，运行后端程序
+
+```shell
+cd backend
+pip install -r requirements.txt
+python app.py
+# 注意：服务将在 5005 端口启动
+```
+
+3. 进入 frontend 文件夹，运行前端程序
+
+```shell
+cd frontend
+npm install
+npm run serve
+```
+
+4. 打开浏览器，输入 http://localhost:8080 ，即可访问网站
+
+### E2E 测试（Playwright）
+
+`e2e/` 目录是端到端测试套件，用真实前后端跑完整流程（真实渲染手写图片、下载附件），少数难以真实触发的分支（队列满 503 等）用路由拦截模拟。
+
+首次运行先装依赖和浏览器（需要 Node.js 20 或更高，Playwright 的要求）：
+
+```shell
+cd e2e
+npm install
+npx playwright install chromium
+```
+
+然后直接在 `e2e` 目录下运行（会自动拉起后端 5005 和前端 8080，跑完自动关掉）：
+
+```shell
+npm test
+```
+
+- 需要数据库/依赖已就绪的后端解释器：脚本会自动探测仓库根目录的 `venv`，探测不到时用 `E2E_PYTHON` 指定，例如 `E2E_PYTHON=./venv/Scripts/python.exe npm test`
+- 本地已在跑的开发服务器会被直接复用，不会重复启动
+- 测试时会设置 `CPU_USAGE_LIMIT=100`，避免开发机被 webpack/浏览器占满 CPU 时误触发后端的过载保护（429）
+- 失败时的截图、录像和 trace 在 `e2e/test-results/`，HTML 报告用 `npm run report` 打开
+- 每次 PR 会由 `.github/workflows/e2e.yml` 自动跑一遍
+
+## 后端架构
+
+### 整体流程
+
+```
+用户请求 → Nginx（前端容器） → 反向代理 → FastAPI（后端容器）
+                                          │
+                                          ▼
+                              提交任务 → 写入 SQLite → 立即返回 task_id
+                                          │
+                              后台协程排队执行 → Semaphore(2) 控制并发
+                                          │
+                              handwrite() 渲染 → 保存结果到磁盘
+                                          │
+                              用户通过轮询 或 WebSocket 获取结果
+```
+
+请求提交后立即返回 `task_id`（HTTP 200），实际的手写图像渲染在后台 `BackgroundTask` 中异步执行，用户通过轮询 `/task/{task_id}` 接口或 WebSocket 连接获取实时进度。
+
+
+
+## 结语
+
+我希望你喜欢使用我的手写文字生成网站来创建你的个性化手写文字图片！
+
+## 赞助方式
+
+如果这个项目对你有帮助，欢迎通过支付宝赞助支持我继续维护：
+
+![支付宝赞助](https://www.sixiangjia.de/assets/images/zhifubao.jpg)
+
+## 随笔
+
+2024.6.13 由于昨天需要完成政治论文的手写，于是亲自体验了我的程序，发现效果确实不错，但是几个月来一直没有解决处理大量文字的时候程序没响应的问题，经过我添加日志发现，其实后端一直在生成图片，但是由于 nginx 的超时限制导致请求失败（这个在 docker 的日志中可以看到），于是我修改了外部和镜像内部的 nginx 的超时配置，但是问题仍然存在，这时我发现前端控制台中不再是 504 错误而是 524 错误，经过查询发现这是因为 cf 的超时限制是 100 秒，超过 cf 的限制而报错，解决方法是关闭小黄云不享受 cf 的保护，还有一种解决方法就是让后端不断给前端传输数据保持连接活跃。
+
+### 随笔其二
+我感觉以后还是让ai查看问题，因为人没有考虑这么全面，之前文件虽然清理成功，但只是部分的，没有包括pdf，我忽视了，导致磁盘爆满了两次，最后把日志给ai（claude code），让它解决了
+
+### 随笔其三
+2026.4.18
+Service worker缓存处理不好就会导致用户无法更新新的页面
+
+### 随笔其四
+2026.4.18
+**上传背景图片报错 `Missing required field: background_image`**
+
+**问题根因**：FastAPI 内部使用 `starlette.datastructures.UploadFile`，但代码中 `isinstance(background_image, UploadFile)` 导入的是 `fastapi.UploadFile`。两者在运行时不是同一个类，导致类型检查失败，`background_image_bytes` 被设为 `None`。
+
+**修复方案**：用 `hasattr` 检查对象的特征属性（`read` 和 `filename` 方法），而不是依赖 `isinstance`：
+
+```python
+# ❌ 错误
+if isinstance(background_image, UploadFile):
+    background_image_bytes = await background_image.read()
+
+# ✅ 正确
+if hasattr(background_image, 'read') and hasattr(background_image, 'filename'):
+    background_image_bytes = await background_image.read()
+```
+最后一定要记住一点点，不要相信VSCode或者任何值得相信的程序，它有时候会出错，导致我的fast API服务器无法输出日志，最好的方法就是重启
+### 随笔其五
+2026.4.21
+将原先首屏的大图片替换成小的webp，大大优化FCP
+![lighthouse](lighthouse.png)
+## 待做(已完成)
+
+使用 websocket 保持连接，避免 cf 超时，并通知客户端目前生成进度
+socketio.emit('image_generated', {'image_index': i, 'image_path': image_path})
+使用队列，通知客户端目前有多少人等待，暂存请求（目前好像是直接抛弃）
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=14790897%2Fhandwriting-web&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&legend=top-left" />
+ </picture>
+</a>
