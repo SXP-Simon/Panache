@@ -1,8 +1,10 @@
 # Handwriting Web (Simon's Enhanced Edition)
 
-> 本分支为 **Simon 自用定制基准分支 (`custom-base`)**。基于原开源项目构建，针对理工科/作业抄写场景进行了深度排版增强，包括高可靠 Markdown 符号清洗、Word 公式兼容、字形 Fallback 引擎以及全自动手写上下竖式分式渲染。
->
-> 📖 **[👉 点击查看原项目 README 文档 (Upstream README)](./README_upstream.md)**
+> 老实写作业，很无聊吧
+
+本分支为自用定制基准分支。基于原开源项目构建，针对理工科/作业抄写场景进行了深度排版增强，包括高可靠 Markdown 符号清洗、Word 公式兼容、字形 Fallback 引擎以及全自动手写上下竖式分式渲染。
+
+📖 **[👉 点击查看原项目 README 文档 (Upstream README)](./README_upstream.md)**
 
 ---
 
