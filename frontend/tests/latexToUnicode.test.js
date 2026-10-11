@@ -27,7 +27,26 @@ async function run() {
     ['multiline full homework paragraph', String.raw`- 余弦相似度：
 $$x \cdot y = 0\times 1 + 1\times 0 = 0 \implies \cos(x, y) = 0$$`, `- 余弦相似度：
 x·y=0×1+1×0=0  ⇒  cos(x,y)=0`],
+    ['sized parentheses in boxed prose', String.raw`故所求公式为 \(\boxed{\neg\bigl(p\land(q\land\neg r)\bigr)}\)，其中仅含联结词 \(\neg\) 和 \(\land\)。`, '故所求公式为 ¬(p∧(q∧¬ r))，其中仅含联结词 ¬ 和 ∧。'],
+    ['sized escaped braces', String.raw`\Bigl\{x\Bigr\}`, '{x}'],
+    ['sized named brackets', String.raw`\biggl\langle x\biggr\rangle`, '⟨ x⟩'],
+    ['sized floor and ceiling', String.raw`\bigl\lfloor x\bigr\rfloor+\Bigl\lceil y\Bigr\rceil`, '⌊ x⌋+⌈ y⌉'],
+    ['sizing does not match longer commands', String.raw`\bigcup+\Biggish`, 'bigcup+Biggish'],
   ];
+  const sizes = ['big', 'Big', 'bigg', 'Bigg'];
+  for (const size of sizes) {
+    cases.push(
+      [`${size} plain delimiters`, `\\${size}(p\\${size})`, '(p)'],
+      [`${size} directional delimiters`, `\\${size}l(p\\${size}m|q\\${size}r)`, '(p|q)'],
+      [`${size} inline math`, `$\\${size}l(p\\${size}r)$`, '(p)'],
+      [`${size} AST preserves delimiters`, `$\\frac{1}{2}+\\${size}l(p\\${size}r)$`, '½+(p)'],
+    );
+  }
+  cases.push(
+    ['AST preserves sized braces', String.raw`$\frac{1}{2}+\Bigl\{p\Bigr\}$`, '½+{p}'],
+    ['AST preserves sized angle brackets', String.raw`$\frac{1}{2}+\biggl\langle p\biggr\rangle$`, '½+⟨p⟩'],
+    ['AST preserves sized norms', String.raw`$\frac{1}{2}+\Biggl\lVert p\Biggr\rVert$`, '½+||p||'],
+  );
   for (const [name, input, expected] of cases) {
     assert.equal(convert(input), expected, name);
     console.log(`PASS: ${name}`);
@@ -36,7 +55,13 @@ x·y=0×1+1×0=0  ⇒  cos(x,y)=0`],
     assert.equal(hasLatexMarkup(input), true, input);
   }
   assert.equal(hasLatexMarkup('R&D https://example.com'), false);
-  console.log(`Passed ${cases.length} conversion cases and 5 detection cases.`);
+  for (const size of sizes) {
+    for (const suffix of ['', 'l', 'm', 'r']) {
+      assert.equal(hasLatexMarkup(`\\${size}${suffix}(p)`), true);
+    }
+  }
+  assert.equal(hasLatexMarkup(String.raw`\bigcup+\Biggish`), false);
+  console.log(`Passed ${cases.length} conversion cases and 22 detection cases.`);
 }
 
 run().catch(error => { console.error(error); process.exitCode = 1; });
