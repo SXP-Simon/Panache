@@ -14,6 +14,14 @@ const LATEX_SYMBOL_MAP = {
   '\\vert': '|',
   '\\lvert': '|',
   '\\rvert': '|',
+  '\\lVert': '||',
+  '\\rVert': '||',
+  '\\langle': '⟨',
+  '\\rangle': '⟩',
+  '\\lfloor': '⌊',
+  '\\rfloor': '⌋',
+  '\\lceil': '⌈',
+  '\\rceil': '⌉',
   '\\|': '||',
   '\\{': '{',
   '\\}': '}',
@@ -470,6 +478,11 @@ function astNodeToUnicode(node) {
       return ` ${rows.join(' ; ')} `;
     }
 
+    case 'delimsizing': {
+      const delimiter = node.delim || '';
+      return delimiter === '.' ? '' : (LATEX_SYMBOL_MAP[delimiter] || delimiter);
+    }
+
     case 'leftright': {
       let l = node.left || '';
       let r = node.right || '';
@@ -594,6 +607,8 @@ export function convertLatexToUnicode(text) {
   // 4.3 剥离 \left 和 \right 前缀
   s = s.replace(/\\left(?![a-zA-Z])\s*([([{|.])?/g, '$1');
   s = s.replace(/\\right(?![a-zA-Z])\s*([)\]}|.])?/g, '$1');
+  // 括号尺寸只影响排版；正文中的公式走正则兜底时仍需保留实际括号。
+  s = s.replace(/\\(?:big|Big)g?[lmr]?(?![a-zA-Z])[ \t]*/g, '');
 
   // 4.4 替换标准宏命令与特殊符号
   for (const [cmd, sym] of Object.entries(LATEX_SYMBOL_MAP)) {
@@ -640,5 +655,5 @@ export function convertLatexToUnicode(text) {
  */
 export function hasLatexMarkup(text) {
   if (!text || typeof text !== 'string') return false;
-  return /\$|\\(?:begin\{|end\{|boxed\b|fbox\b|[()[\]]|\\)|\\(mid|frac|sqrt|alpha|beta|Rightarrow|rightarrow|to|sum|prod|in|leq|geq|neq|text|mathrm)|\^\{|_\{/.test(text);
+  return /\$|\\(?:begin\{|end\{|boxed\b|fbox\b|(?:big|Big)g?[lmr]?(?![a-zA-Z])|[()[\]]|\\)|\\(mid|frac|sqrt|alpha|beta|Rightarrow|rightarrow|to|sum|prod|in|leq|geq|neq|text|mathrm)|\^\{|_\{/.test(text);
 }
