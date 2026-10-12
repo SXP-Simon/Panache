@@ -1,0 +1,6 @@
+{
+  "@@locale": "en",
+  "appTitle": "Handwriting Generator",
+  "welcomeTitle": "Turn text into handwriting",
+  "migrationNotice": "The cross-platform app is under development. Handwriting generation and export will be available in a future update."
+}

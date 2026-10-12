@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "crates/handwriting-core",
+    "crates/handwriting-bridge",
+    "crates/handwriting-server",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+handwriting-core = { path = "crates/handwriting-core" }
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower-http = { version = "0.6", features = ["fs"] }
