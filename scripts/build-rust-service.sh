@@ -15,8 +15,10 @@ find "$PACKAGE_DIR/web" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 cp -R app/build/web/. "$PACKAGE_DIR/web/"
 cp assets/font_assets/* "$PACKAGE_DIR/font_assets/"
 cp VERSION "$PACKAGE_DIR/VERSION"
+cp LICENSE "$PACKAGE_DIR/LICENSE"
 cp crates/handwriting-core/NOTICE "$PACKAGE_DIR/NOTICE"
 cp crates/handwriting-core/licenses/* "$PACKAGE_DIR/licenses/"
+cp assets/licenses/* "$PACKAGE_DIR/licenses/"
 cp deploy/rust/README.md "$PACKAGE_DIR/README.md"
 if [[ -f target/release/handwriting-server.exe ]]; then
   rm -f "$PACKAGE_DIR/handwriting-server.exe"

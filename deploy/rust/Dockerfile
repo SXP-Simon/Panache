@@ -13,8 +13,10 @@ COPY --from=build /source/target/release/handwriting-server ./
 COPY app/build/web ./web
 COPY assets/font_assets ./font_assets
 COPY VERSION ./VERSION
+COPY LICENSE ./LICENSE
 COPY crates/handwriting-core/NOTICE ./NOTICE
 COPY crates/handwriting-core/licenses ./licenses
+COPY assets/licenses ./licenses
 USER handwriting
 ENV HANDWRITING_LISTEN_ADDR=0.0.0.0:5006 HANDWRITING_DATA_DIR=/data
 EXPOSE 5006

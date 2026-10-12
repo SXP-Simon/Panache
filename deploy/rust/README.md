@@ -1,6 +1,6 @@
 # 独立 Rust 服务
 
-服务包目录包含 `handwriting-server`（Windows 为 `.exe`）、`web/`、`font_assets/`、`VERSION` 和算法许可证。启动程序后打开 <http://127.0.0.1:5006>，无需安装 Python、Rust 或 Flutter；目录整体移动时请保留资源目录。macOS 程序当前未经签名或公证，分发需遵循项目现有 Gatekeeper 说明。
+服务包目录包含 `handwriting-server`（Windows 为 `.exe`）、`web/`、`font_assets/`、`VERSION`、项目 `LICENSE` 和 `licenses/`（算法与字体许可及授权记录）。启动程序后打开 <http://127.0.0.1:5006>，无需安装 Python、Rust 或 Flutter；目录整体移动时请保留资源与许可文件。macOS 程序当前未经签名或公证，分发需遵循项目现有 Gatekeeper 说明。
 
 ## 开发与打包
 

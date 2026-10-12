@@ -81,6 +81,7 @@
   "aboutText": "A free, open-source handwriting tool with a Material Design 3 Flutter interface and a Rust engine. Desktop and mobile support offline generation; Web connects to a Rust service.",
   "accountUnavailable": "Accounts are unavailable: login and registration are disabled in the existing backend.",
   "project": "Project source",
+  "licenses": "Open-source licenses",
   "feedback": "Feedback",
   "email": "Your email",
   "feedbackHint": "Describe an issue or suggestion",

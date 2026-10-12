@@ -6,8 +6,6 @@ import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart'
-    show LicenseRegistry, LicenseEntryWithLineBreaks;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -99,10 +97,6 @@ class MobileHandwritingApi extends HandwritingApi {
         }
       }
       await api.call('fonts');
-      final license = await api.call('license') as String;
-      LicenseRegistry.addLicense(() async* {
-        yield LicenseEntryWithLineBreaks(['handwriting-core'], license);
-      });
       return api;
     } catch (_) {
       api.close();

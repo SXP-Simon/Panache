@@ -49,8 +49,10 @@ def main():
         shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
         shutil.copytree(ROOT / 'assets/font_assets', backend / 'font_assets')
         shutil.copy2(ROOT / 'VERSION', backend / 'VERSION')
+        shutil.copy2(ROOT / 'LICENSE', backend / 'LICENSE')
         shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
         shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
+        shutil.copytree(ROOT / 'assets/licenses', backend / 'licenses', dirs_exist_ok=True)
     if target == 'macos':
         run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))
         run('codesign', '--verify', '--deep', '--strict', str(bundle))

@@ -81,6 +81,7 @@
   "aboutText": "免费的开源手写体生成工具。Flutter 界面采用 Material Design 3，使用 Rust 手写引擎。桌面和移动端支持离线生成，Web 连接 Rust 服务。",
   "accountUnavailable": "账户服务暂不可用：现有后端未启用登录和注册接口。",
   "project": "项目源码",
+  "licenses": "开源许可",
   "feedback": "意见反馈",
   "email": "你的邮箱",
   "feedbackHint": "描述问题或建议",
