@@ -20,7 +20,8 @@ def main():
     parser.add_argument('--flutter', default=os.environ.get('FLUTTER', 'flutter'))
     args = parser.parse_args()
     target = {'Darwin': 'macos', 'Windows': 'windows', 'Linux': 'linux'}[platform.system()]
-    run('cargo', 'build', '--locked', '--release', '-p', 'handwriting-server')
+    if target != 'macos':
+        run('cargo', 'build', '--locked', '--release', '-p', 'handwriting-server')
     version = (ROOT / 'backend/VERSION').read_text().strip()
     run(args.flutter, 'pub', 'get', cwd=ROOT / 'app')
     run(args.flutter, 'build', target, '--release', f'--build-name={version}', cwd=ROOT / 'app')
@@ -41,15 +42,16 @@ def main():
         bundle = output / 'HandwritingWeb'
         shutil.copytree(source, bundle, symlinks=True)
         backend = bundle / 'backend'
-    backend.mkdir()
-    binary = 'handwriting-server.exe' if target == 'windows' else 'handwriting-server'
-    shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
-    shutil.copytree(ROOT / 'backend/font_assets', backend / 'font_assets')
-    shutil.copy2(ROOT / 'backend/VERSION', backend / 'VERSION')
-    shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
-    shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
+    # macOS 的 Xcode 构建阶段已包含 sidecar，分发时直接复用。
+    if target != 'macos':
+        backend.mkdir()
+        binary = 'handwriting-server.exe' if target == 'windows' else 'handwriting-server'
+        shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
+        shutil.copytree(ROOT / 'backend/font_assets', backend / 'font_assets')
+        shutil.copy2(ROOT / 'backend/VERSION', backend / 'VERSION')
+        shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
+        shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
     if target == 'macos':
-        run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/sidecar.entitlements'), str(backend / binary))
         run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))
         run('codesign', '--verify', '--deep', '--strict', str(bundle))
         archive = output / f'HandwritingWeb-{version}-{platform.machine()}.zip'

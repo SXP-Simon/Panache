@@ -2,7 +2,7 @@ name: Flutter 独立桌面客户端
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["app/**", "crates/**", "Cargo.toml", "Cargo.lock", "backend/font_assets/**", "scripts/build-flutter-desktop.py", ".github/workflows/flutter_desktop.yml"]
+    paths: ["app/**", "crates/**", "Cargo.toml", "Cargo.lock", "backend/font_assets/**", "scripts/build-flutter-desktop.py", "scripts/embed-macos-backend.sh", ".github/workflows/flutter_desktop.yml"]
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
@@ -28,6 +28,9 @@ jobs:
           python-version: "3.12"
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - if: runner.os == 'macOS'
+        run: flutter build macos --debug
+        working-directory: app
       - run: python scripts/build-flutter-desktop.py
       - name: Flutter 检查
         working-directory: app
