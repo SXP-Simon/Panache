@@ -3,10 +3,10 @@
 !Cargo.lock
 !crates/
 !crates/**
-!backend/
-!backend/VERSION
-!backend/font_assets/
-!backend/font_assets/**
+!assets/
+!VERSION
+!assets/font_assets/
+!assets/font_assets/**
 !app/
 !app/build/
 !app/build/web/

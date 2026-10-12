@@ -16,7 +16,7 @@ class Workspace extends ChangeNotifier {
   static String get defaultBase {
     const configured = String.fromEnvironment('API_BASE_URL');
     if (configured.isNotEmpty) return configured.replaceAll(RegExp(r'/$'), '');
-    return kIsWeb ? Uri.base.origin : 'http://127.0.0.1:5005';
+    return kIsWeb ? Uri.base.origin : 'http://127.0.0.1:5006';
   }
 
   HandwritingApi api;

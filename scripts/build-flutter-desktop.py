@@ -22,7 +22,7 @@ def main():
     target = {'Darwin': 'macos', 'Windows': 'windows', 'Linux': 'linux'}[platform.system()]
     if target != 'macos':
         run('cargo', 'build', '--locked', '--release', '-p', 'handwriting-server')
-    version = (ROOT / 'backend/VERSION').read_text().strip()
+    version = (ROOT / 'VERSION').read_text().strip()
     run(args.flutter, 'pub', 'get', cwd=ROOT / 'app')
     run(args.flutter, 'build', target, '--release', f'--build-name={version}', cwd=ROOT / 'app')
     output = ROOT / 'target/desktop-package' / target
@@ -47,8 +47,8 @@ def main():
         backend.mkdir()
         binary = 'handwriting-server.exe' if target == 'windows' else 'handwriting-server'
         shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
-        shutil.copytree(ROOT / 'backend/font_assets', backend / 'font_assets')
-        shutil.copy2(ROOT / 'backend/VERSION', backend / 'VERSION')
+        shutil.copytree(ROOT / 'assets/font_assets', backend / 'font_assets')
+        shutil.copy2(ROOT / 'VERSION', backend / 'VERSION')
         shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
         shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
     if target == 'macos':

@@ -51,7 +51,7 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 3)),
     skip: base.isEmpty
-        ? '通过 --dart-define=LIVE_API_BASE=http://127.0.0.1:5005 启用'
+        ? '通过 --dart-define=LIVE_API_BASE=http://127.0.0.1:5006 启用'
         : false,
   );
 }

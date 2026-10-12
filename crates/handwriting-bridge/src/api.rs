@@ -137,7 +137,7 @@ pub fn execute(mut request: Request) -> Result<Value> {
             "\n",
             include_str!("../../handwriting-core/licenses/handright-LICENSE.txt")
         ))),
-        "version" => Ok(json!({"version": include_str!("../../../backend/VERSION").trim()})),
+        "version" => Ok(json!({"version": include_str!("../../../VERSION").trim()})),
         "import" | "identify" => {
             let _operation = OPERATIONS
                 .try_lock()

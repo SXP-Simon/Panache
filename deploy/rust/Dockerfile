@@ -3,7 +3,7 @@ FROM rust:1.94.1-bookworm AS build
 WORKDIR /source
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
-COPY backend/VERSION ./backend/VERSION
+COPY VERSION ./VERSION
 RUN cargo build --locked --release -p handwriting-server
 
 FROM debian:bookworm-slim
@@ -11,8 +11,8 @@ RUN useradd --uid 10001 --create-home handwriting && mkdir /data && chown handwr
 WORKDIR /opt/handwriting
 COPY --from=build /source/target/release/handwriting-server ./
 COPY app/build/web ./web
-COPY backend/font_assets ./font_assets
-COPY backend/VERSION ./VERSION
+COPY assets/font_assets ./font_assets
+COPY VERSION ./VERSION
 COPY crates/handwriting-core/NOTICE ./NOTICE
 COPY crates/handwriting-core/licenses ./licenses
 USER handwriting

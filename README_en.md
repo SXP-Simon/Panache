@@ -1,82 +1,37 @@
-# Handwritten text generation website
+# Handwriting generator
 
-![star](https://atomgit.com/liuweiqing147/handwriting-web/star/badge.svg)
+A cross-platform handwriting tool built with Flutter and Rust. It supports text and document import, fonts and backgrounds, layout variation, image previews, and PNG / PDF / ZIP export.
 
-Welcome to my handwritten text generation site! This platform allows you to use existing fonts to create images that mimic handwritten text.
+- Android / iOS use a bundled Rust engine through Dart FFI.
+- Windows / macOS / Linux automatically start a bundled Rust sidecar.
+- Flutter Web connects to a Rust HTTP service that can also host the UI.
 
-URL: https://handwrite.sixiangjia.de
+## Layout
 
-The current interface splits the workspace into three columns — settings on the left, text in the middle, preview on the right:
+| Path | Purpose |
+| --- | --- |
+| `app/` | Flutter client, platform projects, and tests |
+| `assets/` | Shared font assets as a Flutter package |
+| `crates/` | Rust rendering core, mobile bridge, and HTTP server |
+| `scripts/` | Desktop, mobile, and service build scripts |
+| `deploy/rust/` | Docker and service deployment |
+| `VERSION` | Product version |
 
-![New interface](image-new-ui.png)
+## Development
 
-The "Old layout" button in the top bar switches back to the previous layout; both edit the same content:
+Toolchain: Flutter 3.47.5 / Dart 3.13.4 and Rust 1.94.1, plus the SDK for each native platform. Python is only used by native build scripts.
 
-![Old interface](image.png)
-
-📖 **Full documentation (user guide / self-hosting / development): https://mygithub.sixiangjia.de/handwriting-web/en/**
-
-## Function
-
-### Custom Fonts
-
-You can upload your own fonts to generate a unique handwriting style that suits your needs.
-
-### Background picture
-
-Upload your desired background image to add a personal touch to your handwriting. If you don't have a background image, don't worry! Just specify the width and height of the picture, and my website will automatically generate a background picture with horizontal lines for you.
-
-### Tunable parameters
-
-You have full control over various parameters such as margins (top, bottom, left, right) and random perturbation between characters. This allows you to fine-tune the look of your handwritten text.
-
-### Text layout markers
-
-Use standalone markers in the text input to control layout:
-
-- `---` (three or more dashes) forces the following content onto a new page.
-- Prefix a line with `>>>` to right-align it, which is useful for signatures and dates.
-
-For example:
-
-```text
-First page
----
-Second page
->>>Signature
->>>July 27, 2026
+```bash
+# Repository root
+cargo run --locked -p handwriting-server
+# Another terminal
+cd app
+flutter pub get
+flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 ```
 
-The markers control layout and are not printed in the generated handwriting.
+For cross-origin development, configure `HANDWRITING_ALLOWED_ORIGINS`. See the [client guide](app/README.md), [Rust workspace guide](crates/README.md), and [deployment guide](deploy/rust/README.md) for builds, tests, signing, and platform limitations.
 
-### Extract text from various file types
+The product version comes from the root `VERSION` file. The legacy release pipeline has been removed; automated releases for the rewrite are not yet configured. `CHANGELOG.md` retains historical releases.
 
-My site can extract text content from various file types, allowing you to upload text easily.
-
-### Preview function
-
-I added a preview feature to the right side of the website. This allows you to conveniently review how your handwritten text image will look before finalizing it.
-
-### Complete image generation
-
-Once you're happy with the preview, you can generate a full set of images. The images will be conveniently packaged into a zip file for easy download.
-
-## How to build it yourself
-
-Use `docker-compose up -d` in the project directory, the default port is 2345
-
-To add fonts, font files are placed in ttf_files in the project root directory
-
-## Conclusion
-
-I hope you enjoy using my handwriting generator site to create your personalized handwriting pictures!
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=14790897%2Fhandwriting-web&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&legend=top-left" />
- </picture>
-</a>
+See [LICENSE](LICENSE) and the algorithm [NOTICE](crates/handwriting-core/NOTICE). Font redistribution is subject to each font's license.

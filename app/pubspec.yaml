@@ -2,7 +2,7 @@ name: handwriting_app
 description: 手写体生成器的跨平台 Flutter 客户端。
 publish_to: none
 
-# 开发脚手架版本；产品发布版本后续接入 semantic-release。
+# 开发脚手架版本；产品版本由根目录 VERSION 提供。
 version: 0.1.0+1
 
 environment:
@@ -19,7 +19,7 @@ dependencies:
   http: ^1.6.0
   ffi: ^2.1.4
   handwriting_assets:
-    path: ../backend
+    path: ../assets
   file_picker: ^10.3.10
   file_saver: ^0.7.0
   path_provider: ^2.1.5

@@ -16,7 +16,7 @@ impl Drop for OwnedChild {
 #[test]
 fn desktop_handshake_and_parent_pipe_eof_shutdown() {
     let data = tempfile::tempdir().unwrap();
-    let fonts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../backend/font_assets");
+    let fonts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/font_assets");
     let mut child = OwnedChild(
         Command::new(env!("CARGO_BIN_EXE_handwriting-server"))
             .env("HANDWRITING_DESKTOP_SIDECAR", "1")

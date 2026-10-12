@@ -16,7 +16,7 @@ fn request(text: &str) -> RenderRequest {
     static FONT: std::sync::OnceLock<std::sync::Arc<fontdue::Font>> = std::sync::OnceLock::new();
     let font = FONT
         .get_or_init(|| {
-            FontBook::load(&std::fs::read(root().join("font_assets/霞鹜文楷.ttf")).unwrap())
+            FontBook::load(&std::fs::read(root().join("assets/font_assets/霞鹜文楷.ttf")).unwrap())
                 .unwrap()
         })
         .clone();
@@ -274,7 +274,7 @@ fn form_validation_rejects_nan_and_conflicting_geometry() {
 #[test]
 fn all_default_fonts_load_and_render() {
     let mut r = request("中文 English，。123");
-    for file in std::fs::read_dir(root().join("backend/font_assets")).unwrap() {
+    for file in std::fs::read_dir(root().join("assets/font_assets")).unwrap() {
         let file = file.unwrap();
         if file.path().extension().is_some_and(|e| e == "ttf") {
             r.fonts = FontBook::new(&std::fs::read(file.path()).unwrap(), &[]).unwrap();

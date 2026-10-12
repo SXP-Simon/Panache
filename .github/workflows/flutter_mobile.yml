@@ -1,7 +1,7 @@
 name: Flutter Mobile
 on:
   pull_request:
-    paths: ["app/**", "crates/**", "Cargo.*", "backend/pubspec.yaml", "backend/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
+    paths: ["VERSION", "app/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
   workflow_dispatch:
 jobs:
   android:

@@ -52,11 +52,11 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             data_dir: PathBuf::from(".handwriting-rust"),
-            font_dir: PathBuf::from("backend/font_assets"),
+            font_dir: PathBuf::from("assets/font_assets"),
             web_dir: None,
             allowed_origins: vec!["http://127.0.0.1:5006".into()],
             access_token: None,
-            version: include_str!("../../../backend/VERSION").trim().into(),
+            version: include_str!("../../../VERSION").trim().into(),
             limits: Limits::default(),
             concurrency: 2,
             max_active: 8,
@@ -851,7 +851,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let server = Server::new(Config {
             data_dir: dir.path().into(),
-            font_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../backend/font_assets"),
+            font_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/font_assets"),
             ..Config::default()
         })
         .unwrap();
