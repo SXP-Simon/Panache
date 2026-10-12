@@ -64,4 +64,6 @@ bash scripts/build-rust-service.sh
 
 ## 许可
 
-项目许可见 [LICENSE](LICENSE)，移植算法的声明与许可见 [NOTICE](crates/handwriting-core/NOTICE)。共享字体沿用已有资产，分发时需遵守各字体许可。
+项目许可见 [LICENSE](LICENSE)，移植算法的声明与许可见 [NOTICE](crates/handwriting-core/NOTICE)。客户端可在“关于与反馈 → 开源许可”查看项目、算法及已确认的 OFL 字体许可；服务包、桌面包和 Rust Docker 镜像同时携带 LICENSE 与 licenses/。
+
+九款共享字体保持不变，授权依据及尚待确认的字体见 [字体许可记录](assets/licenses/FONT-LICENSES.md)。项目 MIT 许可不覆盖第三方字体；保留字体文件不代表已取得其商用或再分发授权。

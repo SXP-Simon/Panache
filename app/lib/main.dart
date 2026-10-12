@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/workbench.dart';
 import 'services/workspace.dart';
+import 'services/licenses.dart';
 import 'services/desktop_bootstrap_stub.dart'
     if (dart.library.io) 'services/desktop_bootstrap.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  registerBundledLicenses();
   runApp(
     usesDesktopBackend || usesMobileBackend
         ? DesktopBootstrap(

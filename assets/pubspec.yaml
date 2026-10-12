@@ -6,3 +6,4 @@ environment:
 flutter:
   assets:
     - font_assets/
+    - licenses/

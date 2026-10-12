@@ -5,6 +5,9 @@
 !crates/**
 !assets/
 !VERSION
+!LICENSE
+!assets/licenses/
+!assets/licenses/**
 !assets/font_assets/
 !assets/font_assets/**
 !app/

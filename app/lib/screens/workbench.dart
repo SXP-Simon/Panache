@@ -1261,6 +1261,14 @@ class _WorkbenchState extends State<Workbench> {
               spacing: 8,
               children: [
                 OutlinedButton.icon(
+                  onPressed: () => showLicensePage(
+                    context: context,
+                    applicationName: l.appTitle,
+                  ),
+                  icon: const Icon(Icons.description_outlined),
+                  label: Text(l.licenses),
+                ),
+                OutlinedButton.icon(
                   onPressed: () => launchUrl(
                     Uri.parse('https://github.com/14790897/handwriting-web'),
                   ),
