@@ -1,0 +1,6 @@
+{
+  "@@locale": "zh",
+  "appTitle": "手写体生成器",
+  "welcomeTitle": "让文字成为手写稿",
+  "migrationNotice": "全平台版本正在开发，手写生成和导出功能将在后续提供。"
+}

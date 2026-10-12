@@ -1,0 +1,26 @@
+name: handwriting_app
+description: 手写体生成器的跨平台 Flutter 客户端。
+publish_to: none
+
+# 开发脚手架版本；产品发布版本后续接入 semantic-release。
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.3
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true

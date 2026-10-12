@@ -6,7 +6,7 @@
 
 **已确定：使用 Rust 实现跨平台生成核心，替代客户端对 Python 运行时的依赖；新界面不再使用 Vue。**
 
-**建议但尚未确定：使用 Flutter 实现 Android、iOS、Windows、macOS、Linux 和 Web 界面。** 用户目前确认的是 Rust，Flutter 仍是本方案的推荐前端。若最终选择 React + Tauri，Rust 核心与 Web 服务可以保留，只需调整客户端适配层。
+**基础工程采用 Flutter 实现 Android、iOS、Windows、macOS、Linux 和 Web 界面。** 用户已要求按 `app/` + Rust workspace 结构建立工程。Flutter 文本编辑体验与各平台表现仍需通过原型验证；Rust 核心保持独立。
 
 产品目标：
 
@@ -236,7 +236,7 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 
 | 风险或决策 | 处理方式 |
 | --- | --- |
-| Flutter 尚未由用户确认 | 文档按推荐方案评估，实施界面前确认；Rust 核心保持独立 |
+| 原生桥接尚未接入 | 当前 bridge 仅提供 Rust API 边界；后续生成 FFI 绑定并验证原生构建 |
 | 字体与现有度量差异 | 原型先测全部默认字体和代表性上传字体，必要时选择 FreeType |
 | 图像算法无法等价替换 | 真实样本对照，明确容差；必要时引入裁剪后的 OpenCV |
 | 移动端内存和后台限制 | 真机优先、逐页处理、协作取消，定义挂起与恢复行为 |
@@ -262,4 +262,4 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 - [flutter_rust_bridge 平台说明](https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview)：原生平台与 Web 支持。
 - [rust-skia 平台与构建说明](https://github.com/rust-skia/rust-skia)：Skia binding 的平台目标及原生构建成本。
 
-后续以原型结果更新候选库、性能预算、平台矩阵和前端决策。
+后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。目前只有中英文首页、核心能力状态、Web 健康检查与静态页面托管，尚未接入 FFI 或手写渲染。

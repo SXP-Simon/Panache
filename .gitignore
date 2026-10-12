@@ -44,3 +44,5 @@ desktop/dist/
 preview_outputs/
 # 文档站构建产物（mkdocs build 默认输出到 site/）
 site/
+# Rust workspace 构建产物
+/target/
