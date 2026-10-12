@@ -1,12 +1,12 @@
 # 跨平台重构方案评估
 
-评估日期：2026-10-12。实施顺序为 Flutter UI → Rust 核心与 HTTP 服务。桌面客户端使用内置 Rust sidecar 独立运行；Flutter 原生 FFI 与移动端离线性能验证继续作为后续阶段。
+评估日期：2026-10-12。实施顺序为 Flutter UI → Rust 核心与 HTTP 服务。桌面客户端使用内置 Rust sidecar 独立运行；Android/iOS 已接入 C ABI + Dart FFI；移动端真机性能验收仍需继续。
 
 ## 当前实施：Rust 核心与 HTTP 服务
 
-2026-10-12 桌面端已接入内置 Rust 进程管理与打包：随机 loopback 端口、每次启动令牌、握手及健康检查、应用支持目录、启动失败/崩溃重试、退出与父进程 EOF 回收。完整分发包包含服务和默认字体，用户无需外部后端。macOS arm64 实测通过，Windows/Linux 已加入 CI；移动端离线 FFI 尚未实施。
+2026-10-12 桌面端已接入内置 Rust 进程管理与打包：随机 loopback 端口、每次启动令牌、握手及健康检查、应用支持目录、启动失败/崩溃重试、退出与父进程 EOF 回收。完整分发包包含服务和默认字体，用户无需外部后端。macOS arm64 实测通过，Windows/Linux 已加入 CI；移动端离线 FFI 已接入，构建与验证见下文。
 
-2026-10-12 按确认的实施范围，完成 `handwriting-core` 的字体、排版、连通区域扰动、公式节点、插图滤镜、背景识别、文档导入和 PNG/PDF/ZIP 导出，并通过 `handwriting-server` 提供兼容 Flutter 的 HTTP/WebSocket API。原生 FFI 不在本轮范围，`handwriting-bridge` 继续保留边界。
+2026-10-12 按确认的实施范围，完成 `handwriting-core` 的字体、排版、连通区域扰动、公式节点、插图滤镜、背景识别、文档导入和 PNG/PDF/ZIP 导出，并通过 `handwriting-server` 提供兼容 Flutter 的 HTTP/WebSocket API。后续移动端实施已将 `handwriting-bridge` 接入 Flutter。
 
 服务提供 2 个执行配额、8 个活跃任务、SQLite 元数据、磁盘结果、30 分钟终态 TTL、协作取消、重启中断标记和幂等下载。Origin/Referer/Host、CORS、可选鉴权、限流与资源预算已实现。独立服务包和 Docker 为新增入口，Python 后端和既有发布路径继续保留。
 
@@ -16,13 +16,15 @@
 
 ## 当前实施：Flutter UI 先行
 
-2026-10-12 按用户最新要求，先使用 Flutter 完整迁移 UI，并按 Material Design 3 重新设计；这一阶段不修改 Python 后端。`app/` 通过兼容 HTTP API 使用手写引擎；桌面分发包自动启动随包 Rust 服务并支持离线生成。下文的移动端 Rust/FFI 架构仍是后续目标。
+2026-10-12 按用户最新要求，先使用 Flutter 完整迁移 UI，并按 Material Design 3 重新设计；这一阶段不修改 Python 后端。`app/` 通过兼容 HTTP API 使用手写引擎；桌面分发包自动启动随包 Rust 服务并支持离线生成。移动端使用随包 Rust FFI，引擎行为复用同一核心。
 
 已实现编辑、全部参数、字体与背景上传、文档导入、插图、Markdown/LaTeX/书信工具、预设与草稿、任务进度、多页预览以及 PNG/PDF/ZIP 导出。宽屏采用三栏布局，窄屏采用分段工作台，提供中英文和明暗主题。Web 和 Electron 打包入口已切到 Flutter；旧 Vue 源码保留用于对照验收。
 
 账户服务遵循现有后端状态：登录和注册接口未启用，Flutter 明确显示不可用说明。任务仍使用后端的 pending/processing/completed/failed 和 30 分钟 TTL；没有新增取消能力。Web 首次加载可迁移同源 Vue 草稿和参数。
 
 开发、部署及验证命令见 [Flutter 客户端](../app/README.md)。UI 阶段验证与 Rust 引擎的性能、效果验收分别记录，不将 Flutter 构建成功视为 Rust 或全部平台验收完成。
+
+2026-10-12 移动端实现：采用小型 C ABI + Dart FFI，Android 打包 `.so`，iOS 链接静态库；Flutter 启动时提取随包字体并初始化本地引擎，不启动 HTTP 服务。支持导入、背景识别、PNG/PDF/ZIP、单任务进度与取消；暂停时请求取消。Gradle/Xcode 自动编译原生库，CI 检查 APK、iOS 模拟器及未签名 device 构建。性能与系统文件保存的真机验收仍是发布前检查项。
 
 ## 1. 决策与目标
 
@@ -59,9 +61,10 @@ Rust 能合理实现当前业务。推荐组合是：**现有库负责字体、�
 ## 3. 架构与运行方式
 
 ```text
-Flutter 客户端：Android / iOS / Windows / macOS / Linux
+Flutter 客户端：Android / iOS（C ABI + Dart FFI）
+               Windows / macOS / Linux（HTTP sidecar）
                          │
-                 flutter_rust_bridge
+                    共用 Rust 核心
                          │
                          ▼
                   Rust 生成核心
@@ -75,9 +78,9 @@ Flutter 客户端：Android / iOS / Windows / macOS / Linux
 
 ### 3.1 原生客户端
 
-桌面当前通过 HTTP 调用随包 Rust sidecar：由 Flutter 管理启动、就绪、崩溃与退出，服务只监听随机 loopback 端口，并使用每次启动令牌。打包入口为 `scripts/build-flutter-desktop.py`，无需用户另装后端。Android/iOS 的后续方案仍为 FFI（外部函数接口）：Android 打包原生共享库，iOS 将原生库链接进应用，移动端不启动 HTTP 服务。
+桌面当前通过 HTTP 调用随包 Rust sidecar：由 Flutter 管理启动、就绪、崩溃与退出，服务只监听随机 loopback 端口，并使用每次启动令牌。打包入口为 `scripts/build-flutter-desktop.py`，无需用户另装后端。Android/iOS 使用 FFI（外部函数接口）：Android 打包原生共享库，iOS 将原生库链接进应用，移动端不启动 HTTP 服务。
 
-生成任务在后台执行，进度通过事件传回界面。文件选择、系统分享、用户目录和导出授权由客户端适配层处理。界面向核心传入字体数据、输入资源与显式输出位置，核心不依赖全局工作目录。
+生成任务在后台执行，当前客户端轮询任务状态和进度。文件选择、系统分享、用户目录和导出授权由客户端适配层处理。界面向核心传入字体数据、输入资源与显式输出位置，核心不依赖全局工作目录。
 
 ### 3.2 Web 与自托管
 
@@ -122,7 +125,7 @@ app/                    # Flutter 应用与平台适配
 | 多页图片 ZIP | `zip` | 明确顺序、命名和压缩策略 |
 | FastAPI 与 WebSocket | `axum` + `tokio` + `serde` | 显式参数校验，保留必要的 API 兼容 |
 | SQLite 任务记录 | `rusqlite`，按需使用 bundled SQLite | 结果存文件，数据库只保存元数据 |
-| Flutter 原生集成 | `flutter_rust_bridge` | 验证构建、线程、事件与大数据传递 |
+| Flutter 原生集成 | C ABI + Dart FFI | JSON 参数/状态/路径，阻塞调用在 isolate，原生 worker 逐页写文件 |
 | 日志与错误 | `tracing` + `thiserror` | 核心返回结构化错误，界面负责中英文文案 |
 
 `imageproc` 不承诺覆盖 OpenCV 全部能力。`fontdue` 不处理 shaping，其默认布局也不承担本项目的排版规则。shaping 若采用 `harfrust` 与 `read-fonts`，应评估是否能减少重复字体解析，而非同时堆叠多套字体库。
@@ -258,7 +261,7 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 
 | 风险或决策 | 处理方式 |
 | --- | --- |
-| 原生桥接尚未接入 | 当前 bridge 仅提供 Rust API 边界；后续生成 FFI 绑定并验证原生构建 |
+| 原生桥接与构建 | 已实现 C ABI 和 Android/iOS 构建钩子；继续通过设备测试验证生命周期 |
 | 字体与现有度量差异 | 原型先测全部默认字体和代表性上传字体，必要时选择 FreeType |
 | 图像算法无法等价替换 | 真实样本对照，明确容差；必要时引入裁剪后的 OpenCV |
 | 移动端内存和后台限制 | 真机优先、逐页处理、协作取消，定义挂起与恢复行为 |
@@ -284,4 +287,4 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 - [flutter_rust_bridge 平台说明](https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview)：原生平台与 Web 支持。
 - [rust-skia 平台与构建说明](https://github.com/rust-skia/rust-skia)：Skia binding 的平台目标及原生构建成本。
 
-后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 已实现核心与 HTTP 服务并连接 Flutter；桌面 sidecar 与独立分发包已实施；FFI、移动端离线运行与移动端安装包尚未实施。
+后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 已实现核心与 HTTP 服务并连接 Flutter；桌面 sidecar 与独立分发包已实施；FFI、移动端离线运行和 Android/iOS 自动构建已接入；真机内存、系统保存与发行签名仍需验收。

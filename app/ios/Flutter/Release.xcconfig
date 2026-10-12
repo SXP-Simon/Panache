@@ -1,1 +1,2 @@
 #include "Generated.xcconfig"
+OTHER_LDFLAGS = $(inherited) -force_load "$(BUILT_PRODUCTS_DIR)/mobile-engine/libhandwriting_bridge.a" -Wl,-export_dynamic

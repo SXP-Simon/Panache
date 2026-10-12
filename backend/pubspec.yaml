@@ -1,0 +1,8 @@
+name: handwriting_assets
+description: Flutter 客户端共享的现有字体资产。
+publish_to: none
+environment:
+  sdk: ^3.13.4
+flutter:
+  assets:
+    - font_assets/

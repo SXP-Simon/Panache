@@ -11,7 +11,7 @@ import 'services/desktop_bootstrap_stub.dart'
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    usesDesktopBackend
+    usesDesktopBackend || usesMobileBackend
         ? DesktopBootstrap(
             builder: (workspace) => HandwritingApp(workspace: workspace),
           )

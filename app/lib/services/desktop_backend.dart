@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'api.dart';
 
+bool get usesMobileBackend => Platform.isAndroid || Platform.isIOS;
 bool get usesDesktopBackend =>
     Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 

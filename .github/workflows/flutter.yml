@@ -2,7 +2,7 @@ name: Flutter UI
 
 on:
   pull_request:
-    paths: ["app/**", "scripts/build-flutter-web.sh", ".github/workflows/flutter.yml"]
+    paths: ["app/**", "backend/pubspec.yaml", "backend/font_assets/**", "scripts/build-flutter-web.sh", ".github/workflows/flutter.yml"]
   workflow_dispatch:
 
 jobs:

@@ -148,6 +148,7 @@ class Workspace extends ChangeNotifier {
       return;
     }
     busy = true;
+    taskId = '';
     error = '';
     progress = 0;
     phase = 'pending';
@@ -189,19 +190,11 @@ class Workspace extends ChangeNotifier {
         await Future<void>.delayed(const Duration(seconds: 2));
       }
       if (disposed) return;
-      final response = await activeApi.result(taskId);
       if (preview) {
-        if (response.headers['content-type']?.contains('json') ?? false) {
-          final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-          pages = [
-            for (final image in data['images'] as List)
-              base64Decode(image as String),
-          ];
-        } else {
-          pages = [response.bodyBytes];
-        }
+        pages = await activeApi.preview(taskId);
         page = 0;
       } else {
+        final response = await activeApi.result(taskId);
         exportBytes = response.bodyBytes;
         exportExtension = pdf ? 'pdf' : 'zip';
       }
@@ -217,6 +210,11 @@ class Workspace extends ChangeNotifier {
       busy = false;
       emit();
     }
+  }
+
+  Future<void> cancel() async {
+    if (!busy || taskId.isEmpty || !api.supportsCancel) return;
+    await api.cancelTask(taskId);
   }
 
   void emit() {

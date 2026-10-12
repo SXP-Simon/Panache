@@ -110,5 +110,22 @@ class HandwritingApi {
       headers: headers,
     ),
   );
+  bool get supportsCancel => false;
+  Future<void> cancelTask(String id) async {
+    throw UnsupportedError('Cancellation unavailable');
+  }
+
+  Future<List<Uint8List>> preview(String id) async {
+    final response = await result(id);
+    if (response.headers['content-type']?.contains('json') ?? false) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      return [
+        for (final image in data['images'] as List)
+          base64Decode(image as String),
+      ];
+    }
+    return [response.bodyBytes];
+  }
+
   void close() => client.close();
 }

@@ -7,8 +7,9 @@ import 'package:path_provider/path_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'desktop_backend.dart';
 import 'workspace.dart';
+import 'mobile_api.dart';
 
-export 'desktop_backend.dart' show usesDesktopBackend;
+export 'desktop_backend.dart' show usesDesktopBackend, usesMobileBackend;
 
 class DesktopBootstrap extends StatefulWidget {
   const DesktopBootstrap({super.key, required this.builder});
@@ -31,7 +32,17 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
       onExitRequested: () async {
         closing = true;
         await backend?.stop();
+        if (workspace?.api case final MobileHandwritingApi api) {
+          await api.cancelAll();
+        }
         return AppExitResponse.exit;
+      },
+      onStateChange: (state) {
+        if (state == AppLifecycleState.paused) {
+          if (workspace?.api case final MobileHandwritingApi api) {
+            unawaited(api.cancelAll());
+          }
+        }
       },
     );
     unawaited(start());
@@ -50,8 +61,11 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
     backend = current;
     Workspace? candidate;
     try {
-      final data = await getApplicationSupportDirectory();
-      final api = await current.start(dataDirectory: data.path);
+      final api = usesMobileBackend
+          ? await MobileHandwritingApi.bundled()
+          : await current.start(
+              dataDirectory: (await getApplicationSupportDirectory()).path,
+            );
       if (!mounted || closing) {
         api.close();
         await current.stop();
@@ -76,15 +90,20 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
         failed = false;
         starting = false;
       });
-      unawaited(
-        current.exited!.then((_) {
-          if (mounted && !closing && !starting && identical(backend, current)) {
-            setState(() {
-              failed = true;
-            });
-          }
-        }),
-      );
+      if (!usesMobileBackend) {
+        unawaited(
+          current.exited!.then((_) {
+            if (mounted &&
+                !closing &&
+                !starting &&
+                identical(backend, current)) {
+              setState(() {
+                failed = true;
+              });
+            }
+          }),
+        );
+      }
     } catch (error) {
       candidate?.dispose();
       await current.stop();

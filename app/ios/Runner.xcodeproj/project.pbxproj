@@ -153,6 +153,7 @@
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				9740EEB61CF901F6004384FC /* Run Script */,
+				AABBCCDD0011223344556677 /* Build Mobile Engine */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -265,6 +266,19 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+
+		AABBCCDD0011223344556677 /* Build Mobile Engine */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			name = "Build Mobile Engine";
+			outputPaths = ("$(BUILT_PRODUCTS_DIR)/mobile-engine/libhandwriting_bridge.a",);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "python3 \"$SRCROOT/../../scripts/build-mobile-engine.py\" ios --output \"$BUILT_PRODUCTS_DIR/mobile-engine\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 
