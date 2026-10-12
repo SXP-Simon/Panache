@@ -8,7 +8,7 @@ import 'package:handwriting_app/services/workspace.dart';
 void main() {
   const base = String.fromEnvironment('LIVE_API_BASE');
   test(
-    '真实 Python 后端：文本导入、单页/多页 PNG、PDF 与 ZIP',
+    '真实后端：文本导入、单页/多页 PNG、PDF 与 ZIP',
     () async {
       HttpOverrides.global = null;
       final w = Workspace(api: HandwritingApi(base));

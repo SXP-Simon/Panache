@@ -1,0 +1,60 @@
+name: Rust 后端
+on:
+  pull_request:
+    paths: ["crates/**", "Cargo.toml", "Cargo.lock", "app/**", "backend/font_assets/**", "font_assets/**", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
+  workflow_dispatch:
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      - run: cargo build --locked --release -p handwriting-server
+  flutter-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+      - uses: Swatinem/rust-cache@v2
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - run: flutter pub get
+        working-directory: app
+      - run: flutter analyze
+        working-directory: app
+      - run: flutter build web --release
+        working-directory: app
+      - run: bash scripts/build-rust-service.sh --skip-web
+      - name: 真实 Rust 服务与 Flutter 客户端
+        shell: bash
+        run: |
+          HANDWRITING_DATA_DIR="$RUNNER_TEMP/handwriting-data" target/service-package/handwriting-server > "$RUNNER_TEMP/rust-service.log" 2>&1 &
+          SERVICE_PID=$!
+          trap 'kill "$SERVICE_PID" || true' EXIT
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:5006/api/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5006/api/health
+          cd app
+          flutter test --dart-define=LIVE_API_BASE=http://127.0.0.1:5006
+      - uses: actions/upload-artifact@v4
+        with:
+          name: handwriting-rust-linux
+          path: target/service-package/
+      - run: docker build -f deploy/rust/Dockerfile -t handwriting-rust .

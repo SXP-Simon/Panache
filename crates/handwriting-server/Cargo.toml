@@ -6,11 +6,24 @@ publish.workspace = true
 
 [dependencies]
 handwriting-core.workspace = true
-axum.workspace = true
+axum = { workspace = true, features = ["multipart", "ws"] }
 serde.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["fs", "sync", "time"] }
 tower-http.workspace = true
+serde_json = "1"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+uuid = { version = "1.28.0", features = ["v4"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+url = "2.5.8"
+tokio-util = { version = "0.7.20", features = ["io"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+base64 = "0.23.1"
+fontdue = "0.9.4"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 serde_json = "1"
+tempfile = "3.27.0"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+tokio-tungstenite = "0.29.0"

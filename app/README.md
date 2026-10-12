@@ -1,6 +1,6 @@
 # Flutter 客户端
 
-使用 Material Design 3 重建的手写体生成界面，通过 HTTP 连接现有 Python/FastAPI 后端。此次不改动 `backend/` 和 Rust workspace。原生 Flutter 客户端当前也需要后端连接，Rust 离线引擎属于后续阶段。
+使用 Material Design 3 重建的手写体生成界面，通过 HTTP 连接 Python/FastAPI 或 Rust 后端。Rust 核心与兼容 API 已实现；原生 Flutter 客户端当前仍需要后端连接，FFI 离线集成属于后续阶段。
 
 ## 已实现
 
@@ -24,6 +24,8 @@ cd backend
 ../.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 5005
 ```
 
+也可以在仓库根目录执行 `cargo run --locked -p handwriting-server`，然后将 UI 服务地址设为 `http://127.0.0.1:5006`。Flutter Web 开发使用不同 origin 时，需要在 Rust 的 `HANDWRITING_ALLOWED_ORIGINS` 中同时列出 API 和开发页面地址；例如固定 `--web-port=8080` 后允许 `http://localhost:8080`，生产构建同源托管无需额外配置。Rust 独立服务包与 Docker 配置见 [部署说明](../deploy/rust/README.md)。
+
 在另一终端启动 Flutter：
 
 ```bash
@@ -34,7 +36,7 @@ flutter run -d macos
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5005
 ```
 
-Web release 默认请求同源 `/api`；原生默认连接 `http://127.0.0.1:5005`。顶栏云图标可修改服务地址。Android 模拟器连接主机时使用 `http://10.0.2.2:5005`；手机需填写电脑局域网地址，HTTPS 服务适用于所有平台。iOS 真机局域网权限、移动设备文件选择与导出需要对应设备验收。
+Web release 默认请求同源 `/api`；原生默认连接 `http://127.0.0.1:5005`。顶栏云图标可修改服务地址。Rust 服务需要认证时，原生构建可用 `--dart-define=HANDWRITING_ACCESS_TOKEN=<token>` 配置 Bearer header；Web 通过浏览器 Basic auth 访问，不把令牌编译进 Web。Android 模拟器连接主机时使用 `http://10.0.2.2:5005`；手机需填写电脑局域网地址，HTTPS 服务适用于所有平台。iOS 真机局域网权限、移动设备文件选择与导出需要对应设备验收。
 
 ## Web 与桌面打包
 
@@ -58,7 +60,7 @@ Python 后端可用既有 `HANDWRITING_DIST_DIR` 托管 `app/build/web`。Web �
 cd app
 flutter analyze
 flutter test
-# 需要已启动的真实 Python 后端
+# 需要已启动的真实后端；Rust 使用端口 5006
 flutter test test/live_api_test.dart --dart-define=LIVE_API_BASE=http://127.0.0.1:5005
 flutter build web --release
 flutter build macos --debug
@@ -68,6 +70,6 @@ pnpm --filter handwriting-web-e2e run test:desktop
 
 测试包含旧 LaTeX 的 46 个兼容样例、文本工具、API multipart 和返回格式，以及中英文 320/375/768/1024/1440px 工作台布局。桌面 E2E 使用 Flutter Web 的 `Semantics.identifier`（DOM 属性 `flt-semantics-identifier`）作为 `getByTestId` 选择器。
 
-任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；目前后端没有取消接口，所以生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
+任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；Rust 提供取消 API 和 cancelled 状态，客户端已将其作为终态处理；UI 暂未添加取消按钮，生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
 
 Android/iOS/Windows/Linux 工程已接入文件与网络插件；本机不能证明这些平台的完整运行和分发已经通过。签名、公证和版本发布继续遵循仓库原有流程。
