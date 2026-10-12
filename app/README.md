@@ -1,6 +1,6 @@
 # Flutter 客户端
 
-使用 Material Design 3 重建的手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 的 FFI 离线集成仍属于后续阶段。
+使用 Material Design 3 重建的手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 随包内置 Rust FFI 引擎，生成、导入和导出可离线完成。
 
 ## 已实现
 
@@ -38,7 +38,7 @@ xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 
 Rust sidecar 的架构取决于构建机。当前 macOS 实测为 arm64，不支持直接将此包用于 Intel Mac。Windows/Linux 构建与进程测试已加入 `.github/workflows/flutter_desktop.yml`，需等待对应 runner 验证。macOS 已在 Xcode 构建阶段自动构建、复制和签名 sidecar，`cd app && flutter run -d macos`、`flutter build macos` 均可直接使用内置引擎。首次启动需安装 Rust 工具链，之后 Cargo 增量构建。Windows/Linux 当前仍使用上面的完整打包脚本嵌入后端。
 
-## Web 与移动端开发
+## Web 开发
 
 先按仓库 `AGENTS.md` 启动 Python 后端，或在根目录执行 `cargo run --locked -p handwriting-server` 启动 Rust 服务（默认端口 5006）。随后：
 
@@ -50,7 +50,43 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5005
 
 Web release 默认请求同源 `/api`。Rust 开发跨 origin 时需配置 `HANDWRITING_ALLOWED_ORIGINS`。Web 托管、独立服务包与 Docker 见 [部署说明](../deploy/rust/README.md)。
 
-Android/iOS 当前仍通过 HTTP 使用后端：默认 `http://127.0.0.1:5005`，顶栏连接按钮可更改地址，Android 模拟器访问主机使用 `http://10.0.2.2:5005`。可用 `--dart-define=API_BASE_URL=...` 和 `--dart-define=HANDWRITING_ACCESS_TOKEN=...` 配置原生远程连接。Web 使用浏览器 Basic auth。移动端权限、文件导出与离线 FFI 尚需对应设备验收。
+## 移动端独立客户端
+
+Android/iOS 直接调用随包 Rust 引擎，不监听 HTTP 端口，也无需启动外部后端。Android 打包 `libhandwriting_bridge.so`，iOS 链接静态库；Gradle/Xcode 在 `flutter run` 和 `flutter build` 时自动执行 `scripts/build-mobile-engine.py`。构建机需要 Rust，最终用户无需安装 Rust 或 Python。
+
+```bash
+# 仓库根目录：按目标平台安装 Rust 标准库
+rustup target add aarch64-linux-android x86_64-linux-android
+# iOS 需要 macOS + Xcode
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+cd app
+flutter pub get
+flutter run -d <移动设备或模拟器ID>
+# Android：安装 NDK 28.2.13676358，支持 API 24+ 的 arm64/x86_64
+flutter build apk --release --target-platform android-arm64,android-x64
+flutter build appbundle --release --target-platform android-arm64,android-x64
+# iOS 15+：本地检查编译，生成未签名 .app
+flutter build ios --release --no-codesign
+# 发布 IPA 需配置 Apple 签名后使用 flutter build ipa
+```
+
+Android release 当前沿用脚手架的 debug 签名，正式发布前需配置自己的签名。iOS 的未签名 `.app` 不能直接安装到真机。Android 不支持 armv7；iOS 真机为 arm64，模拟器支持 arm64/x86_64。
+
+阻塞 FFI 调用运行在 Dart background isolate，生成运行在 Rust worker thread；参数、状态和私有目录路径通过 JSON 传递，PNG/PDF/ZIP 从文件读取。字体由本地 `handwriting_assets` package 复用 `backend/font_assets/`，避免重复维护；首次启动将内置字体提取到应用缓存目录，草稿继续保存在 preferences；生成结果是可清理的缓存，需主动保存导出。单次只执行一个生成任务，最多保留 8 个任务结果。热重启会先取消原生任务并清理旧缓存；应用进入 paused 状态请求协作取消，恢复后可重新生成。
+
+移动端限制：单页最多 12M pixels、20K 字符、20 页、单文件 16MiB、DOCX 解压总量 32MiB；优先使用较小内置字体，缺字时加载 fallback，不长期缓存解析后的字体。预览仍会将全部 PNG 读入 Flutter 内存，大字体和高分辨率在低内存真机上的表现需要进一步验收。
+
+```bash
+# 实际移动设备：覆盖随包加载、TXT 导入、两页 PNG、PDF/ZIP 和取消
+flutter test integration_test/mobile_engine_test.dart -d <设备ID>
+# macOS host 真实 FFI 回归测试
+# 先在仓库根目录 cargo build --release -p handwriting-bridge
+flutter test test/mobile_api_test.dart --dart-define=MOBILE_ENGINE_LIBRARY=<仓库绝对路径>/target/release/libhandwriting_bridge.dylib
+```
+
+本次本地验证通过：Android arm64 模拟器和 iOS arm64 模拟器的离线集成测试、Android arm64/x86_64 release APK、iOS arm64 未签名 release `.app`；Android release APK 已实际启动工作台。Flutter analyze、64 项测试（包含真实 FFI 和桌面 sidecar）以及 Web release 构建通过。模拟器结果不替代低内存真机验收。
+
+移动构建与模拟器集成测试 CI 见 `.github/workflows/flutter_mobile.yml`，尚未在远程 runner 执行。系统文件选择和保存使用现有 Flutter 插件；需要真机检查系统授权、分享/保存目标和后台切换。
 
 既有 Electron/Python 打包入口仍可使用：
 
@@ -75,6 +111,6 @@ pnpm --filter handwriting-web-e2e run test:desktop
 
 测试包含旧 LaTeX 的 46 个兼容样例、文本工具、API multipart 和返回格式，以及中英文 320/375/768/1024/1440px 工作台布局。桌面 E2E 使用 Flutter Web 的 `Semantics.identifier`（DOM 属性 `flt-semantics-identifier`）作为 `getByTestId` 选择器。
 
-任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；Rust 提供取消 API 和 cancelled 状态，客户端已将其作为终态处理；UI 暂未添加取消按钮，生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
+任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；Rust 提供取消 API 和 cancelled 状态，客户端已将其作为终态处理；移动端 UI 提供取消按钮，生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
 
-内置进程集成测试可传入 `--dart-define=DESKTOP_BACKEND_EXECUTABLE=<打包后的服务绝对路径>`，覆盖自动启动、令牌、地址隔离、真实生成及退出。Rust 另有管道 EOF 退出测试。macOS 实际应用已验证启动和父进程崩溃回收；Windows/Linux 和移动端仍需对应平台验收。
+内置进程集成测试可传入 `--dart-define=DESKTOP_BACKEND_EXECUTABLE=<打包后的服务绝对路径>`，覆盖自动启动、令牌、地址隔离、真实生成及退出。Rust 另有管道 EOF 退出测试。macOS 实际应用已验证启动和父进程崩溃回收；Windows/Linux 与移动端真机仍需对应平台验收。

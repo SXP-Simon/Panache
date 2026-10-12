@@ -571,7 +571,11 @@ dependencies = [
 name = "handwriting-bridge"
 version = "0.1.0"
 dependencies = [
+ "fontdue",
  "handwriting-core",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

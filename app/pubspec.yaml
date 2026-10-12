@@ -17,6 +17,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   web: ^1.1.1
   http: ^1.6.0
+  ffi: ^2.1.4
+  handwriting_assets:
+    path: ../backend
   file_picker: ^10.3.10
   file_saver: ^0.7.0
   path_provider: ^2.1.5
@@ -29,6 +32,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
 
 flutter:
   generate: true

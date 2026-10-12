@@ -89,8 +89,11 @@ class _WorkbenchState extends State<Workbench> {
     }
   }
 
-  Future<void> action(Future<void> Function() work) async {
-    if (locked) return;
+  Future<void> action(
+    Future<void> Function() work, {
+    bool allowBusy = false,
+  }) async {
+    if (operation || (!allowBusy && w.busy)) return;
     setState(() => operation = true);
     try {
       await work();
@@ -991,6 +994,14 @@ class _WorkbenchState extends State<Workbench> {
                 icon: const Icon(Icons.chevron_right),
               ),
             ],
+          ),
+        if (w.busy && w.api.supportsCancel)
+          TextButton.icon(
+            onPressed: w.taskId.isEmpty
+                ? null
+                : () => action(w.cancel, allowBusy: true),
+            icon: const Icon(Icons.cancel_outlined),
+            label: Text(l.cancel),
           ),
         if (w.pages.isNotEmpty)
           TextButton.icon(

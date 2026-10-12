@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'workspace.dart';
 
 bool get usesDesktopBackend => false;
+bool get usesMobileBackend => false;
 
 class DesktopBootstrap extends StatelessWidget {
   const DesktopBootstrap({super.key, required this.builder});
