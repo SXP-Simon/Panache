@@ -1,6 +1,16 @@
 # 跨平台重构方案评估
 
-评估日期：2026-10-12。本文保留跨平台 Rust 引擎的后续规划；当前实施顺序已调整为先迁移 Flutter UI，保持 Python 后端不变。Rust 原型与移动端性能验证尚未完成。
+评估日期：2026-10-12。实施顺序为 Flutter UI → Rust 核心与 HTTP 服务。Flutter 原生 FFI 与移动端离线性能验证继续作为后续阶段。
+
+## 当前实施：Rust 核心与 HTTP 服务
+
+2026-10-12 按确认的实施范围，完成 `handwriting-core` 的字体、排版、连通区域扰动、公式节点、插图滤镜、背景识别、文档导入和 PNG/PDF/ZIP 导出，并通过 `handwriting-server` 提供兼容 Flutter 的 HTTP/WebSocket API。原生 FFI 不在本轮范围，`handwriting-bridge` 继续保留边界。
+
+服务提供 2 个执行配额、8 个活跃任务、SQLite 元数据、磁盘结果、30 分钟终态 TTL、协作取消、重启中断标记和幂等下载。Origin/Referer/Host、CORS、可选鉴权、限流与资源预算已实现。独立服务包和 Docker 为新增入口，Python 后端和既有发布路径继续保留。
+
+测试覆盖固定 seed、分页/对齐、默认字体、公式、文档/图片、导出、表单兼容、真实 WebSocket、队列/取消/重启/过期和鉴权边界。Flutter 的真实接口测试可直接连接 Rust 服务。字体度量、随机采样和图像算法与 Python 不保证逐像素相同；识别已修复行距误判，但真实照片仍需样本验收。完整部署与限制见 [Rust 服务说明](../deploy/rust/README.md)。
+
+以下架构评估保留作为后续原生桥接、平台验收和发布工作的依据，候选库与未来目标不等同于已交付能力。
 
 ## 当前实施：Flutter UI 先行
 
@@ -272,4 +282,4 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 - [flutter_rust_bridge 平台说明](https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview)：原生平台与 Web 支持。
 - [rust-skia 平台与构建说明](https://github.com/rust-skia/rust-skia)：Skia binding 的平台目标及原生构建成本。
 
-后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 仍仅有能力边界、健康检查与静态托管，尚未接入 FFI 或 Rust 手写渲染。
+后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 已实现核心与 HTTP 服务并连接 Flutter；FFI、移动端离线运行与对应安装包尚未实施。

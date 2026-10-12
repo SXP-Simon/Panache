@@ -1,0 +1,13 @@
+**
+!Cargo.toml
+!Cargo.lock
+!crates/
+!crates/**
+!backend/
+!backend/VERSION
+!backend/font_assets/
+!backend/font_assets/**
+!app/
+!app/build/
+!app/build/web/
+!app/build/web/**

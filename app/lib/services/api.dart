@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 class Upload {
@@ -19,9 +20,17 @@ class ApiException implements Exception {
 }
 
 class HandwritingApi {
-  HandwritingApi(this.base, {http.Client? client})
-    : client = client ?? http.Client();
+  HandwritingApi(this.base, {http.Client? client, String? accessToken})
+    : accessToken =
+          accessToken ??
+          (kIsWeb
+              ? ''
+              : const String.fromEnvironment('HANDWRITING_ACCESS_TOKEN')),
+      client = client ?? http.Client();
   final String base;
+  final String accessToken;
+  Map<String, String> get headers =>
+      accessToken.isEmpty ? const {} : {'Authorization': 'Bearer $accessToken'};
   final http.Client client;
   Uri uri(String path) => Uri.parse('$base$path');
 
@@ -47,8 +56,11 @@ class HandwritingApi {
     return response;
   }
 
-  Future<dynamic> getJson(String path) async =>
-      jsonDecode(utf8.decode((await checked(client.get(uri(path)))).bodyBytes));
+  Future<dynamic> getJson(String path) async => jsonDecode(
+    utf8.decode(
+      (await checked(client.get(uri(path), headers: headers))).bodyBytes,
+    ),
+  );
 
   Future<http.Response> multipart(
     String path,
@@ -56,7 +68,8 @@ class HandwritingApi {
     Map<String, Upload> files,
   ) async {
     final request = http.MultipartRequest('POST', uri(path))
-      ..fields.addAll(fields);
+      ..fields.addAll(fields)
+      ..headers.addAll(headers);
     for (final entry in files.entries) {
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -91,7 +104,11 @@ class HandwritingApi {
   Future<Map<String, dynamic>> status(String id) async =>
       (await getJson('/api/generate_handwriting/task/$id'))
           as Map<String, dynamic>;
-  Future<http.Response> result(String id) =>
-      checked(client.get(uri('/api/generate_handwriting/task/$id/result')));
+  Future<http.Response> result(String id) => checked(
+    client.get(
+      uri('/api/generate_handwriting/task/$id/result'),
+      headers: headers,
+    ),
+  );
   void close() => client.close();
 }

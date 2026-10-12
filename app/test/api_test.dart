@@ -53,6 +53,51 @@ void main() {
     expect(w.pages.map(utf8.decode), ['a', 'b']);
     expect(w.progress, 100);
   });
+  test('访问令牌覆盖提交、查询与结果下载', () async {
+    final seen = <String>[];
+    final api = HandwritingApi(
+      'http://localhost:5006',
+      accessToken: 'test-token',
+      client: MockClient((request) async {
+        expect(request.headers['Authorization'], 'Bearer test-token');
+        seen.add(request.url.path);
+        return http.Response(
+          '{"task_id":"abc","task_status":"completed"}',
+          200,
+        );
+      }),
+    );
+    addTearDown(api.close);
+    await api.submit({'text': '正文'}, {});
+    await api.status('abc');
+    await api.result('abc');
+    expect(seen.length, 3);
+  });
+  test('取消状态终止轮询并显示任务错误', () async {
+    var polls = 0;
+    final w = Workspace(
+      api: HandwritingApi(
+        'http://localhost:5006',
+        client: MockClient((request) async {
+          if (request.method == 'POST') {
+            return http.Response('{"task_id":"abc"}', 200);
+          }
+          polls++;
+          return http.Response(
+            '{"task_status":"cancelled","error_message":"cancelled"}',
+            200,
+          );
+        }),
+      ),
+    );
+    addTearDown(w.dispose);
+    w.text = '正文';
+    w.settings.font = 'test.ttf';
+    await w.generate();
+    expect(polls, 1);
+    expect(w.busy, isFalse);
+    expect(w.error, 'cancelled');
+  });
   test('上传背景时省略 width/height，避免后端覆盖上传图', () async {
     final client = MockClient((request) async {
       if (request.method == 'POST') {

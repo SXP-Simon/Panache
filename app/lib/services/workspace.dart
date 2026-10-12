@@ -174,7 +174,7 @@ class Workspace extends ChangeNotifier {
             .toInt()
             .clamp(0, 100);
         emit();
-        if (phase == 'failed' || phase == 'error') {
+        if (phase == 'failed' || phase == 'error' || phase == 'cancelled') {
           throw ApiException(
             '${data['error_message'] ?? data['message'] ?? 'Task failed'}',
           );
