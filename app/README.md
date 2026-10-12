@@ -1,6 +1,6 @@
 # Flutter 客户端
 
-使用 Material Design 3 重建的手写体生成界面，通过 HTTP 连接 Python/FastAPI 或 Rust 后端。Rust 核心与兼容 API 已实现；原生 Flutter 客户端当前仍需要后端连接，FFI 离线集成属于后续阶段。
+使用 Material Design 3 重建的手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 的 FFI 离线集成仍属于后续阶段。
 
 ## 已实现
 
@@ -14,45 +14,50 @@
 
 Web 第一次使用时读取同源旧 Vue `localStorage` 中的草稿与参数，保留原键；新数据写入独立的 `flutter.workspace`。旧版参数 JSON 的 camelCase 字段也可导入。字体与背景文件需重新选择；插图随草稿保存，浏览器存储容量仍有限。
 
-## 本地启动
+## 桌面独立客户端
 
-工具链：Flutter 3.47.5 / Dart 3.13.4；各原生平台另需对应 SDK。先按仓库 `AGENTS.md` 启动 Python 后端：
+工具链：Flutter 3.47.5 / Dart 3.13.4、Rust 1.94.1；另需当前平台的 Flutter 桌面 SDK。仓库根目录执行：
 
 ```bash
-uv sync
-cd backend
-../.venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 5005
+python3 scripts/build-flutter-desktop.py
+# Flutter 未加入 PATH 时
+python3 scripts/build-flutter-desktop.py --flutter /path/to/flutter
 ```
 
-也可以在仓库根目录执行 `cargo run --locked -p handwriting-server`，然后将 UI 服务地址设为 `http://127.0.0.1:5006`。Flutter Web 开发使用不同 origin 时，需要在 Rust 的 `HANDWRITING_ALLOWED_ORIGINS` 中同时列出 API 和开发页面地址；例如固定 `--web-port=8080` 后允许 `http://localhost:8080`，生产构建同源托管无需额外配置。Rust 独立服务包与 Docker 配置见 [部署说明](../deploy/rust/README.md)。
+脚本构建当前平台的原生 UI 和 Rust 服务，随包复制默认字体、VERSION 和许可。产物在 `target/desktop-package/<platform>/`：macOS 为 `.app` 和 ZIP，Windows 为完整应用目录和 ZIP，Linux 为应用目录和 tar.gz。Windows 可用 `python` 执行脚本。必须分发完整目录，不能只复制 UI 可执行文件。版本读取 semantic-release 维护的 `backend/VERSION`。
 
-在另一终端启动 Flutter：
+启动 `.app`、Windows 目录中的 `.exe` 或 Linux 目录中的 `handwriting_app` 即可。客户端自动拉起内置服务，等待握手和健康检查，再恢复草稿并连接工作台。服务只绑定 `127.0.0.1` 的随机端口，访问令牌每次随机生成；桌面模式忽略保存的远程地址并禁用地址切换。生成、文档导入、背景识别与导出不需要网络；项目链接和发送反馈需要网络。
+
+运行数据由 `path_provider` 放在用户应用支持目录中，macOS 使用 sandbox 容器目录。正常退出先关闭 stdin 管道，协作取消任务，最多等待 5 秒后强制回收；客户端崩溃也会触发管道 EOF。后端启动失败或意外退出时展示重新启动入口。
+
+macOS 使用 ad-hoc 签名，并未进行 Developer ID 签名和公证。下载后若被 Gatekeeper 拦截，将 `.app` 放到 `/Applications` 后执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
+```
+
+Rust sidecar 的架构取决于构建机。当前 macOS 实测为 arm64，不支持直接将此包用于 Intel Mac。Windows/Linux 构建与进程测试已加入 `.github/workflows/flutter_desktop.yml`，需等待对应 runner 验证。单独 `flutter build` 或 `flutter run` 不会复制 sidecar，桌面使用上面的完整打包脚本。
+
+## Web 与移动端开发
+
+先按仓库 `AGENTS.md` 启动 Python 后端，或在根目录执行 `cargo run --locked -p handwriting-server` 启动 Rust 服务（默认端口 5006）。随后：
 
 ```bash
 cd app
 flutter pub get
-flutter run -d macos
-# Web 开发模式连接现有后端（与 Flutter 开发服务端口不同）
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5005
 ```
 
-Web release 默认请求同源 `/api`；原生默认连接 `http://127.0.0.1:5005`。顶栏云图标可修改服务地址。Rust 服务需要认证时，原生构建可用 `--dart-define=HANDWRITING_ACCESS_TOKEN=<token>` 配置 Bearer header；Web 通过浏览器 Basic auth 访问，不把令牌编译进 Web。Android 模拟器连接主机时使用 `http://10.0.2.2:5005`；手机需填写电脑局域网地址，HTTPS 服务适用于所有平台。iOS 真机局域网权限、移动设备文件选择与导出需要对应设备验收。
+Web release 默认请求同源 `/api`。Rust 开发跨 origin 时需配置 `HANDWRITING_ALLOWED_ORIGINS`。Web 托管、独立服务包与 Docker 见 [部署说明](../deploy/rust/README.md)。
 
-## Web 与桌面打包
+Android/iOS 当前仍通过 HTTP 使用后端：默认 `http://127.0.0.1:5005`，顶栏连接按钮可更改地址，Android 模拟器访问主机使用 `http://10.0.2.2:5005`。可用 `--dart-define=API_BASE_URL=...` 和 `--dart-define=HANDWRITING_ACCESS_TOKEN=...` 配置原生远程连接。Web 使用浏览器 Basic auth。移动端权限、文件导出与离线 FFI 尚需对应设备验收。
+
+既有 Electron/Python 打包入口仍可使用：
 
 ```bash
-# 仓库根目录：构建 Flutter Web，并同步到现有桌面打包使用的 frontend/dist
 bash scripts/build-flutter-web.sh
-# 沿用 Electron 外壳与 PyInstaller 后端，加载 Flutter Web 界面
 bash desktop/build.sh --app-only
-# 原生 Flutter UI 构建（不包含 Python 后端，需独立启动服务）
-cd app
-flutter build macos
 ```
-
-Python 后端可用既有 `HANDWRITING_DIST_DIR` 托管 `app/build/web`。Web 部署先执行 `cd app && flutter build web --release`，再执行 `docker build -t handwriting-frontend app`（从仓库根目录执行 Docker 命令）。`app/Dockerfile` 和 `app/nginx.conf` 托管构建产物，仍代理到 `backend:5005`，原来的 Docker Compose 服务关系不变。前端发布工作流已切到 Flutter。Flutter 脚本不含 Vue 的文件 hash，因此 Nginx 使用重新验证缓存策略；CanvasKit 从构建目录加载。
-
-旧 `frontend/` 源码与 Vue E2E 暂留作迁移对照，线上与桌面构建入口已使用 Flutter。旧版 `/About`、`/Introduce`、`/Feedback` 等路径有对应入口。
 
 ## 验证
 
@@ -63,7 +68,7 @@ flutter test
 # 需要已启动的真实后端；Rust 使用端口 5006
 flutter test test/live_api_test.dart --dart-define=LIVE_API_BASE=http://127.0.0.1:5005
 flutter build web --release
-flutter build macos --debug
+# 完整原生桌面包在仓库根目录构建：python3 scripts/build-flutter-desktop.py
 # 仓库根目录；需要已经完成桌面构建
 pnpm --filter handwriting-web-e2e run test:desktop
 ```
@@ -72,4 +77,4 @@ pnpm --filter handwriting-web-e2e run test:desktop
 
 任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；Rust 提供取消 API 和 cancelled 状态，客户端已将其作为终态处理；UI 暂未添加取消按钮，生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
 
-Android/iOS/Windows/Linux 工程已接入文件与网络插件；本机不能证明这些平台的完整运行和分发已经通过。签名、公证和版本发布继续遵循仓库原有流程。
+内置进程集成测试可传入 `--dart-define=DESKTOP_BACKEND_EXECUTABLE=<打包后的服务绝对路径>`，覆盖自动启动、令牌、地址隔离、真实生成及退出。Rust 另有管道 EOF 退出测试。macOS 实际应用已验证启动和父进程崩溃回收；Windows/Linux 和移动端仍需对应平台验收。

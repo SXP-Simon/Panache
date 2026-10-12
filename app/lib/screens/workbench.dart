@@ -237,7 +237,7 @@ class _WorkbenchState extends State<Workbench> {
             actions: [
               IconButton(
                 tooltip: l.connection,
-                onPressed: locked ? null : connectionDialog,
+                onPressed: locked || w.managedBackend ? null : connectionDialog,
                 icon: Icon(
                   w.connected
                       ? Icons.cloud_done_outlined

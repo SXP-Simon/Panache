@@ -1,5 +1,5 @@
 use handwriting_server::{Config, Server};
-use std::{env, net::SocketAddr, path::PathBuf};
+use std::{env, io::Write, net::SocketAddr, path::PathBuf};
 fn number<T: std::str::FromStr>(key: &str, default: T) -> Result<T, Box<dyn std::error::Error>> {
     match env::var(key) {
         Ok(value) => value.parse().map_err(|_| format!("{key} 无效").into()),
@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     config.web_dir = match env::var_os("HANDWRITING_WEB_DIR") {
+        Some(v) if v.is_empty() => None,
         Some(v) => Some(PathBuf::from(v)),
         None => [root.join("web"), PathBuf::from("app/build/web")]
             .into_iter()
@@ -100,6 +101,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::new(config)?;
     let cleanup = server.start_cleanup();
     tracing::info!("服务地址：http://{bound}；Rust 手写引擎已启用");
+    // 2026-10-12：桌面 sidecar 通过 stdin 管道跟随父进程生命周期。
+    // 专用线程避免 Tokio 的阻塞 stdin 在运行时退出时无法回收。
+    let desktop = env::var("HANDWRITING_DESKTOP_SIDECAR").as_deref() == Ok("1");
+    let (parent_closed, parent_gone) = tokio::sync::oneshot::channel();
+    if desktop {
+        std::thread::spawn(move || {
+            use std::io::Read;
+            let mut byte = [0u8; 1];
+            while matches!(std::io::stdin().read(&mut byte), Ok(n) if n > 0) {}
+            let _ = parent_closed.send(());
+        });
+        println!(
+            "HANDWRITING_READY {}",
+            serde_json::json!({"base": format!("http://{bound}")})
+        );
+        std::io::stdout().flush()?;
+    }
     let shutdown_server = server.clone();
     axum::serve(
         listener,
@@ -108,7 +126,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(async move {
-        shutdown_signal().await;
+        if desktop {
+            tokio::select! {
+                _ = shutdown_signal() => {},
+                _ = parent_gone => {},
+            }
+        } else {
+            shutdown_signal().await;
+        }
         shutdown_server.cancel_active();
     })
     .await?;

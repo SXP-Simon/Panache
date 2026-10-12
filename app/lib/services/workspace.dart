@@ -10,7 +10,9 @@ import 'api.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
 
 class Workspace extends ChangeNotifier {
-  Workspace({HandwritingApi? api}) : api = api ?? HandwritingApi(defaultBase);
+  Workspace({HandwritingApi? api, this.managedBackend = false})
+    : api = api ?? HandwritingApi(defaultBase);
+  final bool managedBackend;
   static String get defaultBase {
     const configured = String.fromEnvironment('API_BASE_URL');
     if (configured.isNotEmpty) return configured.replaceAll(RegExp(r'/$'), '');
@@ -56,7 +58,7 @@ class Workspace extends ChangeNotifier {
       }
     }
     final base = prefs!.getString('flutter.api');
-    if (base != null && base != api.base && !kIsWeb) {
+    if (base != null && base != api.base && !kIsWeb && !managedBackend) {
       api.close();
       api = HandwritingApi(base);
     }
@@ -90,6 +92,7 @@ class Workspace extends ChangeNotifier {
   }
 
   Future<void> setBase(String base) async {
+    if (managedBackend) return;
     api.close();
     api = HandwritingApi(base.replaceAll(RegExp(r'/$'), ''));
     await prefs?.setString('flutter.api', api.base);

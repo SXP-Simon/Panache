@@ -91,5 +91,8 @@
   "theme": "切换明暗主题",
   "textPreview": "文本与公式预览",
   "characters": "字符",
-  "invalidServer": "请填写有效的 HTTP 或 HTTPS 服务地址"
+  "invalidServer": "请填写有效的 HTTP 或 HTTPS 服务地址",
+  "backendStarting": "正在启动内置手写引擎……",
+  "backendFailed": "内置手写引擎无法运行，请重试。若问题持续，请重新安装客户端。",
+  "backendRetry": "重新启动"
 }

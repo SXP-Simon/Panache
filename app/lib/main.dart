@@ -5,10 +5,18 @@ import 'package:flutter/foundation.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/workbench.dart';
 import 'services/workspace.dart';
+import 'services/desktop_bootstrap_stub.dart'
+    if (dart.library.io) 'services/desktop_bootstrap.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const HandwritingApp());
+  runApp(
+    usesDesktopBackend
+        ? DesktopBootstrap(
+            builder: (workspace) => HandwritingApp(workspace: workspace),
+          )
+        : const HandwritingApp(),
+  );
 }
 
 class HandwritingApp extends StatefulWidget {
