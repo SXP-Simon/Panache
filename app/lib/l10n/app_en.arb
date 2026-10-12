@@ -91,5 +91,8 @@
   "theme": "Toggle light/dark theme",
   "textPreview": "Text & formula preview",
   "characters": "characters",
-  "invalidServer": "Enter a valid HTTP or HTTPS server URL"
+  "invalidServer": "Enter a valid HTTP or HTTPS server URL",
+  "backendStarting": "Starting the bundled handwriting engine…",
+  "backendFailed": "The bundled engine could not run. Retry, or reinstall the app if the problem persists.",
+  "backendRetry": "Restart"
 }

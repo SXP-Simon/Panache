@@ -1,8 +1,10 @@
 # 跨平台重构方案评估
 
-评估日期：2026-10-12。实施顺序为 Flutter UI → Rust 核心与 HTTP 服务。Flutter 原生 FFI 与移动端离线性能验证继续作为后续阶段。
+评估日期：2026-10-12。实施顺序为 Flutter UI → Rust 核心与 HTTP 服务。桌面客户端使用内置 Rust sidecar 独立运行；Flutter 原生 FFI 与移动端离线性能验证继续作为后续阶段。
 
 ## 当前实施：Rust 核心与 HTTP 服务
+
+2026-10-12 桌面端已接入内置 Rust 进程管理与打包：随机 loopback 端口、每次启动令牌、握手及健康检查、应用支持目录、启动失败/崩溃重试、退出与父进程 EOF 回收。完整分发包包含服务和默认字体，用户无需外部后端。macOS arm64 实测通过，Windows/Linux 已加入 CI；移动端离线 FFI 尚未实施。
 
 2026-10-12 按确认的实施范围，完成 `handwriting-core` 的字体、排版、连通区域扰动、公式节点、插图滤镜、背景识别、文档导入和 PNG/PDF/ZIP 导出，并通过 `handwriting-server` 提供兼容 Flutter 的 HTTP/WebSocket API。原生 FFI 不在本轮范围，`handwriting-bridge` 继续保留边界。
 
@@ -14,7 +16,7 @@
 
 ## 当前实施：Flutter UI 先行
 
-2026-10-12 按用户最新要求，先使用 Flutter 完整迁移 UI，并按 Material Design 3 重新设计；这一阶段不修改 Python 后端。`app/` 通过原有 HTTP API 使用手写引擎，原生客户端也连接现有服务。下文的 Rust/FFI 架构是后续目标，不代表当前客户端已经支持离线生成。
+2026-10-12 按用户最新要求，先使用 Flutter 完整迁移 UI，并按 Material Design 3 重新设计；这一阶段不修改 Python 后端。`app/` 通过兼容 HTTP API 使用手写引擎；桌面分发包自动启动随包 Rust 服务并支持离线生成。下文的移动端 Rust/FFI 架构仍是后续目标。
 
 已实现编辑、全部参数、字体与背景上传、文档导入、插图、Markdown/LaTeX/书信工具、预设与草稿、任务进度、多页预览以及 PNG/PDF/ZIP 导出。宽屏采用三栏布局，窄屏采用分段工作台，提供中英文和明暗主题。Web 和 Electron 打包入口已切到 Flutter；旧 Vue 源码保留用于对照验收。
 
@@ -73,7 +75,7 @@ Flutter 客户端：Android / iOS / Windows / macOS / Linux
 
 ### 3.1 原生客户端
 
-Flutter 通过 FFI（外部函数接口）调用 Rust。Android 打包原生共享库，iOS 将原生库链接进应用；桌面按平台打包所需原生库。客户端不运行 FastAPI，也不启动监听端口的后台服务。
+桌面当前通过 HTTP 调用随包 Rust sidecar：由 Flutter 管理启动、就绪、崩溃与退出，服务只监听随机 loopback 端口，并使用每次启动令牌。打包入口为 `scripts/build-flutter-desktop.py`，无需用户另装后端。Android/iOS 的后续方案仍为 FFI（外部函数接口）：Android 打包原生共享库，iOS 将原生库链接进应用，移动端不启动 HTTP 服务。
 
 生成任务在后台执行，进度通过事件传回界面。文件选择、系统分享、用户目录和导出授权由客户端适配层处理。界面向核心传入字体数据、输入资源与显式输出位置，核心不依赖全局工作目录。
 
@@ -282,4 +284,4 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 - [flutter_rust_bridge 平台说明](https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview)：原生平台与 Web 支持。
 - [rust-skia 平台与构建说明](https://github.com/rust-skia/rust-skia)：Skia binding 的平台目标及原生构建成本。
 
-后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 已实现核心与 HTTP 服务并连接 Flutter；FFI、移动端离线运行与对应安装包尚未实施。
+后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 已实现核心与 HTTP 服务并连接 Flutter；桌面 sidecar 与独立分发包已实施；FFI、移动端离线运行与移动端安装包尚未实施。
