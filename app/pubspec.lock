@@ -202,7 +202,7 @@ packages:
   handwriting_assets:
     dependency: "direct main"
     description:
-      path: "../backend"
+      path: "../assets"
       relative: true
     source: path
     version: "0.0.0"

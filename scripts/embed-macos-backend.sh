@@ -17,9 +17,9 @@ mkdir -p "$BACKEND_DIR/font_assets" "$BACKEND_DIR/licenses"
 # 不覆写已签名的 Mach-O inode，避免 macOS 命中旧签名缓存。
 rm -f "$BACKEND_DIR/handwriting-server"
 cp "$REPO_ROOT/target/release/handwriting-server" "$BACKEND_DIR/"
-rsync -a --delete "$REPO_ROOT/backend/font_assets/" "$BACKEND_DIR/font_assets/"
+rsync -a --delete "$REPO_ROOT/assets/font_assets/" "$BACKEND_DIR/font_assets/"
 rsync -a --delete "$REPO_ROOT/crates/handwriting-core/licenses/" "$BACKEND_DIR/licenses/"
-cp "$REPO_ROOT/backend/VERSION" "$BACKEND_DIR/VERSION"
+cp "$REPO_ROOT/VERSION" "$BACKEND_DIR/VERSION"
 cp "$REPO_ROOT/crates/handwriting-core/NOTICE" "$BACKEND_DIR/NOTICE"
 /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" \
   --entitlements "$REPO_ROOT/app/macos/sidecar.entitlements" "$BACKEND_DIR/handwriting-server"

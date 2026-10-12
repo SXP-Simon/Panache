@@ -14,7 +14,7 @@ use std::{
 #[test]
 fn local_engine_lifecycle_and_abi() {
     let root = tempfile::tempdir().unwrap();
-    let font_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../backend/font_assets");
+    let font_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/font_assets");
     let call = |command: &str,
                 fields: HashMap<String, String>,
                 files: HashMap<String, Upload>,

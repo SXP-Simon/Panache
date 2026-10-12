@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if root.join("font_assets").is_dir() {
                 root.join("font_assets")
             } else {
-                PathBuf::from("backend/font_assets")
+                PathBuf::from("assets/font_assets")
             }
         });
     config.web_dir = match env::var_os("HANDWRITING_WEB_DIR") {

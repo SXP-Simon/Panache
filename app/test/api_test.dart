@@ -40,7 +40,7 @@ void main() {
       );
     });
     final w = Workspace(
-      api: HandwritingApi('http://localhost:5005', client: client),
+      api: HandwritingApi('http://localhost:5006', client: client),
     );
     addTearDown(w.dispose);
     w.settings.font = 'test.ttf';
@@ -119,7 +119,7 @@ void main() {
       );
     });
     final w = Workspace(
-      api: HandwritingApi('http://localhost:5005', client: client),
+      api: HandwritingApi('http://localhost:5006', client: client),
     );
     addTearDown(w.dispose);
     w.settings.font = 'test.ttf';

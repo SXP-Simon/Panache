@@ -15,7 +15,7 @@ bash scripts/build-rust-service.sh --skip-web
 # 产物在 target/service-package/
 ```
 
-服务包是 HTTP 服务及浏览器界面，不是原生 Flutter FFI 安装包。构建使用当前机器架构；Windows、Linux 与 macOS 的编译测试由独立 CI matrix 执行。现有 Python/Electron 构建与 Docker Compose 保留。
+服务包是 HTTP 服务及浏览器界面，不是原生 Flutter FFI 安装包。构建使用当前机器架构；Windows、Linux 与 macOS 的编译测试由独立 CI matrix 执行。
 
 ## Docker
 
@@ -35,9 +35,9 @@ Compose 将端口绑定在主机 `127.0.0.1:5006`。浏览器访问时使用 Bas
 | `HANDWRITING_ACCESS_TOKEN` | 本地默认无令牌，配置后 HTTP、静态资源和 WebSocket 均需认证 |
 | `HANDWRITING_ALLOWED_ORIGINS` | 实际监听地址和 localhost 的 HTTP origin，以逗号分隔 |
 | `HANDWRITING_DATA_DIR` | 平台用户可写目录中的 HandwritingWebRust / handwriting-rust |
-| `HANDWRITING_FONT_DIR` | 程序旁 `font_assets/`，开发时 `backend/font_assets/`；兼容 `FONT_ASSETS_DIR` |
+| `HANDWRITING_FONT_DIR` | 程序旁 `font_assets/`，开发时 `assets/font_assets/`；兼容 `FONT_ASSETS_DIR` |
 | `HANDWRITING_WEB_DIR` | 程序旁 `web/` 或 `app/build/web`；显式设置需包含 index.html |
-| `HANDWRITING_APP_VERSION` | 程序旁 VERSION，开发时使用现有 backend/VERSION |
+| `HANDWRITING_APP_VERSION` | 程序旁 VERSION，开发时使用根目录 VERSION |
 | `HANDWRITING_CONCURRENCY` | 2；文档/图片处理共享同一执行配额 |
 | `HANDWRITING_MAX_ACTIVE` | 8 个 pending/processing 生成任务 |
 | `HANDWRITING_TASK_TTL_SECONDS` | 1800；终态最后更新后计时，下载中保留 |

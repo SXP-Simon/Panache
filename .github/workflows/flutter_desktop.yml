@@ -2,7 +2,7 @@ name: Flutter 独立桌面客户端
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["app/**", "crates/**", "Cargo.toml", "Cargo.lock", "backend/font_assets/**", "backend/pubspec.yaml", "scripts/build-flutter-desktop.py", "scripts/embed-macos-backend.sh", ".github/workflows/flutter_desktop.yml"]
+    paths: ["VERSION", "app/**", "crates/**", "Cargo.toml", "Cargo.lock", "assets/font_assets/**", "assets/pubspec.yaml", "scripts/build-flutter-desktop.py", "scripts/embed-macos-backend.sh", ".github/workflows/flutter_desktop.yml"]
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"

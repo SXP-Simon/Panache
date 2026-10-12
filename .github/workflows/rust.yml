@@ -1,7 +1,7 @@
 name: Rust 后端
 on:
   pull_request:
-    paths: ["crates/**", "Cargo.toml", "Cargo.lock", "app/**", "backend/font_assets/**", "font_assets/**", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
+    paths: ["VERSION", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "assets/font_assets/**", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
   workflow_dispatch:
 jobs:
   verify:

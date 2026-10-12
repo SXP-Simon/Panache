@@ -14,7 +14,7 @@ void main() {
       addTearDown(() => root.delete(recursive: true));
       Future<MobileHandwritingApi> open() => MobileHandwritingApi.open(
         dataDirectory: root.path,
-        fontDirectory: Directory('../backend/font_assets').absolute.path,
+        fontDirectory: Directory('../assets/font_assets').absolute.path,
         libraryPath: library,
       );
       final api = await open();

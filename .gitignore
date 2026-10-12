@@ -1,48 +1,16 @@
-.history
-.vscode/*
-!.vscode/tasks.json
-env-handwrite
-hand-write
+# 本地环境与编辑器
 .env
-backend/env
-# backend/font_assets/*
-# !backend/font_assets/.gitkeep
-venv
-.venv
-backend/flask_session/*
-backend/_pycache__/*
-原始handwrite.py
-测试.txt
-backend\app.log
-*.log
-app.log
-backend/notebook.jpg
-backend/notebook2.jpg
-backend/app.log
-*.pyc
-backend/A4本子.jpg
-ignore_rm.bat
-*.pdf
-backend/textfileprocess/doc
-backend/textfileprocess/docx
-backend/pandoc-3.1.11-windows-x86_64.msi
-backend/pyproject2.toml
-node_modules
-pandoc-3.8.3-windows-x86_64.msi
-pandoc-*-windows-x86_64.msi
-create_transparent.py
-transparent_image.png
-# macOS pandoc installer
-backend/pandoc-*-macOS.pkg
-*.pkg
-*.db
-*.bin
-.workbuddy/memory/*
-# 桌面版打包产物
-desktop/build/
-desktop/dist/
-preview_outputs/
-# 文档站构建产物（mkdocs build 默认输出到 site/）
-site/
-# Rust workspace 构建产物
+.history/
+.vscode/
+.DS_Store
+.workbuddy/memory/
+# Rust 与构建预览
 /target/
+/preview_outputs/
+# 构建脚本缓存与运行数据
+__pycache__/
+*.pyc
+*.log
+*.db
+*.db-shm
+*.db-wal
