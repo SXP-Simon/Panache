@@ -1,6 +1,16 @@
 # 跨平台重构方案评估
 
-评估日期：2026-10-12。本文用于技术选型和实施规划，尚未开始代码重写，也未完成 Rust 原型与移动端性能验证。
+评估日期：2026-10-12。本文保留跨平台 Rust 引擎的后续规划；当前实施顺序已调整为先迁移 Flutter UI，保持 Python 后端不变。Rust 原型与移动端性能验证尚未完成。
+
+## 当前实施：Flutter UI 先行
+
+2026-10-12 按用户最新要求，先使用 Flutter 完整迁移 UI，并按 Material Design 3 重新设计；这一阶段不修改 Python 后端。`app/` 通过原有 HTTP API 使用手写引擎，原生客户端也连接现有服务。下文的 Rust/FFI 架构是后续目标，不代表当前客户端已经支持离线生成。
+
+已实现编辑、全部参数、字体与背景上传、文档导入、插图、Markdown/LaTeX/书信工具、预设与草稿、任务进度、多页预览以及 PNG/PDF/ZIP 导出。宽屏采用三栏布局，窄屏采用分段工作台，提供中英文和明暗主题。Web 和 Electron 打包入口已切到 Flutter；旧 Vue 源码保留用于对照验收。
+
+账户服务遵循现有后端状态：登录和注册接口未启用，Flutter 明确显示不可用说明。任务仍使用后端的 pending/processing/completed/failed 和 30 分钟 TTL；没有新增取消能力。Web 首次加载可迁移同源 Vue 草稿和参数。
+
+开发、部署及验证命令见 [Flutter 客户端](../app/README.md)。UI 阶段验证与 Rust 引擎的性能、效果验收分别记录，不将 Flutter 构建成功视为 Rust 或全部平台验收完成。
 
 ## 1. 决策与目标
 
@@ -199,7 +209,7 @@ Flutter 是推荐方案，但需要先验证中文输入法、长文本选区、
 | 桌面 | 参数与预览并排、快捷键、拖放、窗口缩放和文件导出 |
 | Web | 浏览器下载、连接状态、窄屏、键盘与文本输入 |
 
-界面复用当前设计语言，默认中文并提供英文翻译。错误文案由界面根据结构化错误生成，Rust 核心不拼接 UI 文案。
+按用户 2026-10-12 的明确要求，界面使用 Material Design 3 重新设计，默认中文并提供英文翻译。错误文案由界面根据结构化错误生成，Rust 核心不拼接 UI 文案。
 
 全平台原型验证后再冻结最低系统版本与架构矩阵。macOS/iOS 使用对应 Apple 构建环境，Android 使用 NDK，Windows/Linux 各自验证安装、启动和导出。CI 需要真实打包验证；不能把文档宣称的平台支持视为本项目已通过测试。
 
@@ -262,4 +272,4 @@ Python/Vue/Electron 版本在新实现通过验收前继续可用。新旧实现
 - [flutter_rust_bridge 平台说明](https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview)：原生平台与 Web 支持。
 - [rust-skia 平台与构建说明](https://github.com/rust-skia/rust-skia)：Skia binding 的平台目标及原生构建成本。
 
-后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。目前只有中英文首页、核心能力状态、Web 健康检查与静态页面托管，尚未接入 FFI 或手写渲染。
+后续以原型结果更新候选库、性能预算和平台矩阵。基础工程的开发与启动说明见 [Flutter 客户端](../app/README.md) 和 [Rust workspace](../crates/README.md)。Flutter UI 已通过现有 Python API 接入生成与导出；Rust workspace 仍仅有能力边界、健康检查与静态托管，尚未接入 FFI 或 Rust 手写渲染。

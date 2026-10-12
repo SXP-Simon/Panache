@@ -15,6 +15,14 @@ dependencies:
     sdk: flutter
   intl: ^0.20.3
   cupertino_icons: ^1.0.8
+  web: ^1.1.1
+  http: ^1.6.0
+  file_picker: ^10.3.10
+  file_saver: ^0.7.0
+  shared_preferences: ^2.5.6
+  url_launcher: ^6.3.3
+  flutter_math_fork: ^0.7.4
+  flutter_markdown_plus: ^1.0.12
 
 dev_dependencies:
   flutter_test:

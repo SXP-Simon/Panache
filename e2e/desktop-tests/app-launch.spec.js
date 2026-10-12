@@ -48,9 +48,9 @@ test.describe("桌面版启动与打包完整性", () => {
     expect(index.status).toBe(200);
     expect(index.headers["content-type"]).toContain("text/html");
     const html = index.body.toString("utf8");
-    expect(html).toContain('<div id="app">');
+    expect(html).toContain('flutter_bootstrap.js');
 
-    const assetPath = html.match(/src="(\/js\/[^"]+\.js)"/)?.[1];
+    const assetPath = "/flutter_bootstrap.js";
     expect(assetPath, "首页 HTML 里没有引用打包后的 js").toBeTruthy();
     const asset = await httpRequest({ port: desktop.port, reqPath: assetPath });
     expect(asset.status).toBe(200);

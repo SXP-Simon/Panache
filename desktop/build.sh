@@ -49,6 +49,8 @@ find_python() {
   fi
   local r
   for r in "${roots[@]}"; do
+    if [ -x "$r/.venv/Scripts/python.exe" ]; then echo "$r/.venv/Scripts/python.exe"; return 0; fi
+    if [ -x "$r/.venv/bin/python" ]; then echo "$r/.venv/bin/python"; return 0; fi
     if [ -x "$r/venv/Scripts/python.exe" ]; then echo "$r/venv/Scripts/python.exe"; return 0; fi
     if [ -x "$r/venv/bin/python" ]; then echo "$r/venv/bin/python"; return 0; fi
   done
@@ -87,9 +89,7 @@ if [ "$SKIP_DEPS" = false ]; then
 fi
 
 echo "==> 构建前端"
-ensure_node_deps "$ROOT/frontend"
-cd "$ROOT/frontend"
-npm run build
+bash "$ROOT/scripts/build-flutter-web.sh"
 
 echo "==> 打包后端 (PyInstaller onedir)"
 cd "$ROOT"
