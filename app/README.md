@@ -36,7 +36,7 @@ macOS 使用 ad-hoc 签名，并未进行 Developer ID 签名和公证。下载�
 xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 ```
 
-Rust sidecar 的架构取决于构建机。当前 macOS 实测为 arm64，不支持直接将此包用于 Intel Mac。Windows/Linux 构建与进程测试已加入 `.github/workflows/flutter_desktop.yml`，需等待对应 runner 验证。单独 `flutter build` 或 `flutter run` 不会复制 sidecar，桌面使用上面的完整打包脚本。
+Rust sidecar 的架构取决于构建机。当前 macOS 实测为 arm64，不支持直接将此包用于 Intel Mac。Windows/Linux 构建与进程测试已加入 `.github/workflows/flutter_desktop.yml`，需等待对应 runner 验证。macOS 已在 Xcode 构建阶段自动构建、复制和签名 sidecar，`cd app && flutter run -d macos`、`flutter build macos` 均可直接使用内置引擎。首次启动需安装 Rust 工具链，之后 Cargo 增量构建。Windows/Linux 当前仍使用上面的完整打包脚本嵌入后端。
 
 ## Web 与移动端开发
 
