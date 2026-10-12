@@ -1,0 +1,232 @@
+[
+  [
+    "aligned rows",
+    "\\begin{aligned}x &= 1 \\\\ y &= 2\\end{aligned}",
+    "x = 1\ny = 2"
+  ],
+  [
+    "display wrapper",
+    "\\[\\begin{aligned}x&=1\\\\y&=2\\end{aligned}\\]",
+    "x=1\ny=2"
+  ],
+  [
+    "starred align and spacing",
+    "\\begin{align*}x&=1\\\\[2pt]y&=2\\end{align*}",
+    "x=1\ny=2"
+  ],
+  [
+    "line-end row break",
+    "x=1\\\\\ny=2",
+    "x=1\ny=2"
+  ],
+  [
+    "final row break",
+    "x=1\\\\",
+    "x=1\n"
+  ],
+  [
+    "boxed formula",
+    "$\\boxed{x^2+\\alpha}$",
+    "x²+α"
+  ],
+  [
+    "nested braces",
+    "\\boxed{\\frac{a}{b}}",
+    "(a)/(b)"
+  ],
+  [
+    "nested boxes",
+    "\\boxed{\\boxed{x_1}}",
+    "x₁"
+  ],
+  [
+    "escaped braces",
+    "\\boxed{\\{a,b\\}}",
+    "{a,b}"
+  ],
+  [
+    "inline math wrapper",
+    "答案：\\(x_1\\leq 2\\)。",
+    "答案：x₁≤ 2。"
+  ],
+  [
+    "existing conversions",
+    "$\\sqrt{x}+\\frac{a}{b}\\Rightarrow\\beta$",
+    "√(x)+(a)/(b)⇒β"
+  ],
+  [
+    "literal ampersand",
+    "$\\text{R&D}\\quad A\\&B$",
+    "R&D   A&B"
+  ],
+  [
+    "plain prose",
+    "R&D，https://example.com/a//b，a/b，普通正文。",
+    "R&D，https://example.com/a//b，a/b，普通正文。"
+  ],
+  [
+    "invalid box retains content",
+    "\\boxed{x+1 后面的正文",
+    "boxed{x+1 后面的正文"
+  ],
+  [
+    "pmatrix matrix",
+    "\\begin{pmatrix}1 & 2 \\\\ 3 & 4\\end{pmatrix}",
+    "( 1  2 ; 3  4 )"
+  ],
+  [
+    "bmatrix matrix",
+    "\\begin{bmatrix}a & b \\\\ c & d\\end{bmatrix}",
+    "[ a  b ; c  d ]"
+  ],
+  [
+    "pearson complex formula",
+    "$r = \\frac{\\sum (x_i - \\bar{x})(y_i - \\bar{y})}{\\sqrt{\\sum(x_i - \\bar{x})^2}\\sqrt{\\sum(y_i - \\bar{y})^2}}$",
+    "r=(∑(xᵢ-x̄)(yᵢ-ȳ))/(√(∑(xᵢ-x̄)²)√(∑(yᵢ-ȳ)²))"
+  ],
+  [
+    "euclidean distance formula",
+    "$d(x, y) = \\sqrt{(1-2)^2 + (1-2)^2} = \\sqrt{4} = 2$",
+    "d(x,y)=√((1-2)²+(1-2)²)=√(4)=2"
+  ],
+  [
+    "cosine similarity fraction",
+    "$\\cos(x, y) = \\frac{x \\cdot y}{\\|x\\|_2 \\|y\\|_2}$",
+    "cos(x,y)=(x·y)/(||x||₂||y||₂)"
+  ],
+  [
+    "implies and long arrows",
+    "$$0 \\implies \\cos(x, y) = 0$$",
+    "0  ⇒  cos(x,y)=0"
+  ],
+  [
+    "relations and sets",
+    "$x \\in A \\cap B \\cup C \\subseteq D \\neq \\emptyset$",
+    "x ∈ A ∩ B ∪ C ⊆ D ≠ ∅"
+  ],
+  [
+    "multiline full homework paragraph",
+    "- 余弦相似度：\n$$x \\cdot y = 0\\times 1 + 1\\times 0 = 0 \\implies \\cos(x, y) = 0$$",
+    "- 余弦相似度：\nx·y=0×1+1×0=0  ⇒  cos(x,y)=0"
+  ],
+  [
+    "sized parentheses in boxed prose",
+    "故所求公式为 \\(\\boxed{\\neg\\bigl(p\\land(q\\land\\neg r)\\bigr)}\\)，其中仅含联结词 \\(\\neg\\) 和 \\(\\land\\)。",
+    "故所求公式为 ¬(p∧(q∧¬ r))，其中仅含联结词 ¬ 和 ∧。"
+  ],
+  [
+    "sized escaped braces",
+    "\\Bigl\\{x\\Bigr\\}",
+    "{x}"
+  ],
+  [
+    "sized named brackets",
+    "\\biggl\\langle x\\biggr\\rangle",
+    "⟨ x⟩"
+  ],
+  [
+    "sized floor and ceiling",
+    "\\bigl\\lfloor x\\bigr\\rfloor+\\Bigl\\lceil y\\Bigr\\rceil",
+    "⌊ x⌋+⌈ y⌉"
+  ],
+  [
+    "sizing does not match longer commands",
+    "\\bigcup+\\Biggish",
+    "bigcup+Biggish"
+  ],
+  [
+    "big plain delimiters",
+    "\\big(p\\big)",
+    "(p)"
+  ],
+  [
+    "big directional delimiters",
+    "\\bigl(p\\bigm|q\\bigr)",
+    "(p|q)"
+  ],
+  [
+    "big inline math",
+    "$\\bigl(p\\bigr)$",
+    "(p)"
+  ],
+  [
+    "big AST preserves delimiters",
+    "$\\frac{1}{2}+\\bigl(p\\bigr)$",
+    "½+(p)"
+  ],
+  [
+    "Big plain delimiters",
+    "\\Big(p\\Big)",
+    "(p)"
+  ],
+  [
+    "Big directional delimiters",
+    "\\Bigl(p\\Bigm|q\\Bigr)",
+    "(p|q)"
+  ],
+  [
+    "Big inline math",
+    "$\\Bigl(p\\Bigr)$",
+    "(p)"
+  ],
+  [
+    "Big AST preserves delimiters",
+    "$\\frac{1}{2}+\\Bigl(p\\Bigr)$",
+    "½+(p)"
+  ],
+  [
+    "bigg plain delimiters",
+    "\\bigg(p\\bigg)",
+    "(p)"
+  ],
+  [
+    "bigg directional delimiters",
+    "\\biggl(p\\biggm|q\\biggr)",
+    "(p|q)"
+  ],
+  [
+    "bigg inline math",
+    "$\\biggl(p\\biggr)$",
+    "(p)"
+  ],
+  [
+    "bigg AST preserves delimiters",
+    "$\\frac{1}{2}+\\biggl(p\\biggr)$",
+    "½+(p)"
+  ],
+  [
+    "Bigg plain delimiters",
+    "\\Bigg(p\\Bigg)",
+    "(p)"
+  ],
+  [
+    "Bigg directional delimiters",
+    "\\Biggl(p\\Biggm|q\\Biggr)",
+    "(p|q)"
+  ],
+  [
+    "Bigg inline math",
+    "$\\Biggl(p\\Biggr)$",
+    "(p)"
+  ],
+  [
+    "Bigg AST preserves delimiters",
+    "$\\frac{1}{2}+\\Biggl(p\\Biggr)$",
+    "½+(p)"
+  ],
+  [
+    "AST preserves sized braces",
+    "$\\frac{1}{2}+\\Bigl\\{p\\Bigr\\}$",
+    "½+{p}"
+  ],
+  [
+    "AST preserves sized angle brackets",
+    "$\\frac{1}{2}+\\biggl\\langle p\\biggr\\rangle$",
+    "½+⟨p⟩"
+  ],
+  [
+    "AST preserves sized norms",
+    "$\\frac{1}{2}+\\Biggl\\lVert p\\Biggr\\rVert$",
+    "½+||p||"
+  ]
+]

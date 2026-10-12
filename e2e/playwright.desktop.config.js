@@ -19,6 +19,7 @@ module.exports = defineConfig({
   reporter: [["list"], ["html", { outputFolder: "desktop-tests/.report", open: "never" }]],
   outputDir: "desktop-tests/.results",
   use: {
+    testIdAttribute: "flt-semantics-identifier",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

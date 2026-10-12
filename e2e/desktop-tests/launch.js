@@ -82,15 +82,7 @@ function logTail(dataDir, lines = 40) {
 // 等字体列表就绪：生成流程要靠它取 font_option，没加载完就点会报错。
 // 注意只能用 count —— <option> 没有布局盒，Playwright 的可见性断言永远等不到。
 async function waitForFontOptions(page, timeout = 60_000) {
-  const deadline = Date.now() + timeout;
-  for (;;) {
-    const count = await page.getByTestId("font-select").locator("option").count();
-    if (count > 0) return count;
-    if (Date.now() > deadline) {
-      throw new Error("字体列表 60 秒内没加载出来（/api/fonts_info 可能失败了）");
-    }
-    await page.waitForTimeout(200);
-  }
+  await page.getByTestId("app-version").waitFor({ timeout });
 }
 
 async function waitForHome(page) {
