@@ -99,6 +99,73 @@ test("PR 使用共同祖先比较，基础分支的新文件不进入 PR 影响�
   assert.notEqual(main, base);
 });
 
+test("文档推送继续验证并发布被前次 CI 取消的未发布应用变更", (t) => {
+  const { directory, git, index, commit } = fixture(t);
+  index("frontend/src/App.tsx", "released UI\n");
+  commit();
+  git("tag", "v1.9.0");
+  index("frontend/src/App.tsx", "unreleased UI\n");
+  const application = commit();
+  index("docs/development.md");
+  const documentation = commit();
+  const plan = readPlan(["--ci"], { EVENT_NAME: "push", PUSH_BASE: application, HEAD_SHA: documentation }, directory);
+  assert.deepEqual(plan.paths, ["docs/development.md", "frontend/src/App.tsx"]);
+  assert.equal(plan.full, false);
+  for (const flag of ["docs", "frontend", "unit_frontend", "e2e", "docker", "release"]) {
+    assert.equal(plan[flag], true, flag);
+  }
+  assert.match(plan.reason, /unpublished application paths since v1\.9\.0/);
+
+  // The newest reachable stable version, rather than lexicographic order or a prerelease, is the baseline.
+  git("tag", "v1.10.0");
+  index("frontend/src/App.tsx", "next unreleased UI\n");
+  const nextApplication = commit();
+  git("tag", "v2.0.0-beta.1");
+  index("docs/development.md", "next docs\n");
+  const nextDocs = commit();
+  const next = readPlan(["--ci"], { EVENT_NAME: "push", PUSH_BASE: nextApplication, HEAD_SHA: nextDocs }, directory);
+  assert.equal(next.release, true);
+  assert.match(next.reason, /since v1\.10\.0$/);
+});
+
+test("新版本 tag 清除累计应用范围，未发布测试和工作流不反复触发重型检查", (t) => {
+  const { directory, git, index, commit } = fixture(t);
+  index("backend/app.py");
+  commit();
+  git("tag", "v1.0.0");
+  index("backend/app.py", "new application\n");
+  commit();
+  git("tag", "v1.1.0");
+  index("backend/tests/test_app.py");
+  index(".github/workflows/engineering-quality.yml");
+  const maintenance = commit();
+  index("docs/development.md");
+  const documentation = commit();
+  const plan = readPlan(["--ci"], { EVENT_NAME: "push", PUSH_BASE: maintenance, HEAD_SHA: documentation }, directory);
+  assert.deepEqual(plan.paths, ["docs/development.md"]);
+  assert.deepEqual(FLAGS.filter((flag) => plan[flag]), ["docs"]);
+  assert.equal(plan.full, false);
+  assert.match(plan.reason, /release baseline v1\.1\.0$/);
+});
+
+test("缺少可达稳定发布 tag 时保守完整验证，旁支及预发布 tag 不充当基线", (t) => {
+  const { directory, git, index, commit } = fixture(t);
+  const base = commit();
+  git("checkout", "-b", "unrelated-release");
+  index("backend/app.py");
+  commit();
+  git("tag", "v99.0.0");
+  git("checkout", "main");
+  git("tag", "v1.0.0-beta.1");
+  index("docs/development.md");
+  const documentation = commit();
+  const plan = readPlan(["--ci"], { EVENT_NAME: "push", PUSH_BASE: base, HEAD_SHA: documentation }, directory);
+  assert.deepEqual(plan.paths, ["docs/development.md"]);
+  assert.equal(plan.full, true);
+  assert.ok(FLAGS.every((flag) => plan[flag]));
+  assert.match(plan.reason, /stable release baseline unavailable/);
+});
+
 test("pre-push 合并全部引用更新，删除引用不覆盖其他更新", (t) => {
   const { directory, index, commit } = fixture(t);
   index("README.md");

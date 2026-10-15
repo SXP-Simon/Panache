@@ -1,6 +1,7 @@
 "use strict";
 
 const { spawnSync } = require("node:child_process");
+const { planChanges } = require("./change-impact.cjs");
 const ZERO = /^0+$/;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i;
 
@@ -36,8 +37,21 @@ function ciChanges(environment = process.env, cwd) {
     } else if (environment.EVENT_NAME === "push") {
       base = commit(environment.PUSH_BASE || "", cwd);
     } else return fallback("unknown CI event; full validation");
-    return { paths: diff(base, targetCommit, cwd), full: false,
-      reason: environment.EVENT_NAME === "pull_request" ? "PR merge-base to head" : "push before to head", head_sha: targetCommit };
+    const changed = diff(base, targetCommit, cwd);
+    if (environment.EVENT_NAME === "pull_request") {
+      return { paths: changed, full: false, reason: "PR merge-base to head", head_sha: targetCommit };
+    }
+    // A later documentation push can cancel an application's checks before it is released.
+    // Carry those application inputs forward, but do not perpetually repeat unrelated test/CI changes.
+    const releaseTag = git(["tag", "--merged", targetCommit, "--sort=-version:refname"], cwd)
+      .split(/\r?\n/).find((tag) => /^v\d+\.\d+\.\d+$/.test(tag));
+    if (!releaseTag) {
+      return { paths: changed, full: true, reason: "stable release baseline unavailable; full validation", head_sha: targetCommit };
+    }
+    const pending = diff(releaseTag, targetCommit, cwd).filter((file) => planChanges([file]).release);
+    return { paths: [...new Set([...changed, ...pending])], full: false,
+      reason: pending.length ? `push before to head plus unpublished application paths since ${releaseTag}`
+        : `push before to head; release baseline ${releaseTag}`, head_sha: targetCommit };
   } catch {
     return fallback("comparison history unavailable; full validation");
   }
