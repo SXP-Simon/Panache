@@ -3,7 +3,6 @@ use crate::{
     text::{self, Node},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
-use fontdue::{Font, FontSettings};
 use image::{GrayImage, RgbaImage};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -26,36 +25,7 @@ impl Cancellation {
         }
     }
 }
-#[derive(Clone)]
-pub struct FontBook {
-    fonts: Vec<Arc<Font>>,
-}
-impl FontBook {
-    pub fn new(primary: &[u8], fallbacks: &[Vec<u8>]) -> Result<Self> {
-        let mut fonts = vec![Self::load(primary)?];
-        for bytes in fallbacks {
-            fonts.push(Self::load(bytes)?);
-        }
-        Ok(Self { fonts })
-    }
-    pub fn load(bytes: &[u8]) -> Result<Arc<Font>> {
-        ttf_parser::Face::parse(bytes, 0).map_err(|e| Error::new("invalid_font", e.to_string()))?;
-        Font::from_bytes(bytes, FontSettings::default())
-            .map(Arc::new)
-            .map_err(|e| Error::new("invalid_font", e))
-    }
-    pub fn from_fonts(primary: Arc<Font>, fallbacks: Vec<Arc<Font>>) -> Self {
-        let mut fonts = vec![primary];
-        fonts.extend(fallbacks);
-        Self { fonts }
-    }
-    fn for_char(&self, c: char) -> &Font {
-        self.fonts
-            .iter()
-            .find(|f| f.lookup_glyph_index(c) != 0)
-            .unwrap_or(&self.fonts[0])
-    }
-}
+pub use crate::fonts::FontBook;
 pub struct RenderRequest {
     pub text: String,
     pub params: Parameters,
