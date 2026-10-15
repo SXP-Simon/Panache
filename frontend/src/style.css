@@ -914,6 +914,11 @@ input[type='color'] {
 .app-footer a:hover {
   color: var(--green-ink);
 }
+.project-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .local-dot {
   width: 4px;
   height: 4px;

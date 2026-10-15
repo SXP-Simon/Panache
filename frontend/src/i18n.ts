@@ -13,6 +13,7 @@ const words = {
   workspace: ['创作工作台', 'Workspace'],
   help: ['使用指南', 'Guide'],
   desktop: ['桌面版', 'Desktop app'],
+  projectSource: ['开源代码', 'Source code'],
   language: ['切换语言', 'Switch language'],
   theme: ['切换主题', 'Switch theme'],
   document: ['文字与公式', 'Text & formulas'],
