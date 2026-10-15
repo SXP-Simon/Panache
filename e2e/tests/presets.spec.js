@@ -23,7 +23,7 @@ test.describe('预设与设置存取', () => {
     await expect(page.getByText('预设设置保存成功！')).toBeVisible();
 
     await page.getByTestId('reset-settings-btn').click();
-    await expect(page.getByTestId('font-size-input')).toHaveValue('124');
+    await expect(page.getByTestId('font-size-input')).toHaveValue('160');
 
     await page.getByTestId('load-settings-btn').click();
     await expect(page.getByText('预设设置加载成功！')).toBeVisible();

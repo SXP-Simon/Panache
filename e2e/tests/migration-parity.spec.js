@@ -111,7 +111,7 @@ test('reset removes background and uploaded font and preset cannot override a ba
   await expect(page.getByTestId('message-info')).toContainText('先移除背景');
   await page.getByTestId('reset-settings-btn').click();
   await expect(page.getByTestId('width-input')).toBeEnabled();
-  await expect(page.getByTestId('font-size-input')).toHaveValue('124');
+  await expect(page.getByTestId('font-size-input')).toHaveValue('160');
   await expect(page.getByTestId('font-select')).toHaveValue(initialFont);
   await expect(
     page.getByTestId('font-select').locator('option[value="reset-upload.ttf"]'),

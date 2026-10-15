@@ -1,10 +1,10 @@
 import type { MessageKey } from './i18n';
 export const defaultNumbers = {
-  font_size: 124,
-  line_spacing: 200,
+  font_size: 160,
+  line_spacing: 260,
   word_spacing: 1,
-  width: 2481,
-  height: 3507,
+  width: 2800,
+  height: 3960,
   top_margin: 50,
   bottom_margin: 50,
   left_margin: 50,
