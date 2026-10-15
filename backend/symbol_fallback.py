@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import threading
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
@@ -204,6 +205,90 @@ _MATH_NODE_DEPTH: Dict[str, int] = {}
 _RADICAL_MAP: Dict[str, Tuple[str, Optional[str]]] = {}
 _DYNAMIC_RADICAL_COUNTER = 0xF8000
 _RADICAL_KEYS: Dict[Tuple[str, Optional[str]], str] = {}
+
+# 2026-10-15：用主手写字体绘制脚标，避免 Unicode 小字形缺失或混入印刷体。
+_SCRIPT_MAP: Dict[str, tuple] = {}
+_SCRIPT_KEYS: Dict[tuple, str] = {}
+_DYNAMIC_SCRIPT_COUNTER = 0xFC000
+_SUPER_TO_TEXT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱˣʸᵏᵐ", "0123456789+-=()nixykm")
+_SUB_TO_TEXT = str.maketrans("₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ", "0123456789+-=()aehijklmnoprstuvxy")
+_SUPER_CHARS = frozenset(chr(cp) for cp in _SUPER_TO_TEXT)
+_SUB_CHARS = frozenset(chr(cp) for cp in _SUB_TO_TEXT)
+
+
+def is_math_glyph(char: str) -> bool:
+    return char in _VULGAR_FRACTION_MAP or char in _RADICAL_MAP or char in _SCRIPT_MAP
+
+
+def register_dynamic_script(content: str, superscript: bool) -> str:
+    """2026-10-15：将脚标作为一个可测量的整体，保留完整字符与表达式。"""
+    return _register_script_parts(((content, superscript),))
+
+
+def _register_script_parts(parts) -> str:
+    global _DYNAMIC_SCRIPT_COUNTER
+    key = tuple(parts)
+    with _REGISTRY_LOCK:
+        if key in _SCRIPT_KEYS:
+            return _SCRIPT_KEYS[key]
+        if len(_SCRIPT_MAP) >= _MAX_DYNAMIC_EXPRESSIONS:
+            return ''.join(f"{'^' if superscript else '_'}({content})" for content, superscript in key)
+        char = chr(_DYNAMIC_SCRIPT_COUNTER)
+        _DYNAMIC_SCRIPT_COUNTER += 1
+        _SCRIPT_MAP[char] = key
+        _SCRIPT_KEYS[key] = char
+        return char
+
+
+def _script_token(text: str, index: int):
+    """2026-10-15：读取 Unicode 连续脚标或明确括号脚标，不改普通文件名下划线。"""
+    char = text[index]
+    chars = _SUPER_CHARS if char in _SUPER_CHARS else _SUB_CHARS if char in _SUB_CHARS else None
+    if chars is not None:
+        end = index + 1
+        while end < len(text) and text[end] in chars:
+            end += 1
+        return text[index:end].translate(_SUPER_TO_TEXT if char in _SUPER_CHARS else _SUB_TO_TEXT), char in _SUPER_CHARS, end
+    if char not in "^_" or index == 0 or text[index - 1] == "\\":
+        return None
+    start = index + 1
+    if start >= len(text):
+        return None
+    if text[start] in "({":
+        opening, closing = text[start], ")" if text[start] == "(" else "}"
+        depth, end = 1, start + 1
+        while end < len(text) and depth:
+            if text[end] == "\\":
+                end += 2
+                continue
+            if text[end] == opening:
+                depth += 1
+            elif text[end] == closing:
+                depth -= 1
+            end += 1
+        if not depth and end > start + 2:
+            return text[start + 1:end - 1], char == "^", end
+    elif char == "^" and text[start].isalnum():
+        return text[start], True, start + 1
+    return None
+
+
+def convert_scripts_to_drawn(text: str) -> str:
+    output, index = [], 0
+    while index < len(text):
+        token = _script_token(text, index)
+        if token:
+            content, superscript, index = token
+            parts = [(content, superscript)]
+            following = _script_token(text, index) if index < len(text) else None
+            if following and following[1] != superscript:
+                parts.append(following[:2])
+                index = following[2]
+            output.append(_register_script_parts(parts))
+        else:
+            output.append(text[index])
+            index += 1
+    return "".join(output)
 
 
 def register_dynamic_radical(radicand: str, root_index: Optional[str] = None) -> str:
@@ -593,206 +678,182 @@ def _get_char_glyph_and_bbox(
     return (fb_font, bb, adv)
 
 
+@dataclass(frozen=True)
+class _MathBox:
+    """2026-10-15：同一盒模型同时驱动测量和绘制，bbox 使用右/下开区间。"""
+    advance: int
+    bbox: Tuple[int, int, int, int]
+    children: tuple = ()
+    paths: tuple = ()
+    glyph: Optional[str] = None
+    font: Any = None
+
+
+def _union_bounds(bounds):
+    visible = [box for box in bounds if box[2] > box[0] and box[3] > box[1]]
+    if not visible:
+        return (0, 0, 0, 0)
+    return (min(b[0] for b in visible), min(b[1] for b in visible),
+            max(b[2] for b in visible), max(b[3] for b in visible))
+
+
+def _compose_box(advance, children=(), paths=()):
+    bounds = [(box.bbox[0] + x, box.bbox[1] + y, box.bbox[2] + x, box.bbox[3] + y)
+              for box, x, y in children]
+    for points, thickness in paths:
+        pad = (thickness + 1) // 2
+        bounds.append((min(x for x, _ in points) - pad, min(y for _, y in points) - pad,
+                       max(x for x, _ in points) + pad + 1, max(y for _, y in points) + pad + 1))
+    return _MathBox(int(advance), _union_bounds(bounds), tuple(children), tuple(paths))
+
+
+def _math_axis(font, font_path):
+    # 2026-10-15：分数线与当前手写字体的小写文字中轴对齐，不再固定在字号的 0.52 倍。
+    _, bbox, _ = _get_char_glyph_and_bbox('x', font, font_path)
+    return round((bbox[1] + bbox[3]) / 2)
+
+
+def _layout_script(content, superscript, font, font_path, memo):
+    size = getattr(font, 'size', 30)
+    small = _get_cached_image_font(font_path, max(8, round(size * 0.65)))
+    body = _layout_math_text(content, small, font_path, memo)
+    _, base_bbox, _ = _get_char_glyph_and_bbox('x', font, font_path)
+    if superscript:
+        dy = base_bbox[1] + round(size * 0.10) - body.bbox[3]
+    else:
+        dy = base_bbox[3] - round(size * 0.10) - body.bbox[1]
+    return _compose_box(body.advance + max(1, round(size * 0.03)), ((body, 0, dy),))
+
+
+def _layout_math_char(char, font, font_path, memo):
+    size = getattr(font, 'size', 30)
+    if char in _SCRIPT_MAP:
+        parts = [_layout_script(content, superscript, font, font_path, memo)
+                 for content, superscript in _SCRIPT_MAP[char]]
+        return _compose_box(max(part.advance for part in parts), tuple((part, 0, 0) for part in parts))
+    if char in _VULGAR_FRACTION_MAP:
+        numerator, denominator = _VULGAR_FRACTION_MAP[char]
+        # 2026-10-15：0.76 替代 0.58；嵌套仍保留手写可读的字高，由真实边界撑开分数。
+        small = _get_cached_image_font(font_path, max(10, round(size * 0.76)))
+        num = _layout_math_text(numerator, small, font_path, memo)
+        den = _layout_math_text(denominator, small, font_path, memo)
+        padding = max(3, round(size * 0.12))
+        line_width = max(num.bbox[2] - num.bbox[0], den.bbox[2] - den.bbox[0], 1) + 2 * padding
+        axis = _math_axis(font, font_path)
+        thickness, gap = max(1, round(size * 0.035)), max(2, round(size * 0.08))
+        nx = (line_width - (num.bbox[2] - num.bbox[0])) // 2 - num.bbox[0]
+        dx = (line_width - (den.bbox[2] - den.bbox[0])) // 2 - den.bbox[0]
+        ny = axis - (thickness + 1) // 2 - gap - num.bbox[3]
+        dy = axis + (thickness + 1) // 2 + gap + 1 - den.bbox[1]
+        return _compose_box(line_width + max(3, round(size * 0.1)),
+                            ((num, nx, ny), (den, dx, dy)), ((((1, axis), (line_width - 1, axis)), thickness),))
+    if char in _RADICAL_MAP:
+        radicand, index = _RADICAL_MAP[char]
+        body = _layout_math_text(radicand, font, font_path, memo)
+        gap = max(2, round(size * 0.09))
+        top = body.bbox[1] - gap
+        bottom = max(body.bbox[3], top + round(size * 0.58))
+        height = bottom - top
+        stem_width = max(10, round(size * 0.46))
+        thickness = max(1, round(size * 0.035))
+        offset, children = 0, []
+        if index:
+            # 根指数先还原普通字符再缩小，不能对上标字形重复缩放。
+            index_text = index.translate(_SUPER_TO_TEXT)
+            small = _get_cached_image_font(font_path, max(8, round(size * 0.46)))
+            idx = _layout_math_text(index_text, small, font_path, memo)
+            index_bottom = top + round(height * 0.34)
+            children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
+            offset = max(0, idx.bbox[2] - idx.bbox[0] - round(size * 0.16))
+        body_x = offset + stem_width + max(1, round(size * 0.04)) - body.bbox[0]
+        children.append((body, body_x, 0))
+        right = body_x + body.bbox[2] + gap
+        # 一条连贯笔画从根钩到封顶横线，随被开方式真实高度伸展。
+        points = ((offset + 1, top + round(height * 0.63)),
+                  (offset + round(stem_width * 0.20), top + round(height * 0.55)),
+                  (offset + round(stem_width * 0.43), bottom - 1),
+                  (offset + stem_width - 2, top), (right, top))
+        return _compose_box(right + gap, children, ((points, thickness),))
+    chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
+    return _MathBox(advance, bbox, glyph=char, font=chosen)
+
+
+def _layout_math_text(text, font, font_path=None, memo=None):
+    if memo is None:
+        memo = {}
+    font_path = font_path or getattr(font, 'path', None)
+    key = (text, id(font))
+    if key in memo:
+        return memo[key]
+    active = memo.setdefault('_active', set())
+    if key in active or len(active) >= _MAX_MATH_DEPTH:
+        # 2026-10-15：极深脚标或外部传入的私用字符循环按字面渲染，不能递归耗尽栈。
+        x, children = 0, []
+        for char in text:
+            chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
+            children.append((_MathBox(advance, bbox, glyph=char, font=chosen), x, 0))
+            x += advance
+        return _compose_box(x, children)
+    active.add(key)
+    x, children, index = 0, [], 0
+    while index < len(text):
+        token = _script_token(text, index)
+        if token:
+            content, superscript, index = token
+            box = _layout_script(content, superscript, font, font_path, memo)
+            following = _script_token(text, index) if index < len(text) else None
+            if following and following[1] != superscript:
+                other = _layout_script(*following[:2], font, font_path, memo)
+                box = _compose_box(max(box.advance, other.advance), ((box, 0, 0), (other, 0, 0)))
+                index = following[2]
+        else:
+            box = _layout_math_char(text[index], font, font_path, memo)
+            index += 1
+        children.append((box, x, 0))
+        x += box.advance
+    result = _compose_box(x, children)
+    active.remove(key)
+    memo[key] = result
+    return result
+
+
+def _paint_math_box(draw, box, xy):
+    import handright._core as core
+    x, y = xy
+    if box.glyph is not None:
+        draw.text((x, y), box.glyph, fill=core._WHITE, font=box.font)
+    for child, dx, dy in box.children:
+        _paint_math_box(draw, child, (x + dx, y + dy))
+    for points, thickness in box.paths:
+        draw.line([(x + px, y + py) for px, py in points], fill=core._WHITE, width=thickness, joint='curve')
+
+
 def _measure_radical(char: str, font, font_path: Optional[str]) -> Tuple[int, int]:
-    """测量带封顶横线的根式整体宽度与高度"""
-    radicand, root_index = _RADICAL_MAP[char]
-    font_size = getattr(font, "size", 30)
-
-    rw = 0
-    if root_index:
-        root_size = max(8, int(font_size * 0.48))
-        f_root = _get_cached_image_font(font_path, root_size)
-        rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
-
-    _, bb_sqrt, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
-    w_inner, _ = _measure_text_or_fraction(radicand, font, font_path)
-
-    # 2026-10-15：测量与绘制使用同一前进量，避免嵌套根式覆盖相邻字符。
-    total_w = (rw + max(adv_sqrt, bb_sqrt[2]) - max(1, int(font_size * 0.05))
-               + w_inner + max(3, int(font_size * 0.08)) + max(2, int(font_size * 0.04)))
-    return total_w, font_size
+    box = _layout_math_text(char, font, font_path)
+    return box.advance, box.bbox[3] - box.bbox[1]
 
 
 def _draw_text_or_fraction(draw, text: str, xy: Tuple[int, int], font, font_path: Optional[str]) -> Tuple[int, int]:
-    """绘制一段可能包含真分数/带封顶根式/普通文本的子串，返回 (总宽度, 最大高度)"""
-    import handright._core as core
-    x, y = xy
-    start_x = x
-    font_size = getattr(font, "size", 30)
-    max_h = font_size
-
-    for ch in text:
-        if ch in _VULGAR_FRACTION_MAP:
-            # 嵌套递归绘制更小字号的子分数
-            w = _draw_vertical_fraction(draw, ch, (x, y), font)
-            x += w
-        elif ch in _RADICAL_MAP:
-            # 嵌套递归绘制带封顶横线的根式
-            w = _draw_radical_with_vinculum(draw, ch, (x, y), font)
-            x += w
-        else:
-            fb_font, bb, adv, is_fb = _get_char_glyph_and_bbox_cached(ch, font_path, font_size)
-            font_to_draw = fb_font if is_fb else font
-            draw.text((x, y), ch, fill=core._WHITE, font=font_to_draw)
-            x += adv
-    return x - start_x, max_h
+    box = _layout_math_text(text, font, font_path)
+    _paint_math_box(draw, box, xy)
+    return box.advance, box.bbox[3] - box.bbox[1]
 
 
 def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tuple[int, int]:
-    """测量可能包含真分数或带封顶根式的子串尺寸 (宽度, 高度)"""
-    total_w = 0
-    font_size = getattr(font, "size", 30)
-    for ch in text:
-        if ch in _VULGAR_FRACTION_MAP:
-            n, d = _VULGAR_FRACTION_MAP[ch]
-            sub_s = max(10, int(font_size * 0.58))
-            f_sub = _get_cached_image_font(font_path, sub_s)
-            nw, _ = _measure_text_or_fraction(n, f_sub, font_path)
-            dw, _ = _measure_text_or_fraction(d, f_sub, font_path)
-            total_w += max(nw, dw) + 10
-        elif ch in _RADICAL_MAP:
-            rw, _ = _measure_radical(ch, font, font_path)
-            total_w += rw
-        else:
-            _, _, adv = _get_char_glyph_and_bbox(ch, font, font_path)
-            total_w += adv
-    return total_w, font_size
+    box = _layout_math_text(text, font, font_path)
+    return box.advance, box.bbox[3] - box.bbox[1]
 
 
 def _get_rendered_text_bbox(text: str, font, font_path: Optional[str]) -> Tuple[int, int, int, int]:
-    """计算一段可能包含嵌套真分数字符或根式的复合文本的真实边界框 (min_x, min_y, max_x, max_y)"""
-    min_x, min_y, max_x, max_y = 0, 9999, 0, -9999
-    curr_x = 0
-    has_valid = False
-    fs = getattr(font, "size", 30)
-
-    for ch in text:
-        if ch in _VULGAR_FRACTION_MAP:
-            w, h = _measure_text_or_fraction(ch, font, font_path)
-            has_valid = True
-            min_y = min(min_y, 0)
-            max_y = max(max_y, fs)
-            curr_x += w
-        elif ch in _RADICAL_MAP:
-            w, h = _measure_radical(ch, font, font_path)
-            has_valid = True
-            min_y = min(min_y, 0)
-            max_y = max(max_y, fs)
-            curr_x += w
-        else:
-            _, bb, adv = _get_char_glyph_and_bbox(ch, font, font_path)
-            if bb and (bb[2] > bb[0] or bb[3] > bb[1]):
-                has_valid = True
-                min_y = min(min_y, bb[1])
-                max_y = max(max_y, bb[3])
-                curr_x += adv
-            else:
-                curr_x += int(fs * 0.5)
-
-    if not has_valid:
-        return (0, 0, max(1, len(text) * int(fs * 0.6)), fs)
-
-    return (0, min_y if min_y != 9999 else 0, curr_x, max_y if max_y != -9999 else fs)
+    return _layout_math_text(text, font, font_path).bbox
 
 
 def _draw_radical_with_vinculum(draw, char: str, xy: Tuple[int, int], font) -> int:
-    """按真实手写规范绘制带封顶横线的根式：
-    1. 若有根指数（如 ³√），使用小字号在根号钩子上部绘制根指数；
-    2. 绘制根号符号 √；
-    3. 从根号右上角延伸出一条水平封顶横线（vinculum），完全覆盖被开方表达式；
-    4. 在横线下方紧凑绘制被开方表达式（去除原有的外层括号）；
-    5. 返回整体 advance 宽度。
-    """
-    import handright._core as core
-
-    radicand, root_index = _RADICAL_MAP[char]
-    font_path = getattr(font, "path", None)
-    font_size = getattr(font, "size", 30)
-    x, y = xy
-
-    # 1. 绘制根指数 (如有)
-    rw = 0
-    if root_index:
-        root_size = max(8, int(font_size * 0.48))
-        f_root = _get_cached_image_font(font_path, root_size)
-        rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
-        root_y = y + int(font_size * 0.1)
-        _draw_text_or_fraction(draw, root_index, (x, root_y), f_root, font_path)
-        x += rw
-
-    # 2. 绘制根号 √
-    fb_font, bb_sqrt, adv_sqrt, is_fb = _get_char_glyph_and_bbox_cached("√", font_path, font_size)
-    font_sqrt = fb_font if is_fb else font
-    draw.text((x, y), "√", fill=core._WHITE, font=font_sqrt)
-
-    # 根号右上端起点 vx
-    sqrt_right = max(adv_sqrt, bb_sqrt[2] if bb_sqrt else adv_sqrt)
-    vx = x + sqrt_right - max(1, int(font_size * 0.05))
-
-    # 3. 测量被开方表达式尺寸与边界
-    w_inner, _ = _measure_text_or_fraction(radicand, font, font_path)
-    ib = _get_rendered_text_bbox(radicand, font, font_path)
-
-    # 横线高度位置: 位于根号顶部右上端，且略高于被开方表达式的文字顶部
-    line_thickness = max(1, int(font_size * 0.045))
-    rad_top = ib[1] if (ib[1] is not None and ib[1] < 9999) else int(font_size * 0.15)
-    vinculum_y = y + max(1, min(int(font_size * 0.14), rad_top - 2))
-
-    # 横线长度：覆盖被开方数并在右侧留出少量余量
-    vinculum_w = w_inner + max(3, int(font_size * 0.08))
-    draw.line([(vx, vinculum_y), (vx + vinculum_w, vinculum_y)], fill=core._WHITE, width=line_thickness)
-
-    # 4. 绘制被开方表达式
-    rad_x = vx + max(1, int(font_size * 0.04))
-    _draw_text_or_fraction(draw, radicand, (rad_x, y), font, font_path)
-
-    # 5. 总 advance
-    total_w = (vx + vinculum_w + max(2, int(font_size * 0.04))) - xy[0]
-    return total_w
+    return _draw_text_or_fraction(draw, char, xy, font, getattr(font, 'path', None))[0]
 
 
 def _draw_vertical_fraction(draw, char: str, xy: Tuple[int, int], font) -> int:
-    """按真实手写规范绘制上下结构的竖式分数（分子、居中分数横线、分母）。
-    若分子或分母内部含有真分数符号，均以真实上下竖式嵌套绘制，绝不出现斜杠！
-    """
-    import handright._core as core
-
-    num, denom = _VULGAR_FRACTION_MAP[char]
-    font_path = getattr(font, "path", None)
-    font_size = getattr(font, "size", 30)
-
-    # 分子和分母采用缩小子号（约 0.58 倍主字号），符合手写行内竖式分数比例
-    sub_size = max(10, int(font_size * 0.58))
-    f_sub = _get_cached_image_font(font_path, sub_size)
-
-    nw, nh = _measure_text_or_fraction(num, f_sub, font_path)
-    dw, dh = _measure_text_or_fraction(denom, f_sub, font_path)
-
-    line_w = max(nw, dw) + 6
-    x, y = xy
-
-    # 分数线位置: 严格对齐当前行内西文/数字文本的垂直中轴基线 (约 0.52 ~ 0.54)
-    line_y = y + int(font_size * 0.52)
-    line_thickness = max(1, int(font_size * 0.045))
-    draw.line([(x, line_y), (x + line_w, line_y)], fill=core._WHITE, width=line_thickness)
-
-    # 测量分子与分母整体实际文本边界
-    nb = _get_rendered_text_bbox(num, f_sub, font_path)
-    db = _get_rendered_text_bbox(denom, f_sub, font_path)
-
-    # 分子: 底部紧挨分数线上方 3 像素处
-    n_bottom = nb[3] if nb[3] > 0 else int(sub_size * 0.8)
-    nx = x + max(0, (line_w - nw) // 2)
-    ny = line_y - n_bottom - 3
-    _draw_text_or_fraction(draw, num, (nx, ny), f_sub, font_path)
-
-    # 分母: 顶部紧挨分数线下方 3 像素处
-    d_top = db[1] if (db[1] is not None and db[1] >= 0) else 0
-    dx = x + max(0, (line_w - dw) // 2)
-    dy = line_y + line_thickness + 3 - d_top
-    _draw_text_or_fraction(draw, denom, (dx, dy), f_sub, font_path)
-
-    return line_w + 4
+    return _draw_text_or_fraction(draw, char, xy, font, getattr(font, 'path', None))[0]
 
 
 def init_glyph_fallback_engine():
@@ -825,13 +886,9 @@ def init_glyph_fallback_engine():
             if char in (" ", "\t", "\n"):
                 return orig_draw_char(draw, char, xy, font)
 
-            # 优先拦截上下结构的真实手写分数
-            if char in _VULGAR_FRACTION_MAP:
-                return _draw_vertical_fraction(draw, char, xy, font)
-
-            # 优先拦截带封顶横线的真实手写根式
-            if char in _RADICAL_MAP:
-                return _draw_radical_with_vinculum(draw, char, xy, font)
+            # 2026-10-15：复合公式和脚标使用同一测量/绘制盒，保留主字体手写字形。
+            if is_math_glyph(char):
+                return _draw_text_or_fraction(draw, char, xy, font, getattr(font, "path", None))[0]
 
             font_path = getattr(font, "path", None)
             font_size = getattr(font, "size", 30)
@@ -909,6 +966,6 @@ def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
     cleaned = clean_invisible_and_special_characters(text)
     return _transform_math_segments(
         cleaned,
-        lambda segment: convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment)),
+        lambda segment: convert_scripts_to_drawn(convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment))),
     )
 
