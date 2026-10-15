@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { AnimatePresence } from 'motion/react';
 import type { Workspace } from '../composables/useWorkspace';
 import { useI18n } from '../i18n';
 import { mainFields, paperFields, variationFields, strikeFields } from '../models';
 import NumberField from './NumberField';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
+import Accordion from '../shared/ui/Accordion';
 import {
   SlidersHorizontal,
   Upload,
@@ -95,8 +97,7 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
           />
           <span>{t('englishSpacing')}</span>
         </label>
-        <details>
-          <summary data-testid="paper-settings-toggle">{t('paper')}</summary>
+        <Accordion title={t('paper')} testId="paper-settings-toggle">
           <label className="file-button upload-control">
             <ImagePlus size={15} />
             {t('background')}
@@ -141,9 +142,8 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
               />
             ))}
           </div>
-        </details>
-        <details>
-          <summary data-testid="variation-settings-toggle">{t('variation')}</summary>
+        </Accordion>
+        <Accordion title={t('variation')} testId="variation-settings-toggle">
           <div className="field-grid">
             {variationFields.map((field) => (
               <NumberField
@@ -154,9 +154,8 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
               />
             ))}
           </div>
-        </details>
-        <details>
-          <summary data-testid="strike-settings-toggle">{t('strikethrough')}</summary>
+        </Accordion>
+        <Accordion title={t('strikethrough')} testId="strike-settings-toggle">
           <div className="field-grid">
             {strikeFields.map((field) => (
               <NumberField
@@ -167,7 +166,7 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
               />
             ))}
           </div>
-        </details>
+        </Accordion>
         <div className="presets-section">
           <label className="field-label">
             {t('presets')}
@@ -214,30 +213,33 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
           </div>
         </div>
       </div>
-      {detectOpen && (
-        <Modal
-          title={t('detectTitle')}
-          closeLabel={t('close')}
-          onClose={() => setDetectOpen(false)}
-        >
-          <p className="help-text">{t('detectBody')}</p>
-          <footer className="modal-actions">
-            <Button data-testid="detect-background-cancel" onClick={() => setDetectOpen(false)}>
-              {t('cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              data-testid="detect-background-confirm"
-              onClick={() => {
-                setDetectOpen(false);
-                void w.detectBackground();
-              }}
-            >
-              {t('confirm')}
-            </Button>
-          </footer>
-        </Modal>
-      )}
+      <AnimatePresence>
+        {detectOpen && (
+          <Modal
+            key="detect-background"
+            title={t('detectTitle')}
+            closeLabel={t('close')}
+            onClose={() => setDetectOpen(false)}
+          >
+            <p className="help-text">{t('detectBody')}</p>
+            <footer className="modal-actions">
+              <Button data-testid="detect-background-cancel" onClick={() => setDetectOpen(false)}>
+                {t('cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                data-testid="detect-background-confirm"
+                onClick={() => {
+                  setDetectOpen(false);
+                  void w.detectBackground();
+                }}
+              >
+                {t('confirm')}
+              </Button>
+            </footer>
+          </Modal>
+        )}
+      </AnimatePresence>
     </aside>
   );
 }

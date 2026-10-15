@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
 import type { Workspace } from '../composables/useWorkspace';
 import { useI18n } from '../i18n';
 import { cleanMarkdown } from '@/utils/cleanMarkdown';
@@ -309,127 +310,133 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
           <Trash2 size={15} />
         </Button>
       </footer>
-      {activeImage && (
-        <Modal
-          title={`${t('imagePreview')} · ${activeImage.alt}`}
-          closeLabel={t('close')}
-          testId="image-preview-modal"
-          onClose={() => setActiveImageIndex(null)}
-        >
-          <img className="image-preview-full" src={activeImage.data} alt={activeImage.alt} />
-          <p className="field-caption">
-            {t('imageScale')} · <span data-testid="active-scale-badge">{activeImage.scale}</span>
-          </p>
-          <div className="image-scale-presets">
-            {[50, 100, 200, 300, 500, 700].map((scale) => (
-              <Button
-                key={scale}
-                data-testid={`image-scale-${scale}`}
-                size="small"
-                onClick={() => changeScale(activeImage.index, String(scale))}
-              >
-                {scale}%
-              </Button>
-            ))}
-          </div>
-          <input
-            type="range"
-            min="20"
-            max="700"
-            step="10"
-            value={Number.parseInt(activeImage.scale, 10)}
-            aria-label={t('imageScale')}
-            data-testid="scale-slider"
-            onChange={(event) => changeScale(activeImage.index, event.currentTarget.value)}
-          />
-          <footer className="modal-actions">
-            <Button data-testid="modal-delete-btn" onClick={() => removeImage(activeImage.index)}>
-              {t('removeImage')}
-            </Button>
-            <Button
-              variant="primary"
-              data-testid="modal-close-btn"
-              onClick={() => setActiveImageIndex(null)}
-            >
-              {t('close')}
-            </Button>
-          </footer>
-        </Modal>
-      )}
-      {letter && (
-        <Modal
-          title={t('letter')}
-          closeLabel={t('close')}
-          testId="letter-dialog"
-          onClose={() => setLetter(null)}
-        >
-          <p className="help-text">{t('letterHint')}</p>
-          {letter.detectedEnding && (
-            <div className="letter-detected">
-              <p>{t('letterEndingDetected')}</p>
-              <Button
-                size="small"
-                data-testid="letter-restore-btn"
-                onClick={() =>
-                  setLetter({
-                    body: restoreLetterEnding(letter),
-                    signature: '',
-                    date: '',
-                    detectedEnding: false,
-                  })
-                }
-              >
-                {t('letterRestore')}
-              </Button>
+      <AnimatePresence>
+        {activeImage && (
+          <Modal
+            key="image-preview"
+            title={`${t('imagePreview')} · ${activeImage.alt}`}
+            closeLabel={t('close')}
+            testId="image-preview-modal"
+            onClose={() => setActiveImageIndex(null)}
+          >
+            <img className="image-preview-full" src={activeImage.data} alt={activeImage.alt} />
+            <p className="field-caption">
+              {t('imageScale')} · <span data-testid="active-scale-badge">{activeImage.scale}</span>
+            </p>
+            <div className="image-scale-presets">
+              {[50, 100, 200, 300, 500, 700].map((scale) => (
+                <Button
+                  key={scale}
+                  data-testid={`image-scale-${scale}`}
+                  size="small"
+                  onClick={() => changeScale(activeImage.index, String(scale))}
+                >
+                  {scale}%
+                </Button>
+              ))}
             </div>
-          )}
-          <div className="modal-fields">
-            <label className="field-label">
-              {t('signature')}
-              <textarea
-                rows={2}
-                value={letter.signature}
-                onChange={(event) => setLetter({ ...letter, signature: event.currentTarget.value })}
-                data-testid="letter-signature-input"
-                placeholder={t('signaturePlaceholder')}
-              />
-            </label>
-            <label className="field-label">
-              {t('date')}
-              <input
-                value={letter.date}
-                onChange={(event) => setLetter({ ...letter, date: event.currentTarget.value })}
-                data-testid="letter-date-input"
-                placeholder={t('datePlaceholder')}
-              />
-            </label>
-          </div>
-          <p className="field-caption">{t('letterPreview')}</p>
-          <pre className="letter-preview" data-testid="letter-preview">
-            {letterPreview}
-          </pre>
-          <footer className="modal-actions">
-            <Button data-testid="letter-cancel-btn" onClick={() => setLetter(null)}>
-              {t('cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              data-testid="letter-apply-btn"
-              disabled={!letter.body.trim()}
-              onClick={() => {
-                setBackup((previous) => ({
-                  original: previous?.formatted === w.text ? previous.original : w.text,
-                  formatted: letterPreview,
-                }));
-                w.setText(letterPreview);
-                setLetter(null);
-              }}
-            >
-              {t('apply')}
-            </Button>
-          </footer>
-        </Modal>
-      )}
+            <input
+              type="range"
+              min="20"
+              max="700"
+              step="10"
+              value={Number.parseInt(activeImage.scale, 10)}
+              aria-label={t('imageScale')}
+              data-testid="scale-slider"
+              onChange={(event) => changeScale(activeImage.index, event.currentTarget.value)}
+            />
+            <footer className="modal-actions">
+              <Button data-testid="modal-delete-btn" onClick={() => removeImage(activeImage.index)}>
+                {t('removeImage')}
+              </Button>
+              <Button
+                variant="primary"
+                data-testid="modal-close-btn"
+                onClick={() => setActiveImageIndex(null)}
+              >
+                {t('close')}
+              </Button>
+            </footer>
+          </Modal>
+        )}
+        {letter && (
+          <Modal
+            key="letter"
+            title={t('letter')}
+            closeLabel={t('close')}
+            testId="letter-dialog"
+            onClose={() => setLetter(null)}
+          >
+            <p className="help-text">{t('letterHint')}</p>
+            {letter.detectedEnding && (
+              <div className="letter-detected">
+                <p>{t('letterEndingDetected')}</p>
+                <Button
+                  size="small"
+                  data-testid="letter-restore-btn"
+                  onClick={() =>
+                    setLetter({
+                      body: restoreLetterEnding(letter),
+                      signature: '',
+                      date: '',
+                      detectedEnding: false,
+                    })
+                  }
+                >
+                  {t('letterRestore')}
+                </Button>
+              </div>
+            )}
+            <div className="modal-fields">
+              <label className="field-label">
+                {t('signature')}
+                <textarea
+                  rows={2}
+                  value={letter.signature}
+                  onChange={(event) =>
+                    setLetter({ ...letter, signature: event.currentTarget.value })
+                  }
+                  data-testid="letter-signature-input"
+                  placeholder={t('signaturePlaceholder')}
+                />
+              </label>
+              <label className="field-label">
+                {t('date')}
+                <input
+                  value={letter.date}
+                  onChange={(event) => setLetter({ ...letter, date: event.currentTarget.value })}
+                  data-testid="letter-date-input"
+                  placeholder={t('datePlaceholder')}
+                />
+              </label>
+            </div>
+            <p className="field-caption">{t('letterPreview')}</p>
+            <pre className="letter-preview" data-testid="letter-preview">
+              {letterPreview}
+            </pre>
+            <footer className="modal-actions">
+              <Button data-testid="letter-cancel-btn" onClick={() => setLetter(null)}>
+                {t('cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                data-testid="letter-apply-btn"
+                disabled={!letter.body.trim()}
+                onClick={() => {
+                  setBackup((previous) => ({
+                    original: previous?.formatted === w.text ? previous.original : w.text,
+                    formatted: letterPreview,
+                  }));
+                  w.setText(letterPreview);
+                  setLetter(null);
+                }}
+              >
+                {t('apply')}
+              </Button>
+            </footer>
+          </Modal>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

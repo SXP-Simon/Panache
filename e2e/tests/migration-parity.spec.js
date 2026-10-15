@@ -128,6 +128,7 @@ test('multi-line letter ending can be restored to body and edited text invalidat
   await page.getByTestId('letter-signature-input').fill('你的孩子\n小明');
   await page.getByTestId('letter-date-input').fill('2026年10月15日');
   await page.getByTestId('letter-apply-btn').click();
+  await expect(page.getByTestId('letter-dialog')).toHaveCount(0);
   await expect(page.getByTestId('text-input')).toHaveValue(/>>>你的孩子\n>>>小明/);
   await page.getByTestId('letter-format-btn').click();
   await expect(page.getByTestId('letter-signature-input')).toHaveValue('你的孩子\n小明');
@@ -135,10 +136,12 @@ test('multi-line letter ending can be restored to body and edited text invalidat
   await expect(page.getByTestId('letter-signature-input')).toHaveValue('');
   await expect(page.getByTestId('letter-preview')).toContainText('小明');
   await page.getByTestId('letter-apply-btn').click();
+  await expect(page.getByTestId('letter-dialog')).toHaveCount(0);
   await page.getByTestId('letter-undo-btn').click();
   await expect(page.getByTestId('text-input')).toHaveValue(original);
   await page.getByTestId('letter-format-btn').click();
   await page.getByTestId('letter-apply-btn').click();
+  await expect(page.getByTestId('letter-dialog')).toHaveCount(0);
   await page.getByTestId('text-input').press('End');
   await page.getByTestId('text-input').press('X');
   await expect(page.getByTestId('letter-undo-btn')).toHaveCount(0);

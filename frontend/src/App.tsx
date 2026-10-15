@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import brandIcon from './assets/brand.svg';
-import { motion, MotionConfig } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { I18nContext, translate, useI18n } from './i18n';
 import type { Locale, MessageKey } from './i18n';
 import { getPwaState, subscribePwa, installPwa } from './pwa';
@@ -10,6 +10,7 @@ import SettingsPanel from './components/SettingsPanel';
 import PreviewPanel from './components/PreviewPanel';
 import Button from './shared/ui/Button';
 import Modal from './shared/ui/Modal';
+import AnimatedReveal from './shared/ui/AnimatedReveal';
 import {
   Languages,
   Moon,
@@ -65,6 +66,7 @@ export default function App() {
 }
 function Studio() {
   const { locale, t, toggle } = useI18n();
+  const reduced = useReducedMotion();
   const w = useWorkspace();
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
   const [guide, setGuide] = useState(false);
@@ -153,7 +155,7 @@ function Studio() {
         className="workspace-content"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: reduced ? 0 : 0.2 }}
       >
         <div className="workspace-intro">
           <div>
@@ -173,43 +175,51 @@ function Studio() {
             {t('previewAction')}
           </Button>
         </div>
-        {!pwa.online && (
-          <div className="status-message" role="status" data-testid="offline-notice">
-            <AlertCircle size={17} />
-            <span>{t('offlineNotice')}</span>
-          </div>
-        )}
-        {status && (
-          <div
-            className={`status-message ${w.error ? 'status-message--error' : ''}`}
-            role="status"
-            aria-live="polite"
-            data-testid="message-info"
-          >
-            {w.error ? (
-              <AlertCircle size={17} />
-            ) : w.busy ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <Check size={17} />
-            )}
-            <span>{status}</span>
-          </div>
-        )}
-        {w.savedPath && (
-          <div className="download-hint" data-testid="download-saved-hint">
-            <span data-testid="download-saved-path">{w.savedPath}</span>
-            <Button
-              size="small"
-              variant="ghost"
-              data-testid="reveal-download-btn"
-              onClick={() => window.handwritingDesktop?.revealLastDownload()}
-            >
-              <FolderOpen size={15} />
-              {t('openFolder')}
-            </Button>
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {!pwa.online && (
+            <AnimatedReveal key="offline">
+              <div className="status-message" role="status" data-testid="offline-notice">
+                <AlertCircle size={17} />
+                <span>{t('offlineNotice')}</span>
+              </div>
+            </AnimatedReveal>
+          )}
+          {status && (
+            <AnimatedReveal key="status">
+              <div
+                className={`status-message ${w.error ? 'status-message--error' : ''}`}
+                role="status"
+                aria-live="polite"
+                data-testid="message-info"
+              >
+                {w.error ? (
+                  <AlertCircle size={17} />
+                ) : w.busy ? (
+                  <LoaderCircle className="spin" size={17} />
+                ) : (
+                  <Check size={17} />
+                )}
+                <span>{status}</span>
+              </div>
+            </AnimatedReveal>
+          )}
+          {w.savedPath && (
+            <AnimatedReveal key="download">
+              <div className="download-hint" data-testid="download-saved-hint">
+                <span data-testid="download-saved-path">{w.savedPath}</span>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  data-testid="reveal-download-btn"
+                  onClick={() => window.handwritingDesktop?.revealLastDownload()}
+                >
+                  <FolderOpen size={15} />
+                  {t('openFolder')}
+                </Button>
+              </div>
+            </AnimatedReveal>
+          )}
+        </AnimatePresence>
         {w.pdfBytes > 0 && (
           <span data-testid="pdf-download-bytes" hidden>
             {w.pdfBytes}
@@ -236,33 +246,45 @@ function Studio() {
           </span>
         </footer>
       </motion.main>
-      {guide && (
-        <Modal title={t('guideTitle')} closeLabel={t('close')} onClose={() => setGuide(false)}>
-          <p className="help-text">{t('guideText')}</p>
-          <p className="privacy-note">{t('privacy')}</p>
-          <footer className="modal-actions">
-            <Button variant="primary" onClick={() => setGuide(false)}>
-              {t('close')}
-            </Button>
-          </footer>
-        </Modal>
-      )}
-      {desktop && (
-        <Modal title={t('desktop')} closeLabel={t('close')} onClose={() => setDesktop(false)}>
-          <p className="help-text">{t('desktopHint')}</p>
-          <footer className="modal-actions">
-            <a
-              className="button button--primary"
-              href="https://github.com/SXP-Simon/handwriting-web/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('viewReleases')}
-              <ArrowUpRight size={16} />
-            </a>
-          </footer>
-        </Modal>
-      )}
+      <AnimatePresence>
+        {guide && (
+          <Modal
+            key="guide"
+            title={t('guideTitle')}
+            closeLabel={t('close')}
+            onClose={() => setGuide(false)}
+          >
+            <p className="help-text">{t('guideText')}</p>
+            <p className="privacy-note">{t('privacy')}</p>
+            <footer className="modal-actions">
+              <Button variant="primary" onClick={() => setGuide(false)}>
+                {t('close')}
+              </Button>
+            </footer>
+          </Modal>
+        )}
+        {desktop && (
+          <Modal
+            key="desktop"
+            title={t('desktop')}
+            closeLabel={t('close')}
+            onClose={() => setDesktop(false)}
+          >
+            <p className="help-text">{t('desktopHint')}</p>
+            <footer className="modal-actions">
+              <a
+                className="button button--primary"
+                href="https://github.com/SXP-Simon/handwriting-web/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t('viewReleases')}
+                <ArrowUpRight size={16} />
+              </a>
+            </footer>
+          </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

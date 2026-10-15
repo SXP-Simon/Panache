@@ -51,6 +51,7 @@ for (const width of [1440, 390]) {
         await page.getByTestId('guide-btn').click();
         await expectUnifiedFont(page);
         await page.keyboard.press('Escape');
+        await expect(page.getByTestId('modal')).toHaveCount(0);
         await fillText(page, '亲爱的朋友：\nHello from 手写工作室。');
         await page.evaluate(() => document.fonts.load('16px "LXGW WenKai"', '亲爱的朋友 Hello'));
         const session = await page.context().newCDPSession(page);
@@ -83,6 +84,7 @@ for (const width of [1440, 390]) {
         await expectUnifiedFont(page);
         await expect(page.getByTestId('letter-signature-input')).toBeVisible();
         await page.keyboard.press('Escape');
+        await expect(page.getByTestId('letter-dialog')).toHaveCount(0);
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
         ).toBe(false);

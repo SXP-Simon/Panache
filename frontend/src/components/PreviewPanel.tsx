@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Workspace } from '../composables/useWorkspace';
 import { useI18n } from '../i18n';
 import Button from '../shared/ui/Button';
@@ -16,6 +17,7 @@ import {
 } from '../shared/icons';
 export default function PreviewPanel({ workspace: w }: { workspace: Workspace }) {
   const { t } = useI18n();
+  const reduced = useReducedMotion();
   const [zoom, setZoom] = useState(100);
   const image = w.images[w.currentPage] ?? w.backgroundUrl;
   return (
@@ -53,21 +55,25 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
             </Button>
           </div>
         ) : (
-          <img
-            src={image}
-            data-testid="preview-image"
-            className="preview-image"
-            style={{ width: `${zoom}%` }}
-            alt={t('preview')}
-          />
+          <PreviewImage key={image} src={image} zoom={zoom} alt={t('preview')} />
         )}{' '}
-        {w.busy && (
-          <div className="preview-progress" role="status">
-            <LoaderCircle className="spin" size={22} />
-            <p>{t('working')}</p>
-            <progress value={w.progress} max="100" />
-          </div>
-        )}
+        <AnimatePresence>
+          {w.busy && (
+            <motion.div
+              key="progress"
+              className="preview-progress"
+              role="status"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduced ? 0 : 0.2 }}
+            >
+              <LoaderCircle className="spin" size={22} />
+              <p>{t('working')}</p>
+              <progress value={w.progress} max="100" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <footer className="preview-tools">
         <div className="page-nav">
@@ -149,5 +155,22 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
         </div>
       </div>
     </section>
+  );
+}
+
+function PreviewImage({ src, zoom, alt }: { src: string; zoom: number; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const reduced = useReducedMotion();
+  return (
+    <motion.img
+      src={src}
+      data-testid="preview-image"
+      className="preview-image"
+      initial={{ width: `${zoom}%`, opacity: 0 }}
+      animate={{ width: `${zoom}%`, opacity: loaded ? 1 : 0 }}
+      transition={{ duration: reduced ? 0 : 0.2, ease: 'easeOut' }}
+      onLoad={() => setLoaded(true)}
+      alt={alt}
+    />
   );
 }

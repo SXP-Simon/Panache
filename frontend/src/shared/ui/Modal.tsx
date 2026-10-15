@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { motion, useIsPresent, useReducedMotion } from 'motion/react';
 import Button from './Button';
 import { X } from '../icons';
 export default function Modal({
@@ -17,6 +18,8 @@ export default function Modal({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const present = useIsPresent();
+  const reduced = useReducedMotion();
   useEffect(() => {
     const element = dialog.current;
     const previous = document.activeElement;
@@ -27,10 +30,20 @@ export default function Modal({
     };
   }, []);
   return (
-    <dialog
+    <motion.dialog
       ref={dialog}
       className="modal"
-      data-testid={testId}
+      data-present={present}
+      inert={!present}
+      initial={{ opacity: 0, y: reduced ? 0 : 10, scale: reduced ? 1 : 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: reduced ? 0 : 6, scale: reduced ? 1 : 0.99 }}
+      transition={
+        reduced
+          ? { duration: 0 }
+          : { type: 'spring', stiffness: 300, damping: 25, opacity: { duration: 0.2 } }
+      }
+      data-testid={testId ?? 'modal'}
       aria-labelledby={titleId}
       onKeyDown={(event) => {
         if (event.key !== 'Tab') return;
@@ -88,11 +101,17 @@ export default function Modal({
         <h2 id={titleId} data-testid={`${testId ?? 'modal'}-title`}>
           {title}
         </h2>
-        <Button size="icon" variant="ghost" aria-label={closeLabel} onClick={onClose}>
+        <Button
+          size="icon"
+          variant="ghost"
+          data-testid={`${testId ?? 'modal'}-close`}
+          aria-label={closeLabel}
+          onClick={onClose}
+        >
           <X size={18} />
         </Button>
       </header>
       {children}
-    </dialog>
+    </motion.dialog>
   );
 }
