@@ -6,11 +6,12 @@ Welcome to my handwritten text generation site! This platform allows you to use 
 
 URL: https://handwrite.sixiangjia.de
 
-The current interface splits the workspace into three columns — settings on the left, text in the middle, preview on the right:
+On `custom-base`, the React workspace combines the document editor, preview, and handwriting settings with a responsive layout.
+The screenshots below show the original upstream application:
 
 ![New interface](image-new-ui.png)
 
-The "Old layout" button in the top bar switches back to the previous layout; both edit the same content:
+An alternative layout from the original upstream application:
 
 ![Old interface](image.png)
 
@@ -18,10 +19,26 @@ The "Old layout" button in the top bar switches back to the previous layout; bot
 
 ## Fork branches and upstream synchronization
 
-- **`custom-base`** is Simon's default development branch for the Vue/Python/Electron application and personal mathematics, formatting, and performance improvements.
+- **`custom-base`** is Simon's default development branch for the React/Python/Electron application and personal mathematics, formatting, and performance improvements.
 - **`main`** mirrors [`upstream/main`](https://github.com/14790897/handwriting-web), including its release history. Personal features belong on `custom-base`.
 - **`flutter`** started from the personal baseline and received [HakimYu's Flutter/Rust migration](https://github.com/HakimYu/handwriting/tree/refactor/flutter-rust) through `cherry-pick -x`. It is maintained separately; do not merge its removal of the legacy application back into `custom-base`. Mathematics improvements need a separate port.
 - Useful upstream fixes are reviewed and selectively cherry-picked into `custom-base`; release-only version and changelog commits normally remain on `main`. See [AGENTS.md](./AGENTS.md#项目与分支) for the branch workflow.
+
+## Current architecture and technology stack
+
+| Layer | Technology and responsibility |
+|---|---|
+| Frontend | React, TypeScript, Vite; project styles, Tailwind CSS, Motion, Lucide |
+| State and requests | Zustand for client business state; TanStack Query for server data, Fetch + Valibot for transport and validation |
+| Local persistence | Web: localStorage + IndexedDB; desktop: restricted Electron IPC and application data files |
+| Backend and rendering | FastAPI, SQLite task queue, handrightbeta, Pillow, math layout modules, PyMuPDF |
+| Desktop and validation | Electron + PyInstaller; Playwright, Node tests, pytest; Oxlint / Oxfmt, Ruff / Pyright |
+
+UI, business state, cross-domain actions, API contracts, and persistence have separate responsibilities.
+See [Architecture and Technology Stack](docs/en/architecture.md) for ownership, generation flow, and
+storage boundaries, and [Local Development](docs/en/development.md) for setup and validation.
+The toolchain requires Node.js 24+, pnpm 10.13.1, Python 3.12+, and uv; manifests and lockfiles specify
+the exact dependency versions.
 
 ## Function
 

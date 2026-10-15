@@ -41,7 +41,22 @@
 
 ## 🚀 快速启动与开发指南
 
-工具链：Node.js 24+、pnpm 10.13.1、Python 3.12+、uv。前端使用 React、Vite、TypeScript 7 原生编译器与 Oxlint；后端使用 Pyright strict 和 Ruff。
+### 当前技术栈与架构
+
+| 层 | 技术与职责 |
+|---|---|
+| 前端界面 | React、TypeScript、Vite；项目样式、Tailwind CSS、Motion、Lucide |
+| 状态与请求 | Zustand 管理客户端业务状态；TanStack Query 管理服务端数据，Fetch + Valibot 负责请求和校验 |
+| 本地保存 | Web：localStorage + IndexedDB；桌面：受限 Electron IPC + 应用数据目录 |
+| 后端与渲染 | FastAPI、SQLite 任务队列、handrightbeta、Pillow、数学排版模块与 PyMuPDF |
+| 桌面与验证 | Electron + PyInstaller；Playwright、Node 测试、pytest；Oxlint / Oxfmt、Ruff / Pyright |
+
+界面、业务状态、跨域操作、API 与持久化各有独立职责。详细说明见
+**[架构与技术栈](docs/architecture.md)**，开发与验证命令见[本地开发](docs/development.md)。
+
+### 开发环境
+
+工具链：Node.js 24+、pnpm 10.13.1、Python 3.12+、uv。具体依赖版本以工程清单和锁文件为准。
 
 ```bash
 # 仓库根目录安装并锁定依赖

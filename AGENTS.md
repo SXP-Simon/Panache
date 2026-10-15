@@ -36,6 +36,14 @@
 - 用 `git cherry -v custom-base upstream/main` 辅助识别等价补丁，再审查实际改动；不同提交哈希不代表功能缺失。
 - 向原项目贡献改动通过 PR。
 
+## 架构约定
+
+- 前端使用 React、TypeScript 与 Vite；Zustand 管理分域客户端状态，TanStack Query 管理服务端数据。
+- 组件保留局部交互状态并按需订阅业务状态；Context 提供语言与稳定操作入口。
+- 业务操作、请求契约和持久化分层维护，store 不承担网络、文件写入与对象 URL 生命周期。
+- Web 使用 localStorage 与 IndexedDB；桌面通过受限 Electron IPC 保存到应用数据目录。
+- 架构、模块职责与存储边界见 [docs/architecture.md](docs/architecture.md)，开发入口见 [docs/development.md](docs/development.md)。
+
 ## 开发入口
 
 工具链：Node.js 24+、pnpm 10.13.1、Python 3.12+ 和 uv。
