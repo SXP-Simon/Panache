@@ -14,6 +14,7 @@ import glob
 import logging
 import os
 import re
+import threading
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
@@ -75,7 +76,8 @@ def _get_font_cmap(font_source: Any) -> Set[int]:
             if not os.path.exists(font_source):
                 return set()
             norm_path = os.path.normpath(os.path.abspath(font_source))
-            f = TTFont(norm_path)
+            # 2026-10-15：系统字体可能是 TTC 集合，明确读取首个字面。
+            f = TTFont(norm_path, fontNumber=0)
             cmap = f.getBestCmap()
             f.close()
             return set(cmap.keys()) if cmap else set()
@@ -132,8 +134,15 @@ def _find_fallback_font_files() -> List[str]:
     """寻找本地包含完整数学字形的手写字体或系统字体作为备用字库池。"""
     candidates = []
     # 优先选择本地手写体
-    possible_dirs = ["./ttf_files", "./backend/font_assets", "./font_assets", "../ttf_files", "../font_assets"]
+    # 2026-10-15：桌面版资源目录与运行目录不同，优先读取明确配置的字体目录。
+    possible_dirs = [
+        os.getenv("FONT_ASSETS_DIR"), os.getenv("FONT_ASSETS_BUNDLED_DIR"),
+        os.path.join(os.path.dirname(__file__), "font_assets"),
+        "./ttf_files", "./backend/font_assets", "./font_assets", "../ttf_files", "../font_assets",
+    ]
     for d in possible_dirs:
+        if not d:
+            continue
         for f in glob.glob(os.path.join(d, "*.ttf")):
             if f not in candidates:
                 candidates.append(f)
@@ -149,6 +158,9 @@ def _find_fallback_font_files() -> List[str]:
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+        "/System/Library/Fonts/Apple Symbols.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
     ]
     for sc in system_candidates:
         if os.path.exists(sc) and sc not in candidates:
@@ -180,11 +192,18 @@ _VULGAR_FRACTION_MAP: Dict[str, Tuple[str, str]] = {
     "\ue003": ("1", "10"),
 }
 
-_DYNAMIC_PUA_COUNTER = 0xE200
+# 2026-10-15：分式和根式使用不重叠的辅助私用区，避免第 513 个分式覆盖根式。
+_DYNAMIC_PUA_COUNTER = 0xF0000
+_MAX_DYNAMIC_EXPRESSIONS = 4096
+_MAX_MATH_DEPTH = 48
+_REGISTRY_LOCK = threading.RLock()
+_FRACTION_KEYS = {value: char for char, value in _VULGAR_FRACTION_MAP.items()}
+_MATH_NODE_DEPTH: Dict[str, int] = {}
 
 # 动态根式映射表：PUA 码点 -> (被开方数, 根指数)
 _RADICAL_MAP: Dict[str, Tuple[str, Optional[str]]] = {}
-_DYNAMIC_RADICAL_COUNTER = 0xE400
+_DYNAMIC_RADICAL_COUNTER = 0xF8000
+_RADICAL_KEYS: Dict[Tuple[str, Optional[str]], str] = {}
 
 
 def register_dynamic_radical(radicand: str, root_index: Optional[str] = None) -> str:
@@ -192,26 +211,38 @@ def register_dynamic_radical(radicand: str, root_index: Optional[str] = None) ->
     global _DYNAMIC_RADICAL_COUNTER
     clean_idx = root_index.strip() if root_index else None
     key = (radicand.strip(), clean_idx)
-    for ch, v in _RADICAL_MAP.items():
-        if v == key:
-            return ch
-    ch = chr(_DYNAMIC_RADICAL_COUNTER)
-    _DYNAMIC_RADICAL_COUNTER += 1
-    _RADICAL_MAP[ch] = key
-    return ch
+    with _REGISTRY_LOCK:
+        if key in _RADICAL_KEYS:
+            return _RADICAL_KEYS[key]
+        # 2026-10-15：保留已有引用；达到进程预算后保留可读公式，不淘汰仍在绘制的字符。
+        node_depth = 1 + max((_MATH_NODE_DEPTH.get(ch, 0) for ch in key[0] + (clean_idx or "")), default=0)
+        if len(_RADICAL_MAP) >= _MAX_DYNAMIC_EXPRESSIONS or node_depth > _MAX_MATH_DEPTH:
+            index = f"[{clean_idx}]" if clean_idx else ""
+            return rf"\sqrt{index}{{{key[0]}}}"
+        ch = chr(_DYNAMIC_RADICAL_COUNTER)
+        _DYNAMIC_RADICAL_COUNTER += 1
+        _RADICAL_MAP[ch] = key
+        _RADICAL_KEYS[key] = ch
+        _MATH_NODE_DEPTH[ch] = node_depth
+        return ch
 
 
 def register_dynamic_fraction(num: str, denom: str) -> str:
     """动态注册一个新的手写分式并分配 PUA 码点。"""
     global _DYNAMIC_PUA_COUNTER
     key = (num.strip(), denom.strip())
-    for ch, v in _VULGAR_FRACTION_MAP.items():
-        if v == key:
-            return ch
-    ch = chr(_DYNAMIC_PUA_COUNTER)
-    _DYNAMIC_PUA_COUNTER += 1
-    _VULGAR_FRACTION_MAP[ch] = key
-    return ch
+    with _REGISTRY_LOCK:
+        if key in _FRACTION_KEYS:
+            return _FRACTION_KEYS[key]
+        node_depth = 1 + max((_MATH_NODE_DEPTH.get(ch, 0) for ch in key[0] + key[1]), default=0)
+        if len(_FRACTION_KEYS) >= _MAX_DYNAMIC_EXPRESSIONS or node_depth > _MAX_MATH_DEPTH:
+            return f"({key[0]})/({key[1]})"
+        ch = chr(_DYNAMIC_PUA_COUNTER)
+        _DYNAMIC_PUA_COUNTER += 1
+        _VULGAR_FRACTION_MAP[ch] = key
+        _FRACTION_KEYS[key] = ch
+        _MATH_NODE_DEPTH[ch] = node_depth
+        return ch
 
 
 def _extract_balanced_paren_backward(text: str, slash_pos: int):
@@ -254,10 +285,82 @@ def _extract_balanced_paren_forward(text: str, slash_pos: int):
     return None
 
 
-def convert_slashed_fractions_to_vertical(text: str) -> str:
+def _extract_braced_group(text: str, start: int):
+    """2026-10-15：平衡读取 LaTeX 花括号组，转义花括号不参与配对。"""
+    while start < len(text) and text[start].isspace():
+        start += 1
+    if start >= len(text) or text[start] != "{":
+        return None
+    depth, pos = 1, start + 1
+    while pos < len(text):
+        if text[pos] == "\\":
+            pos += 2
+            continue
+        if text[pos] == "{":
+            depth += 1
+        elif text[pos] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:pos], pos + 1
+        pos += 1
+    return None
+
+
+# 2026-10-15：普通链接、日期、路径和代码必须先保护，不能把其中的斜杠当除号。
+_NON_MATH_SLASH_RE = re.compile(
+    r"```[\s\S]*?(?:```|\Z)|~~~[\s\S]*?(?:~~~|\Z)|`[^`\n]*`"
+    r"|(?:https?|ftp|file)://[^\s<>\"']+|www\.[^\s<>\"']+"
+    r"|[A-Za-z]:[\\/][^\s<>\"']+"
+    r"|\b\d{4}/\d{1,2}(?:/\d{1,2})?\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b"
+    r"|(?<![\w)])(?:\.{0,2}/)[\w.-]+/[^\s<>\"']+"
+    r"|\b[\w.-]+/[\w.-]+/[^\s<>\"']+"
+)
+
+
+def _transform_math_segments(text: str, transform) -> str:
+    """2026-10-15：分式和根式共用保护范围，代码块和链接中的数学字样保留原文。"""
+    output, last = [], 0
+    for match in _NON_MATH_SLASH_RE.finditer(text):
+        output.append(transform(text[last:match.start()]))
+        output.append(match.group())
+        last = match.end()
+    output.append(transform(text[last:]))
+    return "".join(output)
+
+
+def convert_slashed_fractions_to_vertical(text: str, _depth: int = 0) -> str:
+    """2026-10-15：只转换数学片段，保护普通文本中的斜杠及过深的公式。"""
+    if _depth >= _MAX_MATH_DEPTH:
+        return text
+    return _transform_math_segments(text, lambda segment: _convert_fraction_segment(segment, _depth))
+
+
+def _convert_fraction_segment(text: str, _depth: int) -> str:
     """自动将文本中出现的 (A)/(B) 复杂代数分式以及数值、导数、倒数单项分式转换为上下竖式分式。"""
     if not text:
         return ""
+
+    # 2026-10-15：API 直接接收的 frac 也需解析，不能只依赖前端预处理。
+    command = re.compile(r"\\(?:dfrac|tfrac|frac)(?![a-zA-Z])")
+    pos = 0
+    while True:
+        match = command.search(text, pos)
+        if not match:
+            break
+        numerator = _extract_braced_group(text, match.end())
+        denominator = _extract_braced_group(text, numerator[1]) if numerator else None
+        if not denominator:
+            pos = match.end()
+            continue
+        def normalize_part(part):
+            return convert_radicals_to_drawn(
+                convert_slashed_fractions_to_vertical(part, _depth + 1), _depth + 1
+            )
+        replacement = register_dynamic_fraction(
+            normalize_part(numerator[0]), normalize_part(denominator[0])
+        )
+        text = text[:match.start()] + replacement + text[denominator[1]:]
+        pos = match.start() + len(replacement)
 
     # 1. 基础单项式分式正则（数值、导数、单字母变量、带下标变量等）：
     # 例如：1/2, 3/4, 4/3, 1/3, 1/300, 1/y, 1/y₁, 1/y₂, 2/t, 0.2/t, dt/t, ds/s, dV/V, dR/R, 0.00005/0.9863
@@ -329,11 +432,14 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
                         # 对提取出的分子分母递归清洗内部可能含有的简单单项式、根式或真分数
                         num_inner = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), l_content.strip())
                         denom_inner = p_single.sub(lambda m: register_dynamic_fraction(m.group(1), m.group(2)), r_content.strip())
-                        num_clean = convert_radicals_to_drawn(num_inner)
-                        denom_clean = convert_radicals_to_drawn(denom_inner)
+                        num_clean = convert_radicals_to_drawn(num_inner, _depth + 1)
+                        denom_clean = convert_radicals_to_drawn(denom_inner, _depth + 1)
                         dyn_char = register_dynamic_fraction(num_clean, denom_clean)
 
-                        s = s[:l_start] + dyn_char + s[r_end:]
+                        replacement = s[:l_start] + dyn_char + s[r_end:]
+                        if replacement == s:
+                            continue
+                        s = replacement
                         changed = True
                         break
         return s
@@ -347,51 +453,45 @@ def convert_slashed_fractions_to_vertical(text: str) -> str:
     return text
 
 
-def convert_radicals_to_drawn(text: str) -> str:
+def convert_radicals_to_drawn(text: str, _depth: int = 0) -> str:
     """将文本中出现的根式 \\sqrt[n]{...}, \\sqrt{...}, [n]√(...), √(...) 或单项根式 √x 转换为带上方封顶横线的手写根式字符。"""
     if not text:
         return ""
+    if _depth >= _MAX_MATH_DEPTH:
+        return text
 
     # 1. 深度平衡解析 LaTeX \\sqrt[n]{...} 和 \\sqrt{...}
     def _resolve_latex_sqrt(s: str) -> str:
         p_sqrt = re.compile(r"\\sqrt(?:\s*\[([^{}]+)\])?\s*\{")
-        changed = True
-        while changed:
-            changed = False
-            m = p_sqrt.search(s)
+        pos = 0
+        while True:
+            m = p_sqrt.search(s, pos)
             if not m:
                 break
             root_idx = m.group(1)
             start_brace = m.end() - 1
-            depth = 1
-            end_brace = -1
-            for p in range(start_brace + 1, len(s)):
-                if s[p] == '\\':
-                    continue
-                if s[p] == '{':
-                    depth += 1
-                elif s[p] == '}':
-                    depth -= 1
-                    if depth == 0:
-                        end_brace = p
-                        break
-            if end_brace != -1:
-                inner = s[start_brace + 1 : end_brace].strip()
-                inner_cleaned = convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(inner))
+            group = _extract_braced_group(s, start_brace)
+            if group:
+                inner, end = group
+                inner_cleaned = convert_radicals_to_drawn(
+                    convert_slashed_fractions_to_vertical(inner, _depth + 1), _depth + 1
+                )
                 dyn_char = register_dynamic_radical(inner_cleaned, root_idx)
-                s = s[:m.start()] + dyn_char + s[end_brace + 1:]
-                changed = True
+                s = s[:m.start()] + dyn_char + s[end:]
+                pos = m.start() + len(dyn_char)
+            else:
+                pos = m.end()
         return s
 
     text = _resolve_latex_sqrt(text)
 
     # 2. 深度平衡解析 [⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ0-9a-zA-Z]*√\s*\(...\)
     def _resolve_unicode_paren_sqrt(s: str) -> str:
-        p_rad = re.compile(r"([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿa-zA-Z0-9]*)√\s*\(")
-        changed = True
-        while changed:
-            changed = False
-            m = p_rad.search(s)
+        # 2026-10-15：普通数字/字母在根号前表示系数，只有上标才作为根指数。
+        p_rad = re.compile(r"([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ]*)√\s*\(")
+        pos = 0
+        while True:
+            m = p_rad.search(s, pos)
             if not m:
                 break
             root_idx = m.group(1) or None
@@ -408,16 +508,20 @@ def convert_radicals_to_drawn(text: str) -> str:
                         break
             if close_paren != -1:
                 inner = s[open_paren + 1 : close_paren].strip()
-                inner_cleaned = convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(inner))
+                inner_cleaned = convert_radicals_to_drawn(
+                    convert_slashed_fractions_to_vertical(inner, _depth + 1), _depth + 1
+                )
                 dyn_char = register_dynamic_radical(inner_cleaned, root_idx)
                 s = s[:m.start()] + dyn_char + s[close_paren + 1:]
-                changed = True
+                pos = m.start() + len(dyn_char)
+            else:
+                pos = m.end()
         return s
 
     text = _resolve_unicode_paren_sqrt(text)
 
     # 3. 匹配单项无括号根式，例如 √x, √2, ³√8, √y₁
-    p_single_sqrt = re.compile(r"([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿa-zA-Z0-9]*)√([0-9a-zA-Zα-ωΑ-Ω₁-₉²³⁴]+)")
+    p_single_sqrt = re.compile(r"([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ]*)√([0-9a-zA-Zα-ωΑ-Ω₀-₉²³⁴]+)")
 
     def _replace_single_sqrt(m):
         root_idx = m.group(1) or None
@@ -496,14 +600,16 @@ def _measure_radical(char: str, font, font_path: Optional[str]) -> Tuple[int, in
 
     rw = 0
     if root_index:
-        root_size = max(8, int(font_size * 0.5))
+        root_size = max(8, int(font_size * 0.48))
         f_root = _get_cached_image_font(font_path, root_size)
         rw, _ = _measure_text_or_fraction(root_index, f_root, font_path)
 
-    _, _, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
+    _, bb_sqrt, adv_sqrt = _get_char_glyph_and_bbox("√", font, font_path)
     w_inner, _ = _measure_text_or_fraction(radicand, font, font_path)
 
-    total_w = rw + adv_sqrt + w_inner + max(2, int(font_size * 0.1))
+    # 2026-10-15：测量与绘制使用同一前进量，避免嵌套根式覆盖相邻字符。
+    total_w = (rw + max(adv_sqrt, bb_sqrt[2]) - max(1, int(font_size * 0.05))
+               + w_inner + max(3, int(font_size * 0.08)) + max(2, int(font_size * 0.04)))
     return total_w, font_size
 
 
@@ -539,7 +645,7 @@ def _measure_text_or_fraction(text: str, font, font_path: Optional[str]) -> Tupl
     for ch in text:
         if ch in _VULGAR_FRACTION_MAP:
             n, d = _VULGAR_FRACTION_MAP[ch]
-            sub_s = max(8, int(font_size * 0.58))
+            sub_s = max(10, int(font_size * 0.58))
             f_sub = _get_cached_image_font(font_path, sub_s)
             nw, _ = _measure_text_or_fraction(n, f_sub, font_path)
             dw, _ = _measure_text_or_fraction(d, f_sub, font_path)
@@ -801,7 +907,8 @@ def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
         init_glyph_fallback_engine()
 
     cleaned = clean_invisible_and_special_characters(text)
-    with_fractions = convert_slashed_fractions_to_vertical(cleaned)
-    with_radicals = convert_radicals_to_drawn(with_fractions)
-    return with_radicals
+    return _transform_math_segments(
+        cleaned,
+        lambda segment: convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment)),
+    )
 
