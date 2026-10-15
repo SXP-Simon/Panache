@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/SXP-Simon/handwriting-web/compare/v1.0.1...v1.0.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* **desktop:** 让启动与错误页也使用自托管文楷 ([1af5a60](https://github.com/SXP-Simon/handwriting-web/commit/1af5a601b0984e9ad8f8b762195a6b8a2e21c926))
+
 ## [1.0.1](https://github.com/SXP-Simon/handwriting-web/compare/v1.0.0...v1.0.1) (2026-10-15)
 
 
