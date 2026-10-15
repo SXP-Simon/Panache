@@ -55,7 +55,8 @@ jobs:
           done
           curl -fsS http://127.0.0.1:5006/api/health
           cd app
-          flutter test --dart-define=LIVE_API_BASE=http://127.0.0.1:5006
+          flutter test --dart-define=LIVE_API_BASE=http://127.0.0.1:5006 \
+            --dart-define=DESKTOP_BACKEND_EXECUTABLE="$GITHUB_WORKSPACE/target/service-package/handwriting-server"
       - uses: actions/upload-artifact@v4
         with:
           name: handwriting-rust-linux
