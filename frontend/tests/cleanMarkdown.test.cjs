@@ -23,7 +23,7 @@ test("strips bold, italic, strikethrough, and inline code", async () => {
 
 test("strips links and images while keeping text/alt", async () => {
   const { cleanMarkdown } = await cleanModule;
-  const input = "查看 [项目地址](https://github.com/14790897/handwriting-web) 或图片 ![图示](https://example.com/pic.png)";
+  const input = "查看 [项目地址](https://example.invalid/project) 或图片 ![图示](https://example.invalid/pic.png)";
   const output = cleanMarkdown(input);
   assert.equal(output, "查看 项目地址 或图片 图示");
 });
