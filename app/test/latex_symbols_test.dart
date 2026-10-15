@@ -191,6 +191,16 @@ void main() {
     expect(convertLatex(r'$\foo$'), r'$\foo$');
   });
 
+  test('blackboard capitals have explicit Unicode mappings', () {
+    expect(
+      convertLatex(r'$\mathbb{ABCDEFGHIJKLMNOPQRSTUVWXYZ}$'),
+      '𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ',
+    );
+    for (final source in [r'$\mathbb{abc}$', r'$\mathbb{123}$']) {
+      expect(convertLatex(source), source);
+    }
+  });
+
   for (final function in [
     'sin',
     'cos',

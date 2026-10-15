@@ -4,7 +4,10 @@ use crate::{
     text::{self, Node},
 };
 use fontdue::{Font, FontSettings};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, OnceLock},
+};
 
 pub const FALLBACK_FONT_NAMES: [&str; 4] = [
     "霞鹜文楷.ttf",
@@ -86,6 +89,30 @@ impl FontBook {
             }
         });
         let mut fallbacks = Vec::new();
+        if missing
+            .iter()
+            .any(|c| ('\u{1d538}'..='\u{1d551}').contains(c))
+        {
+            // 2026-10-15：此区段的黑板大写使用内部 AMS 子集，避免冷加载多个无此字形的大字体。
+            static MATH: OnceLock<std::result::Result<Arc<Font>, String>> = OnceLock::new();
+            let font = MATH
+                .get_or_init(|| {
+                    Self::load(include_bytes!("../assets/HandwritingMathSymbols.ttf"))
+                        .map_err(|error| error.to_string())
+                })
+                .as_ref()
+                .map(Arc::clone)
+                .map_err(|message| Error::new("invalid_font", message.clone()))?;
+            missing.retain(|c| {
+                if ('\u{1d538}'..='\u{1d551}').contains(c) && visible_glyph(&font, *c) {
+                    coverage.insert(*c, fallbacks.len() + 1);
+                    false
+                } else {
+                    true
+                }
+            });
+            fallbacks.push(font);
+        }
         for name in FALLBACK_FONT_NAMES {
             if missing.is_empty() {
                 break;

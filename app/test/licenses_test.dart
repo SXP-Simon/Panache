@@ -17,6 +17,8 @@ void main() {
       'handright-BSD-3-Clause.txt':
           '../crates/handwriting-core/licenses/handright-LICENSE.txt',
       'handright-NOTICE.txt': '../crates/handwriting-core/NOTICE',
+      'katex-fonts-MIT.txt':
+          '../crates/handwriting-core/licenses/katex-fonts-MIT.txt',
     };
     for (final entry in originals.entries) {
       final bundled = await rootBundle.loadString(

@@ -130,3 +130,24 @@ fn fallback_loading_is_lazy_ordered_and_keeps_selected_primary() {
     assert!(Arc::ptr_eq(&book.fonts[0], &primary));
     assert_ne!(book.for_char(rare).lookup_glyph_index(rare), 0);
 }
+
+#[test]
+fn blackboard_capitals_have_real_ink_without_loading_large_handwriting_fonts() {
+    let text = "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ";
+    let book = FontBook::with_text_fallbacks(fonts()["云烟体.ttf"].clone(), text, |name| {
+        Ok(fonts().get(name).cloned())
+    })
+    .unwrap();
+    for c in text.chars() {
+        assert!(
+            visible_glyph(book.for_char(c), c),
+            "blackboard {c} disappeared"
+        );
+    }
+    let only_expectation =
+        FontBook::with_text_fallbacks(fonts()["云烟体.ttf"].clone(), "𝔼", |_| {
+            panic!("a known internal math character must not load large handwriting fonts")
+        })
+        .unwrap();
+    assert!(visible_glyph(only_expectation.for_char('𝔼'), '𝔼'));
+}
