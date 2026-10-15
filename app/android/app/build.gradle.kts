@@ -32,11 +32,31 @@ android {
 
     sourceSets.getByName("main").jniLibs.srcDir(layout.buildDirectory.dir("rust-jni").get().asFile)
 
+    val releaseSigning = listOf(
+        "HANDWRITING_ANDROID_KEYSTORE_PATH",
+        "HANDWRITING_ANDROID_STORE_PASSWORD",
+        "HANDWRITING_ANDROID_KEY_ALIAS",
+        "HANDWRITING_ANDROID_KEY_PASSWORD",
+    ).map { System.getenv(it).orEmpty() }
+    signingConfigs {
+        if (releaseSigning.any { it.isNotEmpty() }) {
+            require(releaseSigning.all { it.isNotEmpty() }) {
+                "All four HANDWRITING_ANDROID signing variables must be provided"
+            }
+            require(file(releaseSigning[0]).isFile) { "Android release keystore is missing" }
+            create("release") {
+                storeFile = file(releaseSigning[0])
+                storePassword = releaseSigning[1]
+                keyAlias = releaseSigning[2]
+                keyPassword = releaseSigning[3]
+            }
+        }
+    }
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Local release-mode testing may use debug keys; publication requires
+            // the complete signing environment and checks its certificate.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 }
