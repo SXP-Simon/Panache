@@ -2,48 +2,26 @@ name: Backend Test Workflow
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - "backend/**"
+    branches: [main]
+    paths: ["backend/**", "pyproject.toml", "uv.lock", ".github/workflows/test_backend.yml"]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   backend-test:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: 检出代码仓库
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Step 2: 设置 Python 环境
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.10" # 指定 Python 版本
-
-      # Step 3: 进入 backend 目录
-      - name: Change to backend directory
-        run: cd backend
-
-      # Step 4: 安装依赖包
-      - name: Install dependencies
-        run: |
-          cd backend
-          python -m pip install --upgrade pip  # 升级 pip
-          pip install -r requirements.txt
-
-      # Step 5: 运行 backend/tests/ 下的单元测试
-      # pytest.ini 已把需要真实服务的压测（-m load）反选掉，CI 只跑不需要服务的部分
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
+      - run: uv sync --locked --extra dev
       - name: Run unit tests
-        working-directory: backend
-        run: python -m pytest tests/ -q
-
-      # Step 6: 冒烟启动 —— 能跑满 60s 被 timeout 杀掉才说明后端在服务；
-      # 提前退出（崩溃或自行退出）都算失败，退出码 124 才是通过
+        run: uv run --locked --extra dev python -m pytest backend/tests -q
       - name: Smoke-test app boot
         working-directory: backend
-        run: bash smoke_boot.sh
+        run: uv run --project .. --locked bash smoke_boot.sh

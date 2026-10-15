@@ -3,7 +3,7 @@ name = "handwrite-backend"
 version = "1.34.0"
 description = "手写体生成器后端"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -25,12 +25,22 @@ dependencies = [
     "psutil>=5.9.0",
     "Werkzeug==2.3.6",
     "fonttools>=4.65.0",
+    "gunicorn>=26.2.0",
+    "uvicorn-worker>=0.4.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "pyright>=1.1.414",
     "pytest>=7.4.0",
     "requests>=2.31.0",
+    "ruff>=0.17.0",
+    "types-pillow>=10.2.0.20240822",
+    "types-psutil>=7.2.2.20260906",
+    "types-requests>=2.33.0.20261006",
+]
+build = [
+    "pyinstaller>=6.22.3,<7",
 ]
 
 [build-system]
@@ -39,3 +49,37 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend"]
+[tool.pyright]
+include = ["backend/*.py", "scripts/*.py"]
+extraPaths = ["backend"]
+typeCheckingMode = "strict"
+stubPath = "backend/stubs"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+# Chinese prose punctuation and mathematical symbols are intentional project content.
+allowed-confusables = ["，", "：", "；", "（", "）", "。", "！", "？", "—", "–", "…", "“", "”", "‘", "’", "、", "α", "∣", "∶", "⁄", "−", "×", "′", "″", "｝", "％"]
+# These pairs are mutually exclusive; D211/D212 and the formatter own the style.
+ignore = ["D203", "D213", "COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally assert behavior and inspect private rendering geometry.
+"backend/tests/**" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "D100", "D101", "D102", "D103", "D107", "INP001", "PLR2004", "PT009", "PT027", "S101", "SLF001"]
+# Third-party declarations must preserve their existing keyword and API names.
+"backend/stubs/**/*.pyi" = ["A001", "A002", "N802", "N803"]
+# Rendering tests deliberately seed non-cryptographic pseudo-random generators.
+"backend/tests/test_math_page_layout.py" = ["S311"]
+"backend/tests/test_math_strikethrough.py" = ["S311"]
+"backend/tests/locustfile.py" = ["S311"]
+# These /tmp paths are input strings verifying literal-path preservation, never files.
+"backend/tests/test_symbol_fallback.py" = ["S108"]
+[tool.ruff.format]
+# Markdown snapshots are documentation archives, not Python source files.
+exclude = ["*.md"]

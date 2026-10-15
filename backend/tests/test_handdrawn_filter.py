@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
 import numpy as np
+from handdrawn_filter import fit_image_to_layout, process_image_to_handdrawn
 from PIL import Image, ImageDraw
-from handdrawn_filter import process_image_to_handdrawn
 
 
 def test_process_image_to_handdrawn_basic():
@@ -28,7 +28,6 @@ def test_process_image_to_handdrawn_basic():
 
 
 def test_fit_image_to_layout():
-    from handdrawn_filter import fit_image_to_layout
 
     # 1. 较小图片不缩放
     small_img = Image.new("RGB", (300, 200))

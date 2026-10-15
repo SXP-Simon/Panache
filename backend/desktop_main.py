@@ -1,4 +1,5 @@
-"""桌面版（Electron + PyInstaller）后端入口。
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""桌面版（Electron + PyInstaller）后端入口.
 
 与 `python app.py` 的区别：
 1. 数据目录不在包内 —— 打包后 `__file__` 落在只读的安装目录（onedir）
@@ -12,27 +13,37 @@
     cd backend && python desktop_main.py
 """
 
+import importlib
+import io
 import json
+
+# onefile 打包下子进程会重复执行入口，必须先冻结支持
+import multiprocessing
 import os
 import socket
 import sys
 import threading
 import time
+from pathlib import Path
 
 import psutil
+import uvicorn
+from fastapi import FastAPI
 
-# onefile 打包下子进程会重复执行入口，必须先冻结支持
-import multiprocessing
+if __package__:
+    from .library_boundary import member
+else:
+    from library_boundary import member
+
 
 multiprocessing.freeze_support()
 
-from pathlib import Path
 
 APP_NAME = "HandwritingWeb"
 
 
 def bundle_dir() -> Path:
-    """随包分发的只读资源目录（font_assets、dist）。"""
+    """随包分发的只读资源目录（font_assets、dist）."""
     if getattr(sys, "frozen", False):
         # PyInstaller 6.x onedir：_MEIPASS 指向 <app>/_internal
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
@@ -40,7 +51,7 @@ def bundle_dir() -> Path:
 
 
 def data_dir() -> Path:
-    """可写的用户数据目录。Electron 通过 HANDWRITING_DATA_DIR 指定，独立运行时回退到平台默认位置。"""
+    """可写的用户数据目录。Electron 通过 HANDWRITING_DATA_DIR 指定，独立运行时回退到平台默认位置."""
     override = os.getenv("HANDWRITING_DATA_DIR")
     if override:
         return Path(override)
@@ -48,18 +59,18 @@ def data_dir() -> Path:
         # 与 desktop/main.js 的 dataDir() 保持一致
         base = Path(os.getenv("HOME") or Path.home()) / "Library" / "Application Support"
     else:
-        base = Path(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"))
+        base = Path(os.getenv("LOCALAPPDATA") or Path.home())
     return base / APP_NAME
 
 
 def bind_listener(preferred: int = 57610) -> socket.socket:
-    """绑定并 listen 127.0.0.1 上的一个端口，返回已就绪的 socket。
+    """绑定并 listen 127.0.0.1 上的一个端口，返回已就绪的 socket.
 
     只绑一次、把 socket 直接交给 uvicorn：如果先探测再关闭、让 uvicorn 自己 bind，
     两次绑定之间端口可能被别人抢走，uvicorn 会 bind 失败直接退出。
     不设 SO_REUSEADDR —— Windows 上它会允许别的进程抢占同一端口。
     """
-    for port in list(range(preferred, preferred + 100)) + [0]:
+    for port in [*list(range(preferred, preferred + 100)), 0]:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.bind(("127.0.0.1", port))
@@ -68,11 +79,12 @@ def bind_listener(preferred: int = 57610) -> socket.socket:
             continue
         sock.listen(128)
         return sock
-    raise RuntimeError(f"{preferred}-{preferred + 99} 内没有可用端口")
+    msg = f"{preferred}-{preferred + 99} 内没有可用端口"
+    raise RuntimeError(msg)
 
 
 def prepare_environment() -> Path:
-    """建好目录、设好环境变量，必须在 import app 之前调用。"""
+    """建好目录、设好环境变量，必须在 import app 之前调用."""
     bundle = bundle_dir()
     data = data_dir()
     data.mkdir(parents=True, exist_ok=True)
@@ -100,8 +112,8 @@ def prepare_environment() -> Path:
     return data
 
 
-def watch_parent(parent_pid: int):
-    """父进程（Electron）退出后自杀，避免留下孤儿后端。
+def watch_parent(parent_pid: int) -> None:
+    """父进程（Electron）退出后自杀，避免留下孤儿后端.
 
     注意：不要改成读 stdin 判断父进程存活。在 Windows 的无控制台 frozen 进程里
     阻塞读 stdin 会让整个进程卡死在启动阶段（实测：app 永远起不来、无任何输出）。
@@ -120,25 +132,28 @@ def watch_parent(parent_pid: int):
             os._exit(0)
 
 
-def start_parent_watchdog():
+def start_parent_watchdog() -> None:
+    """Start observing the Electron parent when its PID was provided."""
     parent_pid = os.getenv("HANDWRITING_PARENT_PID", "")
     if not parent_pid.isdigit():
         return
     threading.Thread(target=watch_parent, args=(int(parent_pid),), daemon=True).start()
 
 
-def emit_ready(port: int):
+def emit_ready(port: int) -> None:
+    """Emit the port handshake consumed by Electron."""
     payload = json.dumps({"type": "ready", "port": port}, ensure_ascii=False)
     sys.stdout.write(f"HANDWRITING_BACKEND {payload}\n")
     sys.stdout.flush()
 
 
-def main():
+def main() -> None:
+    """Prepare the local backend and serve the inherited loopback listener."""
     # 打包后 stdout/stderr 是管道或重定向文件，Windows 默认按 ANSI 代码页编码，
     # 中文日志会抛 UnicodeEncodeError（后台线程里就等于静默失败）。Electron 会传
     # PYTHONUTF8，这里再兜一层，保证直接双击 exe 时也不会崩。
     for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
+        if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     prepare_environment()
@@ -151,11 +166,16 @@ def main():
     os.environ["HANDWRITING_ALLOWED_ORIGIN"] = f"http://127.0.0.1:{port}"
 
     # 导入放在环境变量就绪之后：app.py 在导入期读取这些配置并建目录
-    import uvicorn
-
-    from app import app, cleanup_marked_directories
-
-    cleanup_marked_directories()
+    application_module = importlib.import_module("app")
+    application = member(application_module, "app")
+    if not isinstance(application, FastAPI):
+        message = "Backend module did not export a FastAPI application"
+        raise TypeError(message)
+    cleanup = member(application_module, "cleanup_marked_directories")
+    if not callable(cleanup):
+        message = "Backend cleanup callback is not callable"
+        raise TypeError(message)
+    cleanup()
 
     # 此时 socket 已在 listen，报给 Electron 的端口一定可用
     emit_ready(port)
@@ -166,7 +186,7 @@ def main():
     # 明确指定 loop/http/ws 实现，避免 uvicorn 运行时按字符串动态导入，
     # PyInstaller 的静态分析看不到那些模块。
     config = uvicorn.Config(
-        app,
+        application,
         host="127.0.0.1",
         port=port,
         loop="asyncio",

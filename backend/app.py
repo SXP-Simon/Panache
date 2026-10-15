@@ -1,13 +1,37 @@
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""手写体生成 API、持久化任务与桌面静态资源入口."""
+
+from __future__ import annotations
+
+import ast
 import asyncio
 import base64
+import gc
+import importlib
+import io
 import itertools
+import logging
 import math
+import mimetypes
 import re
+import shutil
+import stat
+import tempfile
 import time
-from typing import Any, Optional, Union
+from collections.abc import Awaitable, Callable, Iterable, Sequence
+from dataclasses import dataclass
+from functools import wraps
+from pathlib import Path
+from typing import Annotated, BinaryIO, Protocol, TypedDict, cast
+from uuid import uuid4
 
 import psutil
-from dotenv import load_dotenv
+import pypandoc
+import schedule_clean
+import sentry_sdk
+import uvicorn
+from app_environment import get_environment_value
+from docx_extractor import extract_text_from_docx
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -22,245 +46,26 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
-
-# run_in_threadpool 已移除：handwrite() 返回惰性生成器（map 对象），
-# 真正的 CPU 密集渲染在后续 for 循环消费生成器时才发生，
-# 而 generate_handwriting_impl 整体运行在 BackgroundTask 里，HTTP 请求已秒回，
-# 所以 run_in_threadpool 在此场景下无法真正释放事件循环。
+from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
-
-# from threading import Thread
+from library_boundary import member
 from PIL import Image, ImageDraw, ImageFont
-
-load_dotenv()
-import gc
-import io
-import logging
-import mimetypes
-import os
-import shutil
-import tempfile
-from uuid import uuid4
-
-try:
-    from docx_extractor import extract_text_from_docx
-    from handdrawn_filter import render_inline_markdown_images
-    from symbol_fallback import (normalize_text_for_font, _get_cached_image_font,
-                                 is_math_glyph,
-                                 _get_rendered_text_bbox)
-except ImportError:
-    from backend.docx_extractor import extract_text_from_docx
-    from backend.handdrawn_filter import render_inline_markdown_images
-    from backend.symbol_fallback import (normalize_text_for_font, _get_cached_image_font,
-                                         is_math_glyph,
-                                         _get_rendered_text_bbox)
-from werkzeug.utils import secure_filename
-
-# 2026-10-03：PyPDF2 / python-docx / identify（opencv + sklearn）/ pdf（PyMuPDF）原本都在
-# 模块级导入，但它们只服务于少数几个接口，却让每次启动都得先把它们的 DLL 全部载入
-# （实测 sklearn 一家就占整个 import app 的七成）。现已下沉到各自的使用处按需导入。
-# 注意：下面这几个符号被 backend/tests 打了补丁，别一起挪走 —— handright 的
-# Template/handwrite 和 PIL 的 ImageFont 必须保持模块级属性。
-
-
-# 安全文件删除函数
-def safe_remove_directory(directory_path, max_retries=5):
-    """安全删除目录，带重试机制和更强的文件处理"""
-    if not os.path.exists(directory_path):
-        return True
-
-    for attempt in range(max_retries):
-        try:
-            # 强制垃圾回收，释放可能的文件句柄
-            gc.collect()
-            # 等待更长时间让系统释放文件句柄
-            time.sleep(0.2 * (attempt + 1))  # 递增等待时间
-
-            # 递归删除所有文件和子目录
-            deleted_files = []
-            failed_files = []
-
-            for root, dirs, files in os.walk(directory_path, topdown=False):
-                # 删除文件
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    if safe_remove_single_file(file_path, max_retries=2):
-                        deleted_files.append(file_path)
-                    else:
-                        failed_files.append(file_path)
-
-                # 删除空目录
-                for dir in dirs:
-                    dir_path = os.path.join(root, dir)
-                    try:
-                        if os.path.exists(dir_path) and not os.listdir(dir_path):
-                            os.rmdir(dir_path)
-                    except Exception as dir_e:
-                        logger.warning(
-                            f"Failed to delete subdirectory {dir_path}: {dir_e}"
-                        )
-
-            # 如果有文件删除失败，记录但继续尝试删除目录
-            if failed_files:
-                logger.warning(
-                    f"Failed to delete {len(failed_files)} files: {failed_files[:3]}..."
-                )
-
-            # 最后尝试删除根目录
-            if os.path.exists(directory_path):
-                try:
-                    os.rmdir(directory_path)
-                    logger.info(
-                        f"Successfully deleted temp directory: {directory_path}"
-                    )
-                    return True
-                except OSError as e:
-                    if e.errno == 145:  # 目录不为空
-                        # 列出剩余文件
-                        remaining_files = []
-                        try:
-                            for root, dirs, files in os.walk(directory_path):
-                                remaining_files.extend(
-                                    [os.path.join(root, f) for f in files]
-                                )
-                        except:
-                            pass
-                        logger.warning(
-                            f"Directory not empty, remaining files: {remaining_files[:5]}"
-                        )
-                    raise
-
-        except Exception as e:
-            logger.warning(
-                f"Attempt {attempt + 1} to delete {directory_path} failed: {e}"
-            )
-            if attempt < max_retries - 1:
-                time.sleep(1.0 * (attempt + 1))  # 递增等待时间
-            else:
-                logger.error(
-                    f"Failed to delete temp directory after {max_retries} attempts: {directory_path}"
-                )
-                # 最后尝试：标记目录为稍后清理
-                try:
-                    cleanup_marker = os.path.join(directory_path, ".cleanup_later")
-                    with open(cleanup_marker, "w") as f:
-                        f.write(f"Failed to delete at {time.time()}")
-                    logger.info(f"Marked directory for later cleanup: {directory_path}")
-                except:
-                    pass
-    return False
-
-
-def safe_remove_single_file(file_path, max_retries=3):
-    """安全删除单个文件"""
-    if not os.path.exists(file_path):
-        return True
-
-    for attempt in range(max_retries):
-        try:
-            # 确保文件不是只读
-            os.chmod(file_path, 0o777)
-
-            # 强制垃圾回收
-            gc.collect()
-            time.sleep(0.1)
-
-            # 尝试删除文件
-            os.remove(file_path)
-            return True
-
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(0.3 * (attempt + 1))
-            else:
-                logger.warning(f"Failed to delete file {file_path}: {e}")
-    return False
-
-
-def safe_remove_file(file_path, max_retries=3):
-    """安全删除文件，带重试机制"""
-    result = safe_remove_single_file(file_path, max_retries)
-    if result:
-        logger.info(f"Successfully deleted file: {file_path}")
-    else:
-        logger.error(f"Failed to delete file after {max_retries} attempts: {file_path}")
-    return result
-
-
-def safe_save_and_close_image(image, image_path):
-    """安全保存并关闭图片，确保文件句柄被释放"""
-    try:
-        # 保存图片
-        image.save(image_path)
-
-        # 如果图片对象有 close 方法，调用它
-        # if hasattr(image, "close"):
-        #     image.close()
-
-        # # 强制垃圾回收
-        # gc.collect()
-
-        # # 等待一小段时间确保文件句柄被释放
-        # time.sleep(0.1)
-
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save image {image_path}: {e}")
-        return False
-
-
-def cleanup_marked_directories():
-    """清理项目内标记为稍后清理的目录"""
-    project_temp_base = "./temp"
-
-    # 确保项目临时目录存在
-    os.makedirs(project_temp_base, exist_ok=True)
-
-    try:
-        for item in os.listdir(project_temp_base):
-            item_path = os.path.join(project_temp_base, item)
-            if os.path.isdir(item_path) and item.startswith("tmp"):
-                cleanup_marker = os.path.join(item_path, ".cleanup_later")
-                if os.path.exists(cleanup_marker):
-                    try:
-                        # 检查标记时间，如果超过1小时则尝试清理
-                        with open(cleanup_marker, "r") as f:
-                            content = f.read()
-                            if "Failed to delete at" in content:
-                                timestamp = float(
-                                    content.split("Failed to delete at ")[1]
-                                )
-                                if time.time() - timestamp > 3600:  # 1小时后
-                                    logger.info(
-                                        f"Attempting to cleanup marked directory: {item_path}"
-                                    )
-                                    if safe_remove_directory(item_path, max_retries=2):
-                                        logger.info(
-                                            f"Successfully cleaned up marked directory: {item_path}"
-                                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to cleanup marked directory {item_path}: {e}"
-                        )
-    except Exception as e:
-        logger.warning(f"Error during cleanup of marked directories: {e}")
-
-
-# 装饰器 7.15
-from functools import wraps
-
-# 定时清理文件 10.28
-import schedule_clean
-
-# sentry 错误报告7.7
-import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
-
-# 限制请求速率 7.9
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.datastructures import UploadFile as StarletteUploadFile
+from symbol_fallback import (
+    font_bbox_of,
+    font_path_of,
+    font_size_of,
+    get_cached_image_font,
+    is_math_glyph,
+    math_text_bbox,
+    measure_drawn_advance,
+    normalize_text_for_font,
+)
 from task_store import cleanup_expired as cleanup_expired_generation_tasks
 from task_store import get_active_task_count as get_generation_active_task_count
 from task_store import get_queue_metrics as get_generation_queue_metrics
@@ -268,79 +73,168 @@ from task_store import get_task as get_generation_task
 from task_store import pop_task as pop_generation_task
 from task_store import read_result_file
 from task_store import set_task as set_generation_task
-from task_types import (
-    GenerateHandwritingParams,
-    GenerationTask,
-    form_dependency_from_model,
-)
+from task_types import GenerateHandwritingParams, GenerationTask, form_dependency_from_model
+from werkzeug.utils import secure_filename
+
+type Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
+type ReportProgress = Callable[[str, str, int], None]
+type RequestResponseEndpoint = Callable[[Request], Awaitable[Response]]
+
+
+def _delete_directory_contents(directory: Path) -> None:
+    for child in directory.iterdir():
+        if child.is_dir() and not child.is_symlink():
+            _delete_directory_contents(child)
+            child.rmdir()
+        elif not safe_remove_single_file(str(child), max_retries=2):
+            error = f"Failed to remove file {child}"
+            raise OSError(error)
+
+
+def safe_remove_directory(directory_path: str, max_retries: int = 5) -> bool:
+    """2026-10-15：重试删除临时目录，失败后写入后续清理标记."""
+    directory = Path(directory_path)
+    for attempt in range(max_retries):
+        if not directory.exists():
+            return True
+        gc.collect()
+        time.sleep(0.2 * (attempt + 1))
+        try:
+            _delete_directory_contents(directory)
+            directory.rmdir()
+        except OSError:
+            logger.warning("Attempt %s to delete %s failed", attempt + 1, directory, exc_info=True)
+            if attempt < max_retries - 1:
+                time.sleep(attempt + 1)
+        else:
+            return True
+    try:
+        (directory / ".cleanup_later").write_text(
+            f"Failed to delete at {time.time()}", encoding="utf-8"
+        )
+    except OSError:
+        logger.warning("Failed to mark directory for cleanup: %s", directory, exc_info=True)
+    return False
+
+
+def safe_remove_single_file(file_path: str, max_retries: int = 3) -> bool:
+    """重试删除文件，只为当前用户增加必要的读写权限."""
+    path = Path(file_path)
+    for attempt in range(max_retries):
+        try:
+            if not path.exists():
+                return True
+            path.chmod(path.stat().st_mode | stat.S_IWUSR | stat.S_IRUSR)
+            gc.collect()
+            time.sleep(0.1)
+            path.unlink()
+        except OSError:
+            logger.warning("Failed to delete file %s", path, exc_info=True)
+            if attempt < max_retries - 1:
+                time.sleep(0.3 * (attempt + 1))
+        else:
+            return True
+    return False
+
+
+def safe_remove_file(file_path: str, max_retries: int = 3) -> bool:
+    """重试删除响应文件，并记录失败状态."""
+    result = safe_remove_single_file(file_path, max_retries)
+    if not result:
+        logger.error("Failed to delete file after %s attempts: %s", max_retries, file_path)
+    return result
+
+
+def safe_save_and_close_image(image: Image.Image, image_path: str) -> bool:
+    """保存图像，失败时记录诊断，调用者负责其余生命周期."""
+    try:
+        image.save(image_path)
+    except OSError:
+        logger.exception("Failed to save image %s", image_path)
+        return False
+    else:
+        return True
+
+
+def cleanup_marked_directories() -> None:
+    """清理超过一小时仍带有清理标记的临时目录."""
+    base = Path("temp")
+    base.mkdir(exist_ok=True)
+    cleanup_age_seconds = 3600
+    for directory in base.iterdir():
+        marker = directory / ".cleanup_later"
+        if not directory.name.startswith("tmp") or not marker.is_file():
+            continue
+        try:
+            prefix, _, timestamp = marker.read_text(encoding="utf-8").partition(
+                "Failed to delete at "
+            )
+            if not prefix and timestamp and time.time() - float(timestamp) > cleanup_age_seconds:
+                safe_remove_directory(str(directory), max_retries=2)
+        except (OSError, ValueError):
+            logger.warning("Failed to inspect cleanup marker %s", marker, exc_info=True)
+
 
 # 获取环境变量
-mysql_host = os.getenv("MYSQL_HOST", "db")
-enable_user_auth = os.getenv("ENABLE_USER_AUTH", "false")
+mysql_host = get_environment_value("MYSQL_HOST", "db")
+enable_user_auth = get_environment_value("ENABLE_USER_AUTH", "false")
 # 桌面版（Electron + PyInstaller 打包）标志，由 desktop_main.py 设置
-DESKTOP_MODE = os.getenv("DESKTOP_MODE", "false").lower() == "true"
+DESKTOP_MODE = get_environment_value("DESKTOP_MODE", "false").lower() == "true"
 
 
-def read_app_version():
-    """应用版本号，供前端页面展示。
+def read_app_version() -> str:
+    """应用版本号，供前端页面展示.
 
     优先环境变量：桌面版由 Electron 传 app.getVersion()，拿到的是真正安装的那个版本；
     否则读随包分发的 VERSION（发版时由 scripts/sync-version.js 写入，进后端镜像与
     PyInstaller 的 datas）；都没有就返回空串，前端不显示。
     """
-    override = os.getenv("HANDWRITING_APP_VERSION", "").strip()
+    override = get_environment_value("HANDWRITING_APP_VERSION", "").strip()
     if override:
         return override
-    version_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")
+    version_file = Path(__file__).with_name("VERSION")
     try:
-        with open(version_file, encoding="utf-8") as fp:
-            return fp.read().strip()
+        return version_file.read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
 
 app_version = read_app_version()
-# 获取当前路径
-current_path = os.getcwd()
-# 创建一个子文件夹用于存储输出的图片
-output_path = os.path.join(current_path, "output")
-# 如果子文件夹不存在，就创建它
-if not os.path.exists(output_path):
-    os.makedirs(output_path)
-directory = ["./textfileprocess", "imagefileprocess"]
-for directory in directory:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+current_path = str(Path.cwd())
+output_path = str(Path.cwd() / "output")
+for directory in (output_path, "textfileprocess", "imagefileprocess"):
+    Path(directory).mkdir(exist_ok=True)
 
-font_assets_dir = os.getenv("FONT_ASSETS_DIR", "./font_assets")
-font_assets_bundled_dir = os.getenv("FONT_ASSETS_BUNDLED_DIR", "./font_assets")
 
-def sync_font_assets(source_dir, target_dir):
-    if os.path.abspath(source_dir) == os.path.abspath(target_dir):
+font_assets_dir = get_environment_value("FONT_ASSETS_DIR", "./font_assets")
+font_assets_bundled_dir = get_environment_value("FONT_ASSETS_BUNDLED_DIR", "./font_assets")
+
+
+def sync_font_assets(source_dir: str, target_dir: str) -> None:
+    """将随包字体补充到可写字体目录，不覆盖用户已有文件."""
+    source, target = Path(source_dir), Path(target_dir)
+    if source.resolve() == target.resolve() or not source.is_dir() or not target.is_dir():
         return
-    if not os.path.isdir(source_dir) or not os.path.isdir(target_dir):
-        return
-    for filename in os.listdir(source_dir):
-        if not filename.lower().endswith(".ttf"):
-            continue
-        source_path = os.path.join(source_dir, filename)
-        target_path = os.path.join(target_dir, filename)
-        if os.path.isfile(source_path) and not os.path.exists(target_path):
-            shutil.copy2(source_path, target_path)
+    for path in source.iterdir():
+        destination = target / path.name
+        if path.suffix.lower() == ".ttf" and path.is_file() and not destination.exists():
+            shutil.copy2(path, destination)
 
-os.makedirs(font_assets_dir, exist_ok=True)
+
+Path(font_assets_dir).mkdir(parents=True, exist_ok=True)
 sync_font_assets(font_assets_bundled_dir, font_assets_dir)
-
 font_file_names = [
-    f
-    for f in os.listdir(font_assets_dir)
-    if os.path.isfile(os.path.join(font_assets_dir, f)) and f.endswith(".ttf")
+    path.name
+    for path in Path(font_assets_dir).iterdir()
+    if path.is_file() and path.suffix == ".ttf"
 ]
+
+
 # sentry部分 7.7
 # 桌面版由 desktop_main.py 设 SENTRY_DSN="" 关闭上报，避免把用户本地错误发到线上项目
-_sentry_dsn = os.getenv(
+_sentry_dsn = get_environment_value(
     "SENTRY_DSN",
-    "https://ed22d5c0e3584faeb4ae0f67d19f68aa@o4505255803551744.ingest.sentry.io/4505485583253504",
+    "",
 )
 if _sentry_dsn:
     sentry_sdk.init(
@@ -371,9 +265,9 @@ ch.setLevel(logging.DEBUG)
 # 创建 file handler，并设置级别为 DEBUG
 # LOG_DIR 供桌面版指向可写数据目录；仓库内运行时仍是 backend/logs
 # 显式指定 utf-8：Windows 上 FileHandler 默认用 ANSI 代码页，中文日志会写坏
-log_dir = os.getenv("LOG_DIR", "logs")
-os.makedirs(log_dir, exist_ok=True)
-fh = logging.FileHandler(os.path.join(log_dir, "app.log"), encoding="utf-8")
+log_dir = get_environment_value("LOG_DIR", "logs")
+Path(log_dir).mkdir(parents=True, exist_ok=True)
+fh = logging.FileHandler(Path(log_dir) / "app.log", encoding="utf-8")
 fh.setLevel(logging.DEBUG)
 
 # 创建 formatter
@@ -392,7 +286,7 @@ app = FastAPI()
 # 桌面版由 desktop_main.py 设成本应用窗口的源（http://127.0.0.1:<port>）。
 # 前端与后端同源、本来就不依赖 CORS，所以桌面版把白名单收紧到这一个来源；
 # Web 部署不设该变量，沿用原来的宽松配置。
-_allowed_origin = os.getenv("HANDWRITING_ALLOWED_ORIGIN", "")
+_allowed_origin = get_environment_value("HANDWRITING_ALLOWED_ORIGIN", "")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[_allowed_origin] if _allowed_origin else ["*"],
@@ -402,14 +296,16 @@ app.add_middleware(
 )
 
 
-def _origin_of(url):
-    """从 URL 里取出 scheme://host:port，取不到返回 None。"""
+def _origin_of(url: str | None) -> str | None:
+    """从 URL 里取出 scheme://host:port，取不到返回 None."""
     match = re.match(r"^https?://[^/]+", url or "")
     return match.group(0) if match else None
 
 
-def foreign_origin(origin_header, referer_header, sec_fetch_site=None):
-    """请求来自本应用之外的站点时返回该来源（或 "cross-site"），否则返回 None。
+def foreign_origin(
+    origin_header: str | None, referer_header: str | None, sec_fetch_site: str | None = None
+) -> str | None:
+    """请求来自本应用之外的站点时返回该来源（或 "cross-site"），否则返回 None.
 
     CORS 白名单只决定浏览器能否「读」响应，不阻止请求被发出，所以必须再主动拒绝：
     用户浏览任意网页时，那个页面可以往 127.0.0.1 发简单请求驱动本地渲染，甚至用
@@ -433,7 +329,10 @@ def foreign_origin(origin_header, referer_header, sec_fetch_site=None):
 if _allowed_origin:
 
     @app.middleware("http")
-    async def reject_foreign_origin(request: Request, call_next):
+    async def reject_foreign_origin(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """拒绝从其他网页发送到本地桌面后端的跨站请求."""
         source = foreign_origin(
             request.headers.get("origin"),
             request.headers.get("referer"),
@@ -450,11 +349,14 @@ if _allowed_origin:
 
 # 自定义 422 错误响应，把字段名提取出来让前端更易读
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    missing_fields = []
-    invalid_fields = []
+async def validation_exception_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """将表单验证错误转换为带字段名的响应."""
+    missing_fields: list[str] = []
+    invalid_fields: list[str] = []
     for err in exc.errors():
-        loc = ".".join(str(l) for l in err["loc"] if l not in ("body", "query", "path"))
+        loc = ".".join(str(part) for part in err["loc"] if part not in ("body", "query", "path"))
         if err["type"] in ("missing", "value_error.missing"):
             missing_fields.append(loc)
         else:
@@ -471,120 +373,134 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "status": "fail",
             "message": message,
             "errors": [
-                {"field": ".".join(str(l) for l in e["loc"] if l not in ("body", "query", "path")),
-                 "message": e["msg"]}
+                {
+                    "field": ".".join(
+                        str(part) for part in e["loc"] if part not in ("body", "query", "path")
+                    ),
+                    "message": e["msg"],
+                }
                 for e in exc.errors()
             ],
         },
     )
 
+
 # 设置Flask app的logger级别
-# app.logger.setLevel(logging.DEBUG)
 
-
-SECRET_KEY = "437d75c5af744b76607fe862cf8a5a368519aca486d62c5fa69ba42c16809z88"
-# app.config["SECRET_KEY"] = SECRET_KEY
-# app.config["SESSION_COOKIE_SECURE"] = True
-# app.config["SESSION_COOKIE_SAMESITE"] = "None"
-# app.config["MAX_CONTENT_LENGTH"] = 128 * 1024 * 1024
-# app.permanent_session_lifetime = timedelta(minutes=5000000)
-# app.config["SESSION_TYPE"] = "filesystem"  # 设置session存储方式为文件
-# Session(app)  # 初始化扩展，传入应用程序实例
 limiter = Limiter(key_func=get_remote_address, default_limits=["1000 per 5 minute"])
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def rate_limit_error_handler(request: Request, exception: Exception) -> Response:
+    """2026-10-15：在框架通用异常接口处校验具体限流类型。."""
+    if not isinstance(exception, RateLimitExceeded):
+        raise exception
+    return _rate_limit_exceeded_handler(request, exception)
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
 
 
 # 创建一个新的白色图片，并添加间隔的线条作为背景
-def create_notebook_image(
-    width,
-    height,
-    line_spacing,
-    top_margin,
-    bottom_margin,
-    left_margin,
-    right_margin,
-    font_size,
-    isUnderlined,
-):
-    image = Image.new("RGB", (width, height), "white")
+@dataclass(frozen=True)
+class NotebookOptions:
+    """2026-10-15：笔记本底图的行距、边距与辅助线布局."""
 
-    if isUnderlined == "true":
+    line_spacing: int
+    top_margin: int
+    bottom_margin: int
+    left_margin: int
+    right_margin: int
+    underlined: bool
+
+
+def create_notebook_image(width: int, height: int, layout: NotebookOptions) -> Image.Image:
+    """创建底图，在分配像素及绘制辅助线前验证尺寸与行距."""
+    if width <= 0 or height <= 0 or layout.line_spacing <= 0:
+        error = "Image dimensions and line spacing must be positive"
+        raise ValueError(error)
+    image = Image.new("RGB", (width, height), "white")
+    if layout.underlined:
         draw = ImageDraw.Draw(image)
-        # todo  这个距离的原理不清楚7.15
-        y = top_margin + line_spacing  # 开始的y坐标设为顶部边距加字体大小
-        # bottom_margin -= line_spacing
-        while (
-            y < height - bottom_margin
-        ):  # 当y坐标小于（图片高度-底部边距）时，继续画线
-            draw.line((left_margin, y, width - right_margin, y), fill="black")
-            y += line_spacing  # 每次循环，y坐标增加行间距
-        # draw.line((left_margin, y, width - right_margin, y), fill="black")
+        for y in range(
+            layout.top_margin + layout.line_spacing,
+            height - layout.bottom_margin,
+            layout.line_spacing,
+        ):
+            draw.line((layout.left_margin, y, width - layout.right_margin, y), fill="black")
     return image
 
 
-def read_docx(file_path):
-    # 使用增强版 docx 提取器：提取段落（包含普通文本与 Word 原生 OMML 数学公式）及表格
-    # 同时保留段落换行，确保 "---"（分页）与 ">>>"（右对齐）等标记生效
+class _ParagraphLike(Protocol):
+    text: str
+
+
+class _WordDocumentLike(Protocol):
+    paragraphs: Sequence[_ParagraphLike]
+
+
+class _PdfPageLike(Protocol):
+    def extract_text(self) -> str | None:
+        """返回页面文本."""
+
+
+class _PdfReaderLike(Protocol):
+    pages: Sequence[_PdfPageLike]
+
+
+def read_docx(file_path: str) -> str:
+    """优先读取 Word 原生公式与表格，失败时使用段落文本兜底."""
     try:
         return extract_text_from_docx(file_path)
     except Exception:
-        from docx import Document
+        logger.exception("DOCX structure extraction failed; falling back to paragraph text")
+    constructor = cast(
+        "Callable[[str], _WordDocumentLike]", member(importlib.import_module("docx"), "Document")
+    )
+    return "\n".join(paragraph.text for paragraph in constructor(file_path).paragraphs)
 
-        document = Document(file_path)
-        return "\n".join([paragraph.text for paragraph in document.paragraphs])
 
-
-import pypandoc
-
-# 桌面版不自动下载 pandoc（会联网拉 msi 并调 msiexec），改用 python-docx 兜底
-_pandoc_available = False
-try:
-    # 1. 尝试获取 Pandoc 版本
-    # 如果系统里已经安装了（比如你在 Dockerfile 里用 apt-get 装了），这里会成功
-    version = pypandoc.get_pandoc_version()
-    print(f"Pandoc found: {version}")
-    _pandoc_available = True
-
-except OSError:
-    if DESKTOP_MODE:
-        print("Pandoc not found. Falling back to python-docx.")
-    else:
-        # 2. 如果报错说找不到，说明没装，开始自动下载
-        print("Pandoc not found. Downloading...")
+def _detect_pandoc() -> bool:
+    try:
+        pypandoc.get_pandoc_path()
+    except OSError:
+        if DESKTOP_MODE:
+            return False
         try:
             pypandoc.download_pandoc()
-            print("Pandoc downloaded successfully.")
-            _pandoc_available = True
-        except Exception as exc:  # noqa: BLE001 下载失败不应阻断启动
-            print(f"Pandoc download failed: {exc}. Falling back to python-docx.")
+        except Exception:
+            logger.exception("Pandoc download failed; using DOCX fallback")
+            return False
+        return True
+    else:
+        return True
 
-def convert_docx_to_text(docx_file_path):
-    # 优先使用原生 docx 提取器以完整提取 Word 公式 (OMML) 与表格内容
+
+_pandoc_available = _detect_pandoc()
+
+
+def convert_docx_to_text(docx_file_path: str) -> str:
+    """提取 DOCX 内容，按可用工具回退到 pandoc 或普通段落."""
     try:
         return extract_text_from_docx(docx_file_path)
-    except Exception as e:
-        logger.warning(
-            "extract_text_from_docx 失败 (%s): %s，尝试 pandoc/python-docx 兜底",
-            docx_file_path,
-            e,
-        )
-        if _pandoc_available:
-            return pypandoc.convert_file(docx_file_path, 'plain')
-        return read_docx(docx_file_path)
-    # return None
+    except Exception:
+        logger.exception("DOCX extraction failed for %s", docx_file_path)
+    return (
+        pypandoc.convert_file(docx_file_path, "plain")
+        if _pandoc_available
+        else read_docx(docx_file_path)
+    )
 
 
-def read_pdf(file_path):
-    import PyPDF2
-
-    text = ""
-    with open(file_path, "rb") as pdf_file_obj:
-        pdf_reader = PyPDF2.PdfReader(pdf_file_obj)
-        for page_num in range(len(pdf_reader.pages)):
-            page_obj = pdf_reader.pages[page_num]
-            text += page_obj.extract_text()
-    return text
+def read_pdf(file_path: str) -> str:
+    """按需载入 PDF 文本提取器，并保留页面顺序."""
+    constructor = cast(
+        "Callable[[BinaryIO], _PdfReaderLike]",
+        member(importlib.import_module("PyPDF2"), "PdfReader"),
+    )
+    with Path(file_path).open("rb") as source:
+        reader = constructor(source)
+        return "".join(page.extract_text() or "" for page in reader.pages)
 
 
 # A line containing only three or more dashes forces a new page.
@@ -595,39 +511,37 @@ _PAGE_BREAK_RE = re.compile(r"(?m)^[ \t]*-{3,}[ \t]*$")
 _RIGHT_ALIGN_RE = re.compile(r"^[ \t]*>>>[ \t]?")
 
 
-def apply_right_align(text, template):
+def _alignment_advance(char: str, template: Template, *, math_layout: bool, grid: bool) -> float:
+    font = template.get_font()
+    word_spacing = template.get_word_spacing()
+    if not math_layout:
+        left, _, right, _ = font_bbox_of(font, char)
+        return right - left + word_spacing
+    step = measure_drawn_advance(char, font)
+    bbox = math_text_bbox(char, font, font_path_of(font))
+    if grid:
+        cell = max(1, font_size_of(font) + word_spacing)
+        return math.ceil(max(step, bbox[2]) / cell) * cell if is_math_glyph(char) else cell
+    return max(1, step + word_spacing, bbox[2] if is_math_glyph(char) else 1)
+
+
+def apply_right_align(text: str, template: Template) -> str:
     """Replace right-align markers with full-width-space padding."""
     if ">>>" not in text:
         return text
 
     font = template.get_font()
-    word_spacing = template.get_word_spacing()
     width = template.get_size()[0]
-    usable_width = (
-        width - template.get_left_margin() - template.get_right_margin()
-    )
-    last_glyph_start_limit = usable_width - font.size
+    usable_width = width - template.get_left_margin() - template.get_right_margin()
+    last_glyph_start_limit = usable_width - font_size_of(font)
     math_layout = any(is_math_glyph(char) for char in text)
     grid = math_layout and Feature.GRID_LAYOUT in template.get_features()
-    if math_layout:
-        from handright import _core
-        measure_draw = ImageDraw.Draw(Image.new("1", (1, 1)))
 
-    def advance(char):
-        if math_layout:
-            # 2026-10-15：数学占位符的字体 bbox 为空，必须与数学分页器使用同一实际前进量。
-            path = getattr(font, "path", None)
-            step = _core._draw_char(measure_draw, char, (0, 0), font)
-            bbox = _get_rendered_text_bbox(char, font, path)
-            if grid:
-                cell = max(1, font.size + word_spacing)
-                return math.ceil(max(step, bbox[2]) / cell) * cell if is_math_glyph(char) else cell
-            return max(1, step + word_spacing, bbox[2] if is_math_glyph(char) else 1)
-        left, _, right, _ = font.getbbox(char)
-        return (right - left) + word_spacing
+    def advance(char: str) -> float:
+        return _alignment_advance(char, template, math_layout=math_layout, grid=grid)
 
     pad_unit = advance("　")
-    output = []
+    output: list[str] = []
     aligned_count = 0
 
     for line in text.split("\n"):
@@ -636,7 +550,7 @@ def apply_right_align(text, template):
             output.append(line)
             continue
 
-        content = line[marker.end():]
+        content = line[marker.end() :]
         if not content:
             output.append("")
             aligned_count += 1
@@ -651,10 +565,12 @@ def apply_right_align(text, template):
         for char in content:
             max_prefix_width = max(max_prefix_width, prefix_width)
             if math_layout:
-                bbox = _get_rendered_text_bbox(char, font, getattr(font, "path", None))
+                bbox = math_text_bbox(char, font, font_path_of(font))
                 max_prefix_width = max(max_prefix_width, prefix_width + bbox[2] - min(0, bbox[0]))
             prefix_width += advance(char)
-        available_padding = (usable_width if math_layout else last_glyph_start_limit) - max_prefix_width
+        available_padding = (
+            usable_width if math_layout else last_glyph_start_limit
+        ) - max_prefix_width
 
         if pad_unit > 0 and available_padding > 0:
             # Handright perturbs glyph sizes and spacing during rendering. Keep
@@ -672,11 +588,17 @@ def apply_right_align(text, template):
     return "\n".join(output)
 
 
-def handwrite_with_page_breaks(text, template, font_path=None, is_single_page_preview=False):
+def handwrite_with_page_breaks(
+    text: str,
+    template: Template,
+    font_path: str | None = None,
+    *,
+    is_single_page_preview: bool = False,
+) -> Iterable[Image.Image]:
     """Render text while honoring manual page-break, alignment markers, and font glyph fallback."""
     if font_path is None and hasattr(template, "get_font"):
         font_obj = template.get_font()
-        font_path = getattr(font_obj, "path", None)
+        font_path = font_path_of(font_obj)
 
     # 非侵入式字符清洗与基于当前字体的字形兜底（解决特殊空格、缺失数学符号等留白问题）
     normalized = normalize_text_for_font(text, font_path)
@@ -687,8 +609,9 @@ def handwrite_with_page_breaks(text, template, font_path=None, is_single_page_pr
         return render_inline_markdown_images(aligned, template, handwrite)
 
     raw_chunks = _PAGE_BREAK_RE.split(aligned)
-    chunks = []
-    for index, chunk in enumerate(raw_chunks):
+    chunks: list[str] = []
+    for index, raw_chunk in enumerate(raw_chunks):
+        chunk = raw_chunk
         if index > 0 and chunk.startswith("\n"):
             chunk = chunk[1:]
         if index < len(raw_chunks) - 1 and chunk.endswith("\n"):
@@ -709,20 +632,37 @@ def handwrite_with_page_breaks(text, template, font_path=None, is_single_page_pr
     )
 
 
+def handle_exceptions[**P](f: Callable[P, Awaitable[Response]]) -> Callable[P, Awaitable[Response]]:
+    """为异步请求保留原签名并返回结构化错误响应."""
 
-def handle_exceptions(f):
     @wraps(f)
-    async def decorated_function(*args, **kwargs):
+    async def decorated_function(*args: P.args, **kwargs: P.kwargs) -> Response:
         try:
             return await f(*args, **kwargs)
         except Exception as e:
-            logger.info("An error occurred during the request: %s", e)
+            logger.exception("An error occurred during the request")
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
     return decorated_function
 
 
 # WebSocket 推送（仍需内存存储，仅同进程有效）
+class ProgressHook(Protocol):
+    """2026-10-15：生成进度的关键词契约."""
+
+    def __call__(self, *, stage: str, message: str, progress: int) -> None:
+        """上报当前生成阶段与百分比."""
+
+
+class GenerationPayload(TypedDict):
+    """2026-10-15：后台任务只持有内存文件与已校验表单."""
+
+    params: GenerateHandwritingParams
+    background_image: bytes | None
+    font_file: bytes | None
+
+
+_notification_tasks: set[asyncio.Task[None]] = set()
 task_websocket_connections: dict[str, set[WebSocket]] = {}
 task_websocket_connections_lock = asyncio.Lock()
 
@@ -733,8 +673,9 @@ _generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXECUTIONS)
 
 
 def build_task_status_payload(
-    task_id: str, task: Optional[GenerationTask] = None
-) -> Optional[dict[str, Any]]:
+    task_id: str, task: GenerationTask | None = None
+) -> dict[str, object] | None:
+    """组合任务快照与排队信息，未知任务返回 None."""
     if task is None:
         task = get_generation_task(task_id)
     if task is None:
@@ -757,14 +698,16 @@ def build_task_status_payload(
     }
 
 
-async def register_task_websocket(task_id, websocket):
+async def register_task_websocket(task_id: str, websocket: WebSocket) -> None:
+    """注册任务对应的 WebSocket 连接."""
     async with task_websocket_connections_lock:
         if task_id not in task_websocket_connections:
             task_websocket_connections[task_id] = set()
         task_websocket_connections[task_id].add(websocket)
 
 
-async def unregister_task_websocket(task_id, websocket):
+async def unregister_task_websocket(task_id: str, websocket: WebSocket) -> None:
+    """移除已断开的任务连接."""
     async with task_websocket_connections_lock:
         sockets = task_websocket_connections.get(task_id)
         if sockets is None:
@@ -774,7 +717,8 @@ async def unregister_task_websocket(task_id, websocket):
             task_websocket_connections.pop(task_id, None)
 
 
-async def push_task_status_update(task_id):
+async def push_task_status_update(task_id: str) -> None:
+    """向在线连接发送任务快照并清理断开的连接."""
     task = get_generation_task(task_id)
     if task is None:
         return
@@ -786,11 +730,11 @@ async def push_task_status_update(task_id):
     if len(sockets) == 0:
         return
 
-    dead_sockets = []
+    dead_sockets: list[WebSocket] = []
     for socket in sockets:
         try:
             await socket.send_json(payload)
-        except Exception:
+        except (OSError, RuntimeError, WebSocketDisconnect):
             dead_sockets.append(socket)
 
     if dead_sockets:
@@ -802,398 +746,284 @@ async def push_task_status_update(task_id):
                 task_websocket_connections.pop(task_id, None)
 
 
-def model_to_dict(model):
-    if hasattr(model, "model_dump"):
-        return model.model_dump(exclude_none=True)
-    return model.dict(exclude_none=True)
+def model_to_dict(model: GenerateHandwritingParams) -> dict[str, str]:
+    """将已校验表单转换为字符串映射，第三方模型边界再次收窄."""
+    raw: dict[str, object] = model.model_dump(exclude_none=True, by_alias=True)
+    return {key: value for key, value in raw.items() if isinstance(value, str)}
 
 
-async def generate_handwriting_impl(
-    base_url: str,
-    params: GenerateHandwritingParams,
-    background_image: Union[UploadFile, str, bytes] = File(None),
-    font_file: Union[UploadFile, str, bytes] = File(None),
-    progress_hook=None,
-):
-    def report_progress(stage, message, progress):
-        if progress_hook is not None:
-            progress_hook(stage=stage, message=message, progress=progress)
+async def _upload_bytes(source: UploadFile | str | bytes | None) -> bytes | None:
+    if isinstance(source, StarletteUploadFile):
+        return await source.read()
+    return source if isinstance(source, bytes) else None
 
-    report_progress("validating", "正在校验参数", 5)
-    # 归一化：前端可能发字符串 "null"，需要转成 Python None
-    if isinstance(background_image, str):
-        background_image = None
-    if isinstance(font_file, str):
-        font_file = None
-    # 把所有 form 字段收拢成 data dict，方便后续代码不大改
-    data = model_to_dict(params)
 
-    report_progress("system_check", "正在检查服务器负载", 10)
-    cpu_usage = psutil.cpu_percent(interval=1)  # 获取 CPU 使用率，1 秒采样间隔
-    # 2026-09-29: 阈值可配置，E2E 测试在开发机上跑时 CPU 常被 webpack/浏览器占满，
-    # 会把 429 当成任务结果回放给前端，测试里用 CPU_USAGE_LIMIT=100 放宽
-    cpu_usage_limit = float(os.getenv("CPU_USAGE_LIMIT", "90"))
-    if cpu_usage > cpu_usage_limit:
-        # 如果 CPU 使用率超过阈值，返回提醒
+def _ink_color(source: str) -> int | tuple[int, int, int]:
+    # 2026-10-15：只解析数字和 RGB(A) 字面量；RGB 底图忽略输入颜色的 Alpha 通道。
+    try:
+        value: object = ast.literal_eval(source)
+    except (ValueError, SyntaxError) as error:
+        raise HTTPException(status_code=400, detail="Invalid ink color") from error
+    maximum_channel = 255
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= maximum_channel:
+        return value
+    if isinstance(value, tuple | list):
+        items = cast("Sequence[object]", value)
+        channels = [
+            channel
+            for channel in items
+            if isinstance(channel, int)
+            and not isinstance(channel, bool)
+            and 0 <= channel <= maximum_channel
+        ]
+        if len(channels) in (3, 4) and len(channels) == len(items):
+            return channels[0], channels[1], channels[2]
+    raise HTTPException(
+        status_code=400, detail="Ink color must contain RGB or RGBA channels in 0..255"
+    )
+
+
+def _nonnegative_float(data: dict[str, str], key: str) -> float:
+    value = float(data.get(key, "0"))
+    if not math.isfinite(value) or value < 0:
+        raise HTTPException(status_code=400, detail=f"{key} must be a finite nonnegative number")
+    return value
+
+
+def _generation_rejection(base_url: str, data: dict[str, str]) -> Response | None:
+    cpu_usage = psutil.cpu_percent(interval=1)
+    if cpu_usage > float(get_environment_value("CPU_USAGE_LIMIT", "90")):
         return JSONResponse(
             {
                 "status": "waiting",
-                "message": f"CPU usage is too high. Please wait and try again. current cpu_usage: {cpu_usage}%",
+                "message": f"CPU usage is too high. Please retry. Current usage: {cpu_usage}%",
             },
             status_code=429,
-        )  # HTTP 429: Too Many Requests
-    # logger.info("已经进入generate_handwriting")
-    if enable_user_auth.lower() == "true":
-        # session auth 已移除，如需恢复请使用 JWT 或 cookie
-        pass
-    # try:
-    # 先获取 form 数据
-    if len(data["text"]) > 10000 and (
-        base_url == "https://handwrite.sixiangjia.de/"
-        or base_url == "https://handwrite.sixiangjia.de/"
-    ):
-        # 请自己构建应用来运行而不是使用这个网页
+        )
+    public_text_limit = 10000
+    if len(data["text"]) > public_text_limit and base_url == "https://handwrite.sixiangjia.de/":
         return JSONResponse(
             {
                 "status": "error",
-                "message": "The text is too long to process. If you want to use this service, please build your own application.",
+                "message": "The text is too long. Please build your own application.",
             },
             status_code=500,
         )
-    # 如果存在height和width，就创建一个新的背景图     todo
-    # height=int(data["height"]),
-    # width=int(data["width"]),
+    if int(data["line_spacing"]) <= 0 or int(data["font_size"]) <= 0:
+        raise HTTPException(status_code=400, detail="Font size and line spacing must be positive")
+    return None
 
-    # 如果用户提供了宽度和高度，创建一个新的笔记本背景图像
+
+def _background_for(data: dict[str, str], background: bytes | None) -> Image.Image:
     if "width" in data and "height" in data:
-        report_progress("prepare_background", "正在创建背景图", 20)
-        line_spacing = int(data.get("line_spacing", 30))
-        top_margin = int(data.get("top_margin", 0))
-        bottom_margin = int(data.get("bottom_margin", 0))
-        left_margin = int(data.get("left_margin", 0))
-        right_margin = int(data.get("right_margin", 0))
-        width = int(data["width"])
-        height = int(data["height"])
-        font_size = int(data.get("font_size", 0))
-        isUnderlined = data.get("isUnderlined", False)
-        background_image_obj = create_notebook_image(
-            width,
-            height,
-            line_spacing,
-            top_margin,
-            bottom_margin,
-            left_margin,
-            right_margin,
-            font_size,
-            isUnderlined,
+        layout = NotebookOptions(
+            line_spacing=int(data["line_spacing"]),
+            top_margin=int(data["top_margin"]),
+            bottom_margin=int(data["bottom_margin"]),
+            left_margin=int(data["left_margin"]),
+            right_margin=int(data["right_margin"]),
+            underlined=data.get("isUnderlined") == "true",
         )
+        return create_notebook_image(int(data["width"]), int(data["height"]), layout)
+    if background is None:
+        raise HTTPException(status_code=400, detail="Missing required field: background_image")
+    try:
+        image = Image.open(io.BytesIO(background))
+        image.load()
+    except OSError as error:
+        raise HTTPException(status_code=400, detail="Invalid image format") from error
+    return image.convert("RGB") if image.mode in ("RGBA", "LA") else image
 
-    else:
-        # 否则使用用户上传的背景图像
-        report_progress("prepare_background", "正在读取背景图", 20)
-        if background_image is None:
-            return JSONResponse(
-                {
-                    "status": "fail",
-                    "message": "Missing required field: background_image",
-                },
-                status_code=400,
-            )
-        if isinstance(background_image, (bytes, bytearray)):
-            image_data = io.BytesIO(background_image)
-        else:
-            image_data = io.BytesIO(await background_image.read())
 
-        # 使用 PIL 打开图像
-        try:
-            background_image_obj = Image.open(image_data)
+def _font_for(data: dict[str, str], uploaded: bytes | None) -> tuple[Font, str | None]:
+    if uploaded is not None:
+        return ImageFont.truetype(io.BytesIO(uploaded), size=int(data["font_size"])), None
+    option = data.get("font_option", "")
+    if option not in font_file_names:
+        raise HTTPException(status_code=400, detail="Missing font file")
+    path = str(Path(font_assets_dir) / option)
+    return get_cached_image_font(path, int(data["font_size"])), path
 
-            # 如果图像包含 Alpha 通道（模式为 'RGBA' 或 'LA'），则去除 Alpha 通道
-            if background_image_obj.mode in ("RGBA", "LA"):
-                # 将图像转换为 'RGB' 模式
-                background_image_obj = background_image_obj.convert("RGB")
 
-        except IOError:
-            return JSONResponse(
-                {"status": "error", "message": "Invalid image format"}, status_code=400
-            )
-
-    text_to_generate = data["text"]
-
-    # Conditionally adjust spacing for English text based on user setting
-    if data.get("enableEnglishSpacing", "false").lower() == "true":
-        # Only apply to English words, leave Chinese text unchanged
-        import re
-
-        def replace_english_spaces(text):
-            """Replace single spaces with double spaces only for English text, preserving all other whitespace"""
-            # Pattern to identify English characters (including common punctuation, hyphens, underscores)
-            english_pattern = r'^[a-zA-Z0-9.,!?;:\'\"()\-_]+$'
-
-            # Split by lines to preserve newlines
-            lines = text.split('\n')
-            processed_lines = []
-
-            for line in lines:
-                # Only process spaces within each line, preserve tabs and other whitespace
-                # Split only on spaces (not all whitespace)
-                parts = line.split(' ')
-                if len(parts) <= 1:
-                    # No spaces in this line, keep as is
-                    processed_lines.append(line)
-                    continue
-
-                result = []
-                for i, part in enumerate(parts):
-                    result.append(part)
-
-                    # If this isn't the last part, check if we should add double space
-                    if i < len(parts) - 1:
-                        current_is_english = bool(re.match(english_pattern, part)) if part.strip() else False
-                        next_is_english = bool(re.match(english_pattern, parts[i + 1])) if parts[i + 1].strip() else False
-
-                        # Add double space only if both current and next parts are English
-                        if current_is_english and next_is_english:
-                            result.append('  ')  # Double space
-                        else:
-                            result.append(' ')   # Single space
-
-                processed_lines.append(''.join(result))
-
-            # Rejoin with newlines to preserve line structure
-            return '\n'.join(processed_lines)
-
-        text_to_generate = replace_english_spaces(text_to_generate)
-
-    # if data["preview"] == "true":
-    #     # 截短字符，只生成一面
-    #     preview_length = 300  # 可以调整为所需的预览长度
-    #     text_to_generate = text_to_generate[:preview_length]
-    logger.info(f"text_to_generate: {text_to_generate}")
-    # 从表单中获取字体文件并处理 7.4
-    if font_file is not None:
-        report_progress("prepare_font", "正在加载字体文件", 30)
-        if isinstance(font_file, (bytes, bytearray)):
-            font_bytes = font_file
-        else:
-            font_bytes = await font_file.read()
-        font = ImageFont.truetype(io.BytesIO(font_bytes), size=int(data["font_size"]))
-    else:
-        report_progress("prepare_font", "正在读取系统字体", 30)
-        font_option = data["font_option"]
-        logger.info(f"font_option: {font_option}")
-        logger.info(f"font_file_names: {font_file_names}")
-        if font_option in font_file_names:
-            font_path = os.path.join(font_assets_dir, font_option)
-            logger.info(f"font_path: {font_path}")
-            # 使用带 LRU 缓存的字体实例加载器，避免重复从磁盘读几十兆字体
-            font = _get_cached_image_font(font_path, int(data["font_size"]))
-            font.path = font_path
-        else:
-            return JSONResponse(
-                {
-                    "status": "fail",
-                    "message": "Missing  fontfile.",
-                },
-                status_code=400,
-            )
-
-    template = Template(
-        background=background_image_obj,
+def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> Template:
+    probability = _nonnegative_float(data, "strikethrough_probability")
+    if probability > 1:
+        raise HTTPException(status_code=400, detail="Strikethrough probability must be in 0..1")
+    return Template(
+        background=background,
         font=font,
-        line_spacing=int(data["line_spacing"]),  # + int(data["font_size"])
-        # fill=ast.literal_eval(data["fill"])[:3],  # Ignore the alpha value
-        # fill=(0),#如果feel是只有一个颜色的话那么在改变墨水的时候会导致R变化而GB不变化,颜色会变红 9.17
+        fill=_ink_color(data["fill"]),
+        line_spacing=int(data["line_spacing"]),
         left_margin=int(data["left_margin"]),
         top_margin=int(data["top_margin"]),
         right_margin=int(data["right_margin"]) - int(data["word_spacing"]) * 2,
         bottom_margin=int(data["bottom_margin"]),
         word_spacing=int(data["word_spacing"]),
-        line_spacing_sigma=int(data["line_spacing_sigma"]),  # 行间距随机扰动
-        font_size_sigma=int(data["font_size_sigma"]),  # 字体大小随机扰动
-        word_spacing_sigma=int(data["word_spacing_sigma"]),  # 字间距随机扰动
-        # Keep handright's full default end_chars set so closing punctuation,
-        # such as right quotes, stays on the previous line.
-        perturb_x_sigma=int(data["perturb_x_sigma"]),  # 笔画横向偏移随机扰动
-        perturb_y_sigma=int(data["perturb_y_sigma"]),  # 笔画纵向偏移随机扰动
-        perturb_theta_sigma=float(data["perturb_theta_sigma"]),  # 笔画旋转偏移随机扰动
-        strikethrough_probability=float(
-            data["strikethrough_probability"]
-        ),  # 删除线概率
-        strikethrough_length_sigma=float(
-            data["strikethrough_length_sigma"]
-        ),  # 删除线长度随机扰动
-        strikethrough_width_sigma=float(
-            data["strikethrough_width_sigma"]
-        ),  # 删除线宽度随机扰动
-        strikethrough_angle_sigma=float(
-            data["strikethrough_angle_sigma"]
-        ),  # 删除线角度随机扰动
-        strikethrough_width=float(data["strikethrough_width"]),  # 删除线宽度
-        ink_depth_sigma=float(data["ink_depth_sigma"]),  # 墨水深度随机扰动
+        line_spacing_sigma=_nonnegative_float(data, "line_spacing_sigma"),
+        font_size_sigma=_nonnegative_float(data, "font_size_sigma"),
+        word_spacing_sigma=_nonnegative_float(data, "word_spacing_sigma"),
+        perturb_x_sigma=_nonnegative_float(data, "perturb_x_sigma"),
+        perturb_y_sigma=_nonnegative_float(data, "perturb_y_sigma"),
+        perturb_theta_sigma=_nonnegative_float(data, "perturb_theta_sigma"),
+        strikethrough_probability=probability,
+        strikethrough_length_sigma=_nonnegative_float(data, "strikethrough_length_sigma"),
+        strikethrough_width_sigma=_nonnegative_float(data, "strikethrough_width_sigma"),
+        strikethrough_angle_sigma=_nonnegative_float(data, "strikethrough_angle_sigma"),
+        strikethrough_width=_nonnegative_float(data, "strikethrough_width"),
+        ink_depth_sigma=_nonnegative_float(data, "ink_depth_sigma"),
     )
 
-    # 创建一个BytesIO对象，用于保存.zip文件的内容
-    logger.info(f"data[pdf_save]: {data['pdf_save']}")
-    if not data["pdf_save"] == "true":
-        # 预览模式：检查是否为完整预览模式（本地开发）或单页预览模式（生产环境）
-        is_preview = data["preview"] == "true"
-        full_preview = data.get("full_preview", "true") if is_preview else None
-        is_single_preview = is_preview and (full_preview == "false")
 
-        report_progress("rendering", "正在生成手写图像", 45)
-        # handwrite() 返回惰性 map 对象，只做文本排版（毫秒级），
-        # 真正的 CPU 密集渲染在下方消费 images 时才触发
-        images = handwrite_with_page_breaks(
-            text_to_generate, template, font_path=font_path, is_single_page_preview=is_single_preview
+def _english_spacing(text: str) -> str:
+    english = re.compile(r"""^[a-zA-Z0-9.,!?;:\'\"()\-_]+$""")
+    lines: list[str] = []
+    for line in text.split("\n"):
+        parts = line.split(" ")
+        output = [parts[0]]
+        for previous, current in itertools.pairwise(parts):
+            output.extend(
+                (
+                    "  " if english.fullmatch(previous) and english.fullmatch(current) else " ",
+                    current,
+                )
+            )
+        lines.append("".join(output))
+    return "\n".join(lines)
+
+
+def _png_bytes(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", compress_level=1)
+    return buffer.getvalue()
+
+
+def _preview_response(
+    images: Iterable[Image.Image], background: Image.Image, *, single: bool, report: ReportProgress
+) -> Response:
+    if single:
+        first = next(iter(images), None)
+        result = Response(
+            content=_png_bytes(first if first is not None else background), media_type="image/png"
         )
-        logger.info("handwrite initial images generated successfully")
-
-        # ⚡ 极致加速 1：单页快速预览（内存直接编码输出，0 磁盘 I/O，0 临时目录锁等待）
-        if is_single_preview:
-            first_im = next(iter(images), None)
-            if first_im is None:
-                first_im = background_image_obj
-            buf = io.BytesIO()
-            first_im.save(buf, format="PNG", compress_level=1)
-            image_data = buf.getvalue()
-            logger.info("Single preview image generated directly in memory (0 disk I/O)")
-            report_progress("finalizing", "正在返回预览结果", 100)
-            return Response(
-                content=image_data,
-                media_type="image/png",
-            )
-
-        # ⚡ 极致加速 2：多页预览（直接在内存中转为 Base64，无需中间临时文件写入与二次读回）
-        if is_preview:
-            preview_images_base64 = []
-            for i, im in enumerate(images):
-                buf = io.BytesIO()
-                im.save(buf, format="PNG", compress_level=1)
-                base64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-                preview_images_base64.append(base64_str)
-            logger.info(f"Full preview ({len(preview_images_base64)} pages) generated directly in memory")
-            report_progress("finalizing", "正在返回预览结果", 100)
-            return JSONResponse(
-                {"status": "success", "images": preview_images_base64}
-            )
-
-        # 打包导出 ZIP 路径
-        project_temp_base = "./temp"
-        os.makedirs(project_temp_base, exist_ok=True)
-        temp_dir = tempfile.mkdtemp(dir=project_temp_base)
-        unique_filename = "images_" + str(time.time())
-        zip_path = f"./temp/{unique_filename}.zip"
-
-        try:
-            try:
-                total_images = len(images)
-                if total_images <= 0:
-                    total_images = 1
-            except TypeError:
-                total_images = None
-            for i, im in enumerate(images):
-                if total_images is None:
-                    dynamic_progress = min(90, 60 + min(i, 30))
-                    report_progress("rendering", f"正在处理第 {i + 1} 页", dynamic_progress)
-                else:
-                    dynamic_progress = min(90, 60 + int((i / total_images) * 25))
-                    report_progress("rendering", f"正在处理第 {i + 1}/{total_images} 页", dynamic_progress)
-                # 保存每张图像到临时目录
-                image_path = os.path.join(temp_dir, f"{i}.png")
-
-                # 使用安全保存函数
-                if safe_save_and_close_image(im, image_path):
-                    logger.info(f"Image {i} saved successfully")
-                else:
-                    logger.error(f"Failed to save image {i}")
-
-                del im  # 释放内存
-
-            report_progress("packaging", "正在打包ZIP文件", 92)
-            shutil.make_archive(zip_path[:-4], "zip", temp_dir)
-
-            try:
-                with open(zip_path, "rb") as f:
-                    zip_data = f.read()
-
-                safe_remove_file(zip_path)
-                report_progress("finalizing", "正在返回ZIP结果", 100)
-                return Response(
-                    content=zip_data,
-                    media_type="application/zip",
-                    headers={
-                        "Content-Disposition": "attachment; filename=images.zip"
-                    },
-                )
-            except Exception as e:
-                logger.error(f"Failed to read ZIP file: {e}")
-                with open(zip_path, "rb") as f:
-                    zip_data = f.read()
-                report_progress("finalizing", "正在返回ZIP结果", 100)
-                return Response(
-                    content=zip_data,
-                    media_type="application/zip",
-                    headers={
-                        "Content-Disposition": "attachment; filename=images.zip"
-                    },
-                )
-        finally:
-            safe_remove_directory(temp_dir)
-            # ZIP文件已在上面删除，这里只是保险
     else:
-        logger.info("PDF generate")
-        # PyMuPDF 只在导出 PDF 这条路径上用到（见文件顶部说明）
-        from pdf import generate_pdf
+        encoded = [base64.b64encode(_png_bytes(image)).decode("ascii") for image in images]
+        if not encoded:
+            encoded.append(base64.b64encode(_png_bytes(background)).decode("ascii"))
+        result = JSONResponse({"status": "success", "images": encoded})
+    report("finalizing", "正在返回预览结果", 100)
+    return result
 
-        temp_pdf_file_path = None  # 初始化变量
-        report_progress("rendering", "正在生成手写图像", 45)
-        # handwrite() 返回惰性 map 对象，CPU 密集渲染在 generate_pdf 内部消费时才触发
-        images = handwrite_with_page_breaks(
-            text_to_generate, template, font_path=font_path
+
+def _zip_response(images: Iterable[Image.Image], report: ReportProgress) -> Response:
+    base = Path("temp")
+    base.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=base) as temporary:
+        directory = Path(temporary)
+        pages = directory / "pages"
+        pages.mkdir()
+        for index, image in enumerate(images):
+            report("rendering", f"正在处理第 {index + 1} 页", min(90, 60 + min(index, 30)))
+            image.save(pages / f"{index}.png")
+        report("packaging", "正在打包ZIP文件", 92)
+        archive = shutil.make_archive(str(directory / "images"), "zip", pages)
+        data = Path(archive).read_bytes()
+    report("finalizing", "正在返回ZIP结果", 100)
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=images.zip"},
+    )
+
+
+def _pdf_response(images: Iterable[Image.Image], report: ReportProgress) -> Response:
+    # 2026-10-15：PDF 引擎只在实际导出时载入，保留桌面冷启动的惰性依赖。
+    exporter = cast(
+        "Callable[[Iterable[Image.Image]], str | None]",
+        member(importlib.import_module("pdf"), "generate_pdf"),
+    )
+    report("packaging", "正在导出PDF文件", 92)
+    path = exporter(images)
+    if path is None:
+        return JSONResponse({"status": "error", "message": "PDF export failed"}, status_code=500)
+    try:
+        data = Path(path).read_bytes()
+    finally:
+        safe_remove_file(path)
+    report("finalizing", "正在返回PDF结果", 100)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=images.pdf"},
+    )
+
+
+def _render_handwriting(
+    base_url: str,
+    params: GenerateHandwritingParams,
+    background_image: bytes | None,
+    font_file: bytes | None,
+    progress_hook: ProgressHook | None,
+) -> Response:
+    def report(stage: str, message: str, progress: int) -> None:
+        if progress_hook is not None:
+            progress_hook(stage=stage, message=message, progress=progress)
+
+    try:
+        report("validating", "正在校验参数", 5)
+        data = model_to_dict(params)
+        report("system_check", "正在检查服务器负载", 10)
+        rejection = _generation_rejection(base_url, data)
+        if rejection is not None:
+            return rejection
+        report("prepare_background", "正在准备背景图", 20)
+        background = _background_for(data, background_image)
+        report("prepare_font", "正在加载字体", 30)
+        font, path = _font_for(data, font_file)
+        template = _template_for(data, background, font)
+        text = (
+            _english_spacing(data["text"])
+            if data.get("enableEnglishSpacing") == "true"
+            else data["text"]
         )
-        try:
-            report_progress("packaging", "正在导出PDF文件", 92)
-            # generate_pdf 会消费惰性 images，渲染在此函数内完成
-            temp_pdf_file_path = generate_pdf(images=images)
-            with open(temp_pdf_file_path, "rb") as f:
-                pdf_data = f.read()
-            report_progress("finalizing", "正在返回PDF结果", 100)
-            return Response(
-                content=pdf_data,
-                media_type="application/pdf",
-                headers={"Content-Disposition": "attachment; filename=images.pdf"},
-            )
-        finally:
-            # 清理生成的临时 PDF 文件
-            if temp_pdf_file_path is not None and os.path.exists(temp_pdf_file_path):
-                safe_remove_file(temp_pdf_file_path)
-        # 2.9.2026 之前这里忘记删除temp_pdf_file_path, 根据记载是两年前就存在的问题，不知道最近为什么频繁出现
-        #     if temp_pdf_file_path is not None:  # 检查变量是否已赋值
-        #         for _ in range(5):  # 尝试5次
-        #             try:
-        #                 os.remove(temp_pdf_file_path)  # 尝试删除文件
-        #                 break  # 如果成功删除，跳出循环
-        #             except Exception as e:  # 捕获并处理删除文件时可能出现的异常
-        #                 logger.error(f"Failed to remove temporary PDF file: {e}")
-        #                 time.sleep(1)
-        # unique_filename = "images_" + str(time.time()) + ".zip"
-
-        # # 如果用户选择了保存为PDF，将所有图片合并为一个PDF文件
-        # pdf_bytes = handwrite(text_to_generate, template, export_pdf=True, file_path=unique_filename)
-        # logger.info("pdf generated successfully")
-        # # 返回PDF文件
-        # # mysql_operation(pdf_io)
-        # return send_file(
-        #     pdf_bytes,
-        #     # attachment_filename="images.pdf",
-        #     download_name="images.pdf",
-        #     mimetype="application/pdf",
-        #     as_attachment=True,
-        # )
+        preview, pdf = data["preview"] == "true", data.get("pdf_save") == "true"
+        single = preview and data.get("full_preview") == "false" and not pdf
+        report("rendering", "正在生成手写图像", 45)
+        images = handwrite_with_page_breaks(
+            text, template, font_path=path, is_single_page_preview=single
+        )
+        if pdf:
+            return _pdf_response(images, report)
+        if preview:
+            return _preview_response(images, background, single=single, report=report)
+        return _zip_response(images, report)
+    except HTTPException as error:
+        return JSONResponse(
+            {"status": "fail", "message": str(error.detail)}, status_code=error.status_code
+        )
+    except (ValueError, TypeError, OverflowError) as error:
+        return JSONResponse(
+            {"status": "fail", "message": f"Invalid generation parameters: {error}"},
+            status_code=400,
+        )
 
 
-async def run_generation_task(task_id, base_url, payload):
+async def generate_handwriting_impl(
+    base_url: str,
+    params: GenerateHandwritingParams,
+    background_image: UploadFile | str | bytes | None = None,
+    font_file: UploadFile | str | bytes | None = None,
+    progress_hook: ProgressHook | None = None,
+) -> Response:
+    """2026-10-15：异步读取上传文件，在线程完整消费惰性渲染结果与导出文件."""
+    background = await _upload_bytes(background_image)
+    font = await _upload_bytes(font_file)
+    return await asyncio.to_thread(
+        _render_handwriting, base_url, params, background, font, progress_hook
+    )
+
+
+async def run_generation_task(task_id: str, base_url: str, payload: GenerationPayload) -> None:
+    """通过并发信号量执行任务并持久化进度和结果."""
     set_generation_task(
         task_id,
         status="processing",
@@ -1202,10 +1032,18 @@ async def run_generation_task(task_id, base_url, payload):
         progress=1,
     )
     await push_task_status_update(task_id)
+    loop = asyncio.get_running_loop()
+
+    def schedule_notification() -> None:
+        notification = asyncio.create_task(push_task_status_update(task_id))
+        _notification_tasks.add(notification)
+        notification.add_done_callback(_notification_tasks.discard)
+
     try:
-        def progress_notify(**kwargs):
-            set_generation_task(task_id, **kwargs)
-            asyncio.create_task(push_task_status_update(task_id))
+
+        def progress_notify(*, stage: str, message: str, progress: int) -> None:
+            set_generation_task(task_id, stage=stage, message=message, progress=progress)
+            loop.call_soon_threadsafe(schedule_notification)
 
         async with _generation_semaphore:
             # 拿到信号量后，将阶段更新为"正在执行" 由于这里是协程，所以并不会占据很多资源 4.17.2026
@@ -1217,12 +1055,10 @@ async def run_generation_task(task_id, base_url, payload):
                 progress_hook=progress_notify,
                 **payload,
             )
-        response_body = response.body if response.body is not None else b""
-        response_headers = {}
+        response_body = bytes(response.body)
+        response_headers: dict[str, str] = {}
         if "content-disposition" in response.headers:
-            response_headers["Content-Disposition"] = response.headers[
-                "content-disposition"
-            ]
+            response_headers["Content-Disposition"] = response.headers["content-disposition"]
         set_generation_task(
             task_id,
             status="completed",
@@ -1255,26 +1091,29 @@ async def run_generation_task(task_id, base_url, payload):
 async def generate_handwriting(
     request: Request,
     background_tasks: BackgroundTasks,
-    params: GenerateHandwritingParams = Depends(form_dependency_from_model(GenerateHandwritingParams)),
-    background_image: Union[UploadFile, str] = File(None),
-    font_file: Union[UploadFile, str] = File(None),
-):
+    params: Annotated[
+        GenerateHandwritingParams, Depends(form_dependency_from_model(GenerateHandwritingParams))
+    ],
+    background_image: Annotated[UploadFile | str | None, File()] = None,
+    font_file: Annotated[UploadFile | str | None, File()] = None,
+) -> JSONResponse:
+    """接收生成请求并返回可轮询的持久化任务 ID."""
     cleanup_expired_generation_tasks()
 
     # ── 并发上限检查 ────────────────────────────────────────────────────
-    MAX_ACTIVE_TASKS = 8  # pending + processing 总数上限，根据服务器配置调整
+    max_active_tasks = 8  # pending + processing 总数上限，根据服务器配置调整
     # 队列满时给用户的建议等待时间（秒），固定值比瞎算可靠
-    ESTIMATED_WAIT_SECONDS = 60
+    estimated_wait_seconds = 60
 
     active_count = get_generation_active_task_count()
-    if active_count >= MAX_ACTIVE_TASKS:
+    if active_count >= max_active_tasks:
         return JSONResponse(
             {
                 "status": "queue_full",
                 "message": "当前服务器队列已满，请稍后再试",
                 "active_task_count": active_count,
-                "max_active_tasks": MAX_ACTIVE_TASKS,
-                "estimated_wait_seconds": ESTIMATED_WAIT_SECONDS,
+                "max_active_tasks": max_active_tasks,
+                "estimated_wait_seconds": estimated_wait_seconds,
             },
             status_code=503,
         )
@@ -1283,15 +1122,15 @@ async def generate_handwriting(
     background_image_bytes = None
     # 注意：starlette.datastructures.UploadFile 可能是 fastapi.UploadFile 的运行时类型
     # 用 hasattr 兼容两者：检查是否有 read 方法（UploadFile 特征）
-    if hasattr(background_image, "read") and hasattr(background_image, "filename"):
+    if isinstance(background_image, StarletteUploadFile):
         background_image_bytes = await background_image.read()
 
     font_file_bytes = None
     # 同样用 hasattr 兼容 starlette 和 fastapi 的 UploadFile
-    if hasattr(font_file, "read") and hasattr(font_file, "filename"):
+    if isinstance(font_file, StarletteUploadFile):
         font_file_bytes = await font_file.read()
 
-    payload = {
+    payload: GenerationPayload = {
         "params": params,
         "background_image": background_image_bytes,
         "font_file": font_file_bytes,
@@ -1310,7 +1149,7 @@ async def generate_handwriting(
         response_status_code=None,
         response_content_type=None,
         response_headers={},
-        error_message=None,
+        error_message="",
     )
     background_tasks.add_task(run_generation_task, task_id, str(request.base_url), payload)
 
@@ -1318,8 +1157,9 @@ async def generate_handwriting(
 
 
 @app.websocket("/api/generate_handwriting/ws/{task_id}")
-async def generate_handwriting_task_websocket(websocket: WebSocket, task_id: str):
+async def generate_handwriting_task_websocket(websocket: WebSocket, task_id: str) -> None:
     # WebSocket 不走 HTTP 中间件，也不受 CORS 约束，必须自己校验来源
+    """校验来源并建立任务状态订阅连接."""
     if foreign_origin(
         websocket.headers.get("origin"),
         websocket.headers.get("referer"),
@@ -1350,7 +1190,9 @@ async def generate_handwriting_task_websocket(websocket: WebSocket, task_id: str
 @app.get("/api/generate_handwriting/task/{task_id}")
 @limiter.limit("600 per 5 minute")
 @handle_exceptions
-async def get_generate_handwriting_task_status(request: Request, task_id: str):
+async def get_generate_handwriting_task_status(request: Request, task_id: str) -> Response:
+    """读取任务状态和排队信息."""
+    del request
     cleanup_expired_generation_tasks()
     task = get_generation_task(task_id)
     if task is None:
@@ -1364,7 +1206,9 @@ async def get_generate_handwriting_task_status(request: Request, task_id: str):
 @app.get("/api/generate_handwriting/task/{task_id}/result")
 @limiter.limit("600 per 5 minute")
 @handle_exceptions
-async def get_generate_handwriting_task_result(request: Request, task_id: str):
+async def get_generate_handwriting_task_result(request: Request, task_id: str) -> Response:
+    """幂等读取生成结果，过期结果由 TTL 回收."""
+    del request
     cleanup_expired_generation_tasks()
     task = get_generation_task(task_id)
     if task is None:
@@ -1397,357 +1241,165 @@ async def get_generate_handwriting_task_result(request: Request, task_id: str):
     # 挡掉，但老浏览器/WebView 可能三个头都不发）。读取保持幂等，回收交给 TTL ——
     # 「取过但没删」和「压根没取过」走的是同一条 cleanup_expired 路径，磁盘不会多占用。
     # 顺带也修了重试丢结果的问题：下载中途断线时 axios-retry 会重取，以前第二次必 404。
-    response = Response(
+    return Response(
         content=response_body,
         media_type=task.get("response_content_type") or "application/octet-stream",
         status_code=task.get("response_status_code") or 200,
         headers=task.get("response_headers") or {},
     )
-    return response
 
 
 # @app.after_request
 # def cleanup(response):
 #     # 从请求上下文中获取文件路径
-#     temp_file_path = getattr(request, 'temp_file_path', None)
 #     if temp_file_path is not None:
 #         # 尝试删除文件
-#         try:
-#             os.remove(temp_file_path)
-#         except Exception as e:
-#             app.logger.error(f"Failed to remove temporary PDF file: {e}")
 #     # 返回原始响应
-#     return response
+
+
+def _process_text_upload(filename: str, content: bytes) -> Response:
+    suffix = Path(filename).suffix.lower()
+    allowed = {".docx", ".pdf", ".doc", ".txt", ".rtf"}
+    if suffix not in allowed:
+        return JSONResponse({"error": "Invalid file type"}, status_code=400)
+    path = Path("textfileprocess") / f"{uuid4().hex}-{secure_filename(filename)}"
+    try:
+        path.write_bytes(content)
+        if suffix == ".docx":
+            text = convert_docx_to_text(str(path))
+        elif suffix == ".pdf":
+            text = read_pdf(str(path))
+        elif suffix in (".txt", ".rtf"):
+            text = path.read_text(encoding="utf-8", errors="replace")
+        else:
+            text = "doc文件暂不支持"
+        return JSONResponse({"text": text})
+    except Exception as error:
+        logger.exception("Failed to read uploaded document %s", filename)
+        return JSONResponse({"error": f"Error reading file: {error}"}, status_code=500)
+    finally:
+        safe_remove_file(str(path))
 
 
 @app.post("/api/textfileprocess")
 @limiter.limit("200 per 5 minute")
-async def textfileprocess(request: Request, file: UploadFile = File(...)):
-    if file is None or file.filename == "":
+async def textfileprocess(request: Request, file: Annotated[UploadFile, File()]) -> Response:
+    """在线程解析上传文本，避免文档转换阻塞请求事件循环."""
+    del request
+    if not file.filename:
         return JSONResponse({"error": "No file part in the request"}, status_code=400)
+    return await asyncio.to_thread(_process_text_upload, file.filename, await file.read())
 
-    if file and (
-        file.filename.endswith(".docx")
-        or file.filename.endswith(".pdf")
-        or file.filename.endswith(".doc")
-        or file.filename.endswith(".txt")
-        or file.filename.endswith(".rtf")
-    ):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(".", "textfileprocess", filename)  # 临时目录
-        content = await file.read()
-        with open(filepath, "wb") as f:
-            f.write(content)
-        text = "读取失败"  # Default value for text
-        try:
-            if file.filename.endswith(".docx"):
-                text = convert_docx_to_text(filepath)
-            elif file.filename.endswith(".pdf"):
-                text = read_pdf(filepath)
-            elif file.filename.endswith(".txt") or file.filename.endswith(".rtf"):
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                    text = f.read()
-            elif file.filename.endswith(".doc"):
-                text = "doc文件暂不支持"
-        except Exception as e:
-            return JSONResponse(
-                {"error": f"Error reading file: {str(e)}"}, status_code=500
-            )
 
-        # 删除临时文件
-        safe_remove_file(filepath)
-
-        return JSONResponse({"text": text})
-
-    return JSONResponse({"error": "Invalid file type"}, status_code=400)
+def _process_image_upload(filename: str, content: bytes) -> Response:
+    if Path(filename).suffix.lower() not in {".jpf", ".png", ".jpg", ".jpeg"}:
+        return JSONResponse({"error": "Invalid file type"}, status_code=400)
+    path = Path("imagefileprocess") / f"{uuid4().hex}-{secure_filename(filename)}"
+    try:
+        path.write_bytes(content)
+        detector = cast(
+            "Callable[[str], tuple[float, float, float, float, float]]",
+            member(importlib.import_module("identify"), "identify_distance"),
+        )
+        left, right, top, bottom, spacing = detector(str(path))
+        return JSONResponse(
+            {
+                "marginLeft": left,
+                "marginRight": right,
+                "marginTop": top,
+                "marginBottom": bottom,
+                "lineSpacing": spacing,
+            }
+        )
+    finally:
+        safe_remove_file(str(path))
 
 
 @app.post("/api/imagefileprocess")
 @limiter.limit("200 per 5 minute")
-async def imagefileprocess(request: Request, file: UploadFile = File(...)):
-    if file is None or file.filename == "":
+async def imagefileprocess(request: Request, file: Annotated[UploadFile, File()]) -> Response:
+    """按需载入图片检测引擎，在线程中读取边距与行距."""
+    del request
+    if not file.filename:
         return JSONResponse({"error": "No file part in the request"}, status_code=400)
-
-    if file and (
-        file.filename.endswith(".jpf")
-        or file.filename.endswith(".png")
-        or file.filename.endswith(".jpg")
-        or file.filename.endswith(".jpeg")
-    ):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join("./imagefileprocess", filename)
-        content = await file.read()
-        with open(filepath, "wb") as f:
-            f.write(content)
-        # opencv + sklearn 只在图片边距检测这条路径上用到（见文件顶部说明）
-        from identify import identify_distance
-
-        (
-            avg_l_whitespace,
-            avg_r_whitespace,
-            avg_t_whitespace,
-            avg_b_whitespace,
-            avg_distance,
-        ) = identify_distance(filepath)
-        safe_remove_file(filepath)
-        return JSONResponse(
-            {
-                "marginLeft": avg_l_whitespace,
-                "marginRight": avg_r_whitespace,
-                "marginTop": avg_t_whitespace,
-                "marginBottom": avg_b_whitespace,
-                "lineSpacing": avg_distance,
-            }
-        )
-    else:
-        return JSONResponse({"error": "Invalid file type"}, status_code=400)
+    return await asyncio.to_thread(_process_image_upload, file.filename, await file.read())
 
 
-def get_filenames_in_dir(directory):
+def get_filenames_in_dir(directory: str) -> list[str]:
+    """列出字体目录中的 TrueType 文件名."""
     return [
-        f
-        for f in os.listdir(directory)
-        if os.path.isfile(os.path.join(directory, f)) and f.endswith(".ttf")
+        path.name for path in Path(directory).iterdir() if path.is_file() and path.suffix == ".ttf"
     ]
 
 
 @app.get("/api/fonts_info")
-def get_fonts_info():
+def get_fonts_info() -> JSONResponse:
+    """返回可用字体文件名列表."""
     filenames = get_filenames_in_dir(font_assets_dir)
-    logger.info(f"filenames: {filenames}")
+    logger.info("filenames: %s", filenames)
     if filenames == []:
         return JSONResponse({"error": "fontfile not found"}, status_code=400)
     return JSONResponse(filenames)
 
 
 @app.get("/api/version")
-def get_version():
-    """给前端页面展示的版本号。"""
+def get_version() -> JSONResponse:
+    """给前端页面展示的版本号."""
     return JSONResponse({"version": app_version})
 
 
-def mysql_operation(image_data):
-    # cursor = current_app.cnx.cursor()
-    # username = session["username"]
-    username = None  # session 已移除
-    # 先检查用户是否已存在
-    # cursor.execute("SELECT * FROM user_images WHERE username=%s", (username,))
-    # result = cursor.fetchone()
-
-    # 根据查询结果来判断应该插入新纪录还是更新旧纪录
-    # if result is None:
-    #     # 如果用户不存在，插入新纪录
-    #     sql = "INSERT INTO user_images (username, image) VALUES (%s, %s)"
-    #     params = (username, image_data)
-    # else:
-    #     # 如果用户已存在，更新旧纪录
-    #     sql = "UPDATE user_images SET image=%s WHERE username=%s"
-    #     params = (image_data, username)
-    try:
-        pass
-        # 执行 SQL 语句
-        # 提交到数据库执行
-        # cursor.execute(sql, params)
-        # current_app.cnx.commit()
-    except Exception as e:
-        # 发生错误时回滚
-        # current_app.cnx.rollback()
-        logger.info(f"An error occurred: {e}")
-
-
-# @app.route("/api/login", methods=["POST"])
-# def login():
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
-#     logger.info(f"Received username: {username}")  # 打印接收到的用户名
-#     logger.info(f"Received password: {password}")  # 打印接收到的密码
-#     try:
-#         cursor = current_app.cnx.cursor()
-#         cursor.execute(
-#             f"SELECT password FROM user_images WHERE username=%s", (username,)
-#         )
-#         result = cursor.fetchone()
-#     except Exception as e:
-#         logger.error(f"An error occurred: {e}")
-#         return jsonify({"error": "An error occurred"}), 500
-
-#     if result and result[0] == password:
-#         session["username"] = username
-#         session.permanent = True
-#         logger.info(f"Login success for user: {username}")
-#         return {"status": "success"}, 200
-#     else:
-#         logger.error(f"Login failed for user: {username}")
-#         return {
-#             "status": "failed",
-#             "error": "Login failed. Check your username and password.",
-#         }, 401
-
-
-# @app.route("/api/register", methods=["POST"])
-# def register():
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
-#     try:
-#         cursor = current_app.cnx.cursor()
-#         cursor.execute(f"SELECT * FROM user_images WHERE username=%s", (username,))
-#         result = cursor.fetchone()
-#     except Exception as e:
-#         logger.error(f"An error occurred: {e}")
-#         return jsonify({"error": "An error occurred"}), 500
-
-#     if not result:
-#         try:
-#             cursor.execute(
-#                 f"INSERT INTO user_images (username, password) VALUES (%s, %s)",
-#                 (username, password),
-#             )
-#             current_app.cnx.commit()
-#             session["username"] = username
-#             logger.info(f"User: {username} registered successfully.")
-#             return jsonify(
-#                 {
-#                     "status": "success",
-#                     "message": "Account created successfully. You can now log in.",
-#                 }
-#             )
-#         except mysql.connector.Error as err:
-#             logger.error(f"Failed to insert user: {username} into DB. Error: {err}")
-#             return (
-#                 jsonify(
-#                     {
-#                         "status": "fail",
-#                         "message": "Error occurred during registration.",
-#                     }
-#                 ),
-#                 500,
-#             )
-#     else:
-#         logger.error(f"Username: {username} already exists.")
-#         return (
-#             jsonify(
-#                 {
-#                     "status": "fail",
-#                     "message": "Username already exists. Choose a different one.",
-#                 }
-#             ),
-#             400,
-#         )
-
-
-# 捕获所有未捕获的异常，返回给前端，只能用于生产环境7.12
-# @app.errorhandler(Exception)
-# def handle_exception(e):
-#     # Pass the error to Flask's default error handling.
-#       tb = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
-#     response = {
-#
-#             "type": type(e).__name__,  # The type of the exception
-#             "message": str(e),  # The message of the exception
-#
-#     }
-#     return jsonify(response), 500
-
-
-# @app.before_request
-# def before_request():
-#     if enable_user_auth.lower() == "true":
-#         current_app.cnx = mysql.connector.connect(
-#             host=mysql_host, user="myuser", password="mypassword", database="mydatabase"
-#         )
-#     else:
-#         pass
-
-
 @app.middleware("http")
-async def after_request(request: Request, call_next):
-    response = await call_next(request)
-    if enable_user_auth.lower() == "true":
-        # if hasattr(current_app, "cnx"):
-        #     current_app.cnx.close()
-        # 仅用于调试 7.13
-        # session.clear()
-        return response
-    # 桌面版没有控制台，跳过逐请求打印
-    if not DESKTOP_MODE:
-        print(response)
-    return response
+async def after_request(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    """转发请求并保持统一响应中间件入口."""
+    return await call_next(request)
 
 
 # ── 桌面版：托管打包进 exe 的前端构建产物 ────────────────────────────
 # 由 desktop_main.py 指向随包分发的 frontend/dist；仓库内运行时不设该变量，
 # 路由行为与改动前完全一致（仍是纯 API 服务，静态资源交给 nginx）。
-DIST_DIR = os.getenv("HANDWRITING_DIST_DIR", "")
+DIST_DIR = get_environment_value("HANDWRITING_DIST_DIR", "")
 
 
-def _resolve_dist_file(rel_path):
-    """在 DIST_DIR 内解析相对路径并阻止路径穿越，非文件返回 None。"""
+def _resolve_dist_file(rel_path: str) -> str | None:
+    """在静态资源根目录内解析文件，阻止路径穿越与符号链接逃逸."""
     if not DIST_DIR:
         return None
-    root = os.path.realpath(DIST_DIR)
-    target = os.path.realpath(os.path.join(root, rel_path))
-    if target != root and not target.startswith(root + os.sep):
+    root = Path(DIST_DIR).resolve()
+    target = (root / rel_path).resolve()
+    if not target.is_relative_to(root):
         return None
-    return target if os.path.isfile(target) else None
+    return str(target) if target.is_file() else None
 
 
-if DIST_DIR and os.path.isdir(DIST_DIR):
+if DIST_DIR and Path(DIST_DIR).is_dir():
     _NO_STORE = {"Cache-Control": "no-store"}
 
     @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str):
+    def serve_spa(full_path: str) -> FileResponse:
         # 未匹配的 /api 路径应返回 404，而不是回落到 index.html
+        """返回桌面应用静态文件或 SPA 入口页面."""
         if full_path == "api" or full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not Found")
 
         file_path = _resolve_dist_file(full_path)
         if file_path is None:
             # history 模式路由（/About、/Introduce 等）回落到 index.html
-            index_path = os.path.join(DIST_DIR, "index.html")
-            if not os.path.isfile(index_path):
+            index_path = Path(DIST_DIR) / "index.html"
+            if not index_path.is_file():
                 raise HTTPException(status_code=404, detail="Not Found")
             return FileResponse(index_path, media_type="text/html", headers=_NO_STORE)
 
         media_type = mimetypes.guess_type(file_path)[0]
         # index.html 不缓存，与 nginx.conf 的 no-store 保持一致
-        headers = _NO_STORE if os.path.basename(file_path) == "index.html" else None
+        headers = _NO_STORE if Path(file_path).name == "index.html" else None
         return FileResponse(file_path, media_type=media_type, headers=headers)
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    # 启动时清理之前标记的目录
+def main() -> None:
+    """启动本地开发服务，监听地址可由 HOST 环境变量指定."""
     cleanup_marked_directories()
-    uvicorn.run(app, host="0.0.0.0", port=5005)
+    uvicorn.run(app, host=get_environment_value("HOST", "127.0.0.1"), port=5005)
 
 
-# poetry
-def main():
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=5005)
-
-    # good luck 6/16/2023
-    # thank you 2/14/2025
-
-
-"""    
-数据库初始化操作
-
-CREATE TABLE user_images (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) UNIQUE, 
-    password VARCHAR(255), 
-    image BLOB,
-    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-数据库结构
-mysql -u root -p进入数据库
-USE your_database;数据库中的一个库
-describe user_images;表：
-"""
+if __name__ == "__main__":
+    main()

@@ -1,22 +1,28 @@
-"""真实墨迹的公式边界、连笔和脚标布局回归。"""
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+
+"""真实墨迹的公式边界、连笔和脚标布局回归。."""
 
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pytest
+import symbol_fallback as symbols
 from PIL import Image, ImageDraw, ImageFont
 
-import symbol_fallback as symbols
-
-
 FORMULAS = [
-    r"\frac{1}{2}", r"\frac{x²+1}{x-1}",
-    r"\frac{1}{1+\frac{2}{3}}", r"\frac{\frac{a}{b}}{\frac{c}{d}}",
-    r"\sqrt{x²+1}", r"\sqrt{\frac{x+1}{x-1}}",
-    r"\frac{\sqrt{x+1}}{\sqrt{x-1}}", r"\sqrt{1+\sqrt{1+\sqrt{x}}}",
-    r"\sqrt[12]{x³}", "aₙ₊₁=x_(A)+x^(ab)",
-    r"\frac{-b+\sqrt{b²-4ac}}{2a}", "xₙ² + y²ₘ",
+    r"\frac{1}{2}",
+    r"\frac{x²+1}{x-1}",
+    r"\frac{1}{1+\frac{2}{3}}",
+    r"\frac{\frac{a}{b}}{\frac{c}{d}}",
+    r"\sqrt{x²+1}",
+    r"\sqrt{\frac{x+1}{x-1}}",
+    r"\frac{\sqrt{x+1}}{\sqrt{x-1}}",
+    r"\sqrt{1+\sqrt{1+\sqrt{x}}}",
+    r"\sqrt[12]{x³}",
+    "aₙ₊₁=x_(A)+x^(ab)",
+    r"\frac{-b+\sqrt{b²-4ac}}{2a}",
+    "xₙ² + y²ₘ",
 ]
 
 
@@ -30,7 +36,9 @@ def font_for(name, size):
 def rendered(source, font):
     converted = symbols.normalize_text_for_font(source)
     image = Image.new("1", (4000, 2400), 0)
-    advance, height = symbols._draw_text_or_fraction(ImageDraw.Draw(image), converted, (256, 256), font, font.path)
+    advance, height = symbols._draw_text_or_fraction(
+        ImageDraw.Draw(image), converted, (256, 256), font, font.path
+    )
     return converted, image, advance, height
 
 
@@ -73,8 +81,8 @@ def test_fraction_has_clear_space_above_and_below_the_bar():
     assert rows[bar_y] > 20
     assert rows[bar_y - 1] == rows[bar_y - 2] == 0
     assert rows[bar_y + 1] == rows[bar_y + 2] == 0
-    assert rows[:bar_y - 2].sum() > 0
-    assert rows[bar_y + 3:].sum() > 0
+    assert rows[: bar_y - 2].sum() > 0
+    assert rows[bar_y + 3 :].sum() > 0
 
 
 def test_paired_scripts_share_one_column_and_use_handwriting_letters():

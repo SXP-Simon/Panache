@@ -1,13 +1,17 @@
-# -*- coding: utf-8 -*-
-import os
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
 from pathlib import Path
+
 import pytest
-from PIL import Image, ImageFont
+import symbol_fallback as symbols
 from handright import Template, handwrite
+from PIL import Image, ImageDraw, ImageFont
 from symbol_fallback import (
+    _RADICAL_MAP,
+    _get_char_glyph_and_bbox,
+    _get_char_glyph_and_bbox_cached,
     clean_invisible_and_special_characters,
-    normalize_text_for_font,
     init_glyph_fallback_engine,
+    normalize_text_for_font,
 )
 
 
@@ -32,7 +36,7 @@ def test_math_symbols_preserved_in_text():
     # 验证数学符号（下标 ₆、希腊字母 Σ、箭头 ⇒ 等）不再被粗暴降级为 "_6" 或 "Sigma"
     sample = "L(G₆) = {a | a ∈ Σ} 且 N⇒ND"
     result = normalize_text_for_font(sample, _font_asset("云烟体.ttf"))
-    import symbol_fallback as symbols
+
     assert any(symbols._SCRIPT_MAP.get(ch) == (("6", False),) for ch in result)
     assert "Σ" in result
     assert "⇒" in result
@@ -44,7 +48,7 @@ def test_true_glyph_fallback_rendering():
     # 测试即使使用缺失下标与 ⇒ 的“云烟体”，也能通过真实字形 Fallback 引擎成功绘制出像素
     init_glyph_fallback_engine()
     font_path = _font_asset("云烟体.ttf")
-    if not os.path.exists(font_path):
+    if not Path(font_path).exists():
         pytest.skip(f"Font not found: {font_path}")
 
     font = ImageFont.truetype(font_path, size=30)
@@ -90,7 +94,11 @@ def test_vertical_fraction_conversion_and_rendering():
 
     # 验证在 handwrite 流程中渲染无异常
     bg = Image.new("RGB", (600, 200), (255, 255, 255))
-    font = ImageFont.truetype(_font_asset("云烟体.ttf"), size=30) if os.path.exists(_font_asset("云烟体.ttf")) else ImageFont.load_default()
+    font = (
+        ImageFont.truetype(_font_asset("云烟体.ttf"), size=30)
+        if Path(_font_asset("云烟体.ttf")).exists()
+        else ImageFont.load_default()
+    )
     template = Template(
         background=bg,
         font=font,
@@ -111,30 +119,30 @@ def test_function_division_not_corrupted():
     converted = normalize_text_for_font(text, _font_asset("云烟体.ttf"))
     # 竖式转换应保留分子与完整的分母 f(y)，而不是留下孤立的 /
     assert "/ f" not in converted
-    import symbol_fallback as symbols
+
     assert "ε*(y" in converted
     assert any(symbols._SCRIPT_MAP.get(ch) == (("1", False),) for ch in converted)
 
 
 def test_fallback_glyph_bbox_proportions():
     # 验证缺失字符 (ε, ₁, ·) fallback 到备用字体时，字形包围盒按实际比例计算，不会虚高撑大空白
-    from symbol_fallback import _get_char_glyph_and_bbox
+
     init_glyph_fallback_engine()
     font_path = _font_asset("云烟体.ttf")
-    if not os.path.exists(font_path):
+    if not Path(font_path).exists():
         pytest.skip(f"Font not found: {font_path}")
     base_font = ImageFont.truetype(font_path, size=30)
-    
+
     # 希腊字母 ε
-    glyph_eps, bbox_eps, adv_eps = _get_char_glyph_and_bbox("ε", base_font, font_path)
+    glyph_eps, bbox_eps, _adv_eps = _get_char_glyph_and_bbox("ε", base_font, font_path)
     assert glyph_eps is not None
-    left, top, right, bottom = bbox_eps
+    left, _top, right, _bottom = bbox_eps
     width = right - left
-    # 30px 字号下，小写希腊字母宽度应在合理范围 (8~25px)，绝不能像默认方块一样达到 30px 以上甚至撑大空白
+    # 小写希腊字母不能像默认方块一样撑大空白。
     assert 5 <= width <= 25
 
     # 下标 ₁
-    glyph_sub1, bbox_sub1, adv_sub1 = _get_char_glyph_and_bbox("₁", base_font, font_path)
+    glyph_sub1, bbox_sub1, _adv_sub1 = _get_char_glyph_and_bbox("₁", base_font, font_path)
     assert glyph_sub1 is not None
     w_sub = bbox_sub1[2] - bbox_sub1[0]
     assert 3 <= w_sub <= 20
@@ -142,7 +150,7 @@ def test_fallback_glyph_bbox_proportions():
 
 def test_radical_vinculum_conversion_and_rendering():
     # 测试根式转换与横线封顶手写渲染：\\sqrt{...}, √( ... ), ³√( ... ), √x 均无外层括号并完成绘制
-    from symbol_fallback import _RADICAL_MAP
+
     sample_text = "计算 \\sqrt{x^2 + 1} 与 √(y₁ - y₂) 以及 ³√(8) 和 √x"
     converted = normalize_text_for_font(sample_text, _font_asset("云烟体.ttf"))
 
@@ -154,7 +162,11 @@ def test_radical_vinculum_conversion_and_rendering():
 
     # 验证在 handwrite 流程中渲染无异常
     bg = Image.new("RGB", (700, 200), (255, 255, 255))
-    font = ImageFont.truetype(_font_asset("云烟体.ttf"), size=30) if os.path.exists(_font_asset("云烟体.ttf")) else ImageFont.load_default()
+    font = (
+        ImageFont.truetype(_font_asset("云烟体.ttf"), size=30)
+        if Path(_font_asset("云烟体.ttf")).exists()
+        else ImageFont.load_default()
+    )
     template = Template(
         background=bg,
         font=font,
@@ -178,7 +190,7 @@ def test_nested_radical_and_fraction_rendering():
     text = "复杂公式：\\sqrt{\\frac{1}{2}} 与 \\frac{\\sqrt{x+1}}{2}"
     converted = normalize_text_for_font(text, _font_asset("云烟体.ttf"))
     # 2026-10-15：必须验证公式结构，生成图片本身不能证明 LaTeX 已被正确解析。
-    import symbol_fallback as symbols
+
     first_root = next(ch for ch in converted if ch in symbols._RADICAL_MAP)
     inner_fraction = symbols._RADICAL_MAP[first_root][0]
     assert symbols._VULGAR_FRACTION_MAP[inner_fraction] == ("1", "2")
@@ -187,7 +199,11 @@ def test_nested_radical_and_fraction_rendering():
     assert denominator == "2"
     assert symbols._RADICAL_MAP[numerator] == ("x+1", None)
     bg = Image.new("RGB", (700, 200), (255, 255, 255))
-    font = ImageFont.truetype(_font_asset("云烟体.ttf"), size=30) if os.path.exists(_font_asset("云烟体.ttf")) else ImageFont.load_default()
+    font = (
+        ImageFont.truetype(_font_asset("云烟体.ttf"), size=30)
+        if Path(_font_asset("云烟体.ttf")).exists()
+        else ImageFont.load_default()
+    )
     template = Template(
         background=bg,
         font=font,
@@ -204,10 +220,10 @@ def test_nested_radical_and_fraction_rendering():
 
 def test_font_switching_no_fallback_leak():
     # 测试切换不同字体时，主字库支持的常规字符（如汉字、英文字母、数字）不被 fallback 覆盖
-    from symbol_fallback import _get_char_glyph_and_bbox_cached
+
     font_path_1 = _font_asset("云烟体.ttf")
     font_path_2 = _font_asset("李国夫手写体.ttf")
-    if not os.path.exists(font_path_1) or not os.path.exists(font_path_2):
+    if not Path(font_path_1).exists() or not Path(font_path_2).exists():
         pytest.skip("Test fonts not available")
 
     # 1. 汉字 '你' 在两款字体中均存在
@@ -221,9 +237,9 @@ def test_font_switching_no_fallback_leak():
 def test_large_font_and_heavy_rendering_no_oom():
     # 测试大体积字体（如悠哉手写体 15MB）配合 font_size_sigma 大量字符渲染时，变体缓存生效且无 OOM
     font_path = _font_asset("悠哉手写体.ttf")
-    if not os.path.exists(font_path):
+    if not Path(font_path).exists():
         font_path = _font_asset("云烟体.ttf")
-    if not os.path.exists(font_path):
+    if not Path(font_path).exists():
         pytest.skip("No test font")
 
     font = ImageFont.truetype(font_path, size=30)
@@ -245,26 +261,41 @@ def test_large_font_and_heavy_rendering_no_oom():
     images = list(handwrite(converted, template))
     assert len(images) > 0
     # 验证 font 变体缓存被成功创建与复用
-    assert hasattr(font, "_variant_cache")
-    assert len(font._variant_cache) > 0
+    assert any(key[0] is font for key in symbols._FONT_VARIANTS)
+    assert sum(key[0] is font for key in symbols._FONT_VARIANTS) > 0
 
 
-@pytest.mark.parametrize("text", [
-    "2026/10/15", "2026/10", "10/15/2026", "https://example.com/a/b",
-    "www.example.com/a/b", "C:/Users/Simon", "/tmp/math/input.txt",
-    "../assets/image.png", "assets/fonts/a.ttf", "`a/b`",
-    "https://example.com/√(x)", "C:/math/√(x).txt", "`√(x) + a/b`",
-    "/tmp/√(x).txt", "../assets/√(x).png", "assets/math/√(x).png",
-    "```python\na/b + √(x)\n```", "~~~text\na/b + √(x)\n~~~",
-    "```text\na/b + √(x)",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2026/10/15",
+        "2026/10",
+        "10/15/2026",
+        "https://example.com/a/b",
+        "www.example.com/a/b",
+        "C:/Users/Simon",
+        "/tmp/math/input.txt",
+        "../assets/image.png",
+        "assets/fonts/a.ttf",
+        "`a/b`",
+        "https://example.com/√(x)",
+        "C:/math/√(x).txt",
+        "`√(x) + a/b`",
+        "/tmp/√(x).txt",
+        "../assets/√(x).png",
+        "assets/math/√(x).png",
+        "```python\na/b + √(x)\n```",
+        "~~~text\na/b + √(x)\n~~~",
+        "```text\na/b + √(x)",
+    ],
+)
 def test_non_math_slashes_are_preserved(text):
     # 2026-10-15：文档中的日期、链接、路径及代码不参与自动分式排版。
     assert normalize_text_for_font(text) == text
 
 
 def test_prose_slashes_and_math_can_coexist():
-    import symbol_fallback as symbols
+
     text = normalize_text_for_font("2026/10/15 https://example.com/a/b 求 1/y 和 (a+b)/(c+d)")
     assert "2026/10/15 https://example.com/a/b" in text
     assert any(symbols._VULGAR_FRACTION_MAP.get(ch) == ("1", "y") for ch in text)
@@ -272,7 +303,7 @@ def test_prose_slashes_and_math_can_coexist():
 
 
 def test_protected_code_and_links_allow_surrounding_math_conversion():
-    import symbol_fallback as symbols
+
     source = "```text\na/b + √(x)\n```\nhttps://example.com/√(x) 求 √(x+1) 和 1/y"
     converted = normalize_text_for_font(source)
     assert converted.startswith("```text\na/b + √(x)\n```\nhttps://example.com/√(x)")
@@ -280,20 +311,25 @@ def test_protected_code_and_links_allow_surrounding_math_conversion():
     assert any(symbols._VULGAR_FRACTION_MAP.get(ch) == ("1", "y") for ch in converted)
 
 
-@pytest.mark.parametrize("source,coefficient,index", [
-    ("2√x", "2", None), ("a√(b)", "a", None), ("³√8", "", "³"),
-    (r"\sqrt[3]{8}", "", "3"),
-])
+@pytest.mark.parametrize(
+    ("source", "coefficient", "index"),
+    [
+        ("2√x", "2", None),
+        ("a√(b)", "a", None),
+        ("³√8", "", "³"),
+        (r"\sqrt[3]{8}", "", "3"),
+    ],
+)
 def test_radical_coefficients_are_not_root_indices(source, coefficient, index):
-    import symbol_fallback as symbols
+
     converted = normalize_text_for_font(source)
     assert converted.startswith(coefficient)
-    assert symbols._RADICAL_MAP[converted[len(coefficient):]][1] == index
+    assert symbols._RADICAL_MAP[converted[len(coefficient) :]][1] == index
 
 
 @pytest.mark.parametrize("command", [r"\frac", r"\dfrac", r"\tfrac"])
 def test_raw_latex_fraction_is_structural(command):
-    import symbol_fallback as symbols
+
     converted = normalize_text_for_font(command + r"{a+\frac{1}{2}}{\sqrt{x+1}}")
     numerator, denominator = symbols._VULGAR_FRACTION_MAP[converted]
     assert numerator.startswith("a+")
@@ -302,7 +338,7 @@ def test_raw_latex_fraction_is_structural(command):
 
 
 def test_radical_escaped_braces_and_unclosed_groups():
-    import symbol_fallback as symbols
+
     converted = normalize_text_for_font(r"\sqrt{x\}y}")
     assert symbols._RADICAL_MAP[converted] == (r"x\}y", None)
     for malformed in [r"\frac{1}", r"\sqrt{x", "√(x"]:
@@ -310,7 +346,7 @@ def test_radical_escaped_braces_and_unclosed_groups():
 
 
 def test_dynamic_fraction_and_radical_codepoints_cannot_collide(monkeypatch):
-    import symbol_fallback as symbols
+
     # 2026-10-15：旧实现在第 513 个不同分式处覆盖根式码点。
     monkeypatch.setattr(symbols, "_VULGAR_FRACTION_MAP", {})
     monkeypatch.setattr(symbols, "_FRACTION_KEYS", {})
@@ -322,7 +358,7 @@ def test_dynamic_fraction_and_radical_codepoints_cannot_collide(monkeypatch):
 
 
 def test_dynamic_expression_budget_preserves_old_references_and_new_source(monkeypatch):
-    import symbol_fallback as symbols
+
     existing = symbols.register_dynamic_fraction("retained-n", "retained-d")
     monkeypatch.setattr(symbols, "_MAX_DYNAMIC_EXPRESSIONS", 0)
     assert symbols.register_dynamic_fraction("retained-n", "retained-d") == existing
@@ -337,7 +373,7 @@ def test_deeply_nested_latex_has_a_finite_conversion_budget():
 
 
 def test_configured_fallback_font_directories_are_discovered(tmp_path, monkeypatch):
-    import symbol_fallback as symbols
+
     configured = tmp_path / "configured.ttf"
     configured.touch()
     monkeypatch.setenv("FONT_ASSETS_BUNDLED_DIR", str(tmp_path))
@@ -345,9 +381,10 @@ def test_configured_fallback_font_directories_are_discovered(tmp_path, monkeypat
 
 
 def test_nested_math_measured_width_matches_drawn_advance():
-    from PIL import ImageDraw
-    import symbol_fallback as symbols
-    font = ImageFont.truetype(str(Path(__file__).resolve().parents[1] / "font_assets" / "云烟体.ttf"), size=14)
+
+    font = ImageFont.truetype(
+        str(Path(__file__).resolve().parents[1] / "font_assets" / "云烟体.ttf"), size=14
+    )
     image = Image.new("L", (1000, 1000), 0)
     draw = ImageDraw.Draw(image)
     for source in [r"\frac{1234}{56}", r"\sqrt[3]{\frac{1234}{56}}"]:
@@ -358,7 +395,7 @@ def test_nested_math_measured_width_matches_drawn_advance():
 
 
 def test_composite_registration_limits_render_recursion(monkeypatch):
-    import symbol_fallback as symbols
+
     monkeypatch.setattr(symbols, "_MAX_MATH_DEPTH", 4)
     inner = "nested-leaf"
     for index in range(10):
@@ -366,6 +403,3 @@ def test_composite_registration_limits_render_recursion(monkeypatch):
     assert "nested-leaf" not in inner  # 最内层原文由稳定的已注册节点持有。
     assert max((symbols._MATH_NODE_DEPTH.get(ch, 0) for ch in inner), default=0) <= 4
     assert "/" in inner  # 超限节点保留为可读分式，而非继续创建递归树。
-
-
-

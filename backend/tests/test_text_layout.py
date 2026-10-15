@@ -1,12 +1,12 @@
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
 import unittest
 from collections import defaultdict
 from unittest.mock import call, patch
 
-from PIL import Image
-from handright import Template
 import handright._core as handright_core
-
 from app import apply_right_align, handwrite_with_page_breaks
+from handright import Template
+from PIL import Image
 
 
 class FakeFont:
@@ -42,7 +42,7 @@ class FakeTemplate:
 def draft_lines(text, template):
     positioned_chars = []
 
-    def record_flow_layout(draw, x, y, char, tpl, rand):
+    def record_flow_layout(_draw, x, y, char, tpl, *_rand):
         positioned_chars.append((round(y), char))
         left, _, right, _ = tpl.get_font().getbbox(char)
         return x + (right - left) + tpl.get_word_spacing()

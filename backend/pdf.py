@@ -1,58 +1,41 @@
-import fitz  # PyMuPDF
-from PIL import Image
-import tempfile
-import os, shutil
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""Export handwritten pages with bounded JPEG quality into a temporary PDF."""
 
-# 每页整幅嵌入成 JPEG，画面是书写的笔画线条，质量 95 到 75 的体积差约 40%，
-# 两者肉眼几乎无差别，导出体积却直接决定下载耗时
+import logging
+import shutil
+import tempfile
+from collections.abc import Iterable
+from pathlib import Path
+
+import fitz
+from PIL import Image
+
+logger = logging.getLogger(__name__)
 PDF_JPEG_QUALITY = 75
 
 
-def generate_pdf(images):
-    # 创建项目内的临时目录，避免使用系统临时目录
-    project_temp_base = "./temp"
-    os.makedirs(project_temp_base, exist_ok=True)
-    temp_dir = tempfile.mkdtemp(dir=project_temp_base)
-    print('temp_dir', temp_dir)
+def generate_pdf(images: Iterable[Image.Image]) -> str | None:
+    """Write page images and return the exported PDF path, or report export failure."""
+    base = Path("temp")
+    base.mkdir(exist_ok=True)
+    temp_dir = Path(tempfile.mkdtemp(dir=base))
+    document = fitz.open()
     try:
-        pdf_document = fitz.open()  # 创建一个新的空白PDF文档
-
-        # # 设置A4纸的尺寸和分辨率
-        # a4_width_in_inches = 8.3
-        # a4_height_in_inches = 11.7
-        # dpi = 300  # dots per inch
-        # a4_width_in_pixels = int(a4_width_in_inches * dpi)
-        # a4_height_in_pixels = int(a4_height_in_inches * dpi)
-
-        for i, img in enumerate(images):
-            width, height = img.size  # 获取图片原始宽高（单位：像素）
-            # 保存每张图像到临时目录
-            temp_img_path = os.path.join(temp_dir, f'image{i}.jpg')
-            img.save(temp_img_path, format="JPEG", quality=PDF_JPEG_QUALITY)
-
-            # 创建新页面
-            pdf_page = pdf_document.new_page(width=width, height=height)
-
-            # 定义插入图像的矩形区域
-            rect = fitz.Rect(0, 0, width, height)
-            # 插入图像到PDF页面
-            pdf_page.insert_image(rect, filename=temp_img_path)
-        os.makedirs("./temp", exist_ok=True)
-        # 创建临时PDF文件名
-        temp_pdf_file_path = tempfile.mktemp(suffix='.pdf', dir='./temp')
-
-        # 保存PDF文档到临时文件
-        pdf_document.save(temp_pdf_file_path)
-
-        # 关闭PDF文档
-        pdf_document.close()
-        return temp_pdf_file_path  # 返回 pdf 路径
-    except Exception as e:
-        print(f"Error: {e}")
+        for index, image in enumerate(images):
+            width, height = image.size
+            path = temp_dir / f"image{index}.jpg"
+            image.save(path, format="JPEG", quality=PDF_JPEG_QUALITY)
+            page = document.new_page(width=width, height=height)
+            page.insert_image(fitz.Rect(0, 0, width, height), filename=str(path))
+        # 2026-10-15：原子创建输出文件，避免 mktemp 的检查与使用竞态。
+        with tempfile.NamedTemporaryFile(suffix=".pdf", dir=base, delete=False) as target:
+            output = target.name
+        document.save(output)
+    except Exception:
+        logger.exception("PDF export failed")
+        return None
+    else:
+        return output
     finally:
-        # 清理临时目录及其内容
+        document.close()
         shutil.rmtree(temp_dir)
-
-# 调用示例
-# 假设 images 是一个包含PIL Image对象的列表
-# pdf_path = generate_pdf(images)

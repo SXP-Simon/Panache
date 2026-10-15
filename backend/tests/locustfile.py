@@ -1,24 +1,25 @@
-"""
-Locust 压测脚本 - handwriting-web 后端并发测试
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""Locust backend concurrency scenarios.
+
 用法:
     locust -f locustfile.py --host=http://127.0.0.1:5005
     # 或命令行模式（无 UI）
-    locust -f locustfile.py --host=http://127.0.0.1:5005 --headless -u 20 -r 5 --run-time 60s
+    locust -f locustfile.py --host=http://127.0.0.1:5005 --headless -u 20 -r 5 --run-time 60s.
 """
 
 import random
-import os
-from locust import HttpUser, task, between, events
-from locust.runners import MasterRunner
+import time
+
+from locust import HttpUser, between, task
 
 
 class HandwritingUser(HttpUser):
-    """模拟一个用户提交手写生成任务并等待完成"""
+    """模拟一个用户提交手写生成任务并等待完成."""
 
     wait_time = between(0.5, 2.0)
 
     def on_start(self):
-        """获取可用字体"""
+        """获取可用字体."""
         with self.client.get("/api/fonts_info", catch_response=True) as resp:
             if resp.status_code == 200:
                 fonts = resp.json()
@@ -65,7 +66,7 @@ class HandwritingUser(HttpUser):
 
     @task
     def submit_and_poll(self):
-        """提交任务 -> 轮询等待完成 -> 获取结果"""
+        """提交任务 -> 轮询等待完成 -> 获取结果."""
         form = self._build_form()
 
         # Step 1: 提交任务
@@ -80,13 +81,15 @@ class HandwritingUser(HttpUser):
             task_id = json_data.get("task_id")
 
         # Step 2: 轮询任务状态
-        import time
+
         deadline = time.time() + 120
         poll_interval = 1.0
         task_status = None
 
         while time.time() < deadline:
-            with self.client.get(f"/api/generate_handwriting/task/{task_id}", catch_response=True) as poll_resp:
+            with self.client.get(
+                f"/api/generate_handwriting/task/{task_id}", catch_response=True
+            ) as poll_resp:
                 if poll_resp.status_code != 200:
                     poll_resp.failure(f"轮询失败: {poll_resp.status_code}")
                     return
@@ -111,7 +114,9 @@ class HandwritingUser(HttpUser):
             return
 
         # Step 3: 获取结果
-        with self.client.get(f"/api/generate_handwriting/task/{task_id}/result", catch_response=True) as result_resp:
+        with self.client.get(
+            f"/api/generate_handwriting/task/{task_id}/result", catch_response=True
+        ) as result_resp:
             if result_resp.status_code >= 400:
                 result_resp.failure(f"获取结果失败: {result_resp.status_code}")
             elif len(result_resp.content) == 0:
@@ -122,7 +127,7 @@ class HandwritingUser(HttpUser):
 
 # ==================== 轻量级测试（只测提交接口） ====================
 class HandwritingSubmitOnly(HttpUser):
-    """只测提交接口，不等待任务完成（测接口吞吐量）"""
+    """只测提交接口，不等待任务完成（测接口吞吐量）."""
 
     wait_time = between(0.1, 0.5)
 
@@ -136,7 +141,7 @@ class HandwritingSubmitOnly(HttpUser):
 
     @task(10)
     def submit_only(self):
-        """只提交任务，不等待，用于测试接口极限吞吐量"""
+        """只提交任务，不等待，用于测试接口极限吞吐量."""
         form = {
             "text": "快速压测文本" * 10,
             "font_size": "120",

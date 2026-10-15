@@ -1,15 +1,18 @@
-"""按真实像素验证数学字形分页，不依赖某个字体的具体字形。"""
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+
+"""按真实像素验证数学字形分页，不依赖某个字体的具体字形。."""
 
 import random
-import pytest
 from pathlib import Path
 from types import SimpleNamespace
 
-from PIL import Image, ImageFont
-from handright import Template, Feature
 import handright._core as real_core
-
+import pytest
+import symbol_fallback as symbols
+from app import apply_right_align
+from handright import Feature, Template
 from math_page_layout import install_math_page_layout
+from PIL import Image, ImageFont
 
 
 class Font:
@@ -20,7 +23,7 @@ class Font:
         return Font(size)
 
 
-def glyph_bbox(char, font, path=None):
+def glyph_bbox(char, font, _path=None):
     # 2026-10-15：模拟具有负边承、上伸和下伸的宽分式；墨迹是可精确检查的实心矩形。
     if char == "§":
         return (-3, -font.size, font.size * 3, font.size)
@@ -30,28 +33,57 @@ def glyph_bbox(char, font, path=None):
 
 
 def synthetic_core(original=None):
-    core = SimpleNamespace(**{name: getattr(real_core, name) for name in
-                             ("_check_template", "_get_font", "_draw_strikethrough", "gauss", "Feature", "LayoutError", "_WHITE")})
+    core = SimpleNamespace(
+        **{
+            name: getattr(real_core, name)
+            for name in (
+                "_check_template",
+                "_get_font",
+                "_draw_strikethrough",
+                "gauss",
+                "Feature",
+                "LayoutError",
+                "_WHITE",
+            )
+        }
+    )
 
     def draw_char(draw, char, xy, font):
         bbox = glyph_bbox(char, font)
         if bbox != (0, 0, 0, 0):
-            draw.rectangle((xy[0] + bbox[0], xy[1] + bbox[1],
-                            xy[0] + bbox[2] - 1, xy[1] + bbox[3] - 1), fill=1)
+            draw.rectangle(
+                (xy[0] + bbox[0], xy[1] + bbox[1], xy[0] + bbox[2] - 1, xy[1] + bbox[3] - 1), fill=1
+            )
         return max(font.size // 2, bbox[2] + 2)
 
-    core._draw_page = original or (lambda *args: (_ for _ in ()).throw(AssertionError("unexpected plain delegation")))
+    core._draw_page = original or (
+        lambda *_args: (_ for _ in ()).throw(AssertionError("unexpected plain delegation"))
+    )
     core._draw_char = draw_char
     install_math_page_layout(core, lambda char: char == "§", glyph_bbox)
     return core
 
 
 def template(size=(230, 260), features=frozenset(), **kwargs):
-    params = dict(background=Image.new("RGB", size, "white"), font=Font(), line_spacing=26,
-                  fill=(0, 0, 0), left_margin=10, right_margin=10, top_margin=10, bottom_margin=10,
-                  word_spacing=0, font_size_sigma=0, word_spacing_sigma=0, line_spacing_sigma=0,
-                  perturb_x_sigma=0, perturb_y_sigma=0, perturb_theta_sigma=0,
-                  features=features, strikethrough_probability=0)
+    params = {
+        "background": Image.new("RGB", size, "white"),
+        "font": Font(),
+        "line_spacing": 26,
+        "fill": (0, 0, 0),
+        "left_margin": 10,
+        "right_margin": 10,
+        "top_margin": 10,
+        "bottom_margin": 10,
+        "word_spacing": 0,
+        "font_size_sigma": 0,
+        "word_spacing_sigma": 0,
+        "line_spacing_sigma": 0,
+        "perturb_x_sigma": 0,
+        "perturb_y_sigma": 0,
+        "perturb_theta_sigma": 0,
+        "features": features,
+        "strikethrough_probability": 0,
+    }
     params.update(kwargs)
     return Template(**params)
 
@@ -72,7 +104,11 @@ def draft(core, text, tpl, seed=17):
 def occupied_runs(image, axis):
     occupied = []
     for index in range(image.height if axis == "y" else image.width):
-        box = (0, index, image.width, index + 1) if axis == "y" else (index, 0, index + 1, image.height)
+        box = (
+            (0, index, image.width, index + 1)
+            if axis == "y"
+            else (index, 0, index + 1, image.height)
+        )
         if image.crop(box).getbbox():
             occupied.append(index)
     runs = []
@@ -150,8 +186,13 @@ def test_oversized_formula_scales_instead_of_clipping_or_looping():
 
 
 def test_seed_repeats_size_spacing_and_strikethrough_perturbations():
-    tpl = template(size=(180, 260), font_size_sigma=4, word_spacing_sigma=3,
-                   line_spacing_sigma=4, strikethrough_probability=0.5)
+    tpl = template(
+        size=(180, 260),
+        font_size_sigma=4,
+        word_spacing_sigma=3,
+        line_spacing_sigma=4,
+        strikethrough_probability=0.5,
+    )
     first, first_consumed = draft(synthetic_core(), "§A§\n§A§\n§A§", tpl, seed=123)
     second, second_consumed = draft(synthetic_core(), "§A§\n§A§\n§A§", tpl, seed=123)
     assert first_consumed == second_consumed
@@ -162,23 +203,27 @@ def test_seed_repeats_size_spacing_and_strikethrough_perturbations():
 def test_installer_is_idempotent():
     core = synthetic_core()
     installed = core._draw_page
-    install_math_page_layout(core, lambda char: True, glyph_bbox)
+    install_math_page_layout(core, lambda _char: True, glyph_bbox)
     assert core._draw_page is installed
 
 
 def test_real_nested_fraction_root_ink_stays_inside_narrow_pages():
-    import symbol_fallback as symbols
 
     font_path = Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"
     font = ImageFont.truetype(str(font_path), 40)
     core = synthetic_core()
-    core._draw_page = lambda *args: (_ for _ in ()).throw(AssertionError("math expected"))
+    core._draw_page = lambda *_args: (_ for _ in ()).throw(AssertionError("math expected"))
     core._draw_char = lambda draw, char, xy, f: symbols._draw_text_or_fraction(
-        draw, char, xy, f, str(font_path))[0]
-    install_math_page_layout(core,
-                             lambda ch: ch in symbols._VULGAR_FRACTION_MAP or ch in symbols._RADICAL_MAP,
-                             symbols._get_rendered_text_bbox)
-    formula = symbols.normalize_text_for_font(r"\frac{\sqrt{x²+1}}{\frac{1}{1+\sqrt{y}}}", str(font_path))
+        draw, char, xy, f, str(font_path)
+    )[0]
+    install_math_page_layout(
+        core,
+        lambda ch: ch in symbols._VULGAR_FRACTION_MAP or ch in symbols._RADICAL_MAP,
+        symbols._get_rendered_text_bbox,
+    )
+    formula = symbols.normalize_text_for_font(
+        r"\frac{\sqrt{x²+1}}{\frac{1}{1+\sqrt{y}}}", str(font_path)
+    )
     tpl = template(size=(160, 240), font=font, line_spacing=42)
     pages, consumed = draft(core, "\n".join([formula] * 5), tpl)
     assert len(pages) >= 2
@@ -189,13 +234,15 @@ def test_real_nested_fraction_root_ink_stays_inside_narrow_pages():
 @pytest.mark.parametrize("grid", [False, True])
 @pytest.mark.parametrize("source", [r"\frac{abcdefgh}{2}", "√(x²+1)", "(AB)⃗"])
 def test_right_aligned_math_keeps_the_formula_on_its_original_row(source, grid):
-    from app import apply_right_align
-    import symbol_fallback as symbols
 
     font_path = Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"
     font = ImageFont.truetype(str(font_path), 40)
-    tpl = template(size=(300, 400), font=font, line_spacing=60,
-                   features={Feature.GRID_LAYOUT} if grid else frozenset())
+    tpl = template(
+        size=(300, 400),
+        font=font,
+        line_spacing=60,
+        features={Feature.GRID_LAYOUT} if grid else frozenset(),
+    )
     formula = symbols.normalize_text_for_font(source, str(font_path))
     plain, _ = draft(real_core, formula, tpl)
     aligned, _ = draft(real_core, apply_right_align(">>> " + formula, tpl), tpl)
@@ -206,8 +253,12 @@ def test_right_aligned_math_keeps_the_formula_on_its_original_row(source, grid):
     assert_inside(aligned, tpl)
 
 
-@pytest.mark.parametrize("features,spacing,step", [(frozenset(), -8, 6), ({Feature.GRID_LAYOUT}, -11, 13)])
-def test_mixed_document_keeps_explicit_negative_spacing_for_plain_characters(features, spacing, step):
+@pytest.mark.parametrize(
+    ("features", "spacing", "step"), [(frozenset(), -8, 6), ({Feature.GRID_LAYOUT}, -11, 13)]
+)
+def test_mixed_document_keeps_explicit_negative_spacing_for_plain_characters(
+    features, spacing, step
+):
     tpl = template(word_spacing=spacing, features=features)
     pages, _ = draft(synthetic_core(), "AAAA\n§", tpl)
     first_row = occupied_runs(pages[0], "y")[0]

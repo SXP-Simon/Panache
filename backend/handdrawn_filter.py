@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-手绘风格图像滤镜与仿真模块 (Handdrawn Filter & Noise Simulation)
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""手绘风格图像滤镜与仿真模块 (Handdrawn Filter & Noise Simulation).
 
 将用户粘贴或插入的示意图、电路图、几何草图等：
 1. 灰度化与二值化/反色提取纯净线稿；
@@ -10,25 +9,34 @@
 """
 
 import base64
+import copy
 import io
-import random
+import logging
 import re
-from typing import Optional, Tuple, Union
+from collections.abc import Callable, Iterable
+
 import cv2
 import numpy as np
+from handright import Template
+from numpy.typing import NDArray
 from PIL import Image
 
+logger = logging.getLogger(__name__)
+INK_DIFFERENCE_THRESHOLD = 15
+MAX_IMAGE_SCALE = 7.0
+MAX_IMAGE_PERCENT = 700.0
 
-def decode_base64_image(image_str: str) -> Optional[Image.Image]:
-    """从 Markdown 图片中包含的 base64 编码字符串或 Data URL 中安全解码 PIL.Image。"""
+
+def decode_base64_image(image_str: str) -> Image.Image | None:
+    """从 Markdown 图片中包含的 base64 编码字符串或 Data URL 中安全解码 PIL.Image."""
     try:
         if "," in image_str:
             image_str = image_str.split(",", 1)[1]
         raw_bytes = base64.b64decode(image_str)
         return Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-    except Exception:
+    except (ValueError, OSError):
+        logger.exception("Unable to decode embedded image")
         return None
-
 
 
 def fit_image_to_layout(
@@ -37,7 +45,7 @@ def fit_image_to_layout(
     max_height: int,
     scale: float = 1.0,
 ) -> Image.Image:
-    """根据目标缩放比例及页面版心最大可用宽高，智能等比例缩放图片（支持放大与缩小）。
+    """根据目标缩放比例及页面版心最大可用宽高，智能等比例缩放图片（支持放大与缩小）.
 
     :param image: PIL 图像对象
     :param max_width: 版心允许的最大物理宽度
@@ -65,12 +73,12 @@ def fit_image_to_layout(
 
 
 def process_image_to_handdrawn(
-    image_input: Union[bytes, Image.Image, np.ndarray],
-    ink_color: Tuple[int, int, int] = (20, 20, 25),
+    image_input: bytes | Image.Image | NDArray[np.uint8],
+    ink_color: tuple[int, int, int] = (20, 20, 25),
     jitter_intensity: float = 1.0,
     noise_ratio: float = 0.003,
 ) -> Image.Image:
-    """将输入图片转换为仿手绘墨水线稿风格的透明 PNG 图片。
+    """将输入图片转换为仿手绘墨水线稿风格的透明 PNG 图片.
 
     :param image_input: 输入图片（bytes, PIL.Image 或 numpy.ndarray）
     :param ink_color: 墨水 RGB 颜色，默认为深墨黑 (20, 20, 25)
@@ -78,6 +86,7 @@ def process_image_to_handdrawn(
     :param noise_ratio: 墨水飞溅/细微噪点比例
     :return: 具有透明背景的 PIL.Image (RGBA)
     """
+    rng = np.random.default_rng()
     # 1. 统一转换为 OpenCV BGR 格式
     if isinstance(image_input, bytes):
         nparr = np.frombuffer(image_input, np.uint8)
@@ -85,22 +94,21 @@ def process_image_to_handdrawn(
     elif isinstance(image_input, Image.Image):
         img_rgb = image_input.convert("RGB")
         img_bgr = cv2.cvtColor(np.array(img_rgb), cv2.COLOR_RGB2BGR)
-    elif isinstance(image_input, np.ndarray):
-        img_bgr = image_input
     else:
-        raise ValueError(f"不支持的输入图片类型: {type(image_input)}")
+        img_bgr = image_input
 
     if img_bgr is None:
-        raise ValueError("无法解码输入图片")
+        msg = "无法解码输入图片"
+        raise ValueError(msg)
 
     h, w = img_bgr.shape[:2]
 
     # 2. 灰度化与自适应阈值线稿提取
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    
+
     # 轻微高斯模糊去除高频数字噪点
     blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    
+
     # 自适应二值化：提取黑白边缘，反转使得线条为 255（白色），背景为 0（黑色）
     binary = cv2.adaptiveThreshold(
         blurred,
@@ -115,13 +123,13 @@ def process_image_to_handdrawn(
     if jitter_intensity > 0:
         # 构造低频随机位移场
         scale = max(8, int(min(w, h) / 40))
-        small_dx = (np.random.rand(h // scale + 2, w // scale + 2) - 0.5) * (jitter_intensity * 2.5)
-        small_dy = (np.random.rand(h // scale + 2, w // scale + 2) - 0.5) * (jitter_intensity * 2.5)
+        small_dx = (rng.random((h // scale + 2, w // scale + 2)) - 0.5) * (jitter_intensity * 2.5)
+        small_dy = (rng.random((h // scale + 2, w // scale + 2)) - 0.5) * (jitter_intensity * 2.5)
 
         dx = cv2.resize(small_dx, (w, h), interpolation=cv2.INTER_CUBIC)
         dy = cv2.resize(small_dy, (w, h), interpolation=cv2.INTER_CUBIC)
 
-        grid_x, grid_y = np.meshgrid(np.arange(w), np.arange(h))
+        grid_x, grid_y = np.meshgrid(np.arange(w, dtype=np.float64), np.arange(h, dtype=np.float64))
         map_x = np.clip(grid_x + dx, 0, w - 1).astype(np.float32)
         map_y = np.clip(grid_y + dy, 0, h - 1).astype(np.float32)
 
@@ -130,16 +138,18 @@ def process_image_to_handdrawn(
     # 4. 模拟墨水深度不均 (Ink depth shading)
     # 通过微弱的高斯噪声扰动线条的透明度/粗细
     ink_mask = binary.astype(np.float32) / 255.0
-    ink_noise = np.random.uniform(0.75, 1.0, size=(h, w)).astype(np.float32)
+    ink_noise = rng.uniform(0.75, 1.0, size=(h, w)).astype(np.float32)
     alpha_channel = (ink_mask * ink_noise * 255.0).astype(np.uint8)
 
     # 5. 添加微弱的手写墨水飞溅/细微噪点 (Salt/Ink Splatter)
     if noise_ratio > 0:
-        noise_mask = np.random.rand(h, w) < noise_ratio
+        noise_mask = rng.random((h, w)) < noise_ratio
         # 仅在线条附近产生少量微弱墨滴飞溅
         dilated = cv2.dilate(binary, np.ones((5, 5), np.uint8), iterations=1)
         splatter_zone = (dilated > 0) & noise_mask
-        alpha_channel[splatter_zone] = np.random.randint(100, 200, size=np.count_nonzero(splatter_zone), dtype=np.uint8)
+        alpha_channel[splatter_zone] = rng.integers(
+            100, 200, size=np.count_nonzero(splatter_zone), dtype=np.uint8
+        )
 
     # 6. 合成 RGBA 图像
     r_val, g_val, b_val = ink_color
@@ -152,19 +162,19 @@ def process_image_to_handdrawn(
 
 
 def get_rendered_ink_bottom_y(image: Image.Image, background: Image.Image) -> int:
-    """对比渲染结果与原始底图，检测当前页面最后一行墨迹字符的最低 Y 坐标。"""
+    """对比渲染结果与原始底图，检测当前页面最后一行墨迹字符的最低 Y 坐标."""
     try:
         im_arr = np.array(image)
         bg_arr = np.array(background)
         # 计算 RGB 差异
         diff = np.abs(im_arr.astype(np.int16) - bg_arr.astype(np.int16))
         # 差异显著的点即为绘制的墨迹
-        ink_mask = np.any(diff > 15, axis=2)
+        ink_mask = np.any(diff > INK_DIFFERENCE_THRESHOLD, axis=2)
         y_indices, _ = np.where(ink_mask)
         if len(y_indices) > 0:
             return int(np.max(y_indices))
-    except Exception:
-        pass
+    except (ValueError, OSError, TypeError):
+        logger.exception("Image processing fallback was required")
     return 0
 
 
@@ -176,7 +186,7 @@ MARKDOWN_IMAGE_RE = re.compile(
 
 
 def _parse_image_scale(alt_text: str) -> float:
-    """从 alt 文本中解析缩放比例（如 '插图 1|50%'、'插图 1|200%'、'插图 1|500%'、'插图 1|scale=7.0'），默认 1.0 (100%)。"""
+    """Parse image scaling requested in an illustration caption."""
     if not alt_text or "|" not in alt_text:
         return 1.0
     try:
@@ -190,130 +200,92 @@ def _parse_image_scale(alt_text: str) -> float:
         scale_match = re.search(r"(?:scale\s*=\s*|w\s*=\s*)?(\d+(?:\.\d+)?)", param)
         if scale_match:
             val = float(scale_match.group(1))
-            if val > 7.0:
+            if val > MAX_IMAGE_SCALE:
                 # 可能是百分比整数如 150、200、500 或 700
-                if val <= 700.0:
+                if val <= MAX_IMAGE_PERCENT:
                     return max(0.1, min(7.0, val / 100.0))
             else:
                 return max(0.1, min(7.0, val))
-    except Exception:
-        pass
+    except (ValueError, OSError, TypeError):
+        logger.exception("Image processing fallback was required")
     return 1.0
 
 
+class _InlineRenderer:
+    def __init__(
+        self, template: Template, handwrite_fn: Callable[[str, Template], Iterable[Image.Image]]
+    ) -> None:
+        """Keep the page stream and image insertion cursor for one document."""
+        self.template = template
+        self.handwrite = handwrite_fn
+        self.background = template.get_background()
+        self.canvas = self.background.copy()
+        self.top = template.get_top_margin()
+        self.pages: list[Image.Image] = []
+        self.dirty = False
+
+    def text(self, content: str) -> None:
+        """Render a text fragment and advance the insertion cursor."""
+        if not content.strip():
+            return
+        template = copy.copy(self.template)
+        template.set_background(self.canvas)
+        template.set_top_margin(self.top)
+        pages = list(self.handwrite(content, template))
+        if not pages:
+            return
+        self.canvas = pages[-1]
+        self.dirty = True
+        ink_bottom = get_rendered_ink_bottom_y(self.canvas, self.background)
+        origin = self.top if len(pages) == 1 else self.template.get_top_margin()
+        self.top = max(origin, ink_bottom + self.template.get_line_spacing())
+        self.pages.extend(pages[:-1])
+
+    def image(self, data: str, scale: float) -> None:
+        """Fit an image inside the page margins, starting a new page as needed."""
+        raw = decode_base64_image(data)
+        if raw is None:
+            return
+        template = self.template
+        width, height = self.background.size
+        top, bottom = template.get_top_margin(), template.get_bottom_margin()
+        left, right = template.get_left_margin(), template.get_right_margin()
+        image = fit_image_to_layout(
+            process_image_to_handdrawn(raw),
+            width - left - right,
+            int((height - top - bottom) * 0.45),
+            scale,
+        )
+        image_width, image_height = image.size
+        if self.top + image_height > height - bottom:
+            if self.dirty:
+                self.pages.append(self.canvas)
+            self.canvas = self.background.copy()
+            self.top = top
+            self.dirty = False
+        x = left + max(0, (width - left - right - image_width) // 2)
+        self.canvas.paste(image, (x, self.top), image)
+        self.dirty = True
+        self.top += image_height + template.get_line_spacing()
+
+    def result(self) -> list[Image.Image]:
+        """Return completed pages and the final dirty canvas."""
+        if self.dirty:
+            self.pages.append(self.canvas)
+        return self.pages or [self.background.copy()]
+
+
 def render_inline_markdown_images(
-    text: str,
-    template,
-    handwrite_fn,
-) -> list:
-    """解析 Markdown 中的插图标记，将文本与插图进行手写与墨水线稿智能排版合成。
-    
-    当文本不包含图片标记时，直接调用 handwrite_fn(text, template)。
-    当文本包含图片标记时，按图片将内容划分为多个片段，并在上一段文本下方对齐贴合插图，
-    消除文字与插图重叠碰撞问题。
-    """
+    text: str, template: Template, handwrite_fn: Callable[[str, Template], Iterable[Image.Image]]
+) -> Iterable[Image.Image]:
+    """Insert image fragments between handwriting segments while retaining lazy text rendering."""
     if not MARKDOWN_IMAGE_RE.search(text):
         return handwrite_fn(text, template)
-
-    # 解析文本片段与图片列表
-    parts = []
-    last_end = 0
+    renderer = _InlineRenderer(template, handwrite_fn)
+    end = 0
     for match in MARKDOWN_IMAGE_RE.finditer(text):
-        before_text = text[last_end:match.start()]
-        alt_text = match.group(1).strip()
-        img_data = match.group(2).strip()
-        scale = _parse_image_scale(alt_text)
-        parts.append(("text", before_text, 1.0))
-        parts.append(("image", img_data, scale))
-        last_end = match.end()
-    remaining = text[last_end:]
-    if remaining:
-        parts.append(("text", remaining, 1.0))
-
-    bg_orig = template.get_background()
-    width, height = bg_orig.size
-    top_margin_orig = template.get_top_margin()
-    bottom_margin = template.get_bottom_margin()
-    left_margin = template.get_left_margin()
-    right_margin = template.get_right_margin()
-    line_spacing = template.get_line_spacing()
-
-    usable_width = width - left_margin - right_margin
-    max_img_height = int((height - top_margin_orig - bottom_margin) * 0.45)
-
-    all_pages = []
-    current_canvas = bg_orig.copy()
-    current_top = top_margin_orig
-    page_dirty = False
-
-    def clone_template_with_top(base_tpl, canvas, top_val):
-        new_tpl = copy.copy(base_tpl)
-        new_tpl.set_background(canvas)
-        new_tpl.set_top_margin(top_val)
-        return new_tpl
-
-    import copy
-
-    for part_type, content, scale in parts:
-        if part_type == "text":
-            if not content.strip():
-                continue
-            # 渲染当前文本片段
-            sub_tpl = clone_template_with_top(template, current_canvas, current_top)
-            rendered_sub = list(handwrite_fn(content, sub_tpl))
-            if not rendered_sub:
-                continue
-
-            if len(rendered_sub) == 1:
-                # 仍在当前页
-                current_canvas = rendered_sub[0]
-                page_dirty = True
-                ink_bottom = get_rendered_ink_bottom_y(current_canvas, bg_orig)
-                current_top = max(current_top, ink_bottom + line_spacing)
-            else:
-                # 文本跨页，已填满前面页面
-                all_pages.extend(rendered_sub[:-1])
-                current_canvas = rendered_sub[-1]
-                page_dirty = True
-                ink_bottom = get_rendered_ink_bottom_y(current_canvas, bg_orig)
-                current_top = max(top_margin_orig, ink_bottom + line_spacing)
-
-        elif part_type == "image":
-            raw_img = decode_base64_image(content)
-            if raw_img is None:
-                continue
-
-            # 转换为透明墨水手绘风格
-            hd_img = process_image_to_handdrawn(raw_img)
-            # 自适应页面版心缩放（支持放大/缩小），同时不超过版心可用边界
-            fitted_img = fit_image_to_layout(
-                hd_img,
-                max_width=usable_width,
-                max_height=max_img_height,
-                scale=scale,
-            )
-            img_w, img_h = fitted_img.size
-
-            # 检查当前页剩余空间是否放得下该图片
-            if current_top + img_h > height - bottom_margin:
-                # 空间不足，当前页落版翻页
-                if page_dirty:
-                    all_pages.append(current_canvas)
-                current_canvas = bg_orig.copy()
-                current_top = top_margin_orig
-                page_dirty = False
-
-            # 将图片居中粘贴在版心横向区域
-            paste_x = left_margin + max(0, (usable_width - img_w) // 2)
-            paste_y = current_top
-            current_canvas.paste(fitted_img, (paste_x, paste_y), fitted_img)
-            page_dirty = True
-
-            # 更新下一段文字的起始 top_margin，向下推移图片高度加上整行行间距
-            current_top = paste_y + img_h + line_spacing
-
-    if page_dirty:
-        all_pages.append(current_canvas)
-
-    return all_pages if all_pages else [bg_orig.copy()]
-
+        renderer.text(text[end : match.start()])
+        renderer.image(match.group(2).strip(), _parse_image_scale(match.group(1).strip()))
+        end = match.end()
+    renderer.text(text[end:])
+    return renderer.result()

@@ -12,7 +12,7 @@ BACKEND_DIR = ROOT / "backend"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 if not (FRONTEND_DIST / "index.html").is_file():
-    raise SystemExit("缺少 frontend/dist/index.html，请先在 frontend/ 执行 npm run build")
+    raise SystemExit("缺少 frontend/dist/index.html，请先在仓库根目录执行 pnpm --filter handwrite run build")
 
 # ── 校验 handright 的发行包属主 ──────────────────────────────────────
 # PyPI 上 handright（上游原版）与本项目用的 handrightbeta 模块名相同，都装进
@@ -29,7 +29,7 @@ if _owners != ["handrightbeta"]:
         "handright 的发行包属主应为且仅为 handrightbeta，实际为 %r。\n"
         "PyPI 上的 handright 是上游原版，与本项目用的 fork 模块名相同，"
         "装错会静默改变手写渲染效果。清理后重装：\n"
-        "  pip uninstall -y handright handrightbeta && pip install -r backend/requirements.txt"
+        "  uv sync --locked --extra build --reinstall-package handrightbeta"
         % (_owners,)
     )
 
@@ -51,6 +51,7 @@ if (BACKEND_DIR / "VERSION").is_file():
     datas.append((str(BACKEND_DIR / "VERSION"), "."))
 
 hiddenimports = [
+    "app",
     # 发行名是 handrightbeta，但 import 名是 handright
     "handright",
     # uvicorn 默认按字符串动态解析这些实现，静态分析看不到

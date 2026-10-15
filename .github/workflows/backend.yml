@@ -6,6 +6,10 @@ on:
       - main
     paths:
       - "backend/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".dockerignore"
+      - ".github/workflows/backend.yml"
 
 jobs:
   build-and-push:

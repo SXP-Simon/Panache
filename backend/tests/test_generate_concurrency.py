@@ -1,35 +1,27 @@
-import json
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+import logging
 import os
 import statistics
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 import pytest
+import requests
+
+logger = logging.getLogger(__name__)
 
 
 def http_json(method: str, url: str, data: dict | None = None, timeout: float = 30.0):
-    payload = None
-    headers = {}
-    if data is not None:
-        payload = urllib.parse.urlencode(data).encode("utf-8")
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-
-    req = urllib.request.Request(url=url, data=payload, method=method, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        body = resp.read()
-        text = body.decode("utf-8", errors="replace")
-        return resp.status, resp.headers, json.loads(text)
+    with requests.request(method, url, data=data, timeout=timeout) as response:
+        response.raise_for_status()
+        return response.status_code, response.headers, response.json()
 
 
 def http_binary(method: str, url: str, timeout: float = 60.0):
-    req = urllib.request.Request(url=url, method=method)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        body = resp.read()
-        return resp.status, resp.headers, body
+    with requests.request(method, url, timeout=timeout) as response:
+        response.raise_for_status()
+        return response.status_code, response.headers, response.content
 
 
 @dataclass
@@ -125,24 +117,20 @@ def _run_one_request(
             status_code=status_code,
             message=f"content_type={headers.get('Content-Type', '')}, bytes={len(body)}",
         )
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")
+    except Exception as error:
+        logger.exception("Concurrent handwriting request failed")
+        status_code = 0
+        message = f"exception: {error}"
+        if isinstance(error, requests.HTTPError) and error.response is not None:
+            status_code = error.response.status_code
+            message = f"http error: {error.response.text}"
         return TaskResult(
             idx=idx,
             ok=False,
             total_seconds=time.time() - start,
             task_id=task_id,
-            status_code=e.code,
-            message=f"http error: {detail}",
-        )
-    except Exception as e:
-        return TaskResult(
-            idx=idx,
-            ok=False,
-            total_seconds=time.time() - start,
-            task_id=task_id,
-            status_code=0,
-            message=f"exception: {e}",
+            status_code=status_code,
+            message=message,
         )
 
 
@@ -162,7 +150,7 @@ def test_generate_handwriting_concurrency():
         status_code, _, fonts = http_json(
             "GET", f"{base_url}/api/fonts_info", data=None, timeout=20.0
         )
-    except Exception as e:
+    except requests.RequestException as e:
         pytest.fail(f"Failed to connect backend at {base_url}: {e}")
 
     if status_code != 200 or not isinstance(fonts, list) or len(fonts) == 0:
@@ -216,8 +204,7 @@ def test_generate_handwriting_concurrency():
             )
             for i in range(total_requests)
         ]
-        for f in as_completed(futures):
-            results.append(f.result())
+        results.extend(future.result() for future in as_completed(futures))
     suite_seconds = time.time() - start
 
     failed = [r for r in results if not r.ok]
@@ -232,10 +219,10 @@ def test_generate_handwriting_concurrency():
     ]
     if failed:
         debug_lines.append("failed requests:")
-        for r in failed:
-            debug_lines.append(
-                f"- req={r.idx}, task={r.task_id}, status={r.status_code}, "
-                f"time={r.total_seconds:.2f}s, msg={r.message}"
-            )
+        debug_lines.extend(
+            f"- req={result.idx}, task={result.task_id}, status={result.status_code}, "
+            f"time={result.total_seconds:.2f}s, msg={result.message}"
+            for result in failed
+        )
 
     assert len(failed) == 0, "\n".join(debug_lines)

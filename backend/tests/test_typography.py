@@ -1,14 +1,14 @@
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
 import asyncio
 import unittest
 from unittest.mock import patch
 
+from app import GenerateHandwritingParams, generate_handwriting_impl
 from handright import Template as HandrightTemplate
 from PIL import Image
 
-from app import GenerateHandwritingParams, generate_handwriting_impl
 
-
-class TemplateCaptured(Exception):
+class TemplateCapturedError(Exception):
     pass
 
 
@@ -43,7 +43,7 @@ class TypographyTest(unittest.TestCase):
         def capture_template(*args, **kwargs):
             nonlocal captured_template
             captured_template = HandrightTemplate(*args, **kwargs)
-            raise TemplateCaptured
+            raise TemplateCapturedError
 
         with (
             patch("app.psutil.cpu_percent", return_value=0),
@@ -53,7 +53,7 @@ class TypographyTest(unittest.TestCase):
             ),
             patch("app.ImageFont.truetype", return_value=FakeFont()),
             patch("app.Template", side_effect=capture_template),
-            self.assertRaises(TemplateCaptured),
+            self.assertRaises(TemplateCapturedError),
         ):
             asyncio.run(
                 generate_handwriting_impl(
@@ -63,10 +63,8 @@ class TypographyTest(unittest.TestCase):
                 )
             )
 
-        expected_end_chars = "，。》？；：’”】｝、！％）,.>?;:]}!%)′″℃℉"  # noqa: RUF001
-        self.assertTrue(
-            set(expected_end_chars).issubset(captured_template.get_end_chars())
-        )
+        expected_end_chars = "，。》？；：’”】｝、！％）,.>?;:]}!%)′″℃℉"
+        self.assertTrue(set(expected_end_chars).issubset(captured_template.get_end_chars()))
 
 
 if __name__ == "__main__":

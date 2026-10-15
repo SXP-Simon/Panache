@@ -1,20 +1,48 @@
-# -*- coding: utf-8 -*-
-"""
-Markdown 图文混排与手绘插图排版单元测试
-"""
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""Markdown 图文混排与手绘插图排版单元测试."""
 
 import base64
 import io
 import unittest
-from unittest.mock import MagicMock
 
-from PIL import Image, ImageDraw
 from handdrawn_filter import (
     MARKDOWN_IMAGE_RE,
+    _parse_image_scale,
     decode_base64_image,
     fit_image_to_layout,
     render_inline_markdown_images,
 )
+from PIL import Image, ImageDraw
+
+
+class MockTemplate:
+    def __init__(self, bg):
+        self._bg = bg
+        self._top = 40
+
+    def get_background(self):
+        return self._bg
+
+    def set_background(self, b):
+        self._bg = b
+
+    def get_top_margin(self):
+        return self._top
+
+    def set_top_margin(self, t):
+        self._top = t
+
+    def get_bottom_margin(self):
+        return 40
+
+    def get_left_margin(self):
+        return 40
+
+    def get_right_margin(self):
+        return 40
+
+    def get_line_spacing(self):
+        return 30
 
 
 class InlineMarkdownImageTest(unittest.TestCase):
@@ -70,31 +98,10 @@ class InlineMarkdownImageTest(unittest.TestCase):
     def test_render_inline_markdown_images_with_handwrite(self):
         bg = Image.new("RGB", (600, 800), (255, 255, 255))
 
-        class MockTemplate:
-            def __init__(self, bg):
-                self._bg = bg
-                self._top = 40
-            def get_background(self):
-                return self._bg
-            def set_background(self, b):
-                self._bg = b
-            def get_top_margin(self):
-                return self._top
-            def set_top_margin(self, t):
-                self._top = t
-            def get_bottom_margin(self):
-                return 40
-            def get_left_margin(self):
-                return 40
-            def get_right_margin(self):
-                return 40
-            def get_line_spacing(self):
-                return 30
-
         tpl = MockTemplate(bg)
 
         # 模拟 handwrite 行为：在背景上打上墨迹
-        def mock_handwrite(text, template):
+        def mock_handwrite(_text, template):
             canvas = template.get_background().copy()
             d = ImageDraw.Draw(canvas)
             # 在 top_margin 处画一道墨迹方块
@@ -109,7 +116,7 @@ class InlineMarkdownImageTest(unittest.TestCase):
         self.assertEqual(pages[0].size, (600, 800))
 
     def test_parse_image_scale(self):
-        from handdrawn_filter import _parse_image_scale
+
         self.assertAlmostEqual(_parse_image_scale("插图 1"), 1.0)
         self.assertAlmostEqual(_parse_image_scale("插图 1|50%"), 0.5)
         self.assertAlmostEqual(_parse_image_scale("插图 1|30%"), 0.3)
@@ -130,7 +137,6 @@ class InlineMarkdownImageTest(unittest.TestCase):
         # 放大 7 倍
         fitted_7x = fit_image_to_layout(tiny_img, max_width=500, max_height=300, scale=7.0)
         self.assertEqual(fitted_7x.size, (280, 140))
-
 
 
 if __name__ == "__main__":

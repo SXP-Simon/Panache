@@ -1,7 +1,9 @@
-# -*- coding: utf-8 -*-
-import os
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+from pathlib import Path
+
 import pytest
 from docx import Document
+
 from backend.docx_extractor import extract_text_from_docx
 
 
@@ -19,7 +21,7 @@ def test_extract_text_from_docx_basic(tmp_path):
 
 def test_extract_text_from_exec_docx_if_present():
     exec_docx_path = r"C:\Users\Simon\Downloads\exec.docx"
-    if not os.path.exists(exec_docx_path):
+    if not Path(exec_docx_path).exists():
         pytest.skip("exec.docx not found at local downloads path")
 
     extracted = extract_text_from_docx(exec_docx_path)

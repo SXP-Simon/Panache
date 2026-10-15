@@ -1,12 +1,12 @@
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
 import contextlib
 import io
-import os
 import tempfile
 import unittest
-
-from PIL import Image, ImageDraw
+from pathlib import Path
 
 from identify import identify_distance
+from PIL import Image, ImageDraw
 
 # 与 e2e/fixtures/sample-page.png 同一套几何参数：那张图由下面这段逻辑生成，
 # 改动这里时要同步重新生成，否则前后端两个用例盯的就不是同一份数据了。
@@ -43,7 +43,7 @@ def identify(path):
 class IdentifyDistanceTest(unittest.TestCase):
     def setUp(self):
         self.workdir = tempfile.mkdtemp()
-        self.page = synthetic_page(os.path.join(self.workdir, "page.png"))
+        self.page = synthetic_page(str(Path(self.workdir) / "page.png"))
 
     def test_reads_back_the_margins_the_page_was_drawn_with(self):
         left, right, top, bottom, _ = identify(self.page)
@@ -78,7 +78,7 @@ class IdentifyDistanceTest(unittest.TestCase):
         # 也是已知缺陷：整页找不到直线时 HoughLinesP 返回 None，sorted(None) 直接
         # TypeError，/api/imagefileprocess 会变成 500。用户传一张纯白图就会踩到。
         # 期望的行为是退化成 0 而不是抛异常；修好后这条会变成 unexpectedSuccess。
-        blank = os.path.join(self.workdir, "blank.png")
+        blank = str(Path(self.workdir) / "blank.png")
         Image.new("RGB", (PAGE_WIDTH, PAGE_HEIGHT), "white").save(blank)
 
         left, right, top, bottom, line_spacing = identify(blank)

@@ -1,19 +1,20 @@
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
 import os
 import shutil
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from PIL import Image
-
 from pdf import PDF_JPEG_QUALITY, generate_pdf
+from PIL import Image
 
 # 写死期望值：跟着 PDF_JPEG_QUALITY 走的话，常量被改回高位时用例还是会过
 EXPECTED_JPEG_QUALITY = 75
 
 
 def _stroke_page(width=800, height=1100):
-    """用细笔画模拟一页手写稿：线条走 JPEG 时不像纯色块那样一压就没。"""
+    """用细笔画模拟一页手写稿：线条走 JPEG 时不像纯色块那样一压就没。."""
     image = Image.new("RGB", (width, height), "white")
     pixels = image.load()
     for row in range(10, height - 10, 14):
@@ -29,7 +30,7 @@ def _stroke_page(width=800, height=1100):
 class PdfExportTest(unittest.TestCase):
     def setUp(self):
         # generate_pdf 把临时文件写在当前工作目录的 ./temp 下
-        self.original_cwd = os.getcwd()
+        self.original_cwd = str(Path.cwd())
         self.workdir = tempfile.mkdtemp()
         os.chdir(self.workdir)
 
@@ -52,7 +53,7 @@ class PdfExportTest(unittest.TestCase):
         self.assertEqual(saved_qualities, [EXPECTED_JPEG_QUALITY] * 2)
         self.assertEqual(PDF_JPEG_QUALITY, EXPECTED_JPEG_QUALITY)
 
-        with open(pdf_path, "rb") as handle:
+        with Path(pdf_path).open("rb") as handle:
             export = handle.read()
         self.assertTrue(export.startswith(b"%PDF-"))
         self.assertLess(len(export), 1_000_000)

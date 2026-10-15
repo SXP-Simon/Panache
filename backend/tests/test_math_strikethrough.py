@@ -1,14 +1,14 @@
-"""数学行的错字、删除线及后续正确字必须分别可见。"""
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+"""数学行的错字、删除线及后续正确字必须分别可见。."""
 
 import random
 from types import SimpleNamespace
 
-import pytest
-from PIL import Image
-from handright import Template
 import handright._core as real_core
-
+import pytest
+from handright import Template
 from math_page_layout import install_math_page_layout
+from PIL import Image
 
 
 class Font:
@@ -20,27 +20,54 @@ class Font:
 
 
 def make_core():
-    core = SimpleNamespace(**{name: getattr(real_core, name) for name in
-                             ("_check_template", "_get_font", "gauss", "Feature", "LayoutError", "_WHITE")})
-    core._draw_page = lambda *args: (_ for _ in ()).throw(AssertionError("math layout expected"))
+    core = SimpleNamespace(
+        **{
+            name: getattr(real_core, name)
+            for name in (
+                "_check_template",
+                "_get_font",
+                "gauss",
+                "Feature",
+                "LayoutError",
+                "_WHITE",
+            )
+        }
+    )
+    core._draw_page = lambda *_args: (_ for _ in ()).throw(AssertionError("math layout expected"))
 
-    def draw_char(draw, char, xy, font):
+    def draw_char(draw, _char, xy, font):
         draw.rectangle((xy[0], xy[1], xy[0] + font.size - 1, xy[1] + font.size - 1), fill=1)
         return font.size
 
     core._draw_char = draw_char
-    core._draw_strikethrough = lambda draw, x, y, tpl, rand: draw.line(
-        (x, y, x + tpl.get_font().size - 1, y + tpl.get_font().size - 1), fill=1, width=2)
-    install_math_page_layout(core, lambda char: char == "§",
-                             lambda char, font, path: (0, 0, font.size, font.size))
+    core._draw_strikethrough = lambda draw, x, y, tpl, _rand: draw.line(
+        (x, y, x + tpl.get_font().size - 1, y + tpl.get_font().size - 1), fill=1, width=2
+    )
+    install_math_page_layout(
+        core, lambda char: char == "§", lambda _char, font, _path: (0, 0, font.size, font.size)
+    )
     return core
 
 
 def template(size=(180, 160), **kwargs):
-    params = dict(background=Image.new("RGB", size, "white"), font=Font(), line_spacing=30,
-                  fill=(0, 0, 0), left_margin=10, right_margin=10, top_margin=10, bottom_margin=10,
-                  word_spacing=0, font_size_sigma=0, word_spacing_sigma=0, line_spacing_sigma=0,
-                  perturb_x_sigma=0, perturb_y_sigma=0, perturb_theta_sigma=0, strikethrough_probability=1)
+    params = {
+        "background": Image.new("RGB", size, "white"),
+        "font": Font(),
+        "line_spacing": 30,
+        "fill": (0, 0, 0),
+        "left_margin": 10,
+        "right_margin": 10,
+        "top_margin": 10,
+        "bottom_margin": 10,
+        "word_spacing": 0,
+        "font_size_sigma": 0,
+        "word_spacing_sigma": 0,
+        "line_spacing_sigma": 0,
+        "perturb_x_sigma": 0,
+        "perturb_y_sigma": 0,
+        "perturb_theta_sigma": 0,
+        "strikethrough_probability": 1,
+    }
     params.update(kwargs)
     return Template(**params)
 
@@ -62,7 +89,11 @@ def draft(text, tpl, seed=7, core=None):
 def runs(image, axis="x"):
     occupied, result = [], []
     for index in range(image.width if axis == "x" else image.height):
-        box = (index, 0, index + 1, image.height) if axis == "x" else (0, index, image.width, index + 1)
+        box = (
+            (index, 0, index + 1, image.height)
+            if axis == "x"
+            else (0, index, image.width, index + 1)
+        )
         if image.crop(box).getbbox():
             occupied.append(index)
     for index in occupied:
@@ -125,11 +156,17 @@ def test_very_narrow_page_scales_entire_pair_and_finishes():
         assert 10 <= top < bottom <= 80
 
 
-@pytest.mark.parametrize("parameters", [
-    {"strikethrough_length_sigma": 10**9, "strikethrough_width": 2},
-    {"strikethrough_length_sigma": 0, "strikethrough_width": 10**9,
-     "strikethrough_width_sigma": 10**9},
-])
+@pytest.mark.parametrize(
+    "parameters",
+    [
+        {"strikethrough_length_sigma": 10**9, "strikethrough_width": 2},
+        {
+            "strikethrough_length_sigma": 0,
+            "strikethrough_width": 10**9,
+            "strikethrough_width_sigma": 10**9,
+        },
+    ],
+)
 def test_extreme_strikethrough_parameters_allocate_only_page_sized_masks(monkeypatch, parameters):
     # 2026-10-15：在 Image.new 之前断言，不能先分配十亿像素删除线再缩回纸张。
     tpl = template(size=(100, 140), strikethrough_angle_sigma=0, **parameters)
@@ -138,7 +175,8 @@ def test_extreme_strikethrough_parameters_allocate_only_page_sized_masks(monkeyp
 
     def guarded_new(mode, size, color=0):
         allocated.append(size)
-        assert 0 < size[0] <= 100 and 0 < size[1] <= 140
+        assert 0 < size[0] <= 100
+        assert 0 < size[1] <= 140
         return original_new(mode, size, color)
 
     monkeypatch.setattr("math_page_layout.Image.new", guarded_new)
@@ -148,4 +186,3 @@ def test_extreme_strikethrough_parameters_allocate_only_page_sized_masks(monkeyp
     assert sum(consumed) == 2
     assert allocated
     assert all(page.getbbox() is not None for page in pages)
-
