@@ -20,7 +20,7 @@ cp "$REPO_ROOT/target/release/handwriting-server" "$BACKEND_DIR/"
 rsync -a --delete "$REPO_ROOT/assets/font_assets/" "$BACKEND_DIR/font_assets/"
 rsync -a --delete "$REPO_ROOT/crates/handwriting-core/licenses/" "$BACKEND_DIR/licenses/"
 rsync -a "$REPO_ROOT/assets/licenses/" "$BACKEND_DIR/licenses/"
-cp "$REPO_ROOT/VERSION" "$BACKEND_DIR/VERSION"
+printf '%s\n' "${HANDWRITING_BUILD_VERSION:-$(cat "$REPO_ROOT/VERSION")}" > "$BACKEND_DIR/VERSION"
 cp "$REPO_ROOT/LICENSE" "$BACKEND_DIR/LICENSE"
 cp "$REPO_ROOT/crates/handwriting-core/NOTICE" "$BACKEND_DIR/NOTICE"
 /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" \

@@ -61,6 +61,10 @@ void main() {
         final workspace = Workspace(api: api, managedBackend: true);
         await workspace.initialize();
         expect(workspace.connected, isTrue);
+        const expectedVersion = String.fromEnvironment('EXPECTED_APP_VERSION');
+        if (expectedVersion.isNotEmpty) {
+          expect(workspace.version, expectedVersion);
+        }
         expect(workspace.api, same(api));
         await workspace.setBase('http://127.0.0.1:1');
         expect(workspace.api, same(api));
