@@ -1,6 +1,7 @@
 """按真实像素验证数学字形分页，不依赖某个字体的具体字形。"""
 
 import random
+import pytest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -183,3 +184,23 @@ def test_real_nested_fraction_root_ink_stays_inside_narrow_pages():
     assert len(pages) >= 2
     assert consumed[-1][1] == len("\n".join([formula] * 5))
     assert_inside(pages, tpl)
+
+
+@pytest.mark.parametrize("grid", [False, True])
+@pytest.mark.parametrize("source", [r"\frac{abcdefgh}{2}", "√(x²+1)", "(AB)⃗"])
+def test_right_aligned_math_keeps_the_formula_on_its_original_row(source, grid):
+    from app import apply_right_align
+    import symbol_fallback as symbols
+
+    font_path = Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"
+    font = ImageFont.truetype(str(font_path), 40)
+    tpl = template(size=(300, 400), font=font, line_spacing=60,
+                   features={Feature.GRID_LAYOUT} if grid else frozenset())
+    formula = symbols.normalize_text_for_font(source, str(font_path))
+    plain, _ = draft(real_core, formula, tpl)
+    aligned, _ = draft(real_core, apply_right_align(">>> " + formula, tpl), tpl)
+    assert len(aligned) == len(plain) == 1
+    plain_box, aligned_box = plain[0].getbbox(), aligned[0].getbbox()
+    assert (aligned_box[1], aligned_box[3]) == (plain_box[1], plain_box[3])
+    assert aligned_box[0] > plain_box[0] + 40
+    assert_inside(aligned, tpl)

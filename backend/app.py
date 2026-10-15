@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import itertools
+import math
 import re
 import time
 from typing import Any, Optional, Union
@@ -26,7 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 # 真正的 CPU 密集渲染在后续 for 循环消费生成器时才发生，
 # 而 generate_handwriting_impl 整体运行在 BackgroundTask 里，HTTP 请求已秒回，
 # 所以 run_in_threadpool 在此场景下无法真正释放事件循环。
-from handright import Template, handwrite
+from handright import Feature, Template, handwrite
 
 # from threading import Thread
 from PIL import Image, ImageDraw, ImageFont
@@ -44,11 +45,15 @@ from uuid import uuid4
 try:
     from docx_extractor import extract_text_from_docx
     from handdrawn_filter import render_inline_markdown_images
-    from symbol_fallback import normalize_text_for_font, _get_cached_image_font
+    from symbol_fallback import (normalize_text_for_font, _get_cached_image_font,
+                                 is_math_glyph,
+                                 _get_rendered_text_bbox)
 except ImportError:
     from backend.docx_extractor import extract_text_from_docx
     from backend.handdrawn_filter import render_inline_markdown_images
-    from backend.symbol_fallback import normalize_text_for_font, _get_cached_image_font
+    from backend.symbol_fallback import (normalize_text_for_font, _get_cached_image_font,
+                                         is_math_glyph,
+                                         _get_rendered_text_bbox)
 from werkzeug.utils import secure_filename
 
 # 2026-10-03：PyPDF2 / python-docx / identify（opencv + sklearn）/ pdf（PyMuPDF）原本都在
@@ -602,8 +607,22 @@ def apply_right_align(text, template):
         width - template.get_left_margin() - template.get_right_margin()
     )
     last_glyph_start_limit = usable_width - font.size
+    math_layout = any(is_math_glyph(char) for char in text)
+    grid = math_layout and Feature.GRID_LAYOUT in template.get_features()
+    if math_layout:
+        from handright import _core
+        measure_draw = ImageDraw.Draw(Image.new("1", (1, 1)))
 
     def advance(char):
+        if math_layout:
+            # 2026-10-15：数学占位符的字体 bbox 为空，必须与数学分页器使用同一实际前进量。
+            path = getattr(font, "path", None)
+            step = _core._draw_char(measure_draw, char, (0, 0), font)
+            bbox = _get_rendered_text_bbox(char, font, path)
+            if grid:
+                cell = max(1, font.size + word_spacing)
+                return math.ceil(max(step, bbox[2]) / cell) * cell
+            return max(1, step + word_spacing, bbox[2])
         left, _, right, _ = font.getbbox(char)
         return (right - left) + word_spacing
 
@@ -631,8 +650,11 @@ def apply_right_align(text, template):
         max_prefix_width = 0
         for char in content:
             max_prefix_width = max(max_prefix_width, prefix_width)
+            if math_layout:
+                bbox = _get_rendered_text_bbox(char, font, getattr(font, "path", None))
+                max_prefix_width = max(max_prefix_width, prefix_width + bbox[2] - min(0, bbox[0]))
             prefix_width += advance(char)
-        available_padding = last_glyph_start_limit - max_prefix_width
+        available_padding = (usable_width if math_layout else last_glyph_start_limit) - max_prefix_width
 
         if pad_unit > 0 and available_padding > 0:
             # Handright perturbs glyph sizes and spacing during rendering. Keep
