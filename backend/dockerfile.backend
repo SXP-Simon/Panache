@@ -20,4 +20,4 @@ COPY backend /app
 COPY ttf_files /app/font_assets
 
 EXPOSE 5005
-CMD ["gunicorn", "app:app", "-b", "0.0.0.0:5005", "-w", "1", "-k", "uvicorn_worker.UvicornWorker", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-"]
+CMD ["gunicorn", "app:app", "--config", "gunicorn_config.py", "-b", "0.0.0.0:5005", "-w", "1", "-k", "uvicorn_worker.UvicornWorker", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-"]

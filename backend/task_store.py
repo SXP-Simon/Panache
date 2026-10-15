@@ -2,7 +2,6 @@
 """SQLite 跨进程任务状态存储，响应文件落盘以限制数据库体积."""
 
 import json
-import logging
 import os
 import shutil
 import sqlite3
@@ -14,7 +13,12 @@ from typing import Unpack
 from pydantic import TypeAdapter
 from task_types import GenerationTask
 
-logger = logging.getLogger(__name__)
+if __package__:
+    from .logging_setup import get_logger
+else:
+    from logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 # 2026-10-15：桌面可写目录由启动器传入；包内 __file__ 只作为 Web 部署的兜底。
 _BASE_DIR = Path(os.environ.get("HANDWRITING_DATA_DIR", Path(__file__).resolve().parent))
@@ -148,7 +152,7 @@ def _read_result_file(file_path: str) -> bytes | None:
     try:
         return Path(file_path).read_bytes()
     except OSError as error:
-        logger.warning("Failed to read result file %s: %s", file_path, error)
+        logger.warning("Failed to read result file %s: %s", file_path, error, exc_info=True)
         return None
 
 

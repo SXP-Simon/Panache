@@ -11,7 +11,6 @@
 import base64
 import copy
 import io
-import logging
 import re
 from collections.abc import Callable, Iterable
 
@@ -21,7 +20,12 @@ from handright import Template
 from numpy.typing import NDArray
 from PIL import Image
 
-logger = logging.getLogger(__name__)
+if __package__:
+    from .logging_setup import get_logger
+else:
+    from logging_setup import get_logger
+
+logger = get_logger(__name__)
 INK_DIFFERENCE_THRESHOLD = 15
 MAX_IMAGE_SCALE = 7.0
 MAX_IMAGE_PERCENT = 700.0

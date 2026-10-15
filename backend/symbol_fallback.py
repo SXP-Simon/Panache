@@ -10,7 +10,6 @@
 
 import functools
 import io
-import logging
 import os
 import re
 import threading
@@ -26,9 +25,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 if __package__:
     from .library_boundary import install_member, member
+    from .logging_setup import get_logger
     from .math_page_layout import install_math_page_layout
 else:
     from library_boundary import install_member, member
+    from logging_setup import get_logger
     from math_page_layout import install_math_page_layout
 
 
@@ -85,7 +86,7 @@ try:
 except ImportError:
     ttfont_type = None
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 不可见字符、变体空格及特殊分隔符的通用清洗映射
 _INVISIBLE_AND_SPECIAL_SPACES = {

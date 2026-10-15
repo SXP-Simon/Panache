@@ -4,6 +4,8 @@
 import os
 
 from dotenv import load_dotenv
+from logging_setup import configure_logging
 
 load_dotenv()
 get_environment_value = os.getenv
+configure_logging()

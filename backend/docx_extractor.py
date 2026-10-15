@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 """Extract paragraph, table and OMML formula text from Word documents."""
 
-import logging
 from collections.abc import Iterator
 from typing import Protocol, cast
 
@@ -9,11 +8,13 @@ from docx import Document
 
 if __package__:
     from .library_boundary import member
+    from .logging_setup import get_logger
 else:
     from library_boundary import member
+    from logging_setup import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class _XmlElement(Protocol):

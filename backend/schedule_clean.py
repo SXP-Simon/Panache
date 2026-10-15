@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 """Schedule daily cleanup of generated temporary data."""
 
-import logging
 import shutil
 import threading
 import time
@@ -9,7 +8,12 @@ from pathlib import Path
 
 import schedule
 
-logger = logging.getLogger(__name__)
+if __package__:
+    from .logging_setup import get_logger
+else:
+    from logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 def clear_temp_dir() -> None:

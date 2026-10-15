@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 """Export handwritten pages with bounded JPEG quality into a temporary PDF."""
 
-import logging
 import shutil
 import tempfile
 from collections.abc import Iterable
@@ -10,7 +9,12 @@ from pathlib import Path
 import fitz
 from PIL import Image
 
-logger = logging.getLogger(__name__)
+if __package__:
+    from .logging_setup import get_logger
+else:
+    from logging_setup import get_logger
+
+logger = get_logger(__name__)
 PDF_JPEG_QUALITY = 75
 
 

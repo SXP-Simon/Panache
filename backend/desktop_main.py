@@ -192,7 +192,7 @@ def main() -> None:
         loop="asyncio",
         http="h11",
         ws="websockets",
-        log_level="info",
+        log_config=None,
         access_log=False,
     )
     uvicorn.Server(config).run(sockets=[listener])

@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 """Measure notebook margins and line spacing from detected ruling lines."""
 
-import logging
 import math
 from collections.abc import Sequence
 from itertools import pairwise
@@ -11,7 +10,12 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.cluster import DBSCAN
 
-logger = logging.getLogger(__name__)
+if __package__:
+    from .logging_setup import get_logger
+else:
+    from logging_setup import get_logger
+
+logger = get_logger(__name__)
 PIXEL_WHITE = 255
 MIN_RULING_DISTANCE = 5
 

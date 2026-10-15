@@ -10,7 +10,6 @@ import gc
 import importlib
 import io
 import itertools
-import logging
 import math
 import mimetypes
 import re
@@ -49,6 +48,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
 from library_boundary import member
+from logging_setup import get_logger
 from PIL import Image, ImageDraw, ImageFont
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -252,34 +252,7 @@ if _sentry_dsn:
 # 启动计划任务线程, 定时清理
 schedule_clean.start_schedule_thread()
 
-# 创建一个logger
-logger = logging.getLogger(__name__)
-
-# 设置日志级别
-logger.setLevel(logging.DEBUG)
-
-# 创建 console handler，并设置级别为 DEBUG
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
-# 创建 file handler，并设置级别为 DEBUG
-# LOG_DIR 供桌面版指向可写数据目录；仓库内运行时仍是 backend/logs
-# 显式指定 utf-8：Windows 上 FileHandler 默认用 ANSI 代码页，中文日志会写坏
-log_dir = get_environment_value("LOG_DIR", "logs")
-Path(log_dir).mkdir(parents=True, exist_ok=True)
-fh = logging.FileHandler(Path(log_dir) / "app.log", encoding="utf-8")
-fh.setLevel(logging.DEBUG)
-
-# 创建 formatter
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-# 把 formatter 添加到 ch 和 fh
-ch.setFormatter(formatter)
-fh.setFormatter(formatter)
-
-# 把 ch 和 fh 添加到 logger
-logger.addHandler(ch)
-logger.addHandler(fh)
+logger = get_logger(__name__)
 
 app = FastAPI()
 
@@ -1024,6 +997,8 @@ async def generate_handwriting_impl(
 
 async def run_generation_task(task_id: str, base_url: str, payload: GenerationPayload) -> None:
     """通过并发信号量执行任务并持久化进度和结果."""
+    started_at = time.perf_counter()
+    logger.info("Generation task started, task_id=%s elapsed=0.000s", task_id)
     set_generation_task(
         task_id,
         status="processing",
@@ -1074,7 +1049,11 @@ async def run_generation_task(task_id: str, base_url: str, payload: GenerationPa
         )
         await push_task_status_update(task_id)
     except Exception as e:
-        logger.exception("Generation task failed, task_id=%s", task_id)
+        logger.exception(
+            "Generation task failed, task_id=%s elapsed=%.3fs",
+            task_id,
+            time.perf_counter() - started_at,
+        )
         set_generation_task(
             task_id,
             status="failed",
@@ -1083,6 +1062,12 @@ async def run_generation_task(task_id: str, base_url: str, payload: GenerationPa
             message="任务处理失败",
         )
         await push_task_status_update(task_id)
+    else:
+        logger.info(
+            "Generation task completed, task_id=%s elapsed=%.3fs",
+            task_id,
+            time.perf_counter() - started_at,
+        )
 
 
 @app.post("/api/generate_handwriting")
@@ -1398,7 +1383,7 @@ if DIST_DIR and Path(DIST_DIR).is_dir():
 def main() -> None:
     """启动本地开发服务，监听地址可由 HOST 环境变量指定."""
     cleanup_marked_directories()
-    uvicorn.run(app, host=get_environment_value("HOST", "127.0.0.1"), port=5005)
+    uvicorn.run(app, host=get_environment_value("HOST", "127.0.0.1"), port=5005, log_config=None)
 
 
 if __name__ == "__main__":
