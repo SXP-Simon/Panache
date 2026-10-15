@@ -91,6 +91,18 @@ docker build -f frontend/dockerfile.frontend -t handwriting-frontend .
 docker build -f backend/dockerfile.backend -t handwriting-backend .
 ```
 
+在仓库根目录运行当前分支的容器版：
+
+```bash
+docker compose up --build -d
+```
+
+访问 `http://127.0.0.1:2345`。Compose 从当前源码构建前后端，默认使用本地镜像
+`handwriting-frontend:local` 和 `handwriting-backend:local`；字体与日志分别保存在
+`ttf_files/` 和 `logs/`。`FRONTEND_IMAGE`、`BACKEND_IMAGE` 可覆盖镜像名。
+Watchtower 默认关闭；仅在镜像已发布到自己的 registry 时，设置上述镜像名与
+`WATCHTOWER_ENABLE=true`，并通过 `docker compose --profile auto-update up -d` 启用。
+
 ---
 
 ## 📌 分支管理约定

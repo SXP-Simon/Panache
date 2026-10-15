@@ -1,8 +1,12 @@
 services:
   frontend:
-    image: 14790897/frontend-handwriting:latest
+    image: ${FRONTEND_IMAGE:-handwriting-frontend:local}
+    build:
+      context: .
+      dockerfile: frontend/dockerfile.frontend
+    pull_policy: never
     labels:
-      - com.centurylinklabs.watchtower.enable=true
+      - com.centurylinklabs.watchtower.enable=${WATCHTOWER_ENABLE:-false}
     ports:
       - "2345:80"
     depends_on:
@@ -15,15 +19,20 @@ services:
 
 
   backend:
-    image: 14790897/backend-handwriting:latest
+    image: ${BACKEND_IMAGE:-handwriting-backend:local}
+    build:
+      context: .
+      dockerfile: backend/dockerfile.backend
+    pull_policy: never
     labels:
-      - com.centurylinklabs.watchtower.enable=true
+      - com.centurylinklabs.watchtower.enable=${WATCHTOWER_ENABLE:-false}
     ports:
       - "127.0.0.1:5005:5005"
     # 启动时同步字体文件到指定文件夹，如果直接将字体文件夹挂载到容器中，会默认同步宿主机的空文件导致被覆盖
     environment:
       - FONT_ASSETS_DIR=/app/font_assets_host
       - FONT_ASSETS_BUNDLED_DIR=/app/font_assets
+      - CPU_USAGE_LIMIT=${CPU_USAGE_LIMIT:-90}
     volumes:
       - ./ttf_files:/app/font_assets_host
       - ./logs:/app/logs
@@ -34,6 +43,7 @@ services:
     memswap_limit: 4000m
 
   watchtower:
+    profiles: [auto-update]
     image: containrrr/watchtower:latest
     restart: unless-stopped
     environment:

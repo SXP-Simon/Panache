@@ -275,6 +275,7 @@
       "args": [
         "compose",
         "up",
+        "--build",
         "-d"
       ],
       "options": {
