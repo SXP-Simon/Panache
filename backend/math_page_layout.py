@@ -47,6 +47,54 @@ def install_math_page_layout(core, is_math_glyph, measure_bbox):
             advance = max(1, math.floor(advance * ratio))
         return image, bbox, advance
 
+    def corrected_pair(image, bbox, advance, wrong, font, tpl, rand, width, height):
+        # 2026-10-15：先划掉错字，再在其右侧写正确字，不能把两者叠成一个字。
+        wrong_image, wrong_bbox, wrong_advance = fit(wrong, font, width, height)
+        strokes = []
+
+        class StrokeCapture:
+            def line(self, points, fill, width):
+                strokes.append((tuple(points), fill, max(1, width)))
+
+        core._draw_strikethrough(StrokeCapture(), 0, 0, tpl, rand)
+        bounds = [wrong_bbox]
+        for points, _, thickness in strokes:
+            pad = (thickness + 1) // 2 + 1
+            bounds.append((math.floor(min(points[::2]) - pad), math.floor(min(points[1::2]) - pad),
+                           math.ceil(max(points[::2]) + pad + 1), math.ceil(max(points[1::2]) + pad + 1)))
+        wrong_right = max(bound[2] for bound in bounds)
+        offset = max(wrong_advance + max(0, tpl.get_word_spacing()), wrong_right + max(2, round(font.size * 0.08)))
+        bounds.append((bbox[0] + offset, bbox[1], bbox[2] + offset, bbox[3]))
+        left_edge, top_edge = min(bound[0] for bound in bounds), min(bound[1] for bound in bounds)
+        right_edge, bottom_edge = max(bound[2] for bound in bounds), max(bound[3] for bound in bounds)
+        advance += offset
+        # 2026-10-15：先缩放坐标再分配蒙版，极端删除线参数不能产生超大中间画布。
+        ratio = min(1, width / max(1, max(advance, right_edge) - min(0, left_edge)),
+                    height / max(1, bottom_edge - top_edge))
+        pair_width = max(1, min(width, int((right_edge - left_edge) * ratio)))
+        pair_height = max(1, min(height, int((bottom_edge - top_edge) * ratio)))
+        pair = Image.new("1", (pair_width, pair_height), 0)
+
+        def paste_scaled(glyph, x, y):
+            if ratio < 1:
+                glyph = glyph.resize((max(1, int(glyph.width * ratio)), max(1, int(glyph.height * ratio))),
+                                     Image.Resampling.NEAREST)
+            position = (max(0, min(pair_width - glyph.width, round((x - left_edge) * ratio))),
+                        max(0, min(pair_height - glyph.height, round((y - top_edge) * ratio))))
+            pair.paste(glyph, position, glyph)
+
+        paste_scaled(wrong_image, wrong_bbox[0], wrong_bbox[1])
+        pair_draw = ImageDraw.Draw(pair)
+        for points, fill, thickness in strokes:
+            pair_draw.line(tuple(round((value - (left_edge if index % 2 == 0 else top_edge)) * ratio)
+                                 for index, value in enumerate(points)), fill=fill,
+                           width=max(1, round(thickness * ratio)))
+        paste_scaled(image, bbox[0] + offset, bbox[1])
+        left_edge, top_edge = math.floor(left_edge * ratio), math.floor(top_edge * ratio)
+        advance = max(1, math.floor(advance * ratio))
+        right_edge, bottom_edge = left_edge + pair.width, top_edge + pair.height
+        return pair, (left_edge, top_edge, right_edge, bottom_edge), advance
+
     @functools.wraps(original)
     def draw_page(page, text, start, tpl, rand):
         if not any(is_math_glyph(char) for char in text[start:]):
@@ -99,21 +147,8 @@ def install_math_page_layout(core, is_math_glyph, measure_bbox):
                 if strike:
                     # 2026-10-15：涂改仍使用手写引擎的笔画与参数，固定使用传入的局部随机源。
                     wrong = rand.choice(candidates)
-                    wrong_image, wrong_bbox, _ = fit(wrong, font, max(1, footprint), usable_height)
-                    composite_left = min(bbox[0], wrong_bbox[0])
-                    composite_top = min(bbox[1], wrong_bbox[1], 0)
-                    composite_right = max(bbox[2], wrong_bbox[2], font.size)
-                    composite_bottom = max(bbox[3], wrong_bbox[3], font.size)
-                    composite = Image.new("1", (max(1, composite_right - composite_left),
-                                                 max(1, composite_bottom - composite_top)), 0)
-                    composite.paste(wrong_image, (wrong_bbox[0] - composite_left, wrong_bbox[1] - composite_top), wrong_image)
-                    core._draw_strikethrough(ImageDraw.Draw(composite), -composite_left, -composite_top, tpl, rand)
-                    composite.paste(image, (bbox[0] - composite_left, bbox[1] - composite_top), image)
-                    image, bbox = composite, (composite_left, composite_top, composite_right, composite_bottom)
-                    ratio = min(1, usable_width / image.width, usable_height / image.height)
-                    if ratio < 1:
-                        image = image.resize((max(1, int(image.width * ratio)), max(1, int(image.height * ratio))), Image.Resampling.NEAREST)
-                        bbox = (0, 0, image.width, image.height)
+                    image, bbox, advance = corrected_pair(image, bbox, advance, wrong, font, tpl, rand,
+                                                          usable_width, usable_height)
                     x = max(left - bbox[0], round(cursor + jitter_x))
                     if units and x + bbox[2] > right:
                         rand.setstate(char_state)
