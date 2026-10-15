@@ -9,6 +9,23 @@ const PACKAGED_VERSION = require(path.resolve(__dirname, "..", "..", "desktop", 
   .version;
 
 test.describe("桌面版启动与打包完整性", () => {
+  test("发行包保留完整的项目许可", async ({ desktop }) => {
+    const license = await desktop.app.evaluate(async ({ app, BrowserWindow }) => {
+      const viewer = new BrowserWindow({
+        show: false,
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+      });
+      try {
+        await viewer.loadFile(`${app.getAppPath()}/LICENSE`);
+        return await viewer.webContents.executeJavaScript("document.body.textContent");
+      } finally {
+        viewer.destroy();
+      }
+    });
+    const source = fs.readFileSync(path.resolve(__dirname, "..", "..", "LICENSE"), "utf8");
+    expect(license.replaceAll("\r\n", "\n").trim()).toBe(source.replaceAll("\r\n", "\n").trim());
+  });
+
   test("窗口加载真实站点：字体来自打包资源，页脚版本号是打包版本", async ({ desktop }) => {
     await resetHome(desktop);
 

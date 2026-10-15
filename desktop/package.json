@@ -31,8 +31,11 @@
       "splash.html",
       "package.json",
       {
-        "from": "../LICENSE",
-        "to": "LICENSE"
+        "from": "..",
+        "to": ".",
+        "filter": [
+          "LICENSE"
+        ]
       },
       {
         "from": "../frontend/public/fonts/lxgw-wenkai",
