@@ -6,7 +6,18 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { EXAMPLE, validateCommitMessage } = require("../check-commit-message.cjs");
+const { EXAMPLE, validateCommitMessage, validateScopePaths } = require("../check-commit-message.cjs");
+
+test("fe/be scope 映射真实变更路径，并保留旧 scope 兼容", () => {
+  const message = (scope) => EXAMPLE.replace("fix(math)", `fix(${scope})`);
+  assert.deepEqual(validateScopePaths(message("fe/src/components"), ["frontend/src/components/Editor.tsx"]), []);
+  assert.deepEqual(validateScopePaths(message("be/app.py"), ["backend/app.py"]), []);
+  assert.deepEqual(validateScopePaths(message("be"), ["backend/app.py"]), []);
+  assert.deepEqual(validateScopePaths(EXAMPLE, []), []);
+  for (const scope of ["fe/src/components", "be/app.py", "fe/../backend", "fe/src//components", "be/"]) {
+    assert.ok(validateScopePaths(message(scope), ["frontend/src/components-old/Editor.tsx"]).length > 0, scope);
+  }
+});
 
 test("完整三段、Markdown 标题、CRLF 与 breaking 标记通过", () => {
   for (const message of [EXAMPLE, EXAMPLE.replace(/\n/g, "\r\n"), EXAMPLE.replace("fix(math):", "feat(api)!:"),
@@ -91,4 +102,33 @@ test("范围检查不追溯旧提交，但规则首提交及之后删除规则�
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("CLI 对暂存区与提交范围都核对 fe/be 的真实路径", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "commit-scope-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git("init");
+  git("config", "user.name", "Scope fixture");
+  git("config", "user.email", "scope@example.invalid");
+  git("config", "commit.gpgsign", "false");
+  fs.mkdirSync(path.join(directory, "scripts"));
+  fs.writeFileSync(path.join(directory, "scripts/check-commit-message.cjs"), "// rule exists\n");
+  git("add", "scripts");
+  git("commit", "-m", EXAMPLE);
+  fs.mkdirSync(path.join(directory, "frontend/src"), { recursive: true });
+  fs.writeFileSync(path.join(directory, "frontend/src/App.tsx"), "// changed\n");
+  git("add", "frontend");
+  const script = path.resolve(__dirname, "../check-commit-message.cjs");
+  const message = path.join(directory, "message.txt");
+  const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: directory, encoding: "utf8" });
+  fs.writeFileSync(message, EXAMPLE.replace("fix(math)", "fix(fe/src/App.tsx)"));
+  assert.equal(run(message).status, 0);
+  fs.writeFileSync(message, EXAMPLE.replace("fix(math)", "fix(be/app.py)"));
+  assert.equal(run(message).status, 1);
+  git("commit", "-F", message);
+  assert.equal(run("--range", "HEAD~1..HEAD").status, 1);
 });

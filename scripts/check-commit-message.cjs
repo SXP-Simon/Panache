@@ -3,6 +3,7 @@
 
 const fs = require("node:fs");
 const { spawnSync } = require("node:child_process");
+const { git, staged } = require("./git-change-set.cjs");
 
 const TYPES = "feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert";
 const HEADER = new RegExp(`^(?:${TYPES})(?:\\([a-zA-Z0-9][a-zA-Z0-9._/-]*\\))?!?: \\S.*$`, "u");
@@ -63,9 +64,22 @@ function report(label, errors, write = console.error) {
   write(`提交说明校验失败（${label}）：\n${errors.map((error) => `- ${error}`).join("\n")}\n\n可复制的完整示例：\n\n${EXAMPLE}\n\n请把真实说明保存到文本文件，再执行 git commit -F <文件路径>。\n原子提交建议：只提交一个独立行为变更及其必要测试；无关修复、格式化和文档拆成各自通过检查的最小提交。`);
 }
 
+function validateScopePaths(source, paths) {
+  const scope = /^(?:[^\n(]+)\((fe|be)(?:\/([^)]*))?\)!?: /u.exec(source);
+  if (!scope) return [];
+  const [, layer, suffix] = scope;
+  if (suffix !== undefined && suffix.split("/").some((part) => !part || part === "." || part === "..")) {
+    return ["fe/be scope 必须使用仓库内的真实路径，不能包含空路径、. 或 ..。"];
+  }
+  const target = `${layer === "fe" ? "frontend" : "backend"}${suffix ? `/${suffix}` : ""}`;
+  return paths.some((file) => file === target || file.startsWith(`${target}/`)) ? []
+    : [`scope「${scope[1]}${suffix ? `/${suffix}` : ""}」未对应实际修改路径「${target}」。`];
+}
+
 function main(args) {
   if (args.length === 1 && args[0] !== "--range") {
-    const errors = validateCommitMessage(fs.readFileSync(args[0], "utf8"));
+    const source = fs.readFileSync(args[0], "utf8");
+    const errors = [...validateCommitMessage(source), ...validateScopePaths(source, staged().paths)];
     if (errors.length) report(args[0], errors);
     return errors.length ? 1 : 0;
   }
@@ -82,7 +96,9 @@ function main(args) {
       }
       const result = spawnSync("git", ["show", "-s", "--format=%B", revision], { encoding: "utf8" });
       if (result.status !== 0) throw new Error(result.stderr || `无法读取提交 ${revision}。`);
-      const errors = validateCommitMessage(result.stdout);
+      const changed = git(["diff-tree", "--root", "--first-parent", "-m", "--no-commit-id", "--name-only", "-r", "-z", "--no-renames", revision, "--"])
+        .split("\0").filter(Boolean);
+      const errors = [...validateCommitMessage(result.stdout), ...validateScopePaths(result.stdout, changed)];
       if (errors.length) {
         failed = true;
         report(revision, errors);
@@ -102,4 +118,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { EXAMPLE, main, validateCommitMessage };
+module.exports = { EXAMPLE, main, validateCommitMessage, validateScopePaths };

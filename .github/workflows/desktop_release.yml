@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: desktop-release
@@ -34,7 +35,9 @@ jobs:
   resolve-tag:
     if: >-
       github.event_name == 'workflow_dispatch'
-      || github.event.workflow_run.conclusion == 'success'
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.head_branch == 'custom-base'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
@@ -43,21 +46,51 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # 手动补传时必须检出那个 tag 的代码：否则会拿 main 的最新代码构建、
+          # 手动补传时必须检出那个 tag 的代码：否则会拿 custom-base 的最新代码构建、
           # 再挂到旧 release 上，产物的版本号和 release 对不上。
-          # 自动触发时 inputs.tag 为空，checkout 走默认（触发运行所在的提交）。
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || 'custom-base' }}
           # contents: write 的 token 不该留在 git config 里供后续脚本读取。
           # gh 步骤用的是显式传的 GH_TOKEN。
           persist-credentials: false
 
+      - name: 查找本次发布结果
+        id: result
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          COUNT="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name == "release-result" and .expired == false)] | length')"
+          if [ "$COUNT" = "0" ]; then
+            echo "本次没有发布结果，跳过桌面版构建"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          elif [ "$COUNT" = "1" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::同一次发布存在多个结果，无法确认构建目标"
+            exit 1
+          fi
+
+      - name: 下载同一次运行的发布结果
+        if: steps.result.outputs.available == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-result
+          path: release-result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
       - name: 解析本次要上传的 tag
         id: tag
+        if: github.event_name == 'workflow_dispatch' || steps.result.outputs.available == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           MANUAL_TAG: ${{ inputs.tag }}
-          RUN_CREATED_AT: ${{ github.event.workflow_run.created_at }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
 
@@ -65,11 +98,19 @@ jobs:
             TARGET="${MANUAL_TAG}"
             echo "手动补传 tag=${TARGET}"
           else
-            # semantic-release 走 API 建 release，本地不一定有 tag，所以从 API 取。
-            # 注意：release 的 created_at 是**目标提交的日期**，不是发布时间 —— 用它
-            # 判断「是不是这次工作流产出的」会漏判；要用 published_at。
-            TARGET="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=10" \
-              --jq "[.[] | select(.published_at > \"${RUN_CREATED_AT}\")] | first | .tag_name // \"\"")"
+            # 只接受触发运行自己的结果，不能用发布时间猜测并发运行创建的 release。
+            TARGET="$(node <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync('release-result/release-result.json', 'utf8'));
+          if (result.version !== 1 || result.run_id !== process.env.SOURCE_RUN_ID) {
+            throw new Error('发布结果与触发运行不匹配');
+          }
+          if (result.tag !== null && (typeof result.tag !== 'string' || !/^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(result.tag))) {
+            throw new Error('发布结果中的 tag 无效');
+          }
+          process.stdout.write(result.tag ?? '');
+          NODE
+            )"
             if [ -z "${TARGET}" ]; then
               echo "本次没有产生新版本，跳过桌面版构建"
               exit 0
@@ -77,8 +118,7 @@ jobs:
           fi
 
           # 两条路径都要过这道校验：上传目标的版本必须等于检出代码的版本。
-          # 光凭发布时间不足以确定 release 就是本次运行的产物（并发运行可能挑到别人的），
-          # 而手动补传更可能拿错代码 —— 版本号取自检出代码里的 backend/VERSION
+          # 手动补传可能拿错代码，版本号取自目标 tag 的 backend/VERSION
           # （发版时由 scripts/sync-version.js 写入并随发版提交），产物文件名也带同一个
           # 版本号，所以版本对不上就绝不可能是「这次的构建」。
           if ! git cat-file -e "${TARGET}:backend/VERSION"; then

@@ -14,3 +14,4 @@ pre-push:
   scripts:
     full-tests.cjs:
       runner: node
+      use_stdin: true

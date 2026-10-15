@@ -41,7 +41,7 @@ function installHooks(cwd = process.cwd(), environment = process.env, run = spaw
 if (require.main === module) {
   try {
     const result = installHooks();
-    console.log(result === "ci" ? "CI 直接执行质量门禁，不安装本地 Git hooks。" : "Lefthook 已安装：提交前质量检查、提交说明校验、推送前完整测试。");
+    console.log(result === "ci" ? "CI 直接执行质量门禁，不安装本地 Git hooks。" : "Lefthook 已安装：提交前按需质量检查、提交说明校验、推送前按需测试。");
   } catch (error) {
     console.error(`安装 Git hooks 失败：${error.message}`);
     process.exitCode = 1;

@@ -1,11 +1,8 @@
 name: Backend Test Workflow
 
 on:
-  push:
-    branches: [main]
-    paths: ["backend/**", "pyproject.toml", "uv.lock", ".github/workflows/test_backend.yml"]
-  pull_request:
-    branches: [main]
+  # Automatic checks are part of Engineering quality.
+  workflow_dispatch:
 
 jobs:
   backend-test:

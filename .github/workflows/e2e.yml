@@ -1,9 +1,7 @@
 name: E2E Tests
 
 on:
-  pull_request:
-    branches:
-      - main
+  # Pull requests use the path-aware Engineering quality gate.
   workflow_dispatch:
 
 concurrency:

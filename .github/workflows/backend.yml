@@ -1,55 +1,79 @@
 name: Backend Docker Image
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".dockerignore"
-      - ".github/workflows/backend.yml"
+  workflow_run:
+    workflows: ["Engineering quality"]
+    types: [completed]
+    branches: [custom-base]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: backend-image-custom-base
+  cancel-in-progress: false
 
 jobs:
-  build-and-push:
+  eligibility:
+    if: >-
+      vars.BACKEND_IMAGE != ''
+      && (github.event_name == 'workflow_dispatch'
+          || (github.event.workflow_run.conclusion == 'success'
+              && github.event.workflow_run.event == 'push'
+              && github.event.workflow_run.head_branch == 'custom-base'
+              && github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
-
+    outputs:
+      build: ${{ steps.check.outputs.build }}
     steps:
-      - name: Check Out Repo
-        uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          name: changed-path-plan
+          path: image-plan
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Check exact-run backend image eligibility
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          let selected = true;
+          if (process.env.EVENT_NAME !== 'workflow_dispatch') {
+            const plan = JSON.parse(fs.readFileSync('image-plan/change-plan.json', 'utf8'));
+            if (plan.head_sha !== process.env.EXPECTED_SHA || typeof plan.backend_image !== 'boolean') {
+              throw new Error('The image check plan does not match the successful source run.');
+            }
+            selected = plan.backend_image;
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `build=${selected}\n`);
+          NODE
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+  build-and-push:
+    needs: eligibility
+    if: needs.eligibility.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || 'custom-base' }}
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Build and Push Image
+      - name: Build and push configured backend image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./backend/dockerfile.backend
           push: true
-          tags: 14790897/backend-handwriting:latest
+          tags: ${{ vars.BACKEND_IMAGE }}
           platforms: linux/amd64,linux/arm64
-
-
-  # release-please-backend:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - uses: google-github-actions/release-please-action@v2
-  #       with:
-  #         token: ${{ secrets.GH_TOKEN }}
-  #         release-type: python
-  #         package-name: handwriting-backend
-  #         path: ./backend
-permissions:
-  contents: write

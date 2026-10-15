@@ -8,20 +8,62 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  actions: read
 
 concurrency:
   group: semantic-release-custom-base
   cancel-in-progress: false
 
 jobs:
-  release:
+  eligibility:
     if: >-
       github.event_name == 'workflow_dispatch'
       || (github.event.workflow_run.conclusion == 'success'
           && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_branch == 'custom-base'
           && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          name: changed-path-plan
+          path: release-plan
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Require the exact successful code-check plan
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          let eligible = true;
+          if (process.env.EVENT_NAME !== 'workflow_dispatch') {
+            const plan = JSON.parse(fs.readFileSync('release-plan/change-plan.json', 'utf8'));
+            if (plan.head_sha !== process.env.EXPECTED_SHA || typeof plan.release !== 'boolean') {
+              throw new Error('The check plan does not match the exact successful source run.');
+            }
+            eligible = plan.release;
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `release=${eligible}\n`);
+          console.log(eligible ? 'Code changes are eligible for release analysis.' : 'No application changes; release analysis is unnecessary.');
+          NODE
+
+  release:
+    name: Publish release
+    needs: eligibility
+    if: needs.eligibility.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,8 +75,33 @@ jobs:
           node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec semantic-release
+      - name: Publish from the checked custom-base commit
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
           GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
           GH_REPO: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import semanticRelease from 'semantic-release';
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          // workflow_run points GITHUB_REF at the default branch, which may still be main.
+          const result = await semanticRelease({}, {
+            env: { ...process.env, GITHUB_REF: 'refs/heads/custom-base', GITHUB_SHA: git('rev-parse', 'HEAD') },
+          });
+          const tag = result?.nextRelease?.gitTag ?? null;
+          if (tag !== null) {
+            const version = git('show', `${tag}:backend/VERSION`);
+            if (tag !== `v${version}`) throw new Error('Published tag and release commit version do not match.');
+          }
+          fs.mkdirSync('preview_outputs', { recursive: true });
+          fs.writeFileSync('preview_outputs/release-result.json', JSON.stringify({ version: 1, run_id: process.env.GITHUB_RUN_ID, tag }));
+          NODE
+      - name: Preserve exact desktop build target
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-result
+          path: preview_outputs/release-result.json
+          if-no-files-found: error
+          retention-days: 30
