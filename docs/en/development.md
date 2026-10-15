@@ -177,3 +177,5 @@ configured for the account's Pages site; update both `site_url` and documentatio
 ```bash
 uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 ```
+
+Flutter/Rust packages use the [pinned-source asset workflow](flutter-release.md) and are attached to the same `custom-base` release. APK publishing requires formal Android signing secrets.

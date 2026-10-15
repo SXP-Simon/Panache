@@ -83,6 +83,7 @@ pnpm run test:desktop
 
 自用发布从 `custom-base` 进行：工程质量工作流通过且实际改动涉及应用时触发 semantic-release，再由桌面工作流按本次发布结果构建安装包。`main` 只同步上游。
 桌面版按构建机的平台与架构出包，产物上传使用 `scripts/upload-release-assets.sh`。
+Flutter/Rust 附属安装包使用[固定来源发布流程](docs/flutter-release.md)，同一版本的源 SHA 由 Release manifest 固定，正式 Android 签名未就绪时跳过 APK。
 
 本地 `pnpm install` 自动安装 Lefthook；需要重装时运行 `pnpm run hooks:install`。
 Lefthook 与 CI 共享 `scripts/change-impact.cjs`，根据真实 Git 改动路径选择必要检查；提交前检查暂存区，推送前检查全部待推送 ref 的提交范围。缺失比较基线时执行完整检查。

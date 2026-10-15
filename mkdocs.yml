@@ -66,6 +66,7 @@ plugins:
             本地开发: Local Development
             架构与技术栈: Architecture and Technology Stack
             桌面版: Desktop App
+            Flutter 安装包发布: Flutter Release Assets
             更新日志: Changelog
 
 markdown_extensions:
@@ -105,4 +106,5 @@ nav:
   - 架构与技术栈: architecture.md
   - 本地开发: development.md
   - 桌面版: desktop.md
+  - Flutter 安装包发布: flutter-release.md
   - 更新日志: changelog.md

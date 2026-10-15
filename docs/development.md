@@ -143,6 +143,7 @@ Engineering quality 在推送到 `custom-base`、面向 `custom-base` 的 PR 与
 
 自动发布和镜像构建消费同一次成功检查的计划与提交哈希：只有应用相关改动才进入版本分析，
 镜像只在相应输入变化时构建。桌面发布读取对应版本发布的结果，构建确切的 tag；手动补构建入口保留。
+Flutter/Rust 附属包使用[固定源码发布流程](flutter-release.md)，挂到同一 `custom-base` Release；正式 Android 签名缺失时明确跳过 APK。
 文档部署只监听 `custom-base` 的文档输入。`main` 用于镜像同步上游，不触发自用构建与发布。
 独立后端与 E2E 工作流仅保留手动入口，避免重复自动执行。
 
