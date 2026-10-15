@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/widgets/workbench_shell.dart';
@@ -22,6 +23,43 @@ void main() {
           informationBuilder: () => const SizedBox.expand(),
         ),
       );
+
+  for (final width in [320.0, 375.0, 1280.0]) {
+    testWidgets('repository header remains visible and opens at $width px', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      String? openedUrl;
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        if (call.method == 'launch') {
+          openedUrl =
+              (call.arguments as Map<Object?, Object?>)['url'] as String;
+        }
+        return true;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      await tester.pumpWidget(shell());
+      final link = find.byKey(const ValueKey('project-source-link'));
+      expect(link, findsOneWidget);
+      expect(find.text('SXP-Simon/handwriting-web'), findsOneWidget);
+      expect(tester.getRect(link).top, lessThan(120));
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      expect(openedUrl, 'https://github.com/SXP-Simon/handwriting-web');
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('mobile preferences expose named actions and return callbacks', (
     tester,

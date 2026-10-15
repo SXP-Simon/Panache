@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import 'project_source_link.dart';
 
 /// Adaptive app navigation and visible preference actions. Selection belongs to
 /// the caller; this shell only presents callbacks and responsive navigation.
@@ -37,12 +38,25 @@ class WorkbenchShell extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(l.appTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-        bottom:
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(
             MediaQuery.sizeOf(context).width < 1100 &&
-                MediaQuery.viewInsetsOf(context).bottom > 0
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(40),
-                child: Align(
+                    MediaQuery.viewInsetsOf(context).bottom > 0
+                ? 80
+                : 40,
+          ),
+          child: Column(
+            children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: ProjectSourceLink(),
+                ),
+              ),
+              if (MediaQuery.sizeOf(context).width < 1100 &&
+                  MediaQuery.viewInsetsOf(context).bottom > 0)
+                Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: () => FocusScope.of(context).unfocus(),
@@ -50,8 +64,9 @@ class WorkbenchShell extends StatelessWidget {
                     label: Text(l.dismissKeyboard),
                   ),
                 ),
-              )
-            : null,
+            ],
+          ),
+        ),
         actions: [
           if (MediaQuery.sizeOf(context).width < 1100) ...[
             TextButton.icon(
