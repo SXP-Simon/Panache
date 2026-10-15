@@ -70,6 +70,10 @@ pnpm --filter handwrite run build
 bash desktop/build.sh
 ```
 
+Electron 外壳只使用 Electron 和 Node 内置模块，后端由 PyInstaller 独立打包；
+`npmRebuild` 保持关闭，避免打包器在 pnpm 工作区中再次安装生产依赖并裁剪构建工具。
+新增原生 Node 运行依赖时，需要同步调整对应的安装与重建配置。
+
 `pnpm install` 自动安装 Lefthook。提交前检查 TypeScript、Oxlint、格式、Pyright 和 Ruff；推送前运行完整测试。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，建议按最小独立改动提交。
 
 ```text

@@ -18,6 +18,7 @@
   },
   "build": {
     "electronVersion": "33.4.11",
+    "npmRebuild": false,
     "appId": "top.liuweiqing.handwriting",
     "productName": "HandwritingWeb",
     "directories": {
