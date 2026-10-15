@@ -1,3 +1,5 @@
+import 'dart:ui' show FontStyle;
+
 import 'package:flutter_math_fork/ast.dart';
 import 'package:flutter_math_fork/tex.dart';
 
@@ -67,9 +69,24 @@ String _symbol(String s) =>
       '⟶': '→',
       '⟵': '←',
       '⟷': '↔',
+      '⪯': '≼',
+      '⪰': '≽',
     }[s] ??
     s;
 String _group(String s) => s.runes.length > 1 ? '($s)' : s;
+
+bool _uprightLabel(GreenNode? node, String text) {
+  if (node is EquationRowNode && node.children.length == 1) {
+    return _uprightLabel(node.children.single, text);
+  }
+  if (node is! StyleNode || !RegExp(r'^[A-Za-z]+$').hasMatch(text)) {
+    return false;
+  }
+  final font = node.optionsDiff.mathFontOptions;
+  // Upright labels and element symbols must not gain literal parentheses:
+  // SO₄ is chemically different from (SO)₄. Expressions still need grouping.
+  return font?.fontFamily == 'Main' && font?.fontShape == FontStyle.normal;
+}
 
 // Conversion uses the same public AST as the preview widget. Unknown semantic
 // nodes fail the whole formula instead of silently deleting mathematical data.
@@ -108,7 +125,10 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
       throw const FormatException('Prescripts');
     }
     final base = child(n.base);
-    return '${RegExp(r'^(?:lim|max|min|det|sin|cos|tan|log|ln|[|]+)$').hasMatch(base) ? base : _group(base)}${n.sub == null ? '' : _script(child(n.sub), false)}${n.sup == null ? '' : _script(child(n.sup), true)}';
+    final ungrouped =
+        _uprightLabel(n.base, base) ||
+        RegExp(r'^(?:lim|max|min|det|sin|cos|tan|log|ln|[|]+)$').hasMatch(base);
+    return '${ungrouped ? base : _group(base)}${n.sub == null ? '' : _script(child(n.sub), false)}${n.sup == null ? '' : _script(child(n.sup), true)}';
   }
   if (n is NaryOperatorNode) {
     return '${_symbol(n.operator)}${n.lowerLimit == null ? '' : _script(child(n.lowerLimit), false)}${n.upperLimit == null ? '' : _script(child(n.upperLimit), true)}${child(n.naryand)}';
