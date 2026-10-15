@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/mobile_api.dart';
+import 'package:handwriting_app/utils/latex.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +67,57 @@ void main() {
         latin1.decode(result.bodyBytes.take(pdf ? 5 : 2).toList()),
         pdf ? '%PDF-' : 'PK',
       );
+    }
+    final math = convertLatex(
+      r'公式 $x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$'
+      '\n'
+      r'$\frac{1}{1+\frac{1}{1+\frac{1}{2}}}$'
+      '\n'
+      r'$a_{n+1}^{2}+\overrightarrow{AB}+\underline{xy}$'
+      '\n---\n'
+      r'$\sqrt[12]{\frac{x+1}{x-1}}$'
+      '\n'
+      r'$\frac{a+b+c+d+e+f+g+h+i+j+k+l+m+n}{x+y}$',
+    );
+    for (final grid in [false, true]) {
+      id = await api.submit({
+        ...fields,
+        'text': math,
+        'height': '420',
+        'font_size': '40',
+        'line_spacing': '46',
+        'isUnderlined': '$grid',
+        'font_size_sigma': '0',
+        'line_spacing_sigma': '0',
+        'word_spacing_sigma': '0',
+        'perturb_x_sigma': '0',
+        'perturb_y_sigma': '0',
+        'perturb_theta_sigma': '0',
+        'ink_depth_sigma': '0',
+      }, {});
+      final status = await wait(id);
+      expect(status['task_status'], 'completed', reason: '$status');
+      final mathPages = await api.preview(id);
+      expect(mathPages.length, greaterThanOrEqualTo(2));
+      for (final png in mathPages) {
+        final codec = await ui.instantiateImageCodec(png);
+        final frame = await codec.getNextFrame();
+        expect(frame.image.width, 420);
+        expect(frame.image.height, 420);
+        final rgba = (await frame.image.toByteData())!;
+        var ink = 0;
+        for (var offset = 0; offset < rgba.lengthInBytes; offset += 4) {
+          if (rgba.getUint8(offset) < 100 &&
+              rgba.getUint8(offset + 1) < 100 &&
+              rgba.getUint8(offset + 2) < 100 &&
+              rgba.getUint8(offset + 3) > 200) {
+            ink++;
+          }
+        }
+        expect(ink, greaterThan(100), reason: 'grid=$grid');
+        frame.image.dispose();
+        codec.dispose();
+      }
     }
     id = await api.submit({
       ...fields,
