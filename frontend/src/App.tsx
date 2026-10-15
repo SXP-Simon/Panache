@@ -55,7 +55,7 @@ function Studio() {
             <img src={brandIcon} alt="" aria-hidden="true" />
           </span>
           <span>
-            <a className="brand-home" href="/">
+            <a className="brand-home" href="/" data-testid="brand-title">
               {t('app')}
             </a>
             <a

@@ -61,8 +61,8 @@ for (const width of [1440, 390]) {
         const renderedFonts = [];
         for (const selector of [
           'h1',
-          '.brand strong',
-          '.brand small',
+          '[data-testid="brand-title"]',
+          '[data-testid="project-source-link"]',
           '[data-testid="quick-symbol-α"]',
           '[data-testid="text-input"]',
         ]) {
