@@ -4,6 +4,8 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const { randomUUID } = require("crypto");
+const { setupPersistence } = require("./studio-storage");
 
 // PyInstaller 只在 Windows 上给可执行文件加 .exe 后缀，macOS 上没有
 const BACKEND_EXE =
@@ -12,7 +14,14 @@ const READY_TIMEOUT_MS = 90 * 1000;
 
 let backendProcess = null;
 let mainWindow = null;
+let allowedStorageOrigin = "";
+let studioStorage = null;
 let shuttingDown = false;
+let finalWindowClose = false;
+let closeAttempt = null;
+let closeAcknowledgement = null;
+let finalQuitReady = false;
+let quitDrainPending = false;
 // 最近一次真正落盘成功的下载，供「打开文件夹」用（路径不经过页面，见 preload.js）
 let lastDownloadPath = "";
 
@@ -33,6 +42,75 @@ function dataDir() {
   }
   const base = process.env.LOCALAPPDATA || app.getPath("userData");
   return path.join(base, "HandwritingWeb");
+}
+
+function withDeadline(pending, milliseconds) {
+  let timer;
+  const deadline = new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("Storage shutdown timed out")), milliseconds);
+  });
+  return Promise.race([pending, deadline]).finally(() => clearTimeout(timer));
+}
+
+async function flushRendererBeforeClose(window) {
+  if (!allowedStorageOrigin || window.isDestroyed()) return;
+  let origin;
+  try { origin = new URL(window.webContents.getURL()).origin; } catch { return; }
+  if (origin !== allowedStorageOrigin) return;
+  const id = randomUUID();
+  try {
+    await new Promise((resolve, reject) => {
+      closeAcknowledgement = { id, resolve, reject };
+      window.webContents.send("storage:flush-request", id);
+    });
+  } finally {
+    if (closeAcknowledgement?.id === id) closeAcknowledgement = null;
+  }
+}
+
+// 2026-10-15：保持可信页面存活，先 flush/ack 再 drain；超时交给用户决定，不无限等待 IO。
+function requestApplicationClose() {
+  if (closeAttempt) return closeAttempt;
+  closeAttempt = (async () => {
+    const window = mainWindow;
+    try {
+      await withDeadline((async () => {
+        if (window) await flushRendererBeforeClose(window);
+        await studioStorage?.drain();
+      })(), 5000);
+    } catch {
+      closeAcknowledgement = null;
+      if (window && !window.isDestroyed()) {
+        const result = await dialog.showMessageBox(window, {
+          type: "warning",
+          title: "保存未完成 / Save incomplete",
+          message: "尚未确认最后的修改已保存。\nThe latest changes could not be confirmed as saved.",
+          detail: "取消可保留编辑窗口并重试；继续退出可能丢失未保存的修改。\nCancel to keep editing and retry. Quitting may discard unsaved changes.",
+          buttons: ["取消退出 / Cancel", "仍然退出 / Quit anyway"],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        });
+        if (result.response !== 1) {
+          window.webContents.send("storage:close-cancelled");
+          window.focus();
+          return;
+        }
+      }
+    }
+    finalWindowClose = true;
+    app.quit();
+  })().finally(() => { closeAttempt = null; });
+  return closeAttempt;
+}
+
+function setupCloseAcknowledgements() {
+  ipcMain.on("storage:flush-complete", (event, id, success) => {
+    if (!studioStorage?.trustedRenderer(event) || !closeAcknowledgement ||
+        id !== closeAcknowledgement.id || typeof success !== "boolean") return;
+    if (success) closeAcknowledgement.resolve();
+    else closeAcknowledgement.reject(new Error("Renderer could not save the workspace"));
+  });
 }
 
 function startBackend() {
@@ -217,7 +295,8 @@ function setupDownloads() {
   });
 
   // 页面上的「打开文件夹」：只认主进程刚记下的那次下载
-  ipcMain.on("download:reveal", () => {
+  ipcMain.on("download:reveal", (event) => {
+    if (!studioStorage?.trustedRenderer(event)) return;
     if (!lastDownloadPath) return;
     if (fs.existsSync(lastDownloadPath)) {
       shell.showItemInFolder(lastDownloadPath);
@@ -268,6 +347,11 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+  mainWindow.on("close", (event) => {
+    if (finalWindowClose) return;
+    event.preventDefault();
+    void requestApplicationClose();
   });
 }
 
@@ -370,6 +454,11 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     buildMenu();
     setupDownloads();
+    studioStorage = setupPersistence({
+      ipcMain, getWindow: () => mainWindow,
+      getAllowedOrigin: () => allowedStorageOrigin, dataDir,
+    });
+    setupCloseAcknowledgements();
     // 后端启动要几秒（PyInstaller 引导 + fastapi 等基础依赖载入），先给个等待页
     // 而不是白屏。opencv/sklearn/PyMuPDF 那些重家伙已经不在启动路径上了 ——
     // 见 backend/app.py 顶部的说明，它们改成了按需导入。
@@ -380,7 +469,8 @@ if (!app.requestSingleInstanceLock()) {
       await waitForHttp(port);
       // 站点从同一端口提供，保持同源，前端无需任何跨域配置
       if (mainWindow) {
-        await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
+        allowedStorageOrigin = `http://127.0.0.1:${port}`;
+        await mainWindow.loadURL(`${allowedStorageOrigin}/`);
       }
     } catch (error) {
       const detail = `${error.message}\n\n后端日志：${path.join(dataDir(), "backend-console.log")}`;
@@ -393,6 +483,27 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on("window-all-closed", () => app.quit());
-  app.on("will-quit", stopBackend);
-  app.on("before-quit", stopBackend);
+  app.on("before-quit", (event) => {
+    if (!finalWindowClose && mainWindow && !mainWindow.isDestroyed()) {
+      event.preventDefault();
+      void requestApplicationClose();
+      return;
+    }
+    stopBackend();
+  });
+  app.on("will-quit", (event) => {
+    stopBackend();
+    if (finalQuitReady || !studioStorage) return;
+    event.preventDefault();
+    if (quitDrainPending) return;
+    quitDrainPending = true;
+    // Late accepted IPC after pagehide also gets a bounded drain before the final quit.
+    void withDeadline(studioStorage.drain(), 2000).catch((error) => {
+      console.error(error);
+    }).finally(() => {
+      finalQuitReady = true;
+      // Let Electron finish cancelling the original will-quit before retrying.
+      setImmediate(() => app.quit());
+    });
+  });
 }

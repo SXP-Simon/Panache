@@ -195,20 +195,52 @@ async function launchDesktopApp() {
 
 // 2026-10-15：清理持久化草稿和设置，隔离共享 Electron worker 的各用例。
 async function resetHome(desktop) {
-  await desktop.page.evaluate(() => {
-    for (const key of [
-      'studio.draft',
-      'studio.settings',
-      'studio.preset',
-      'studio.theme',
-      'studio.locale',
-      'text',
-    ]) {
-      localStorage.removeItem(key);
-    }
+  const recordKeys = [
+    'studio.workspace', 'studio.draft', 'studio.settings', 'studio.preset', 'studio.assets',
+    'studio.generation', 'studio.locale', 'studio.theme', 'markdownTableMode', 'studio.legacy',
+  ];
+  // 先等已有保存结束，再阻止卸载补写。直接删记录后 reload 会把旧快照写回。
+  await desktop.page.waitForFunction(() => {
+    const status = document.querySelector('[data-testid="draft-save-status"]');
+    return !status || !/正在保存|Saving on this device/i.test(status.textContent ?? '');
   });
-  await desktop.page.goto(desktop.url);
-  await waitForHome(desktop.page);
+  await desktop.page.evaluate(async (keys) => {
+    const stopFlush = (event) => event.stopImmediatePropagation();
+    window.addEventListener('pagehide', stopFlush, true);
+    window.addEventListener('blur', stopFlush, true);
+    document.addEventListener('visibilitychange', stopFlush, true);
+    const storage = window.handwritingDesktop?.storage;
+    // readRecord 会等待对应键已排队的主进程写入；串行读取不超出 IPC 在途预算。
+    if (storage) for (const key of keys) await storage.readRecord(key).catch(() => null);
+  }, recordKeys);
+  const appWindow = await desktop.app.browserWindow(desktop.page);
+  try {
+    await appWindow.evaluate(async (window) => {
+      await window.loadURL('about:blank');
+      await window.webContents.session.clearStorageData({
+        storages: ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage'],
+      });
+    });
+    const dataRoot = fs.realpathSync(desktop.dataDir);
+    const insideDataRoot = (target) => {
+      const relative = path.relative(dataRoot, target);
+      if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+        throw new Error(`拒绝清理测试数据目录之外的路径：${target}`);
+    };
+    const configuredRecords = path.resolve(dataRoot, 'studio', 'records');
+    const records = fs.existsSync(configuredRecords) ? fs.realpathSync(configuredRecords) : configuredRecords;
+    insideDataRoot(records);
+    for (const key of recordKeys) {
+      const file = path.resolve(records, `${key}.json`);
+      insideDataRoot(file);
+      if (fs.existsSync(file)) insideDataRoot(fs.realpathSync(file));
+      fs.rmSync(file, { force: true });
+    }
+    await appWindow.evaluate((window, url) => window.loadURL(url), desktop.url);
+    await waitForHome(desktop.page);
+  } finally {
+    await appWindow.dispose();
+  }
 }
 
 // 等 Electron 把文件下完。文件名用的是 Electron 解析出的 suggested filename，

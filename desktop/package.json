@@ -26,6 +26,7 @@
     },
     "files": [
       "main.js",
+      "studio-storage.js",
       "preload.js",
       "splash.html",
       "package.json",

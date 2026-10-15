@@ -3,8 +3,17 @@ export {};
 declare global {
   interface Window {
     handwritingDesktop?: {
-      onDownloadFinished(callback: (payload: { file: string; state: string }) => void): void;
+      onDownloadFinished(callback: (payload: { file: string; state: string }) => void): () => void;
       revealLastDownload(): void;
+      onBeforeClose(callback: () => Promise<void>): () => void;
+      storage: {
+        readRecord(key: import('./persistence/contracts').RecordKey): Promise<string | null>;
+        writeRecord(key: import('./persistence/contracts').RecordKey, value: string): Promise<void>;
+        removeRecord(key: import('./persistence/contracts').RecordKey): Promise<void>;
+        readAsset(id: string): Promise<{ bytes: Uint8Array; mimeType: string } | null>;
+        writeAsset(id: string, bytes: ArrayBuffer, mimeType: string): Promise<void>;
+        removeAsset(id: string): Promise<void>;
+      };
     };
   }
 }
