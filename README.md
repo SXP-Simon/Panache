@@ -6,6 +6,10 @@
 - Windows / macOS / Linux：Flutter 原生界面自动启动随包 Rust sidecar，支持离线生成。
 - Web：Flutter Web 连接 Rust HTTP 服务，服务可同时托管页面。
 
+界面采用绿色 Material Design 3 主题，中英文 UI 统一使用霞鹜文楷；纸张中的手写文字仍使用用户所选字体。手机工具入口同时显示图标和名称，展开菜单提供用途说明；生成任务可在工作台直接取消。
+
+模块边界与状态管理见 [客户端架构](docs/flutter-architecture.md)，移动工具链与 Windows 环境入口见 [移动开发环境](scripts/MOBILE_ENVIRONMENT.md)。
+
 ## 目录
 
 ```text
@@ -17,7 +21,7 @@ crates/handwriting-server/   HTTP API、任务队列与静态托管
 scripts/                     桌面、移动端和独立服务构建脚本
 deploy/rust/                 Docker 与服务部署说明
 .github/workflows/           Flutter / Rust 检查与打包
-VERSION                      产品版本（保留原值）
+VERSION                      产品版本
 ```
 
 ## 开发
@@ -62,8 +66,14 @@ bash scripts/build-rust-service.sh
 
 移动端构建、原生库集成、各平台签名与限制见 [Flutter 客户端说明](app/README.md)，Rust 架构见 [workspace 说明](crates/README.md)。产品版本读取根目录 `VERSION`；旧版发布流水线已移除，重写版自动发版尚未接入。`CHANGELOG.md` 保留历史发布记录。
 
+## 持续验证与反馈
+
+`flutter` 分支推送与相关 pull request 按路径触发 Flutter 检查、Rust 跨平台检查，以及 Android/iOS 模拟器上的随包引擎集成测试。独立桌面打包保留 pull request 与手动入口；这些工作流不发布版本。
+
+问题与建议通过[当前 fork 的 GitHub Issues](https://github.com/SXP-Simon/handwriting-web/issues)提交，客户端反馈入口会打开该页面。
+
 ## 许可
 
 项目许可见 [LICENSE](LICENSE)，移植算法的声明与许可见 [NOTICE](crates/handwriting-core/NOTICE)。客户端可在“关于与反馈 → 开源许可”查看项目、算法及已确认的 OFL 字体许可；服务包、桌面包和 Rust Docker 镜像同时携带 LICENSE 与 licenses/。
 
-九款共享字体保持不变，授权依据及尚待确认的字体见 [字体许可记录](assets/licenses/FONT-LICENSES.md)。项目 MIT 许可不覆盖第三方字体；保留字体文件不代表已取得其商用或再分发授权。
+共享字体的授权依据及尚待确认的字体见 [字体许可记录](assets/licenses/FONT-LICENSES.md)。项目 MIT 许可不覆盖第三方字体；保留字体文件不代表已取得其商用或再分发授权。

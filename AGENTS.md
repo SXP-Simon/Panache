@@ -1,8 +1,18 @@
 # AGENTS.md
 
+## 文档约定
+
+只保留稳定的项目事实、职责边界、操作入口与开发约定；不记录工作过程、本机验证结果、测试数量或临时状态。实现细节以源码与测试为准。
+
 ## 项目概述
 
 Flutter + Rust 跨平台手写体生成器。Android/iOS 使用 C ABI + Dart FFI；桌面使用自动启动的 Rust HTTP sidecar；Web 使用 Rust HTTP 服务。
+
+## 分支与同步
+
+- `flutter` 独立维护 Flutter/Rust 客户端与引擎；选择性通过 `cherry-pick -x` 接收 `hakimyu/refactor/flutter-rust`。
+- `custom-base` 是 React/Python/Electron 自用主线；`main` 只同步 `upstream/main`。两种实现不整分支互相合入，功能分别移植和验证。
+- 自用远端是 `origin`（`SXP-Simon/handwriting-web`），原项目是 `upstream`，Flutter 迁移来源是 `hakimyu`。
 
 ## 目录与资源
 
@@ -35,13 +45,21 @@ flutter build web --release
 
 原生桌面包：`python3 scripts/build-flutter-desktop.py`。
 独立服务包：`bash scripts/build-rust-service.sh`。
-移动端及真实引擎测试命令见 `app/README.md`；部署配置见 `deploy/rust/README.md`。
+移动端及真实引擎测试命令见 [客户端说明](app/README.md)，工具链配置见 [移动开发环境](scripts/MOBILE_ENVIRONMENT.md)，部署配置见 [部署说明](deploy/rust/README.md)。
+
+## 架构与界面
+
+- 业务状态与任务协调在 `services/workspace.dart`，持久化通过 `WorkspaceStorage` 适配，平台引擎通过 API 契约接入。
+- 页面组合独立的 `widgets/` 和 `screens/dialogs/`；输入控制器与局部导航由页面持有，不通过 part 或 extension 共享父 State。职责和存储边界见 [客户端架构](docs/flutter-architecture.md)。
+- 使用绿色 Material Design 3 主题及中英文霞鹜文楷 UI；纸张渲染字体由用户选择，不能被主题字体覆盖。第三方字体保留各自许可。
+- 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开当前 fork 的 GitHub Issues，不接入旧邮件服务。
+- `flutter` 分支的相关路径 push 和 pull request 触发 Flutter、Rust 与 Android/iOS 模拟器验证；桌面打包保持 pull request/手动入口，不自动发版。
 
 ## 编码与协作约定
 
 - 先明确假设和成功标准；简单优先，只修改任务必要内容，不顺手重构。
 - 用户沟通、文档和协作文本优先使用简体中文；代码、命令、路径和专有名词保持原文。
-- Commit 使用单行 `<type>: <中文描述>`，不加 scope；每个提交聚焦独立变更。
+- Commit 遵循 Conventional Commits，scope 对应真实路径（客户端 `app/...`、后端 `crates/...`、构建 `scripts/...`）；正文分为「背景：」「解决手段：」「收益：」三个非空段落，每个提交聚焦独立变更。
 - 每次远程推送都需要用户明确授权。
 - UI 复用现有 Flutter Material Design 3 主题；用户可见文字同时维护 `app/lib/l10n/app_zh.arb` 和 `app_en.arb`。
 - 除非用户明确要求，不使用 Browser Use 验证。
