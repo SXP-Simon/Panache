@@ -87,6 +87,7 @@ void main() {
         'font_size': '40',
         'line_spacing': '46',
         'isUnderlined': '$grid',
+        'grid_layout': '$grid',
         'font_size_sigma': '0',
         'line_spacing_sigma': '0',
         'word_spacing_sigma': '0',

@@ -58,6 +58,7 @@ void main() {
           r'$\frac{a+b+c+d+e+f+g+h+i+j+k+l+m+n}{x+y}$',
         );
         for (final grid in [false, true]) {
+          w.settings.values['grid_layout'] = '$grid';
           w.settings.underlined = grid;
           await w.generate();
           expect(w.error, isEmpty, reason: 'grid=$grid');
