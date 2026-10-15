@@ -116,7 +116,7 @@ test("文档推送继续验证并发布被前次 CI 取消的未发布应用变�
   }
   assert.match(plan.reason, /unpublished application paths since v1\.9\.0/);
 
-  // The newest reachable stable version, rather than lexicographic order or a prerelease, is the baseline.
+  // The nearest reachable stable release, rather than a prerelease, is the baseline.
   git("tag", "v1.10.0");
   index("frontend/src/App.tsx", "next unreleased UI\n");
   const nextApplication = commit();
@@ -126,6 +126,23 @@ test("文档推送继续验证并发布被前次 CI 取消的未发布应用变�
   const next = readPlan(["--ci"], { EVENT_NAME: "push", PUSH_BASE: nextApplication, HEAD_SHA: nextDocs }, directory);
   assert.equal(next.release, true);
   assert.match(next.reason, /since v1\.10\.0$/);
+});
+
+test("fork 重启版本编号时使用最近发布 tag，不回到更高版本的上游祖先", (t) => {
+  const { directory, git, index, commit } = fixture(t);
+  index("frontend/src/App.tsx", "upstream UI\n");
+  commit();
+  git("tag", "v1.34.0");
+  index("frontend/src/App.tsx", "fork UI\n");
+  const forkRelease = commit();
+  git("tag", "v1.2.0");
+  index("docs/development.md");
+  const documentation = commit();
+  const plan = readPlan(["--ci"], { EVENT_NAME: "push", PUSH_BASE: forkRelease, HEAD_SHA: documentation }, directory);
+  assert.deepEqual(plan.paths, ["docs/development.md"]);
+  assert.deepEqual(FLAGS.filter((flag) => plan[flag]), ["docs"]);
+  assert.equal(plan.full, false);
+  assert.match(plan.reason, /release baseline v1\.2\.0$/);
 });
 
 test("新版本 tag 清除累计应用范围，未发布测试和工作流不反复触发重型检查", (t) => {

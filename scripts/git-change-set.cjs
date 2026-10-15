@@ -43,11 +43,14 @@ function ciChanges(environment = process.env, cwd) {
     }
     // A later documentation push can cancel an application's checks before it is released.
     // Carry those application inputs forward, but do not perpetually repeat unrelated test/CI changes.
-    const releaseTag = git(["tag", "--merged", targetCommit, "--sort=-version:refname"], cwd)
-      .split(/\r?\n/).find((tag) => /^v\d+\.\d+\.\d+$/.test(tag));
-    if (!releaseTag) {
+    const releaseTags = git(["tag", "--merged", targetCommit], cwd)
+      .split(/\r?\n/).filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag));
+    if (!releaseTags.length) {
       return { paths: changed, full: true, reason: "stable release baseline unavailable; full validation", head_sha: targetCommit };
     }
+    // A fork can restart version numbering below an ancestor's version; graph proximity is authoritative.
+    const releaseTag = git(["describe", "--tags", "--abbrev=0", `--candidates=${releaseTags.length}`,
+      ...releaseTags.flatMap((tag) => ["--match", tag]), targetCommit], cwd).trim();
     const pending = diff(releaseTag, targetCommit, cwd).filter((file) => planChanges([file]).release);
     return { paths: [...new Set([...changed, ...pending])], full: false,
       reason: pending.length ? `push before to head plus unpublished application paths since ${releaseTag}`
