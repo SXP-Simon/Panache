@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "top.liuweiqing.handwriting_app"
+    namespace = "io.github.sxpsimon.handwriting"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
 
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "top.liuweiqing.handwriting_app"
+        applicationId = "io.github.sxpsimon.handwriting"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(24, flutter.minSdkVersion)

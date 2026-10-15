@@ -8,7 +8,7 @@
 PRODUCT_NAME = HandwritingWeb
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = top.liuweiqing.handwritingApp
+PRODUCT_BUNDLE_IDENTIFIER = io.github.sxpsimon.handwriting
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 top.liuweiqing. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 SXP-Simon. Licensed under MIT.
