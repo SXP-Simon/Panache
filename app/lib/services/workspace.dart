@@ -7,10 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/settings.dart';
 import '../utils/text_tools.dart';
 import 'api.dart';
+import 'workspace_storage.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
 
 class Workspace extends ChangeNotifier {
-  Workspace({HandwritingApi? api, this.managedBackend = false})
+  Workspace({HandwritingApi? api, this.managedBackend = false, this.storage})
     : api = api ?? HandwritingApi(defaultBase);
   final bool managedBackend;
   static String get defaultBase {
@@ -31,25 +32,47 @@ class Workspace extends ChangeNotifier {
   int progress = 0, page = 0;
   DateTime? retryAt;
   bool busy = false, connected = false, disposed = false, initialized = false;
-  SharedPreferences? prefs;
+  WorkspaceStorage? storage;
+  Future<void> _writes = Future<void>.value();
+  int _generation = 0, _connection = 0, _editRevision = 0;
+  bool _initializing = false;
   Timer? saveTimer;
   int? legacyFontIndex;
 
   Future<void> initialize() async {
-    prefs = await SharedPreferences.getInstance();
+    if (initialized || _initializing || disposed) return;
+    final revision = _editRevision;
+    _initializing = true;
+    try {
+      storage ??= PreferencesWorkspaceStorage(
+        await SharedPreferences.getInstance(),
+      );
+    } finally {
+      _initializing = false;
+    }
     if (disposed) return;
-    final saved = prefs!.getString('flutter.workspace');
-    if (saved != null) {
+    final saved = storage!.read('flutter.workspace');
+    if (saved != null && revision == _editRevision) {
       try {
         final data = jsonDecode(saved) as Map<String, dynamic>;
-        text = data['text'] as String? ?? '';
-        settings.restore(Map<String, dynamic>.from(data['settings'] as Map));
-        images = Map<String, String>.from(data['images'] as Map? ?? {});
+        // Restore each valid field independently; one damaged field must not
+        // discard the user's otherwise readable draft.
+        if (data['text'] is String) text = data['text'] as String;
+        if (data['settings'] is Map<String, dynamic>) {
+          settings.restore(data['settings'] as Map<String, dynamic>);
+        }
+        if (data['images'] is Map) {
+          images = {
+            for (final entry in (data['images'] as Map).entries)
+              if (entry.key is String && entry.value is String)
+                entry.key as String: entry.value as String,
+          };
+        }
       } catch (_) {
         /* Leave invalid drafts untouched until the next edit. */
       }
     }
-    if (saved == null) {
+    if (saved == null && revision == _editRevision) {
       final legacy = readLegacyDraft();
       if (legacy.isNotEmpty) {
         settings.restore(legacy);
@@ -57,20 +80,28 @@ class Workspace extends ChangeNotifier {
         legacyFontIndex = int.tryParse('${legacy['selectedOption']}');
       }
     }
-    final base = prefs!.getString('flutter.api');
+    final base = storage!.read('flutter.api');
     if (base != null && base != api.base && !kIsWeb && !managedBackend) {
       api.close();
       api = HandwritingApi(base);
     }
     initialized = true;
+    if (revision != _editRevision) await persist();
     emit();
     await connect();
   }
 
   Future<void> connect() async {
+    if (disposed) return;
+    final connection = ++_connection;
+    final activeApi = api;
     error = '';
     try {
-      fonts = List<String>.from(await api.getJson('/api/fonts_info'));
+      final loadedFonts = List<String>.from(
+        await activeApi.getJson('/api/fonts_info'),
+      );
+      if (disposed || connection != _connection) return;
+      fonts = loadedFonts;
       if (legacyFontIndex != null &&
           legacyFontIndex! > 0 &&
           legacyFontIndex! <= fonts.length) {
@@ -80,11 +111,15 @@ class Workspace extends ChangeNotifier {
       if (!fonts.contains(settings.font)) settings.font = fonts.firstOrNull;
       connected = true;
       try {
-        version = '${(await api.getJson('/api/version'))['version'] ?? ''}';
+        final info = await activeApi.getJson('/api/version');
+        if (disposed || connection != _connection) return;
+        version = '${info['version'] ?? ''}';
       } catch (_) {
+        if (disposed || connection != _connection) return;
         version = '';
       }
     } catch (e) {
+      if (disposed || connection != _connection) return;
       connected = false;
       error = '$e';
     }
@@ -92,42 +127,52 @@ class Workspace extends ChangeNotifier {
   }
 
   Future<void> setBase(String base) async {
-    if (managedBackend) return;
+    if (managedBackend || disposed || busy) return;
+    ++_connection;
     api.close();
     api = HandwritingApi(base.replaceAll(RegExp(r'/$'), ''));
-    await prefs?.setString('flutter.api', api.base);
+    await _write('flutter.api', api.base);
     await connect();
   }
 
   void edit() {
+    if (disposed) return;
+    ++_editRevision;
     saveTimer?.cancel();
     saveTimer = Timer(const Duration(milliseconds: 400), persist);
     emit();
   }
 
-  Future<void> persist() async {
-    if (prefs == null) return;
-    try {
-      await prefs!.setString(
-        'flutter.workspace',
-        jsonEncode({
-          'text': text,
-          'settings': settings.toJson(),
-          'images': images,
-        }),
-      );
-    } catch (e) {
+  /// Flush immediately when the app becomes inactive or goes to background.
+  Future<void> persist() {
+    saveTimer?.cancel();
+    final snapshot = jsonEncode({
+      'text': text,
+      'settings': settings.toJson(),
+      'images': images,
+    });
+    return _write('flutter.workspace', snapshot);
+  }
+
+  Future<void> _write(String key, String value) {
+    final storage = this.storage;
+    if (storage == null) return Future<void>.value();
+    // Serialize snapshots so an older, slower disk write cannot win.
+    _writes = _writes.then((_) => storage.write(key, value)).catchError((
+      Object e,
+    ) {
       error = '$e';
       emit();
-    }
+    });
+    return _writes;
   }
 
   Future<void> savePreset() async {
-    await prefs?.setString('flutter.preset', jsonEncode(settings.toJson()));
+    await _write('flutter.preset', jsonEncode(settings.toJson()));
   }
 
   bool loadPreset() {
-    final saved = prefs?.getString('flutter.preset');
+    final saved = storage?.read('flutter.preset');
     if (saved == null) return false;
     try {
       settings.restore(Map<String, dynamic>.from(jsonDecode(saved)));
@@ -139,7 +184,11 @@ class Workspace extends ChangeNotifier {
   }
 
   Future<void> generate({bool preview = true, bool pdf = false}) async {
-    if (busy || (retryAt != null && DateTime.now().isBefore(retryAt!))) return;
+    if (disposed ||
+        busy ||
+        (retryAt != null && DateTime.now().isBefore(retryAt!))) {
+      return;
+    }
     if (text.trim().isEmpty ||
         !settings.valid ||
         (fontFile == null && settings.font == null)) {
@@ -147,6 +196,8 @@ class Workspace extends ChangeNotifier {
       emit();
       return;
     }
+    final generation = ++_generation;
+    bool current() => !disposed && generation == _generation;
     busy = true;
     taskId = '';
     error = '';
@@ -165,14 +216,21 @@ class Workspace extends ChangeNotifier {
         fields.remove('width');
         fields.remove('height');
       }
-      taskId = await activeApi.submit(fields, {
+      final submittedId = await activeApi.submit(fields, {
         'font_file': ?fontFile,
         'background_image': ?background,
       });
+      if (!current()) {
+        if (activeApi.supportsCancel) await activeApi.cancelTask(submittedId);
+        return;
+      }
+      taskId = submittedId;
       await persist();
+      if (!current()) return;
       final deadline = DateTime.now().add(const Duration(minutes: 29));
-      while (!disposed) {
-        final data = await activeApi.status(taskId);
+      while (current()) {
+        final data = await activeApi.status(submittedId);
+        if (!current()) return;
         phase = '${data['task_status'] ?? data['status']}';
         progress = ((data['task_progress'] ?? data['progress']) as num? ?? 0)
             .toInt()
@@ -189,32 +247,53 @@ class Workspace extends ChangeNotifier {
         }
         await Future<void>.delayed(const Duration(seconds: 2));
       }
-      if (disposed) return;
+      if (!current()) return;
       if (preview) {
-        pages = await activeApi.preview(taskId);
+        final rendered = await activeApi.preview(submittedId);
+        if (!current()) return;
+        pages = rendered;
         page = 0;
       } else {
-        final response = await activeApi.result(taskId);
+        final response = await activeApi.result(submittedId);
+        if (!current()) return;
         exportBytes = response.bodyBytes;
         exportExtension = pdf ? 'pdf' : 'zip';
       }
       progress = 100;
     } on ApiException catch (e) {
+      if (!current()) return;
       error = e.waitSeconds == null ? '$e' : 'queue:${e.waitSeconds}';
       if (e.waitSeconds != null) {
         retryAt = DateTime.now().add(Duration(seconds: e.waitSeconds!));
       }
     } catch (e) {
+      if (!current()) return;
       error = '$e';
     } finally {
-      busy = false;
-      emit();
+      if (current()) {
+        busy = false;
+        emit();
+      }
     }
   }
 
   Future<void> cancel() async {
-    if (!busy || taskId.isEmpty || !api.supportsCancel) return;
-    await api.cancelTask(taskId);
+    if (!busy || !api.supportsCancel || disposed) return;
+    final activeApi = api;
+    final activeId = taskId;
+    final cancellation = ++_generation;
+    busy = false;
+    phase = 'cancelled';
+    emit();
+    if (activeId.isNotEmpty) {
+      try {
+        await activeApi.cancelTask(activeId);
+      } catch (e) {
+        if (disposed || cancellation != _generation) return;
+        error = '$e';
+        emit();
+      }
+    }
   }
 
   void emit() {
@@ -223,10 +302,17 @@ class Workspace extends ChangeNotifier {
 
   @override
   void dispose() {
+    ++_generation;
+    ++_connection;
     disposed = true;
     saveTimer?.cancel();
     unawaited(persist());
     api.close();
+    pages = [];
+    images = {};
+    fontFile = null;
+    background = null;
+    exportBytes = null;
     super.dispose();
   }
 }
