@@ -6,6 +6,61 @@
 
 手写体生成 Web 应用。用户输入文字 → 选择字体/参数 → 后端用 `handrightbeta` 渲染手写图片 → 返回图片或 PDF。
 
+## 本仓库的分支关系与同步规则
+
+本仓库是 Simon 的自用 fork。**自用开发默认在 `custom-base` 上进行**，包括数学支持、
+Markdown 清洗、字体回退、排版和性能优化；用户要求独立分支时再开功能分支。
+不要因为上游采用 `main` 开发，就把本仓库的自用改动放到 `main`。
+
+| 远端 | 仓库 | 用途 |
+|---|---|---|
+| `origin` | `https://github.com/SXP-Simon/handwriting-web.git` | Simon 的 fork，保存自用分支与上游同步分支 |
+| `upstream` | `https://github.com/14790897/handwriting-web.git` | 原项目上游，Web/Python 版的更新来源 |
+| `hakimyu` | `https://github.com/HakimYu/handwriting.git` | Flutter/Rust 迁移版的更新来源 |
+
+| 本地分支 | 定位与关系 |
+|---|---|
+| `main` | 只同步 `upstream/main`，保持原项目代码和发布历史，不加入自用业务逻辑 |
+| `custom-base` | 自用主线，保留 Vue/Python/Electron 工程，评估后选择性吸收上游功能修复 |
+| `flutter` | 从 `custom-base` 的 `48da516` 建立，通过 `cherry-pick -x` 接入 `hakimyu/refactor/flutter-rust` 的迁移提交，独立维护 Flutter/Rust 工程 |
+| `feat/latex-math-hardening` | 2026-10-15 工作时建立的历史功能分支，其全部 4 个提交已快进合入 `custom-base`；后续优化继续在 `custom-base` 上进行 |
+
+### 上游更新怎样进入自用主线
+
+1. 先检查工作区与分支，再 `git fetch --all --no-tags` 获取更新。
+2. 将本地 `main` 快进到 `upstream/main`，例如在干净工作区执行
+   `git switch main`、`git merge --ff-only upstream/main`。无法快进时先检查分歧，不强制重置。
+3. 回到 `custom-base`，审查功能、兼容性与测试后，用 `git cherry-pick -x <提交>`
+   选择性吸收有用的功能和修复，保留原提交来源。不要把上游整棵树覆盖到自用分支。
+4. 上游的纯发布提交（CHANGELOG、版本号）通常只留在 `main`；不要为消除历史差异而将
+   上游版本号搬到自用版本，也不要手改自动生成的版本文件。
+5. 判断是否吸收过某项修复，使用 `git cherry -v custom-base upstream/main` 并检查
+   cherry-pick 来源及实际改动。输出 `-` 表示已有等价补丁，`+` 表示尚无等价补丁；
+   `+` 仍须评估是否需要吸收。仅看 `git log custom-base..upstream/main` 会把已 cherry-pick
+   的原始提交再次列出，不能据此判断修复缺失。
+
+**核对记录（2026-10-15；这是历史快照，后续以 fetch 后的 Git 状态为准）：**
+
+- `main` 已同步至上游 `21825b7`（1.34.1 发布提交）。
+- 下载保存位置提示修复 `8946e51` 已以 `9e0ca9d` 吸收进 `custom-base`。
+- `21825b7` 只涉及上游发布记录和版本号，有意未 cherry-pick 到 `custom-base`。
+- LaTeX/数学强化 `8a4c62d`、`7c602aa` 及审查文档 `ccbd0ef` 已在 `custom-base`；
+  支持范围和剩余限制见 [开发文档](docs/development.md#数学转换与维护边界2026-10-15)。
+- 本轮操作只更新了本地分支，未推送远端；本地 `main` 与 `origin/main` 是否一致须单独核对。
+
+### Flutter 分支的边界
+
+`flutter` 按顺序接入了 HakimYu 的 9 个迁移提交（`45295d4` 至 `7afb0e3`），接入后的
+本地提交为 `5881966` 至 `e5a6c29`；当时最终文件树与来源分支完全相同。
+迁移提交包含删除旧 Vue/Python/Electron 工程的操作，**不能整分支合并回 `custom-base`**。
+后续从 HakimYu 吸收迁移更新，应在 `flutter` 上评估并 cherry-pick；数学改进跨技术栈时
+需要分别移植实现和回归测试，不能假定两个分支自动共享功能。
+
+`custom-base` 的本轮数学修复尚未移植到 Dart/Rust。此前验证中，Flutter 的纯 Dart
+兼容样例通过，但完整构建受本机 Dart 版本低于项目要求、缺少 Rust 工具链限制。
+继续开发时重新检查 SDK 与项目要求，不把当时的环境限制当成永久结论。
+两个分支可使用不同 worktree 同时工作，先用 `git worktree list` 确认目录和分支。
+
 ## 技术栈
 
 | 层 | 技术 |
@@ -238,7 +293,7 @@ Release 上只剩 Windows 的两个 exe。脚本按**单个文件**退避重试�
 
 - **Commit message**: 必须遵循 [Conventional Commits](https://www.conventionalcommits.org/) (`feat:` / `fix:` / `chore:` / `test:` / `refactor:` 等)，建议冒号后使用**清晰的中文描述**（例如：`feat(markdown): 支持表格多模式转换与条目列表清洗`、`fix(latex): 修复复杂矩阵环境降级换行`），semantic-release 依靠前缀类型自动计算版本号
 - **原子化提交 (Atomic Commits)**: 每个提交只聚焦一个独立的逻辑变更或功能点，避免将无关改动混在同一提交中；每次提交需保证测试绿灯，便于 code review、cherry-pick 和回滚
-- **分支**: 只推到 `main`，不要直接 push（通过 PR）
+- **分支**: 遵循上文「本仓库的分支关系与同步规则」；自用改动默认在 `custom-base`，`main` 仅同步上游。向原项目贡献改动仍通过 PR。
 - **i18n**: 所有用户可见文字必须同时提供中英文翻译，在 `frontend/src/i18n.js` 中添加
 - **UI 风格**: 新增/改版的界面必须复用站点既有设计语言，不要自带一套配色 —— 主按钮 `#007BFF`（hover `#0056b3`、active `#003d73`）、圆角 `5px`、字体沿用全局 `Avenir, Helvetica, Arial, sans-serif`、面板阴影 `0 2px 5px rgba(0,0,0,0.1)`、输入框边框 `1px solid #ddd`。参考 `HomeView.vue` 的 `.action-btn`（顶栏按钮）与 `.letter-format-button`
 - **E2E 选择器**: 需要被 `e2e/` 测试点到的元素统一加 `data-testid`，测试侧只用 `getByTestId`，不要依赖中文文案或 CSS 类
