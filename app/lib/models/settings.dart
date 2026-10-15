@@ -116,6 +116,12 @@ class Settings {
       'top_margin': '100',
       'bottom_margin': '100',
       'line_spacing': '120',
+      'font_size_sigma': '1',
+      'word_spacing_sigma': '1',
+      'perturb_x_sigma': '1',
+      'perturb_y_sigma': '1',
+      'perturb_theta_sigma': '0.025',
+      'strikethrough_probability': '0',
     });
     return settings;
   }
