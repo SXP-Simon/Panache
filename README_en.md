@@ -21,8 +21,7 @@ The "Old layout" button in the top bar switches back to the previous layout; bot
 - **`custom-base`** is Simon's default development branch for the Vue/Python/Electron application and personal mathematics, formatting, and performance improvements.
 - **`main`** mirrors [`upstream/main`](https://github.com/14790897/handwriting-web), including its release history. Personal features belong on `custom-base`.
 - **`flutter`** started from the personal baseline and received [HakimYu's Flutter/Rust migration](https://github.com/HakimYu/handwriting/tree/refactor/flutter-rust) through `cherry-pick -x`. It is maintained separately; do not merge its removal of the legacy application back into `custom-base`. Mathematics improvements need a separate port.
-- Useful upstream fixes are reviewed and selectively cherry-picked into `custom-base`; release-only version and changelog commits normally remain on `main`. The download-location fix and this round of LaTeX improvements were incorporated into `custom-base` on 2026-10-15.
-- **`feat/latex-math-hardening`** is a historical feature branch whose changes have all been incorporated into `custom-base`. Continue personal development on `custom-base`. See [AGENTS.md](./AGENTS.md#本仓库的分支关系与同步规则) for the detailed workflow and dated synchronization record.
+- Useful upstream fixes are reviewed and selectively cherry-picked into `custom-base`; release-only version and changelog commits normally remain on `main`. See [AGENTS.md](./AGENTS.md#项目与分支) for the branch workflow.
 
 ## Function
 

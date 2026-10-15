@@ -1,9 +1,7 @@
 # 本地开发
 
-!!! info "深度内容在 AGENTS.md"
-    这一页只讲怎么把项目跑起来。架构细节、编码约定、部署流水线、各类踩坑记录，
-    都在仓库根的 [`AGENTS.md`](https://github.com/14790897/handwriting-web/blob/main/AGENTS.md) ——
-    改代码之前先读它。
+分支职责、开发约定和文档维护规则见仓库根的 [AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md)。
+实现细节按需查阅源码和相关测试。
 
 ## 环境要求
 
@@ -93,44 +91,6 @@ cd e2e && npm run test:desktop
 
 请求进来后：提交任务 → 写进 SQLite → 立刻返回 `task_id` → 后台协程排队渲染
 → 前端通过 WebSocket（连不上就轮询）拿进度 → 完成后取结果。
-
-## 数学转换与维护边界（2026-10-15）
-
-Vue/Python 版本的链路是：输入 → 可选 Markdown 清洗 → 用户点击 LaTeX 转换 →
-Unicode 数学文本 → 后端动态分式/根式字形 → 手写图片。上传 Word 使用另一条提取链路；
-后端并非完整 LaTeX 解释器，直接调用 API 时只额外识别有限的分式和根式语法。
-
-本次审查发现并修复了以下会改变内容的问题：
-
-| 原问题 | 当前行为 |
-|---|---|
-| 先删公式定界符，再将含公式的整行解析，导致英文正文丢空格 | 共享扫描器只解析公式范围，代码、网址、路径及图片保持原文 |
-| Markdown 把 `$a<b>c$` 当 HTML，把公式竖线当表格列 | 清洗前暂存公式，清洗后完整恢复；不完整或超限公式也保护 |
-| `a^b` 变成 `ab`，`x_A` 变成 `xA` | 全部字符有对应字形才使用 Unicode，否则输出 `a^(b)`、`x_(A)` |
-| 组合数被写成分式，复合底数的幂丢分组 | `\binom{n}{k}` 输出 `C(n, k)`，`{a+b}^2` 输出 `(a+b)²` |
-| 数学字体、分段条件或未知 AST 内容丢失 | 支持黑板体集合、分段函数、嵌套矩阵及常见注释；未知节点保留整段公式源码 |
-| 日期/URL 误识别为分数，`2√x` 的系数被吞 | 普通文字范围跳过数学转换，只有上标根指数作为指数处理 |
-| 第 513 个动态分式与根式私用字符碰撞 | 使用不重叠的辅助私用区，注册表有数量与深度上限，保留已有引用 |
-
-矩阵和分段函数目前以列间空格、行间分号线性化；带增广分隔线、取消线、未支持字体或
-未知命令的公式保留源码。输出不是完整二维 TeX 排版，嵌套公式的高度/基线、组合附加符
-与罕见 Unicode 字形仍取决于渲染器和可用字体。不要把“能解析”当成“已正确绘制”。
-
-扫描器的单段公式限制为 32768 字符/64 层；AST 转换进一步限制为 16000 字符/64 层、
-500 次宏展开，超限保留源码。后端数学深度限制为 48，分式和根式注册预算各最多约 4096 项，
-饱和后新表达式回退可读源码，已有节点继续有效。KaTeX 的 `__parse` 是内部 API，升级依赖时
-必须运行语义回归；错误与展开限制参考 [KaTeX 配置](https://katex.org/docs/options)。
-
-```shell
-pnpm --filter handwrite run test:latex-unicode
-pnpm --filter handwrite run test:clean-markdown
-uv run --extra dev python -m pytest backend/tests
-pnpm --filter handwriting-web-e2e exec playwright test tests/math-support.spec.js
-```
-
-独立 `flutter` 分支保留 HakimYu 的 Flutter/Rust 迁移。本轮强化针对 Vue/Python，尚未移植到
-Dart/Rust。迁移版仍存在正文空格、未知上下标、高次根及私用分数字符不一致的问题；
-`Math.tex` 预览和 Rust 最终出图也不是同一套数学排版能力，应在迁移这些回归后再评估替代。
 
 ## 提交约定
 

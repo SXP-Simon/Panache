@@ -70,6 +70,5 @@ npm run test:clean-markdown
 - **`custom-base`（当前分支）**：自用主线与功能增强基准分支，包含自定义数学渲染与符号清洗增强。
 - **`main`**：严格保持与上游官方仓库（[upstream/main](https://github.com/14790897/handwriting-web)）一致，仅用于拉取上游最新发布代码与功能同步，严禁直接在 `main` 上开发业务私有逻辑。
 - **`flutter`**：从自用基线建立，使用 `cherry-pick -x` 接入 [HakimYu 的 Flutter/Rust 迁移](https://github.com/HakimYu/handwriting/tree/refactor/flutter-rust)。独立维护，不整分支合回 `custom-base`；数学优化需另行移植。
-- **上游吸收方式**：`main` 保留完整上游历史；`custom-base` 经审查选择性 cherry-pick 功能修复，通常不吸收纯发布版本提交。2026-10-15 的下载保存位置修复已吸收，本轮 LaTeX 强化也已在 `custom-base`。
-- **`feat/latex-math-hardening`**：历史功能分支，全部改动已合入 `custom-base`，后续自用开发继续在 `custom-base` 上进行。详细关系和同步规则见 [AGENTS.md](./AGENTS.md#本仓库的分支关系与同步规则)。
+- **上游吸收方式**：`main` 保留完整上游历史；`custom-base` 经审查选择性 cherry-pick 功能修复，通常不吸收纯发布版本提交。详细规则见 [AGENTS.md](./AGENTS.md#项目与分支)。
 - **原项目文档**：若需查阅原项目历史说明、自部署 Docker 配置或视频介绍，请参阅 [README_upstream.md](./README_upstream.md)。
