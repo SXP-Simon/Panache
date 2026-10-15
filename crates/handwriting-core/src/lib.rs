@@ -11,6 +11,12 @@ pub use render::{Cancellation, FontBook, RenderRequest, render};
 use thiserror::Error;
 pub const ENGINE_NAME: &str = "handwriting-core";
 pub const ALGORITHM_VERSION: &str = "1";
+/// Release builds may share the publication version without changing source files.
+pub fn app_version() -> &'static str {
+    option_env!("HANDWRITING_BUILD_VERSION")
+        .unwrap_or(include_str!("../../../VERSION"))
+        .trim()
+}
 pub fn rendering_available() -> bool {
     true
 }

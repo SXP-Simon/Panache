@@ -56,7 +56,7 @@ impl Default for Config {
             web_dir: None,
             allowed_origins: vec!["http://127.0.0.1:5006".into()],
             access_token: None,
-            version: include_str!("../../../VERSION").trim().into(),
+            version: handwriting_core::app_version().into(),
             limits: Limits::default(),
             concurrency: 2,
             max_active: 8,

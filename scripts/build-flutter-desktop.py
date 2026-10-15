@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -18,13 +19,21 @@ def run(*args, cwd=ROOT):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--flutter', default=os.environ.get('FLUTTER', 'flutter'))
+    parser.add_argument('--version', default=os.environ.get('HANDWRITING_BUILD_VERSION'))
+    parser.add_argument('--build-number', default=os.environ.get('HANDWRITING_BUILD_NUMBER'))
     args = parser.parse_args()
+    version = args.version or (ROOT / 'VERSION').read_text().strip()
+    if not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?', version):
+        parser.error('Invalid release version')
+    if args.build_number and (not args.build_number.isdecimal() or not 1 <= int(args.build_number) <= 2100000000):
+        parser.error('Build number must be between 1 and 2100000000')
+    os.environ['HANDWRITING_BUILD_VERSION'] = version
     target = {'Darwin': 'macos', 'Windows': 'windows', 'Linux': 'linux'}[platform.system()]
     if target != 'macos':
         run('cargo', 'build', '--locked', '--release', '-p', 'handwriting-server')
-    version = (ROOT / 'VERSION').read_text().strip()
     run(args.flutter, 'pub', 'get', cwd=ROOT / 'app')
-    run(args.flutter, 'build', target, '--release', f'--build-name={version}', cwd=ROOT / 'app')
+    build_number = [f'--build-number={args.build_number}'] if args.build_number else []
+    run(args.flutter, 'build', target, '--release', f'--build-name={version}', *build_number, cwd=ROOT / 'app')
     output = ROOT / 'target/desktop-package' / target
     if output.exists():
         shutil.rmtree(output)
@@ -48,7 +57,7 @@ def main():
         binary = 'handwriting-server.exe' if target == 'windows' else 'handwriting-server'
         shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
         shutil.copytree(ROOT / 'assets/font_assets', backend / 'font_assets')
-        shutil.copy2(ROOT / 'VERSION', backend / 'VERSION')
+        (backend / 'VERSION').write_text(f'{version}\n', encoding='utf-8', newline='\n')
         shutil.copy2(ROOT / 'LICENSE', backend / 'LICENSE')
         shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
         shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')

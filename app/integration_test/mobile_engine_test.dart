@@ -12,6 +12,11 @@ void main() {
   testWidgets('随包引擎离线导入、分页预览、PDF/ZIP 和取消', (tester) async {
     final api = await MobileHandwritingApi.bundled();
     addTearDown(api.close);
+    const expectedVersion = String.fromEnvironment('EXPECTED_APP_VERSION');
+    if (expectedVersion.isNotEmpty) {
+      final version = await api.getJson('/api/version') as Map;
+      expect(version['version'], expectedVersion);
+    }
     final fonts = await api.getJson('/api/fonts_info') as List;
     expect(fonts, contains('神韵英子楷书.ttf'));
     final imported = await api.importFile(

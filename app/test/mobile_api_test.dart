@@ -18,6 +18,11 @@ void main() {
         libraryPath: library,
       );
       final api = await open();
+      const expectedVersion = String.fromEnvironment('EXPECTED_APP_VERSION');
+      if (expectedVersion.isNotEmpty) {
+        final version = await api.getJson('/api/version') as Map;
+        expect(version['version'], expectedVersion);
+      }
       final fonts = await api.getJson('/api/fonts_info') as List;
       expect(fonts.first, '神韵英子楷书.ttf');
       final text = await api.importFile(
