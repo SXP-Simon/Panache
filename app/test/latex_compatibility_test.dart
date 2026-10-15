@@ -9,7 +9,7 @@ void main() {
       jsonDecode(File('test/fixtures/latex.json').readAsStringSync()) as List;
   for (final entry in cases) {
     test(
-      '旧 LaTeX 样例：${entry[0]}',
+      'LaTeX 语义回归：${entry[0]}',
       () => expect(convertLatex(entry[1] as String), entry[2]),
     );
   }
