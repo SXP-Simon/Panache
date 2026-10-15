@@ -47,7 +47,7 @@ void main() {
         });
         for (final course in latexCurriculumCases.entries) {
           // Long real-engine suites expose course progress in CI diagnostics.
-          print('Rendering curriculum: ${course.key}');
+          printOnFailure('Rendering curriculum: ${course.key}');
           w.text = course.value
               .map((example) {
                 final (name, source, expected) = example;
