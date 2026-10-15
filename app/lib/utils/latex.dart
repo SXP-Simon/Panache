@@ -49,8 +49,8 @@ String _blackboard(String s) => s.runes.map((r) {
   final c = String.fromCharCode(r);
   if (legacy.containsKey(c)) return legacy[c]!;
   if (r >= 65 && r <= 90) return String.fromCharCode(0x1d538 + r - 65);
-  if (r >= 97 && r <= 122) return String.fromCharCode(0x1d552 + r - 97);
-  if (r >= 48 && r <= 57) return String.fromCharCode(0x1d7d8 + r - 48);
+  // The internal AMS fallback supplies capitals. Unsupported styled lowercase
+  // and digits retain source rather than becoming unavailable Unicode glyphs.
   throw const FormatException('Unsupported blackboard symbol');
 }).join();
 String _symbol(String s) =>
