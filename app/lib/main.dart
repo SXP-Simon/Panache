@@ -48,11 +48,12 @@ class _HandwritingAppState extends State<HandwritingApp> {
 
   ThemeData theme(Brightness brightness) {
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF007BFF),
+      seedColor: const Color(0xFF62833A),
       brightness: brightness,
     );
     return ThemeData(
       useMaterial3: true,
+      fontFamily: 'packages/handwriting_assets/LXGW WenKai',
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       inputDecorationTheme: const InputDecorationTheme(
