@@ -121,15 +121,33 @@ void main() {
         locale: const Locale('en'),
       );
       expect(find.byType(NavigationBar), findsOneWidget);
+      final editor = find.byKey(const ValueKey('text-editor'));
+      await tester.tap(editor);
+      await tester.pumpAndSettle();
+      final focus = tester.widget<TextField>(editor).focusNode!;
+      final editable = find.descendant(
+        of: editor,
+        matching: find.byType(EditableText),
+      );
+      final editingState = tester.state<EditableTextState>(editable);
+      expect(focus.hasFocus, isTrue);
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('text-editor')),
-        'Keyboard input',
-      );
+      expect(focus.hasFocus, isTrue);
+      expect(tester.state<EditableTextState>(editable), same(editingState));
+      expect(tester.testTextInput.isVisible, isTrue);
+      await tester.enterText(editor, 'Keyboard input');
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
       expect(workspace.text, 'Keyboard input');
+      expect(focus.hasFocus, isTrue);
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      expect(focus.hasFocus, isTrue);
+      expect(tester.state<EditableTextState>(editable), same(editingState));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(focus.hasFocus, isTrue);
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.text(labels(tester).dismissKeyboard), findsOneWidget);
       expect(tester.takeException(), isNull);
