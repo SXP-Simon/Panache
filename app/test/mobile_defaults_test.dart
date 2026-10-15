@@ -33,6 +33,9 @@ void main() {
       expect(settings.values, containsPair('font_size', '70'));
       expect(settings.values, containsPair('line_spacing', '120'));
       expect(settings.values, containsPair('word_spacing', '2'));
+      expect(settings.values, containsPair('strikethrough_probability', '0'));
+      expect(settings.values, containsPair('perturb_x_sigma', '1'));
+      expect(settings.values, containsPair('perturb_y_sigma', '1'));
       final width = int.parse(settings.values['width']!);
       final height = int.parse(settings.values['height']!);
       final horizontalMargins =
