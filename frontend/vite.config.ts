@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url';
 import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -10,18 +11,29 @@ export default defineConfig({
     {
       name: 'retire-legacy-service-workers',
       generateBundle(_options, bundle) {
-        const shellPaths = [
-          'index.html',
+        const publicPaths = [
           'manifest.json',
+          'site.webmanifest',
           'icon.svg',
+          'favicon.svg',
+          'favicon.ico',
+          'favicon-96x96.png',
+          'apple-touch-icon.png',
           'web-app-manifest-192x192.png',
           'web-app-manifest-512x512.png',
+          ...readdirSync(fileURLToPath(new URL('./public/fonts/lxgw-wenkai', import.meta.url)))
+            .filter((name) => /\.(?:woff2|css|txt|md)$/.test(name))
+            .map((name) => `fonts/lxgw-wenkai/${name}`),
+        ];
+        const shellPaths = [
+          'index.html',
+          ...publicPaths,
           ...Object.keys(bundle).filter((name) => name.startsWith('assets/')),
         ];
-        const version = createHash('sha256')
-          .update(JSON.stringify(shellPaths))
-          .digest('hex')
-          .slice(0, 20);
+        const contentHash = createHash('sha256').update(JSON.stringify(shellPaths));
+        for (const name of publicPaths)
+          contentHash.update(readFileSync(new URL(`./public/${name}`, import.meta.url)));
+        const version = contentHash.digest('hex').slice(0, 20);
         for (const output of Object.values(bundle)) {
           if (output.type === 'chunk' && output.name === 'service-worker')
             this.emitFile({ type: 'asset', fileName: 'sw.js', source: output.code });

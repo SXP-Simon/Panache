@@ -13,6 +13,8 @@
   --border: oklch(0.9288 0.0126 255.5078);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --radius: 1rem;
+  --font-ui: 'LXGW WenKai';
+  font-family: var(--font-ui);
   --shadow:
     0 3px 12px oklch(0.2077 0.0398 265.7549 / 0.035), 0 1px 3px oklch(0.2077 0.0398 265.7549 / 0.02);
 }
@@ -41,23 +43,36 @@
   --color-destructive: var(--destructive);
   --radius-xl: 0.75rem;
   --radius-2xl: var(--radius);
-  --font-sans: Inter, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-ui);
+  --font-mono: var(--font-ui);
 }
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+  font-family: inherit;
 }
 body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
 button,
 input,
 textarea,
-select {
+select,
+option,
+optgroup,
+dialog,
+pre,
+code,
+kbd,
+samp,
+::file-selector-button {
   font: inherit;
 }
 button,
@@ -222,10 +237,10 @@ input[type='range'] {
   outline-offset: 2px;
 }
 .app-header {
-  height: 86px;
+  height: 64px;
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 22px;
   padding: 0 max(32px, calc((100vw - 1536px)/2));
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklch, var(--card) 80%, transparent);
@@ -237,14 +252,19 @@ input[type='range'] {
   min-width: 230px;
 }
 .brand-mark {
-  width: 43px;
-  height: 43px;
+  width: 38px;
+  height: 38px;
   background: var(--primary);
   color: var(--primary-foreground);
-  border-radius: 15px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .brand strong {
   display: block;
@@ -254,7 +274,7 @@ input[type='range'] {
 }
 .brand small {
   display: block;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--muted-foreground);
   margin-top: 4px;
@@ -273,7 +293,7 @@ input[type='range'] {
 .nav-active::after {
   content: '';
   position: absolute;
-  bottom: -33px;
+  bottom: -23px;
   left: 0;
   right: 0;
   height: 3px;
@@ -289,17 +309,17 @@ input[type='range'] {
 .workspace-content {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 34px 32px 16px;
+  padding: 18px 24px 12px;
 }
 .workspace-intro {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 26px;
+  margin-bottom: 16px;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted-foreground);
@@ -337,8 +357,8 @@ h2 svg {
 }
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(310px, 0.95fr) minmax(330px, 1.15fr) 290px;
-  gap: 20px;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.05fr) 350px;
+  gap: 16px;
   align-items: start;
 }
 .panel {
@@ -350,15 +370,15 @@ h2 svg {
   overflow: hidden;
 }
 .panel-heading {
-  padding: 21px 20px 19px;
-  min-height: 86px;
+  padding: 12px 16px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 .panel-heading .eyebrow {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.035em;
 }
 .editor-panel {
@@ -369,7 +389,7 @@ h2 svg {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 7px 9px;
+  padding: 5px 8px;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
@@ -379,13 +399,13 @@ h2 svg {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 9px 18px 0;
+  padding: 6px 16px 0;
 }
 .editor-options select {
   border: 0;
   background: transparent;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 12px;
   max-width: 160px;
   height: 24px;
   padding: 0;
@@ -396,9 +416,10 @@ h2 svg {
   border: 0;
   border-radius: 0;
   resize: vertical;
-  min-height: 456px;
+  min-height: 240px;
+  height: clamp(240px, calc(100dvh - 430px), 360px);
   width: 100%;
-  padding: 16px 22px 24px;
+  padding: 12px 18px 16px;
   line-height: 2;
   font-size: 14px;
   background: transparent;
@@ -424,7 +445,7 @@ h2 svg {
   flex-shrink: 0;
   white-space: nowrap;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 12px;
   margin-right: 8px;
 }
 .symbol-strip button {
@@ -447,7 +468,7 @@ h2 svg {
   justify-content: space-between;
   gap: 8px;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 12px;
   min-height: 47px;
 }
 .editor-footer > span:nth-child(2) {
@@ -457,8 +478,9 @@ h2 svg {
   white-space: nowrap;
 }
 .preview-size {
-  font-family: monospace;
-  font-size: 10px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
   color: var(--muted-foreground);
   max-width: 120px;
   overflow: hidden;
@@ -470,9 +492,9 @@ h2 svg {
   background-color: color-mix(in oklch, var(--muted) 65%, var(--background));
   background-image: radial-gradient(var(--border) 0.7px, transparent 0.7px);
   background-size: 16px 16px;
-  min-height: 509px;
-  height: 540px;
-  padding: 24px;
+  min-height: 300px;
+  height: clamp(300px, calc(100dvh - 390px), 430px);
+  padding: 18px;
   overflow: auto;
   display: flex;
   align-items: flex-start;
@@ -492,26 +514,26 @@ h2 svg {
 }
 .empty-paper {
   position: relative;
-  width: 113px;
-  height: 145px;
-  padding: 24px 18px;
+  width: 86px;
+  height: 110px;
+  padding: 16px 14px;
   background: var(--card);
   border: 1px solid var(--border);
   box-shadow: 0 10px 26px oklch(0.2 0.03 260 / 0.055);
   border-radius: 10px;
   transform: rotate(-5deg);
   color: oklch(0.67 0.1 138);
-  margin-bottom: 26px;
+  margin-bottom: 16px;
 }
 .empty-paper svg {
-  margin: 1px auto 15px;
+  margin: 0 auto 8px;
 }
 .empty-paper span {
   display: block;
   height: 2px;
   background: var(--border);
   border-radius: 2px;
-  margin: 10px 0;
+  margin: 7px 0;
 }
 .empty-paper span:last-child {
   width: 65%;
@@ -525,7 +547,7 @@ h2 svg {
   font-size: 12px;
   line-height: 1.8;
   color: var(--muted-foreground);
-  margin: 0 0 22px;
+  margin: 0 0 16px;
 }
 .empty-preview .button {
   font-size: 12px;
@@ -574,16 +596,17 @@ progress {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-family: monospace;
-  font-size: 10px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
   color: var(--muted-foreground);
 }
 .export-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  gap: 10px;
+  padding: 10px 14px;
+  gap: 8px;
   border-top: 1px solid var(--border);
 }
 .export-bar > div {
@@ -596,23 +619,23 @@ progress {
   font-size: 12px;
 }
 .export-bar .check-row {
-  font-size: 10px;
+  font-size: 12px;
   gap: 6px;
 }
 .settings-body {
-  padding: 0 20px 20px;
+  padding: 0 16px 16px;
 }
 .field-label {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 500;
 }
 .file-button {
   display: flex;
-  margin-top: 10px;
-  min-height: 35px;
+  margin-top: 8px;
+  min-height: 32px;
   border: 1px dashed var(--border);
   color: var(--muted-foreground);
   font-size: 11px;
@@ -627,17 +650,20 @@ progress {
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 13px 10px;
-  margin-top: 17px;
+  gap: 10px;
+  margin-top: 12px;
+}
+.settings-body > .field-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .number-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
   min-width: 0;
 }
 .number-field > span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted-foreground);
   font-weight: 450;
 }
@@ -650,8 +676,9 @@ progress {
   width: 100%;
   height: 36px;
   padding: 0 24px 0 10px;
-  font-family: monospace;
-  font-size: 12px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
   appearance: textfield;
 }
 .number-control input::-webkit-inner-spin-button {
@@ -661,7 +688,7 @@ progress {
   position: absolute;
   right: 9px;
   color: var(--muted-foreground);
-  font-size: 9px;
+  font-size: 11px;
   pointer-events: none;
 }
 .color-field {
@@ -670,8 +697,8 @@ progress {
   justify-content: space-between;
   font-size: 11px;
   color: var(--muted-foreground);
-  margin-top: 18px;
-  margin-bottom: 14px;
+  margin-top: 12px;
+  margin-bottom: 10px;
 }
 input[type='color'] {
   width: 45px;
@@ -685,7 +712,7 @@ input[type='color'] {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  margin-top: 12px;
+  margin-top: 9px;
   cursor: pointer;
   color: var(--muted-foreground);
 }
@@ -694,8 +721,8 @@ input[type='color'] {
 }
 details {
   border-top: 1px solid var(--border);
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 10px;
 }
 summary {
   font-size: 12px;
@@ -723,7 +750,7 @@ summary::-webkit-details-marker {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted-foreground);
   margin-top: 7px;
 }
@@ -734,13 +761,13 @@ summary::-webkit-details-marker {
 }
 .file-name {
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 12px;
   word-break: break-all;
 }
 .presets-section {
   border-top: 1px solid var(--border);
-  margin-top: 20px;
-  padding-top: 17px;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 .preset-actions {
   display: flex;
@@ -749,7 +776,7 @@ summary::-webkit-details-marker {
   margin-top: 10px;
 }
 .preset-actions .button--small {
-  font-size: 10px;
+  font-size: 12px;
   gap: 4px;
   padding: 0 7px;
   flex: 1;
@@ -784,8 +811,8 @@ summary::-webkit-details-marker {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin: 21px 2px 0;
-  font-size: 10px;
+  margin: 14px 2px 0;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 .app-footer > span:first-child {
@@ -889,7 +916,7 @@ summary::-webkit-details-marker {
 .inline-image-row label {
   flex: 1;
   min-width: 0;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 .inline-image-row label > span {
@@ -906,19 +933,13 @@ summary::-webkit-details-marker {
 }
 @media (min-width: 1500px) {
   .workspace-grid {
-    grid-template-columns: minmax(360px, 1fr) minmax(410px, 1.2fr) 310px;
-    gap: 24px;
-  }
-  .document-input {
-    min-height: 530px;
-  }
-  .preview-canvas {
-    height: 614px;
+    grid-template-columns: minmax(340px, 1fr) minmax(380px, 1.05fr) 360px;
+    gap: 18px;
   }
 }
 @media (max-width: 1100px) {
   .workspace-content {
-    padding: 26px 22px 15px;
+    padding: 18px 20px 12px;
   }
   .workspace-grid {
     grid-template-columns: minmax(300px, 1fr) minmax(330px, 1.1fr);
@@ -980,23 +1001,31 @@ summary::-webkit-details-marker {
 }
 @media (max-width: 720px) {
   .app-header {
-    height: 74px;
-    padding: 0 18px;
-    gap: 12px;
+    height: 64px;
+    padding: 0 12px;
+    gap: 6px;
   }
   .brand {
     min-width: 0;
+    flex: 1;
+    gap: 8px;
     margin-right: auto;
+  }
+  .brand > span:last-child {
+    min-width: 0;
   }
   .brand strong {
     font-size: 15px;
+    line-height: 1.2;
+    letter-spacing: 0;
   }
   .brand small {
-    font-size: 8px;
+    display: none;
   }
   .brand-mark {
-    width: 37px;
-    height: 37px;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
     border-radius: 12px;
   }
   .header-nav {
@@ -1009,7 +1038,7 @@ summary::-webkit-details-marker {
   .header-nav .button {
     font-size: 0;
     gap: 0;
-    width: 34px;
+    width: 30px;
     padding: 0;
   }
   .header-nav .button svg {
@@ -1017,15 +1046,21 @@ summary::-webkit-details-marker {
     height: 18px;
   }
   .header-actions {
-    padding-left: 8px;
+    padding-left: 4px;
+    gap: 0;
+  }
+  .header-actions .button {
+    width: 30px;
+    padding: 0;
+    font-size: 0;
     gap: 0;
   }
   .workspace-content {
-    padding: 23px 16px 12px;
+    padding: 16px 14px 12px;
   }
   .workspace-intro {
     gap: 10px;
-    margin-bottom: 19px;
+    margin-bottom: 14px;
     align-items: flex-start;
   }
   .workspace-intro h1 {
@@ -1037,11 +1072,11 @@ summary::-webkit-details-marker {
     padding: 0 11px;
     min-height: 37px;
     font-size: 11px;
-    margin-top: 19px;
+    margin-top: 10px;
     gap: 6px;
   }
   .eyebrow {
-    font-size: 9px;
+    font-size: 11px;
   }
   .workspace-grid {
     display: flex;
@@ -1061,28 +1096,29 @@ summary::-webkit-details-marker {
     order: 2;
   }
   .document-input {
-    min-height: 300px;
-    padding: 14px 20px;
+    min-height: 220px;
+    height: 240px;
+    padding: 12px 16px;
   }
   .panel-heading {
-    padding: 19px 19px 16px;
-    min-height: 80px;
+    padding: 12px 16px;
+    min-height: 64px;
   }
   .settings-body {
     display: block;
   }
   .settings-body > .field-grid {
-    margin-top: 17px;
+    margin-top: 12px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .settings-body .color-field {
-    margin: 19px 0 14px;
+    margin: 12px 0 10px;
   }
   .settings-body > .check-row {
     margin-top: 12px;
   }
   .settings-body > details {
-    margin-top: 19px;
+    margin-top: 10px;
   }
   .presets-section {
     display: block;
@@ -1091,8 +1127,8 @@ summary::-webkit-details-marker {
     margin-top: 12px;
   }
   .preview-canvas {
-    height: 480px;
-    min-height: 430px;
+    height: 340px;
+    min-height: 300px;
   }
   .export-bar {
     padding: 13px;

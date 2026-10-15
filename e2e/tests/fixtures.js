@@ -17,6 +17,7 @@ async function openHome(page) {
   await page.goto('/');
   await expect(page.getByTestId('preview-btn')).toBeVisible();
   await expect(page.getByTestId('font-select').locator('option')).not.toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
 }
 
 async function fillText(page, text) {
@@ -27,8 +28,14 @@ async function setNumber(page, testId, value) {
   await page.getByTestId(testId).fill(String(value));
 }
 
+async function openPaperSettings(page) {
+  if (!(await page.getByTestId('width-input').isVisible()))
+    await page.getByTestId('paper-settings-toggle').click();
+}
+
 // 小画布 + 短文本，真实渲染约 2 秒
 async function useSmallCanvas(page, { fontSize = 50, lineSpacing = 60 } = {}) {
+  await openPaperSettings(page);
   await setNumber(page, 'width-input', 400);
   await setNumber(page, 'height-input', 300);
   await setNumber(page, 'font-size-input', fontSize);
@@ -57,5 +64,6 @@ module.exports = {
   fillText,
   setNumber,
   useSmallCanvas,
+  openPaperSettings,
   expectPreviewImageLoaded,
 };

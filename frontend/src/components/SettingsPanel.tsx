@@ -95,8 +95,8 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
           />
           <span>{t('englishSpacing')}</span>
         </label>
-        <details open>
-          <summary>{t('paper')}</summary>
+        <details>
+          <summary data-testid="paper-settings-toggle">{t('paper')}</summary>
           <label className="file-button upload-control">
             <ImagePlus size={15} />
             {t('background')}
@@ -143,7 +143,7 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
           </div>
         </details>
         <details>
-          <summary>{t('variation')}</summary>
+          <summary data-testid="variation-settings-toggle">{t('variation')}</summary>
           <div className="field-grid">
             {variationFields.map((field) => (
               <NumberField
@@ -156,7 +156,7 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
           </div>
         </details>
         <details>
-          <summary>{t('strikethrough')}</summary>
+          <summary data-testid="strike-settings-toggle">{t('strikethrough')}</summary>
           <div className="field-grid">
             {strikeFields.map((field) => (
               <NumberField

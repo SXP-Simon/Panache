@@ -37,6 +37,13 @@ for (const viewport of [
     expect(layout.overflow).toBe(false);
     expect(layout.panels.every((panel) => panel.width >= 260)).toBe(true);
     if (viewport.mode === 'desktop') {
+      for (const id of ['generate-image-btn', 'generate-pdf-btn', 'save-settings-btn']) {
+        const bounds = await page.getByTestId(id).boundingBox();
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+      }
+      const input = await page.getByTestId('text-input').boundingBox();
+      expect(input.height).toBeLessThanOrEqual(360);
+      await expect(page.getByTestId('width-input')).not.toBeVisible();
       expect(new Set(layout.panels.map((panel) => panel.left)).size).toBe(3);
       expect(new Set(layout.panels.map((panel) => panel.top)).size).toBe(1);
     } else if (viewport.mode === 'tablet') {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import brandIcon from './assets/brand.svg';
 import { motion, MotionConfig } from 'motion/react';
 import { I18nContext, translate, useI18n } from './i18n';
 import type { Locale, MessageKey } from './i18n';
@@ -10,7 +11,6 @@ import PreviewPanel from './components/PreviewPanel';
 import Button from './shared/ui/Button';
 import Modal from './shared/ui/Modal';
 import {
-  Leaf,
   Languages,
   Moon,
   Sun,
@@ -86,7 +86,7 @@ function Studio() {
       <header className="app-header">
         <a className="brand" href="/" aria-label={t('app')}>
           <span className="brand-mark">
-            <Leaf size={23} strokeWidth={1.7} />
+            <img src={brandIcon} alt="" aria-hidden="true" />
           </span>
           <span>
             <strong>{t('app')}</strong>

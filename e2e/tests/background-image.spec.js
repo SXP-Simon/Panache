@@ -3,6 +3,7 @@ const {
   test,
   expect,
   openHome,
+  openPaperSettings,
   fillText,
   useSmallCanvas,
   expectPreviewImageLoaded,
@@ -22,6 +23,7 @@ const TOLERANCE_PX = 4;
 test.describe('背景图片与边距识别', () => {
   test('上传图片确认识别后，把四个边距与行距回填进参数框', async ({ page }) => {
     await openHome(page);
+    await openPaperSettings(page);
     await page.getByTestId('line-spacing-input').fill('60');
     const spacingBeforeUpload = 60;
 
@@ -74,6 +76,7 @@ test.describe('背景图片与边距识别', () => {
 
 test('取消识别保留背景，可移除背景恢复尺寸输入', async ({ page }) => {
   await openHome(page);
+  await openPaperSettings(page);
   let detected = false;
   await page.route('**/api/imagefileprocess', (route) => {
     detected = true;
@@ -93,6 +96,7 @@ test('取消识别保留背景，可移除背景恢复尺寸输入', async ({ pa
 
 test('背景图作为真实生成文件发送，纸张尺寸由图片决定', async ({ page }) => {
   await openHome(page);
+  await openPaperSettings(page);
   await useSmallCanvas(page, { fontSize: 32, lineSpacing: 50 });
   await fillText(page, '有背景的手写预览');
   await page.getByTestId('background-image-input').setInputFiles(SAMPLE_PAGE);

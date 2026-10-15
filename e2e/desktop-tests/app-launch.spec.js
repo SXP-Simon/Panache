@@ -19,6 +19,17 @@ test.describe("桌面版启动与打包完整性", () => {
     expect(names.length).toBeGreaterThan(0);
     expect(names).toContain("云烟体.ttf");
 
+    // UI 字库必须包含在 dist 内，任意中文的完整字库也由同一个本地后端提供。
+    const interfaceFonts = await desktop.page.evaluate(async () => {
+      const faces = await document.fonts.load('16px "LXGW WenKai"', '中文 English 0123 龘');
+      return faces.map((face) => ({ family: face.family, status: face.status }));
+    });
+    expect(interfaceFonts.length).toBeGreaterThanOrEqual(2);
+    for (const face of interfaceFonts) {
+      expect(face.family.replaceAll(/["']/g, "")).toBe("LXGW WenKai");
+      expect(face.status).toBe("loaded");
+    }
+
     // 页脚显示的是 /api/version 的结果，链路是 app.getVersion() → 后端 → 前端
     await expect(desktop.page.getByTestId("app-version")).toContainText(PACKAGED_VERSION);
   });

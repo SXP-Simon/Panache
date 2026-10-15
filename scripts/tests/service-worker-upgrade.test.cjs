@@ -13,11 +13,62 @@ const dist = path.join(root, "frontend/dist");
 const mime = {
   ".js": "text/javascript", ".css": "text/css", ".html": "text/html",
   ".json": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
 };
+
+async function loadWenKai(page) {
+  return page.evaluate(async () => {
+    const faces = await document.fonts.load('16px "LXGW WenKai"', '中文 English 0123 龘');
+    return faces.map((face) => ({ family: face.family.replaceAll(/["']/g, ''), status: face.status }));
+  });
+}
+
+async function wenKaiSources(page) {
+  return page.evaluate(() => {
+    const urls = new Set();
+    function inspectRules(rules, base) {
+      for (const rule of rules) {
+        if (rule instanceof CSSFontFaceRule && rule.style.fontFamily.replaceAll(/["']/g, '').trim() === 'LXGW WenKai') {
+          for (const match of rule.style.getPropertyValue('src').matchAll(/url\(["']?([^"')]+)["']?\)/g))
+            urls.add(new URL(match[1], base).href);
+        } else if (rule instanceof CSSImportRule && rule.styleSheet) {
+          inspectRules(rule.styleSheet.cssRules, rule.styleSheet.href ?? base);
+        } else if ('cssRules' in rule) {
+          inspectRules(rule.cssRules, base);
+        }
+      }
+    }
+    for (const sheet of document.styleSheets) inspectRules(sheet.cssRules, sheet.href ?? location.href);
+    return [...urls];
+  });
+}
+
+async function expectOfflineCustomGlyphs(page, session) {
+  await page.evaluate(async () => {
+    for (const [id, text] of [['offline-font-cn', '龘'], ['offline-font-en', 'English']]) {
+      const element = document.createElement('p');
+      element.id = id;
+      element.textContent = text;
+      element.style.font = '24px "LXGW WenKai"';
+      document.body.append(element);
+    }
+    await document.fonts.ready;
+  });
+  await session.send('DOM.enable');
+  await session.send('CSS.enable');
+  const { root: documentNode } = await session.send('DOM.getDocument');
+  for (const id of ['offline-font-cn', 'offline-font-en']) {
+    const { nodeId } = await session.send('DOM.querySelector', { nodeId: documentNode.nodeId, selector: `#${id}` });
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
+    assert.ok(fonts.length > 0, `${id} must render real glyphs`);
+    assert.ok(fonts.every((font) => font.isCustomFont && font.glyphCount > 0 && /LXGW.*WenKai/i.test(font.familyName)), `${id} fell back to an installed font: ${JSON.stringify(fonts)}`);
+  }
+}
 
 for (const script of ["service-worker.js", "sw.js"]) {
   test(`cached legacy ${script} upgrades without running the React entry point`, { timeout: 45_000 }, async () => {
     let migrated = false;
+    let networkFontRequests = 0;
     const legacyPage = `<!doctype html><title>Legacy cached page</title><p id="legacy">Old Vue/ad page</p><script>navigator.serviceWorker.register('/${script}')</script>`;
     const legacyWorker = `
       self.addEventListener('install', event => event.waitUntil((async () => {
@@ -39,6 +90,7 @@ for (const script of ["service-worker.js", "sw.js"]) {
     const server = http.createServer((request, response) => {
       void (async () => {
         const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+        if (pathname.endsWith('.woff2')) networkFontRequests += 1;
         response.setHeader("Cache-Control", "no-store");
         if (pathname === `/${script}` && !migrated) {
           response.setHeader("Content-Type", "text/javascript");
@@ -68,6 +120,12 @@ for (const script of ["service-worker.js", "sw.js"]) {
     try {
       browser = await chromium.launch();
       const applicationContext = await browser.newContext();
+      let offline = false;
+      const offlineFontResponses = new Map();
+      applicationContext.on('response', (response) => {
+        if (offline && new URL(response.url()).pathname.endsWith('.woff2'))
+          offlineFontResponses.set(response.url(), response.fromServiceWorker());
+      });
       const page = await applicationContext.newPage();
       await page.goto(origin);
       await page.evaluate(() => navigator.serviceWorker.ready);
@@ -110,8 +168,16 @@ for (const script of ["service-worker.js", "sw.js"]) {
       await page.getByTestId('pwa-install-btn').click();
       assert.equal(await page.locator('html').getAttribute('data-install-prompt-called'), 'yes');
       await page.getByTestId('pwa-install-btn').waitFor({ state: 'hidden' });
+      const fontUrls = await wenKaiSources(page);
+      assert.equal(fontUrls.length, 2, 'Both the UI subset and full WenKai font must be self-hosted');
+      assert.ok(fontUrls.every((url) => new URL(url).origin === origin && new URL(url).pathname.endsWith('.woff2')));
+      const onlineFaces = await loadWenKai(page);
+      assert.equal(onlineFaces.length, 2, 'English/UI Chinese and subset-external 龘 must load both font faces');
+      assert.ok(onlineFaces.every((face) => face.family === 'LXGW WenKai' && face.status === 'loaded'));
       await page.getByTestId('text-input').fill('离线草稿 $x^2$');
       await page.context().setOffline(true);
+      offline = true;
+      const fontRequestsBeforeOffline = networkFontRequests;
       await page.reload();
       await page.getByTestId('text-input').waitFor();
       await page.getByTestId('offline-notice').waitFor();
@@ -135,8 +201,34 @@ for (const script of ["service-worker.js", "sw.js"]) {
         return result;
       });
       assert.ok(cachedRequests.some((url) => /\/assets\/latexToUnicode-/.test(url)));
+      for (const url of fontUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
       assert.ok(cachedRequests.every((url) => !new URL(url).pathname.startsWith('/api/')));
+      const cacheSession = await applicationContext.newCDPSession(page);
+      await cacheSession.send('Network.clearBrowserCache');
+      await cacheSession.detach();
+      offlineFontResponses.clear();
+      // This new Document owns a fresh FontFaceSet; cleared HTTP cache cannot rescue missing SW fonts.
+      const fontPage = await applicationContext.newPage();
+      const offlineSession = await applicationContext.newCDPSession(fontPage);
+      try {
+        await fontPage.goto(origin);
+        await fontPage.getByTestId('text-input').waitFor();
+        const offlineFaces = await loadWenKai(fontPage);
+        assert.deepEqual(offlineFaces, onlineFaces);
+        await expectOfflineCustomGlyphs(fontPage, offlineSession);
+        for (const url of fontUrls)
+          assert.equal(offlineFontResponses.get(url), true, `${url} must be served by the service worker offline`);
+        assert.equal(networkFontRequests, fontRequestsBeforeOffline, 'Offline fonts must not reach the HTTP server');
+        assert.equal(await fontPage.evaluate(async () => {
+          try { await fetch('/api/fonts_info'); return 'unexpected-network'; }
+          catch { return 'network-failed'; }
+        }), 'network-failed', 'The fresh font document must also have no API network access');
+      } finally {
+        await offlineSession.detach();
+        await fontPage.close();
+      }
       await page.context().setOffline(false);
+      offline = false;
       await page.getByTestId('offline-notice').waitFor({ state: 'hidden' });
       // Both desktop detection paths must avoid a second installation layer.
       for (const desktopMode of ['bridge', 'user-agent']) {
