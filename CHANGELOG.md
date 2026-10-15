@@ -1,3 +1,13 @@
+## [1.3.1](https://github.com/SXP-Simon/handwriting-web/compare/v1.3.0...v1.3.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **fe/src:** 将开源仓库入口移至显眼的品牌标题区 ([79ae114](https://github.com/SXP-Simon/handwriting-web/commit/79ae1147ff158d06728e16a23ee2e1f9cfe7161d))
+* **github/workflows:** 解析 Windows Flutter 构建启动器 ([c4df9de](https://github.com/SXP-Simon/handwriting-web/commit/c4df9ded200fcd0f3ddf13346abf0df929fa8c05))
+* **scripts:** 保持重复更新发布说明的空白稳定 ([cb58644](https://github.com/SXP-Simon/handwriting-web/commit/cb58644122c1871e7b6a56f3f372b8dc079c8d69))
+* **scripts:** 更新双客户端 Release 下载指引 ([bf02233](https://github.com/SXP-Simon/handwriting-web/commit/bf02233873cff4e5de30d72bb2ecd0d4a8c7018e))
+
 # [1.3.0](https://github.com/SXP-Simon/handwriting-web/compare/v1.2.0...v1.3.0) (2026-10-15)
 
 
