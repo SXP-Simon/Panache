@@ -38,7 +38,11 @@ function gh(args) {
 const section = `${MARKER}
 ## 下载哪个包
 
-安装包在本页下方的 Assets 里，按你的机器选：
+构建完成后，安装包会出现在本页下方的 Assets。Release 创建时构建可能仍在进行；仅下方实际出现的文件可下载。GitHub 自动提供的 Source code 是源码，不是可运行的客户端。
+
+### Electron 桌面版
+
+沿用 Web 界面的桌面客户端：
 
 | 你的机器 | 下载这个 | 说明 |
 | --- | --- | --- |
@@ -47,18 +51,33 @@ const section = `${MARKER}
 | Mac（Apple 芯片，M1 及以后） | \`HandwritingWeb-${version}-arm64.dmg\` | 挂载后把 \`HandwritingWeb.app\` 拖进「应用程序」 |
 | Mac（Apple 芯片，M1 及以后） | \`HandwritingWeb-${version}-arm64.zip\` | 同一个 App 的压缩包，DMG 打不开时用这个 |
 
-**Intel 芯片的 Mac 暂时没有包。** 桌面版后端不能交叉编译，目前只发 arm64。
-不确定自己是哪种芯片：苹果菜单 →「关于本机」，看「芯片」那一行。
+### Flutter 客户端
+
+Flutter 界面与 Rust 离线渲染引擎，与上面的 Electron 客户端分开打包。按设备选择一套客户端即可：
+
+| 你的机器 | 文件名 | 使用方式 |
+| --- | --- | --- |
+| Windows x64 | \`Flutter-HandwritingWeb-${version}-windows-x64.zip\` | 解压整个目录后运行应用，保留同目录的资源与后端 |
+| Linux x64 | \`Flutter-HandwritingWeb-${version}-linux-x64.tar.gz\` | 解压整个目录后运行应用，需桌面 GTK 运行环境 |
+| Mac（Apple 芯片） | \`Flutter-HandwritingWeb-${version}-macos-arm64.zip\` | 解压后将其中的 App 拖入「应用程序」 |
+| Android arm64 / x64 | \`Flutter-HandwritingWeb-${version}-android-arm64-x64.apk\` | 正式长期密钥签名；下载后允许浏览器或文件管理器安装应用 |
+
+Android 首次从旧调试版切换时，如提示签名冲突，需先卸载旧版（卸载会删除应用数据）；后续正式版沿用同一签名更新。
+两套桌面客户端目前都不提供 Intel Mac 包；iOS 尚无可直接安装的发布包。
+Flutter 构建与上传进度见仓库 Actions 的 **Flutter Release Assets**；任一平台失败时可能暂时没有 Flutter 包。
+\`Flutter-source.json\` 和每个 Flutter 包旁的 JSON 是源码提交、版本与 SHA-256 校验信息，不是安装包。
 
 ### macOS 首次打开会被拦下（正常现象）
 
 这个包没有 Apple 开发者签名，也没有公证，所以 macOS 会拦。macOS 15 起提示的是
 「已损坏，无法打开」—— 那不是真的损坏，是下载时被系统加上的 quarantine 属性。
-照上面的方式装好后执行一次，之后就不会再拦：
+Electron 安装到默认位置后可执行：
 
 \`\`\`bash
 xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 \`\`\`
+
+Flutter 请将命令中的路径替换为实际安装的 App 路径。
 
 不想用命令行也行：被拦一次之后去「系统设置 → 隐私与安全性」，在下方的提示里点「仍要打开」。
 `;
@@ -67,15 +86,17 @@ function main() {
   const raw = gh(["release", "view", tag, "--json", "body", "--jq", ".body"]);
   // 正文为空时 --jq .body 会给一个字符串 "null"
   const body = raw.trim() === "null" ? "" : raw;
-  if (body.includes(MARKER)) {
-    console.log(`${tag} 的正文里已经有下载说明，跳过`);
-    return;
-  }
+  // 2026-10-15：替换受管区段，允许更新模板并保留其后的人工说明。
+  const start = body.indexOf(MARKER);
+  const closing = "<!-- /download-guide -->";
+  const end = start < 0 ? -1 : body.indexOf(closing, start);
+  const prefix = start < 0 ? body : body.slice(0, start);
+  const suffix = end < 0 ? "" : body.slice(end + closing.length);
 
   // gh release edit 没有 --notes-append，只能把拼好的整段正文写回去
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "release-notes-"));
   const file = path.join(dir, "body.md");
-  fs.writeFileSync(file, `${body.trimEnd()}\n\n${section}`, "utf8");
+  fs.writeFileSync(file, `${prefix.trimEnd()}\n\n${section}<!-- /download-guide -->${suffix}`, "utf8");
   try {
     gh(["release", "edit", tag, "--notes-file", file]);
     console.log(`已把「下载哪个包」追加到 ${tag}`);
