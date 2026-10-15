@@ -99,6 +99,27 @@ const legacyFields = <String, String>{
 };
 
 class Settings {
+  Settings();
+
+  /// A portrait exercise-book page sized for comfortable mobile previews.
+  /// The usable area targets about twenty CJK characters and sixteen lines;
+  /// actual glyph advances remain determined by the selected handwriting font.
+  factory Settings.notebook() {
+    final settings = Settings();
+    settings.values.addAll({
+      'width': '1600',
+      'height': '2200',
+      'font_size': '70',
+      'word_spacing': '2',
+      'left_margin': '80',
+      'right_margin': '80',
+      'top_margin': '100',
+      'bottom_margin': '100',
+      'line_spacing': '120',
+    });
+    return settings;
+  }
+
   final Map<String, String> values = {
     for (final p in parameters) p.key: '${p.value}',
   };

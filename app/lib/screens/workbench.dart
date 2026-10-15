@@ -11,7 +11,6 @@ import '../l10n/app_localizations.dart';
 import 'dialogs/connection_dialog.dart';
 import 'dialogs/text_tools_dialogs.dart';
 import 'dialogs/text_preview_dialog.dart';
-import '../models/settings.dart';
 import '../services/api.dart';
 import '../services/workspace.dart';
 import '../services/workspace_documents.dart';
@@ -377,7 +376,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     },
     onDefaultPreset: () {
       final font = w.settings.font;
-      w.settings = Settings()..font = font;
+      w.settings = w.createDefaultSettings()..font = font;
       settingsRevision++;
       w.edit();
     },

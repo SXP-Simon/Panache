@@ -12,8 +12,18 @@ import 'workspace_storage.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
 
 class Workspace extends ChangeNotifier {
-  Workspace({HandwritingApi? api, this.managedBackend = false, this.storage})
-    : api = api ?? HandwritingApi(defaultBase);
+  Workspace({
+    HandwritingApi? api,
+    this.managedBackend = false,
+    this.storage,
+    Settings Function()? settingsFactory,
+  }) : api = api ?? HandwritingApi(defaultBase),
+       _settingsFactory = settingsFactory ?? Settings.new,
+       settings = (settingsFactory ?? Settings.new)();
+  final Settings Function() _settingsFactory;
+
+  /// Platform adapters inject defaults; restored user settings take priority.
+  Settings createDefaultSettings() => _settingsFactory();
   final bool managedBackend;
   static String get defaultBase {
     const configured = String.fromEnvironment('API_BASE_URL');
@@ -22,7 +32,7 @@ class Workspace extends ChangeNotifier {
   }
 
   HandwritingApi api;
-  Settings settings = Settings();
+  Settings settings;
   String text = '', version = '', phase = '', error = '', taskId = '';
   List<String> fonts = [];
   List<Uint8List> pages = [];
