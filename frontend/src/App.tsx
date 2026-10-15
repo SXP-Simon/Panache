@@ -2,56 +2,26 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import brandIcon from './assets/brand.svg';
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { I18nContext, translate, useI18n } from './i18n';
-import type { Locale, MessageKey } from './i18n';
+import type { MessageKey } from './i18n';
 import { getPwaState, subscribePwa, installPwa } from './pwa';
-import { useWorkspace } from './composables/useWorkspace';
+import { usePreferencesStore } from './features/preferences/store';
+import { reportFailure } from './features/workspace/reportFailure';
+import WorkspaceStatus from './components/WorkspaceStatus';
+import WorkspaceFooter from './components/WorkspaceFooter';
+import GenerateButton from './components/GenerateButton';
 import EditorPanel from './components/EditorPanel';
 import SettingsPanel from './components/SettingsPanel';
 import PreviewPanel from './components/PreviewPanel';
 import Button from './shared/ui/Button';
 import Modal from './shared/ui/Modal';
-import AnimatedReveal from './shared/ui/AnimatedReveal';
-import {
-  Languages,
-  Moon,
-  Sun,
-  CircleHelp,
-  MonitorDown,
-  Eye,
-  LoaderCircle,
-  Check,
-  AlertCircle,
-  FolderOpen,
-  ArrowUpRight,
-} from './shared/icons';
-function preferredLocale(): Locale {
-  try {
-    return localStorage.getItem('studio.locale') === 'en' ? 'en' : 'cn';
-  } catch {
-    return 'cn';
-  }
-}
-function preferredTheme() {
-  try {
-    return localStorage.getItem('studio.theme') === 'dark';
-  } catch {
-    return false;
-  }
-}
+import { Languages, Moon, Sun, CircleHelp, MonitorDown, ArrowUpRight } from './shared/icons';
 export default function App() {
-  const [locale, setLocale] = useState<Locale>(preferredLocale);
+  const locale = usePreferencesStore((state) => state.locale);
+  const toggleLocale = usePreferencesStore((state) => state.toggleLocale);
   const t = useCallback((key: MessageKey) => translate(locale, key), [locale]);
-  const value = useMemo(
-    () => ({ locale, t, toggle: () => setLocale((current) => (current === 'cn' ? 'en' : 'cn')) }),
-    [locale, t],
-  );
+  const value = useMemo(() => ({ locale, t, toggle: toggleLocale }), [locale, t, toggleLocale]);
   useEffect(() => {
     document.documentElement.lang = locale === 'cn' ? 'zh-CN' : 'en';
-    try {
-      localStorage.setItem('studio.locale', locale);
-    } catch {
-      /* Language remains available without storage. */
-    }
   }, [locale]);
   return (
     <I18nContext.Provider value={value}>
@@ -67,22 +37,15 @@ export default function App() {
 function Studio() {
   const { locale, t, toggle } = useI18n();
   const reduced = useReducedMotion();
-  const w = useWorkspace();
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
   const [guide, setGuide] = useState(false);
   const [desktop, setDesktop] = useState(false);
-  const [dark, setDark] = useState(preferredTheme);
+  const theme = usePreferencesStore((state) => state.theme);
+  const toggleTheme = usePreferencesStore((state) => state.toggleTheme);
+  const dark = theme === 'dark';
   useEffect(() => {
     document.documentElement.dataset['theme'] = dark ? 'dark' : 'light';
-    try {
-      localStorage.setItem('studio.theme', dark ? 'dark' : 'light');
-    } catch {
-      /* Theme remains available without storage. */
-    }
   }, [dark]);
-  const status =
-    w.error ||
-    (w.retrySeconds > 0 ? `${t('queueBusy')} ${w.retrySeconds} ${t('queueSuffix')}` : w.notice);
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -123,7 +86,7 @@ function Studio() {
               size="small"
               data-testid="pwa-install-btn"
               onClick={() => {
-                void installPwa().catch(w.fail);
+                void installPwa().catch(reportFailure);
               }}
             >
               <MonitorDown size={16} />
@@ -145,7 +108,7 @@ function Studio() {
             size="icon"
             data-testid="theme-toggle"
             aria-label={t('theme')}
-            onClick={() => setDark(!dark)}
+            onClick={toggleTheme}
           >
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
@@ -165,86 +128,15 @@ function Studio() {
             </p>
             <h1>{t('tagline')}</h1>
           </div>
-          <Button
-            variant="primary"
-            data-testid="preview-btn"
-            disabled={w.disabled}
-            onClick={() => void w.generate('preview')}
-          >
-            {w.busy ? <LoaderCircle className="spin" size={17} /> : <Eye size={17} />}{' '}
-            {t('previewAction')}
-          </Button>
+          <GenerateButton testId="preview-btn" />
         </div>
-        <AnimatePresence initial={false}>
-          {!pwa.online && (
-            <AnimatedReveal key="offline">
-              <div className="status-message" role="status" data-testid="offline-notice">
-                <AlertCircle size={17} />
-                <span>{t('offlineNotice')}</span>
-              </div>
-            </AnimatedReveal>
-          )}
-          {status && (
-            <AnimatedReveal key="status">
-              <div
-                className={`status-message ${w.error ? 'status-message--error' : ''}`}
-                role="status"
-                aria-live="polite"
-                data-testid="message-info"
-              >
-                {w.error ? (
-                  <AlertCircle size={17} />
-                ) : w.busy ? (
-                  <LoaderCircle className="spin" size={17} />
-                ) : (
-                  <Check size={17} />
-                )}
-                <span>{status}</span>
-              </div>
-            </AnimatedReveal>
-          )}
-          {w.savedPath && (
-            <AnimatedReveal key="download">
-              <div className="download-hint" data-testid="download-saved-hint">
-                <span data-testid="download-saved-path">{w.savedPath}</span>
-                <Button
-                  size="small"
-                  variant="ghost"
-                  data-testid="reveal-download-btn"
-                  onClick={() => window.handwritingDesktop?.revealLastDownload()}
-                >
-                  <FolderOpen size={15} />
-                  {t('openFolder')}
-                </Button>
-              </div>
-            </AnimatedReveal>
-          )}
-        </AnimatePresence>
-        {w.pdfBytes > 0 && (
-          <span data-testid="pdf-download-bytes" hidden>
-            {w.pdfBytes}
-          </span>
-        )}
+        <WorkspaceStatus />
         <div className="workspace-grid" data-testid="workspace">
-          <EditorPanel workspace={w} />
-          <PreviewPanel workspace={w} />
-          <SettingsPanel workspace={w} />
+          <EditorPanel />
+          <PreviewPanel />
+          <SettingsPanel />
         </div>
-        <footer className="app-footer">
-          <span>
-            <span className="local-dot" />
-            {t('localDraft')}
-          </span>
-          <span>
-            {t('app')}
-            {w.version && (
-              <span>
-                {' '}
-                · <span data-testid="app-version">v{w.version}</span>
-              </span>
-            )}
-          </span>
-        </footer>
+        <WorkspaceFooter />
       </motion.main>
       <AnimatePresence>
         {guide && (

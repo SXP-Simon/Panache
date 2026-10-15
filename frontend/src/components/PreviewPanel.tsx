@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import type { Workspace } from '../composables/useWorkspace';
+import { useShallow } from 'zustand/react/shallow';
+import { usePreviewStore } from '@/features/preview/store';
+import { useSettingsStore } from '@/features/settings/store';
+import { useGenerationState } from '@/features/generation/state';
+import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
+import GenerateButton, { useGenerationAvailability } from './GenerateButton';
 import { useI18n } from '../i18n';
 import Button from '../shared/ui/Button';
 import {
@@ -15,11 +20,29 @@ import {
   Download,
   FileDown,
 } from '../shared/icons';
-export default function PreviewPanel({ workspace: w }: { workspace: Workspace }) {
+export default function PreviewPanel() {
+  const { images, currentPage, setPage } = usePreviewStore(
+    useShallow((state) => ({
+      images: state.images,
+      currentPage: state.currentPage,
+      setPage: state.setPage,
+    })),
+  );
+  const { width, height, background, backgroundUrl, fullPreview, patch } = useSettingsStore(
+    useShallow((state) => ({
+      width: state.numbers.width,
+      height: state.numbers.height,
+      background: state.background,
+      backgroundUrl: state.backgroundUrl,
+      fullPreview: state.fullPreview,
+      patch: state.patch,
+    })),
+  );
+  const { generate } = useWorkspaceActions();
+  const { disabled } = useGenerationAvailability();
   const { t } = useI18n();
-  const reduced = useReducedMotion();
   const [zoom, setZoom] = useState(100);
-  const image = w.images[w.currentPage] ?? w.backgroundUrl;
+  const image = images[currentPage] ?? backgroundUrl;
   return (
     <section className="panel preview-panel" data-testid="preview-panel">
       <header className="panel-heading">
@@ -31,7 +54,7 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
           </h2>
         </div>
         <span className="preview-size">
-          {w.background ? w.background.name : `${w.numbers.width} × ${w.numbers.height}`}
+          {background ? background.name : `${width} × ${height}`}
         </span>
       </header>
       <div className={`preview-canvas ${image ? '' : 'is-empty'}`}>
@@ -45,35 +68,12 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
             </div>
             <h3>{t('emptyPreview')}</h3>
             <p>{t('emptyPreviewHint')}</p>
-            <Button
-              variant="primary"
-              disabled={w.disabled}
-              onClick={() => void w.generate('preview')}
-            >
-              <Eye size={16} />
-              {t('previewAction')}
-            </Button>
+            <GenerateButton compact />
           </div>
         ) : (
           <PreviewImage key={image} src={image} zoom={zoom} alt={t('preview')} />
         )}{' '}
-        <AnimatePresence>
-          {w.busy && (
-            <motion.div
-              key="progress"
-              className="preview-progress"
-              role="status"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: reduced ? 0 : 0.2 }}
-            >
-              <LoaderCircle className="spin" size={22} />
-              <p>{t('working')}</p>
-              <progress value={w.progress} max="100" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <PreviewProgress />
       </div>
       <footer className="preview-tools">
         <div className="page-nav">
@@ -82,21 +82,21 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
             variant="ghost"
             data-testid="preview-prev-btn"
             aria-label={t('previous')}
-            disabled={w.currentPage === 0}
-            onClick={() => w.patch({ currentPage: w.currentPage - 1 })}
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
           >
             <ChevronLeft size={16} />
           </Button>
           <span data-testid="preview-page-indicator">
-            {w.images.length ? w.currentPage + 1 : 0} / {w.images.length}
+            {images.length ? currentPage + 1 : 0} / {images.length}
           </span>
           <Button
             size="icon"
             variant="ghost"
             data-testid="preview-next-btn"
             aria-label={t('next')}
-            disabled={w.currentPage >= w.images.length - 1}
-            onClick={() => w.patch({ currentPage: w.currentPage + 1 })}
+            disabled={currentPage >= images.length - 1}
+            onClick={() => setPage(currentPage + 1)}
           >
             <ChevronRight size={16} />
           </Button>
@@ -127,8 +127,8 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
       <div className="export-bar">
         <label className="check-row">
           <input
-            checked={w.fullPreview}
-            onChange={(event) => w.patch({ fullPreview: event.currentTarget.checked })}
+            checked={fullPreview}
+            onChange={(event) => patch({ fullPreview: event.currentTarget.checked })}
             type="checkbox"
             data-testid="full-preview-checkbox"
           />
@@ -137,8 +137,8 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
         <div>
           <Button
             data-testid="generate-image-btn"
-            disabled={w.disabled}
-            onClick={() => void w.generate('zip')}
+            disabled={disabled}
+            onClick={() => void generate('zip')}
           >
             <Download size={16} />
             ZIP
@@ -146,8 +146,8 @@ export default function PreviewPanel({ workspace: w }: { workspace: Workspace })
           <Button
             variant="primary"
             data-testid="generate-pdf-btn"
-            disabled={w.disabled}
-            onClick={() => void w.generate('pdf')}
+            disabled={disabled}
+            onClick={() => void generate('pdf')}
           >
             <FileDown size={16} />
             PDF
@@ -172,5 +172,31 @@ function PreviewImage({ src, zoom, alt }: { src: string; zoom: number; alt: stri
       onLoad={() => setLoaded(true)}
       alt={alt}
     />
+  );
+}
+
+function PreviewProgress() {
+  const { t } = useI18n();
+  const reduced = useReducedMotion();
+  const busy = useGenerationState((state) => state.busy);
+  const progress = useGenerationState((state) => state.progress);
+  return (
+    <AnimatePresence>
+      {busy && (
+        <motion.div
+          key="progress"
+          className="preview-progress"
+          role="status"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduced ? 0 : 0.2 }}
+        >
+          <LoaderCircle className="spin" size={22} />
+          <p>{t('working')}</p>
+          <progress value={progress} max="100" />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

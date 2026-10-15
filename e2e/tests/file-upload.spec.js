@@ -58,11 +58,7 @@ test('上传字体随真实生成请求发送并出图', async ({ page }) => {
   });
   await expect(page.getByTestId('font-select')).toHaveValue('custom-upload.ttf');
   for (const language of ['en', 'zh-CN']) {
-    const refreshed = page.waitForResponse((response) =>
-      response.url().endsWith('/api/fonts_info'),
-    );
     await page.getByTestId('language-toggle').click();
-    await refreshed;
     await expect(page.locator('html')).toHaveAttribute('lang', language);
     await expect(page.getByTestId('font-select')).toHaveValue('custom-upload.ttf');
     await expect(

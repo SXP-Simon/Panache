@@ -1,6 +1,12 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import type { Workspace } from '../composables/useWorkspace';
+import { useShallow } from 'zustand/react/shallow';
+import { useDocumentStore } from '@/features/document/store';
+import { usePreferencesStore } from '@/features/preferences/store';
+import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
+import { useNotificationStore } from '@/features/notifications/store';
+import { reportFailure } from '@/features/workspace/reportFailure';
+import { updateResources } from '@/features/workspace/resourceUpdates';
 import { useI18n } from '../i18n';
 import { cleanMarkdown } from '@/utils/cleanMarkdown';
 import {
@@ -23,7 +29,19 @@ import {
   Trash2,
   X,
 } from '../shared/icons';
-export default function EditorPanel({ workspace: w }: { workspace: Workspace }) {
+export default function EditorPanel() {
+  const { text, imageStore, textFileName, setText } = useDocumentStore(
+    useShallow((state) => ({
+      text: state.text,
+      imageStore: state.imageStore,
+      textFileName: state.textFileName,
+      setText: state.setText,
+    })),
+  );
+  const { importText } = useWorkspaceActions();
+  const tableMode = usePreferencesStore((state) => state.tableMode);
+  const setTableMode = (value: TableMode) =>
+    usePreferencesStore.getState().patch({ tableMode: value });
   const { t } = useI18n();
   const input = useRef<HTMLTextAreaElement>(null);
   const [letter, setLetter] = useState<{
@@ -33,27 +51,20 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
     detectedEnding: boolean;
   } | null>(null);
   const [backup, setBackup] = useState<{ original: string; formatted: string } | null>(null);
-  const [tableMode, setTableMode] = useState<TableMode>(() => {
-    try {
-      const raw: unknown = JSON.parse(localStorage.getItem('markdownTableMode') ?? '"list"');
-      return raw === 'aligned' || raw === 'raw_pipe' || raw === 'clean' ? raw : 'list';
-    } catch {
-      return 'list';
-    }
-  });
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
-  const images = getReferencedImages(w.text, w.imageStore);
+  const images = getReferencedImages(text, imageStore);
   const letterPreview = letter ? formatChineseLetter(letter) : '';
   const activeImage = images.find((image) => image.index === activeImageIndex);
   function editText(value: string) {
     setBackup(null);
-    w.setText(value);
+    setText(value);
   }
   function insert(value: string) {
-    const start = input.current?.selectionStart ?? w.text.length;
+    const current = useDocumentStore.getState();
+    const start = input.current?.selectionStart ?? current.text.length;
     const end = input.current?.selectionEnd ?? start;
-    editText(w.text.slice(0, start) + value + w.text.slice(end));
-    const offset = collapseInlineImages(value, w.imageStore).collapsedText.length;
+    editText(current.text.slice(0, start) + value + current.text.slice(end));
+    const offset = collapseInlineImages(value, current.imageStore).collapsedText.length;
     requestAnimationFrame(() => {
       input.current?.focus();
       input.current?.setSelectionRange(start + offset, start + offset);
@@ -70,26 +81,48 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
         reader.onerror = () => reject(new Error(t('networkError')));
         reader.readAsDataURL(file);
       });
-      insert(`\n![image](${data})\n`);
+      let cursor = 0;
+      await updateResources((document) => {
+        const start = input.current?.selectionStart ?? document.text.length;
+        const end = input.current?.selectionEnd ?? start;
+        const value = `\n![image](${data})\n`;
+        const draft = collapseInlineImages(
+          document.text.slice(0, start) + value + document.text.slice(end),
+          document.imageStore,
+        );
+        cursor = start + collapseInlineImages(value, document.imageStore).collapsedText.length;
+        return {
+          document: {
+            text: draft.collapsedText,
+            imageStore: draft.imageStore,
+            textFileName: document.textFileName,
+          },
+        };
+      });
+      setBackup(null);
+      requestAnimationFrame(() => {
+        input.current?.focus();
+        input.current?.setSelectionRange(cursor, cursor);
+      });
     } catch (cause) {
-      w.fail(cause);
+      reportFailure(cause);
     }
   }
   function changeScale(index: number, scale: string) {
     const pattern = new RegExp(`!\\[(插图[ \\t]*[#:_-]?[ \\t]*${index})(?:\\|[^\\n\\]]+)?\\]`, 'g');
-    editText(w.text.replace(pattern, `![插图 ${index}|${scale}%]`));
+    editText(text.replace(pattern, `![插图 ${index}|${scale}%]`));
   }
   function removeImage(index: number) {
     const pattern = new RegExp(`!\\[插图[ \\t]*[#:_-]?[ \\t]*${index}(?:\\|[^\\n\\]]+)?\\]`, 'g');
-    editText(w.text.replace(pattern, ''));
+    editText(text.replace(pattern, ''));
     if (activeImageIndex === index) setActiveImageIndex(null);
   }
   function openLetter() {
-    if (!w.text.trim()) {
-      w.fail(new Error(t('emptyText')));
+    if (!text.trim()) {
+      useNotificationStore.getState().fail('emptyText');
       return;
     }
-    const parts = extractLetterEnding(w.text);
+    const parts = extractLetterEnding(text);
     setLetter({
       body: parts.body,
       signature: parts.signature,
@@ -105,12 +138,13 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
         if (
           (event.ctrlKey || event.metaKey) &&
           event.key.toLowerCase() === 'a' &&
-          !(event.target instanceof HTMLInputElement)
+          !(event.target instanceof HTMLInputElement) &&
+          !(event.target instanceof HTMLTextAreaElement)
         ) {
           event.preventDefault();
           event.stopPropagation();
           input.current?.focus();
-          input.current?.setSelectionRange(0, w.text.length);
+          input.current?.setSelectionRange(0, text.length);
         }
       }}
     >
@@ -133,7 +167,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
               const file = event.currentTarget.files?.[0];
               if (file) {
                 setBackup(null);
-                void w.importText(file);
+                void importText(file);
               }
               event.currentTarget.value = '';
             }}
@@ -147,8 +181,10 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
           data-testid="convert-latex-btn"
           onClick={() => {
             void import('@/utils/latexToUnicode')
-              .then((module) => editText(module.convertLatexToUnicode(w.text)))
-              .catch(w.fail);
+              .then((module) =>
+                editText(module.convertLatexToUnicode(useDocumentStore.getState().text)),
+              )
+              .catch(reportFailure);
           }}
         >
           <Sigma size={15} />
@@ -158,7 +194,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
           size="small"
           variant="ghost"
           data-testid="clean-markdown-btn"
-          onClick={() => editText(cleanMarkdown(w.text, { tableMode }))}
+          onClick={() => editText(cleanMarkdown(text, { tableMode }))}
         >
           <AlignLeft size={15} />
           {t('markdown')}
@@ -196,11 +232,6 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
               value === 'clean'
             ) {
               setTableMode(value);
-              try {
-                localStorage.setItem('markdownTableMode', JSON.stringify(value));
-              } catch {
-                w.inform(t('storageUnavailable'));
-              }
             }
           }}
         >
@@ -209,13 +240,13 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
           <option value="raw_pipe">{t('tablePipes')}</option>
           <option value="clean">{t('tableClean')}</option>
         </select>
-        {backup !== null && backup.formatted === w.text && (
+        {backup !== null && backup.formatted === text && (
           <Button
             size="small"
             variant="ghost"
             data-testid="letter-undo-btn"
             onClick={() => {
-              w.setText(backup.original);
+              setText(backup.original);
               setBackup(null);
             }}
           >
@@ -226,7 +257,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
       </div>
       <textarea
         ref={input}
-        value={w.text}
+        value={text}
         onChange={(event) => editText(event.currentTarget.value)}
         data-testid="text-input"
         className="document-input"
@@ -303,9 +334,9 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
       </div>
       <footer className="editor-footer">
         <span>
-          {w.text.length.toLocaleString()} {t('characters')}
+          {text.length.toLocaleString()} {t('characters')}
         </span>
-        <span data-testid="text-file-name">{w.textFileName}</span>
+        <span data-testid="text-file-name">{textFileName}</span>
         <Button size="icon" variant="ghost" aria-label={t('clear')} onClick={() => editText('')}>
           <Trash2 size={15} />
         </Button>
@@ -424,10 +455,10 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
                 disabled={!letter.body.trim()}
                 onClick={() => {
                   setBackup((previous) => ({
-                    original: previous?.formatted === w.text ? previous.original : w.text,
+                    original: previous?.formatted === text ? previous.original : text,
                     formatted: letterPreview,
                   }));
-                  w.setText(letterPreview);
+                  setText(letterPreview);
                   setLetter(null);
                 }}
               >
