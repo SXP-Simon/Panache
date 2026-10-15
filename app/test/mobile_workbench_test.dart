@@ -133,6 +133,12 @@ void main() {
       expect(focus.hasFocus, isTrue);
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
+      // Exercise the real Scaffold boundary: body descendants see consumed
+      // insets, so footer visibility must use the value captured above it.
+      expect(MediaQuery.viewInsetsOf(tester.element(editor)).bottom, 0);
+      expect(find.byKey(const ValueKey('generate-preview')), findsNothing);
+      expect(find.byKey(const ValueKey('export-pdf')), findsNothing);
+      expect(find.byKey(const ValueKey('export-zip')), findsNothing);
       expect(focus.hasFocus, isTrue);
       expect(tester.state<EditableTextState>(editable), same(editingState));
       expect(tester.testTextInput.isVisible, isTrue);
@@ -143,6 +149,9 @@ void main() {
       expect(focus.hasFocus, isTrue);
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('generate-preview')), findsOneWidget);
+      expect(find.byKey(const ValueKey('export-pdf')), findsOneWidget);
+      expect(find.byKey(const ValueKey('export-zip')), findsOneWidget);
       expect(focus.hasFocus, isTrue);
       expect(tester.state<EditableTextState>(editable), same(editingState));
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);

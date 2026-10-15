@@ -55,6 +55,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';
   bool get locked => w.busy || operation;
+  // This context is above Scaffold, before it consumes body keyboard insets.
+  bool get keyboardVisible => MediaQuery.viewInsetsOf(context).bottom > 0;
 
   @override
   void initState() {
@@ -259,6 +261,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Widget workspace(bool wide, double width) => WorkbenchLayout(
     wide: wide,
+    keyboardVisible: keyboardVisible,
     width: width,
     error: w.error,
     busy: locked,

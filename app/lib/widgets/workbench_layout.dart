@@ -6,6 +6,7 @@ class WorkbenchLayout extends StatelessWidget {
   const WorkbenchLayout({
     super.key,
     required this.wide,
+    required this.keyboardVisible,
     required this.width,
     required this.error,
     required this.busy,
@@ -24,7 +25,7 @@ class WorkbenchLayout extends StatelessWidget {
     required this.onZip,
     this.onCancel,
   });
-  final bool wide, busy, generating;
+  final bool wide, busy, generating, keyboardVisible;
   final double width;
   final String error, phase;
   final int progress, mobileTab;
@@ -161,7 +162,7 @@ class WorkbenchLayout extends StatelessWidget {
             ),
           ),
         ),
-        if (MediaQuery.viewInsetsOf(context).bottom == 0)
+        if (!keyboardVisible)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Wrap(
