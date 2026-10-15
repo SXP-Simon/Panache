@@ -72,12 +72,12 @@ void main() {
       storage.values['flutter.workspace'] = jsonEncode({
         'text': '保留我的草稿',
         'settings': 12,
-        'images': {'valid': 'data:image/png;base64,AA==', 'invalid': 42},
+        'images': {'1': 'data:image/png;base64,AA==', 'invalid': 42},
       });
       final w = Workspace(api: ControlledApi(), storage: storage);
       await w.initialize();
       expect(w.text, '保留我的草稿');
-      expect(w.images.keys, ['valid']);
+      expect(w.images.keys, ['1']);
       expect(w.settings.valid, isTrue);
       w.dispose();
       await w.persist();
@@ -133,7 +133,7 @@ void main() {
       expect(w.busy, isTrue);
       await w.cancel();
       api.submission.complete('late-task');
-      await generation;
+      expect(await generation, isFalse);
       expect(api.cancelled, ['late-task']);
       expect(w.busy, isFalse);
       expect(w.phase, 'cancelled');
@@ -157,7 +157,7 @@ void main() {
       api.rendered.complete([
         Uint8List.fromList([2]),
       ]);
-      await generation;
+      expect(await generation, isFalse);
       expect(w.pages.single, same(original));
       expect(w.progress, isNot(100));
       expect(w.phase, 'cancelled');
@@ -190,8 +190,112 @@ void main() {
     api.rendered.complete([
       Uint8List.fromList([2]),
     ]);
-    await generation;
+    expect(await generation, isFalse);
     expect(w.pages, isEmpty);
     expect(w.error, isEmpty);
   });
+
+  test(
+    'preset failures are reported and do not poison subsequent saves',
+    () async {
+      final storage = MemoryStorage()..fail = true;
+      final w = Workspace(api: ControlledApi(), storage: storage);
+      expect(await w.savePreset(), isFalse);
+      expect(w.error, contains('disk full'));
+      expect(storage.values.containsKey('flutter.preset'), isFalse);
+      storage.fail = false;
+      expect(await w.savePreset(), isTrue);
+      w.dispose();
+      await w.persist();
+    },
+  );
+
+  test(
+    'invalid image data and nonnumeric IDs are excluded without losing text',
+    () async {
+      final storage = MemoryStorage();
+      storage.values['flutter.workspace'] = jsonEncode({
+        'text': '正文 ![插图 1] ![插图 2]',
+        'images': {
+          '1': 'data:image/png;base64,AA==',
+          '2': 'data:image/png;base64,%%%',
+          '3': 'data:image/png;base64,A',
+          '4': 'https://example.invalid/picture.png',
+          'not-a-number': 'data:image/png;base64,AA==',
+        },
+      });
+      final w = Workspace(api: ControlledApi(), storage: storage);
+      await w.initialize();
+      expect(w.text, '正文 ![插图 1] ![插图 2]');
+      expect(w.images.keys, ['1']);
+      w.dispose();
+      await w.persist();
+    },
+  );
+
+  test(
+    'generation returns success only after publishing its own result',
+    () async {
+      final api = ControlledApi();
+      final w = Workspace(api: api)..text = 'draft';
+      w.settings.font = 'test.ttf';
+      final generation = w.generate();
+      api.submission.complete('task');
+      await api.previewRequested.future;
+      api.rendered.complete([
+        Uint8List.fromList([2]),
+      ]);
+      expect(await generation, isTrue);
+      expect(w.pages.single, [2]);
+      w.dispose();
+    },
+  );
+
+  test(
+    'invalid input and failed submissions return false despite old pages',
+    () async {
+      final api = ControlledApi();
+      final w = Workspace(api: api)
+        ..pages = [
+          Uint8List.fromList([1]),
+        ];
+      expect(await w.generate(), isFalse);
+      w.text = 'draft';
+      w.settings.font = 'test.ttf';
+      final generation = w.generate();
+      api.submission.completeError(ApiException('failed'));
+      expect(await generation, isFalse);
+      expect(w.pages.single, [1]);
+      w.dispose();
+    },
+  );
+
+  test(
+    'cancelled previous caller cannot claim a later successful result',
+    () async {
+      final oldApi = ControlledApi();
+      final newApi = ControlledApi();
+      final w = Workspace(api: oldApi)..text = 'draft';
+      w.settings.font = 'test.ttf';
+      final oldGeneration = w.generate();
+      oldApi.submission.complete('old-task');
+      await oldApi.previewRequested.future;
+      await w.cancel();
+      w.api = newApi;
+      final newGeneration = w.generate();
+      newApi.submission.complete('new-task');
+      await newApi.previewRequested.future;
+      newApi.rendered.complete([
+        Uint8List.fromList([2]),
+      ]);
+      expect(await newGeneration, isTrue);
+      oldApi.rendered.complete([
+        Uint8List.fromList([1]),
+      ]);
+      expect(await oldGeneration, isFalse);
+      expect(w.pages.single, [2]);
+      w.dispose();
+      oldApi.close();
+    },
+  );
 }

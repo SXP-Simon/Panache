@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings.dart';
 import '../utils/text_tools.dart';
+import '../utils/image_data.dart';
 import 'api.dart';
 import 'workspace_storage.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
@@ -64,7 +65,10 @@ class Workspace extends ChangeNotifier {
         if (data['images'] is Map) {
           images = {
             for (final entry in (data['images'] as Map).entries)
-              if (entry.key is String && entry.value is String)
+              if (entry.key is String &&
+                  int.tryParse(entry.key as String) != null &&
+                  entry.value is String &&
+                  decodeImageData(entry.value as String) != null)
                 entry.key as String: entry.value as String,
           };
         }
@@ -151,25 +155,30 @@ class Workspace extends ChangeNotifier {
       'settings': settings.toJson(),
       'images': images,
     });
-    return _write('flutter.workspace', snapshot);
+    return _write('flutter.workspace', snapshot).then((_) {});
   }
 
-  Future<void> _write(String key, String value) {
+  Future<bool> _write(String key, String value) {
     final storage = this.storage;
-    if (storage == null) return Future<void>.value();
-    // Serialize snapshots so an older, slower disk write cannot win.
-    _writes = _writes.then((_) => storage.write(key, value)).catchError((
-      Object e,
-    ) {
-      error = '$e';
-      emit();
-    });
-    return _writes;
+    if (storage == null) return Future<bool>.value(false);
+    // Serialize snapshots and recover the queue after a failed write, while
+    // preserving an explicit success outcome for user-initiated saves.
+    final operation = _writes
+        .then((_) => storage.write(key, value))
+        .then(
+          (_) => true,
+          onError: (Object e, StackTrace stackTrace) {
+            error = '$e';
+            emit();
+            return false;
+          },
+        );
+    _writes = operation.then((_) {});
+    return operation;
   }
 
-  Future<void> savePreset() async {
-    await _write('flutter.preset', jsonEncode(settings.toJson()));
-  }
+  Future<bool> savePreset() =>
+      _write('flutter.preset', jsonEncode(settings.toJson()));
 
   bool loadPreset() {
     final saved = storage?.read('flutter.preset');
@@ -183,21 +192,22 @@ class Workspace extends ChangeNotifier {
     }
   }
 
-  Future<void> generate({bool preview = true, bool pdf = false}) async {
+  Future<bool> generate({bool preview = true, bool pdf = false}) async {
     if (disposed ||
         busy ||
         (retryAt != null && DateTime.now().isBefore(retryAt!))) {
-      return;
+      return false;
     }
     if (text.trim().isEmpty ||
         !settings.valid ||
         (fontFile == null && settings.font == null)) {
       error = 'validation';
       emit();
-      return;
+      return false;
     }
     final generation = ++_generation;
     bool current() => !disposed && generation == _generation;
+    var succeeded = false;
     busy = true;
     taskId = '';
     error = '';
@@ -222,15 +232,15 @@ class Workspace extends ChangeNotifier {
       });
       if (!current()) {
         if (activeApi.supportsCancel) await activeApi.cancelTask(submittedId);
-        return;
+        return false;
       }
       taskId = submittedId;
       await persist();
-      if (!current()) return;
+      if (!current()) return false;
       final deadline = DateTime.now().add(const Duration(minutes: 29));
       while (current()) {
         final data = await activeApi.status(submittedId);
-        if (!current()) return;
+        if (!current()) return false;
         phase = '${data['task_status'] ?? data['status']}';
         progress = ((data['task_progress'] ?? data['progress']) as num? ?? 0)
             .toInt()
@@ -247,27 +257,28 @@ class Workspace extends ChangeNotifier {
         }
         await Future<void>.delayed(const Duration(seconds: 2));
       }
-      if (!current()) return;
+      if (!current()) return false;
       if (preview) {
         final rendered = await activeApi.preview(submittedId);
-        if (!current()) return;
+        if (!current()) return false;
         pages = rendered;
         page = 0;
       } else {
         final response = await activeApi.result(submittedId);
-        if (!current()) return;
+        if (!current()) return false;
         exportBytes = response.bodyBytes;
         exportExtension = pdf ? 'pdf' : 'zip';
       }
       progress = 100;
+      succeeded = true;
     } on ApiException catch (e) {
-      if (!current()) return;
+      if (!current()) return false;
       error = e.waitSeconds == null ? '$e' : 'queue:${e.waitSeconds}';
       if (e.waitSeconds != null) {
         retryAt = DateTime.now().add(Duration(seconds: e.waitSeconds!));
       }
     } catch (e) {
-      if (!current()) return;
+      if (!current()) return false;
       error = '$e';
     } finally {
       if (current()) {
@@ -275,6 +286,7 @@ class Workspace extends ChangeNotifier {
         emit();
       }
     }
+    return current() && succeeded;
   }
 
   Future<void> cancel() async {
