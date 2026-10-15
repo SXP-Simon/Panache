@@ -46,6 +46,7 @@ class WorkbenchInformation extends StatelessWidget {
                     label: Text(l.licenses),
                   ),
                   OutlinedButton.icon(
+                    key: const ValueKey('project-source-link'),
                     onPressed: () => launchUrl(
                       Uri.parse('https://github.com/SXP-Simon/handwriting-web'),
                     ),
@@ -62,6 +63,11 @@ class WorkbenchInformation extends StatelessWidget {
                     label: Text(l.feedback),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                'https://github.com/SXP-Simon/handwriting-web',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 24),
               Text(l.feedbackHelp),
