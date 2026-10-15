@@ -203,12 +203,15 @@ class WorkbenchLayout extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (context, bounds) {
-        if (!wide && bounds.maxHeight < 450) {
-          return SingleChildScrollView(
-            child: SizedBox(height: 540, child: content),
-          );
-        }
-        return content;
+        if (wide) return content;
+        // Keep the editor's element ancestry stable while the keyboard changes
+        // available height, otherwise EditableText is disposed mid-composition.
+        return SingleChildScrollView(
+          child: SizedBox(
+            height: bounds.maxHeight < 450 ? 540 : bounds.maxHeight,
+            child: content,
+          ),
+        );
       },
     );
   }
