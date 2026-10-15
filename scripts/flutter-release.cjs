@@ -7,7 +7,7 @@ const { execFileSync } = require("node:child_process");
 
 const MANIFEST = "Flutter-source.json";
 const REQUIRED_WORKFLOWS = ["flutter.yml", "rust.yml", "flutter_mobile.yml"];
-const PLATFORMS = ["windows-x64", "linux-x64", "macos-arm64", "android-arm64-x64"];
+const PLATFORMS = ["windows-x64", "linux-x64", "macos-arm64", "android-arm64-v8a", "android-x86_64"];
 
 function releaseVersion(tag) {
   const match = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.exec(tag ?? "");

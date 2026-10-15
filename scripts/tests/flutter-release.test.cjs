@@ -133,12 +133,19 @@ test("signed APK set is distinct and cannot be silently added to unsigned releas
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "flutter-release-apk-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const output = path.join(root, "staged");
-  for (const [platform, extension] of [["windows-x64", ".zip"], ["linux-x64", ".tar.gz"], ["macos-arm64", ".zip"], ["android-arm64-x64", ".apk"]]) {
+  for (const [platform, extension] of [["windows-x64", ".zip"], ["linux-x64", ".tar.gz"], ["macos-arm64", ".zip"], ["android-arm64-v8a", ".apk"], ["android-x86_64", ".apk"]]) {
     const file = path.join(root, `${platform}${extension}`);
     fs.writeFileSync(file, "package");
     stagePackage(file, output, platform, manifest());
   }
-  assert.equal(verifyPackages(output, manifest(), true).length, 8);
+  assert.equal(verifyPackages(output, manifest(), true).length, 10);
+  const x86 = `Flutter-HandwritingWeb-${manifest().version}-android-x86_64.apk`;
+  const saved = fs.readFileSync(path.join(output, x86 + '.json'));
+  fs.unlinkSync(path.join(output, x86 + '.json'));
+  assert.throws(() => verifyPackages(output, manifest(), true), /complete expected/);
+  fs.writeFileSync(path.join(output, x86 + '.json'), saved);
+  assert.throws(() => stagePackage(path.join(root, 'android-arm64-v8a.apk'), output, 'android-arm64-x64', manifest()), /Unsupported/);
+
   assert.throws(() => verifyPackages(output, manifest(), false), /complete expected/);
 });
 

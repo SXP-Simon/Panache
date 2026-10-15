@@ -19,7 +19,7 @@ Flutter 来源必须支持显式版本构建和正式 Android 签名接口；旧
 - `Flutter-HandwritingWeb-<version>-windows-x64.zip`
 - `Flutter-HandwritingWeb-<version>-linux-x64.tar.gz`
 - `Flutter-HandwritingWeb-<version>-macos-arm64.zip`
-- 配置正式签名后：`Flutter-HandwritingWeb-<version>-android-arm64-x64.apk`
+- 配置正式签名后：`Flutter-HandwritingWeb-<version>-android-arm64-v8a.apk`（手机优先）和 `Flutter-HandwritingWeb-<version>-android-x86_64.apk`（x86_64 模拟器或设备）
 
 每个包带独立 `.json` 证明文件，包含源 SHA、版本与 SHA-256。全部必要桌面包构建、打包后版本验证及证明检查通过后，统一使用带重试的上传脚本发布，避免部分构建失败时提前发布另一组包。`Flutter-` 前缀与 Electron 安装包区分。
 

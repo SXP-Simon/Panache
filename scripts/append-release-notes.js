@@ -60,7 +60,8 @@ Flutter 界面与 Rust 离线渲染引擎，与上面的 Electron 客户端分�
 | Windows x64 | \`Flutter-HandwritingWeb-${version}-windows-x64.zip\` | 解压整个目录后运行应用，保留同目录的资源与后端 |
 | Linux x64 | \`Flutter-HandwritingWeb-${version}-linux-x64.tar.gz\` | 解压整个目录后运行应用，需桌面 GTK 运行环境 |
 | Mac（Apple 芯片） | \`Flutter-HandwritingWeb-${version}-macos-arm64.zip\` | 解压后将其中的 App 拖入「应用程序」 |
-| Android arm64 / x64 | \`Flutter-HandwritingWeb-${version}-android-arm64-x64.apk\` | 正式长期密钥签名；下载后允许浏览器或文件管理器安装应用 |
+| Android 手机（优先选择） | \`Flutter-HandwritingWeb-${version}-android-arm64-v8a.apk\` | **推荐普通手机用户下载**，适用于 64 位 ARM 手机 |
+| Android x86_64 | \`Flutter-HandwritingWeb-${version}-android-x86_64.apk\` | 适用于 x86_64 模拟器或设备，普通 ARM 手机请选择上面的 v8a 包 |
 
 Android 首次从旧调试版切换时，如提示签名冲突，需先卸载旧版（卸载会删除应用数据）；后续正式版沿用同一签名更新。
 两套桌面客户端目前都不提供 Intel Mac 包；iOS 尚无可直接安装的发布包。

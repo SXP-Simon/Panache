@@ -239,17 +239,35 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter build apk --release --target-platform android-arm64,android-x64 --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs build/app/outputs/flutter-apk/app-release.apk | tee "$RUNNER_TEMP/apk-signature.txt"
-          if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature.txt"; then
-            echo "::error::Debug-signed APK cannot be uploaded as a release"
-            exit 1
-          fi
-      - name: Stage the signed APK
-        run: node scripts/flutter-release.cjs stage release-plan/Flutter-source.json release-assets android-arm64-x64 flutter-source/app/build/app/outputs/flutter-apk/app-release.apk
+          flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64 --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+          for ABI in arm64-v8a x86_64; do
+            APK="build/app/outputs/flutter-apk/app-${ABI}-release.apk"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apk-signature-${ABI}.txt"
+            if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature-${ABI}.txt"; then
+              echo "::error::Debug-signed APK cannot be uploaded as a release"
+              exit 1
+            fi
+            python - "$APK" "$ABI" <<'PY'
+          import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as apk:
+              native = {n.split('/')[1] for n in apk.namelist() if n.startswith('lib/') and n.endswith('.so')}
+              if native != {sys.argv[2]}:
+                  raise SystemExit(f"Unexpected APK ABIs: {native}")
+              for library in ('libflutter.so', 'libapp.so', 'libhandwriting_bridge.so'):
+                  if f'lib/{sys.argv[2]}/{library}' not in apk.namelist():
+                      raise SystemExit(f"Missing runtime library: {library}")
+          PY
+          done
+      - name: Stage signed APKs by architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ABI in arm64-v8a x86_64; do
+            node scripts/flutter-release.cjs stage release-plan/Flutter-source.json release-assets "android-${ABI}" "flutter-source/app/build/app/outputs/flutter-apk/app-${ABI}-release.apk"
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: flutter-release-android-arm64-x64
+          name: flutter-release-android-split
           path: release-assets/
           if-no-files-found: error
       - name: Remove signing key

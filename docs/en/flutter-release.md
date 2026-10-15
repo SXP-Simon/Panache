@@ -16,7 +16,7 @@ Pending checks for the fixed SHA are polled every 30 seconds with a shared 30-mi
 
 ## Packages and signing
 
-Packages use a `Flutter-HandwritingWeb-<version>-` prefix with `windows-x64.zip`, `linux-x64.tar.gz`, `macos-arm64.zip`, and, when formally signed, `android-arm64-x64.apk`. Each archive has a JSON provenance asset containing its source SHA, version and SHA-256. All required packages and packaged-backend version checks must pass before the retry-capable upload step.
+Packages use a `Flutter-HandwritingWeb-<version>-` prefix with `windows-x64.zip`, `linux-x64.tar.gz`, `macos-arm64.zip`, and, when formally signed, `android-arm64-v8a.apk` (recommended for phones) and `android-x86_64.apk` (x86_64 emulators/devices). Each archive has a JSON provenance asset containing its source SHA, version and SHA-256. All required packages and packaged-backend version checks must pass before the retry-capable upload step.
 
 Android requires all four repository secrets: `HANDWRITING_ANDROID_KEYSTORE_BASE64`, `HANDWRITING_ANDROID_STORE_PASSWORD`, `HANDWRITING_ANDROID_KEY_ALIAS`, and `HANDWRITING_ANDROID_KEY_PASSWORD`. Without all four, APK publishing is explicitly skipped in the source manifest and job summary. A temporary signing file is removed after use; `apksigner verify` must pass and Android Debug certificates are rejected. A debug-signed local APK is not a release substitute.
 
