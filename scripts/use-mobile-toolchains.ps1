@@ -3,6 +3,7 @@ param(
     [string]$ToolchainRoot = (Join-Path $env:LOCALAPPDATA 'HandwriteToolchains'),
     [string]$FlutterRoot = '',
     [string]$AndroidSdk = '',
+    [string]$WorkspacePath = "$env:SystemDrive\src\handwrite-flutter",
     [switch]$EnterApp
 )
 
@@ -43,14 +44,16 @@ if ($EnterApp) {
     # Windows LSP 对非 ASCII 路径的 Content-Length 计算可能截断初始化消息。
     # 使用指向真实工作树的 junction，无需移动仓库或复制源码。
     $taskRepository = Split-Path $PSScriptRoot -Parent
-    $taskWorkspace = Join-Path $ToolchainRoot 'flutter-project'
+    # 避免放在 MSIX 重定向的 LocalAppData 中，否则 Dart File.copy 无法处理该 junction。
+    $taskWorkspace = $WorkspacePath
     if (!(Test-Path $taskWorkspace)) {
+        New-Item -ItemType Directory -Path (Split-Path $taskWorkspace -Parent) -Force | Out-Null
         New-Item -ItemType Junction -Path $taskWorkspace -Target $taskRepository | Out-Null
     }
     $taskWorkspaceInfo = Get-Item $taskWorkspace
     if ($taskWorkspaceInfo.LinkType -ne 'Junction' -or
         [IO.Path]::GetFullPath($taskWorkspaceInfo.Target).TrimEnd('\') -ne [IO.Path]::GetFullPath($taskRepository).TrimEnd('\')) {
-        throw "工作目录 $taskWorkspace 已存在且不指向当前仓库；请使用另一个 -ToolchainRoot。"
+        throw "工作目录 $taskWorkspace 已存在且不指向当前仓库；请使用另一个 -WorkspacePath。"
     }
     Set-Location (Join-Path $taskWorkspace 'app')
 }
