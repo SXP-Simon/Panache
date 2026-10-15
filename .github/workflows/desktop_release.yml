@@ -12,7 +12,7 @@ on:
   workflow_run:
     workflows: ["Semantic Release"]
     types: [completed]
-    branches: [main]
+    branches: [custom-base]
   # 手动补传历史版本：Actions 页面 Run workflow，填上 tag
   workflow_dispatch:
     inputs:
@@ -81,11 +81,11 @@ jobs:
           # 而手动补传更可能拿错代码 —— 版本号取自检出代码里的 backend/VERSION
           # （发版时由 scripts/sync-version.js 写入并随发版提交），产物文件名也带同一个
           # 版本号，所以版本对不上就绝不可能是「这次的构建」。
-          if [ ! -f backend/VERSION ]; then
+          if ! git cat-file -e "${TARGET}:backend/VERSION"; then
             echo "::error::检出的代码里没有 backend/VERSION，无法确认版本。该文件随 v1.31.0 之后才引入，补传更早的 release 需要手工处理。"
             exit 1
           fi
-          VERSION="$(tr -d '[:space:]' < backend/VERSION)"
+          VERSION="$(git show "${TARGET}:backend/VERSION" | tr -d '[:space:]')"
           if [ "v${VERSION}" != "${TARGET}" ]; then
             echo "::error::检出代码是 v${VERSION}，但上传目标是 ${TARGET}，版本不一致，拒绝上传"
             exit 1
@@ -102,9 +102,12 @@ jobs:
         id: mac
         if: steps.tag.outputs.tag != ''
         shell: bash
+        env:
+          TARGET_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          if grep -qE '"mac"[[:space:]]*:' desktop/package.json; then
+          git show "${TARGET_TAG}:desktop/package.json" > "$RUNNER_TEMP/desktop-package.json"
+          if grep -qE '"mac"[[:space:]]*:' "$RUNNER_TEMP/desktop-package.json"; then
             echo "该 tag 已支持 macOS 打包"
             echo "supported=true" >> "$GITHUB_OUTPUT"
           else
@@ -122,7 +125,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.resolve-tag.outputs.tag }}
           persist-credentials: false
 
       - uses: actions/setup-python@v5
@@ -131,19 +134,32 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
-      # build.sh 只装构建期依赖，运行期依赖要在这里先装好
-      - name: 安装 Python 依赖
+      - uses: astral-sh/setup-uv@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+
+      - name: 安装依赖（旧 tag 保留原工具链）
         shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r backend/requirements.txt -r desktop/requirements-build.txt
+          if [ -f frontend/vite.config.ts ] && [ -f uv.lock ]; then
+            uv sync --locked --extra build
+            pnpm install --frozen-lockfile
+            if [ -f .venv/Scripts/python.exe ]; then
+              echo "PYTHON=$PWD/.venv/Scripts/python.exe" >> "$GITHUB_ENV"
+            else
+              echo "PYTHON=$PWD/.venv/bin/python" >> "$GITHUB_ENV"
+            fi
+          else
+            python -m pip install -r backend/requirements.txt -r desktop/requirements-build.txt
+            echo "PYTHON=python" >> "$GITHUB_ENV"
+          fi
 
       - name: 构建桌面版（前端 dist → 后端 exe → 安装包）
         shell: bash
         env:
-          PYTHON: python
           # 英文 Windows runner 的控制台代码页是 cp1252，Python 往 stdout 打中文会抛
           # UnicodeEncodeError。build.sh 自己也 export 了这两个（见 2026-09-29 那次
           # 失败），但手动补传检出的可能是**修复之前**的 tag —— 那时它的 build.sh 还是
@@ -152,7 +168,8 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: bash desktop/build.sh
 
-      - name: 安装桌面版 E2E 依赖
+      - name: 安装旧 tag 桌面版 E2E 依赖
+        if: hashFiles('frontend/vite.config.ts') == ''
         working-directory: e2e
         run: npm ci --no-audit --no-fund
 
@@ -161,7 +178,13 @@ jobs:
       # _electron 驱动的是 Electron 二进制本身，不需要 playwright install 下载浏览器。
       - name: 桌面版 E2E（真实打包产物）
         working-directory: e2e
-        run: npm run test:desktop
+        shell: bash
+        run: |
+          if [ -f ../frontend/vite.config.ts ] && [ -f ../uv.lock ]; then
+            pnpm run test:desktop
+          else
+            npm run test:desktop
+          fi
 
       - name: 上传桌面版 E2E 报告
         if: always()
@@ -181,6 +204,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve-tag.outputs.tag }}
+          GH_REPO: ${{ github.repository }}
         # 脚本内部按文件退避重试，扛 uploads.github.com 对 200MB 大文件偶发的 408
         run: bash scripts/upload-release-assets.sh "$TAG" 'desktop/build/installer/*.exe'
 
@@ -196,7 +220,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.resolve-tag.outputs.tag }}
           persist-credentials: false
 
       - uses: actions/setup-python@v5
@@ -205,18 +229,32 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
-      - name: 安装 Python 依赖
+      - uses: astral-sh/setup-uv@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+
+      - name: 安装依赖（旧 tag 保留原工具链）
         shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r backend/requirements.txt -r desktop/requirements-build.txt
+          if [ -f frontend/vite.config.ts ] && [ -f uv.lock ]; then
+            uv sync --locked --extra build
+            pnpm install --frozen-lockfile
+            if [ -f .venv/Scripts/python.exe ]; then
+              echo "PYTHON=$PWD/.venv/Scripts/python.exe" >> "$GITHUB_ENV"
+            else
+              echo "PYTHON=$PWD/.venv/bin/python" >> "$GITHUB_ENV"
+            fi
+          else
+            python -m pip install -r backend/requirements.txt -r desktop/requirements-build.txt
+            echo "PYTHON=python" >> "$GITHUB_ENV"
+          fi
 
       - name: 构建桌面版（前端 dist → 后端可执行文件 → .app / DMG）
         shell: bash
         env:
-          PYTHON: python
           # 没有 Apple 开发者证书，明确别让 electron-builder 去找签名身份 ——
           # 找不到时它本来就只是警告后跳过，但显式关掉可以避免 runner 上装了别的
           # 证书时用错身份去签。package.json 里的 mac.identity: null 是第二道保险，
@@ -224,7 +262,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: bash desktop/build.sh
 
-      - name: 安装桌面版 E2E 依赖
+      - name: 安装旧 tag 桌面版 E2E 依赖
+        if: hashFiles('frontend/vite.config.ts') == ''
         working-directory: e2e
         run: npm ci --no-audit --no-fund
 
@@ -232,7 +271,13 @@ jobs:
       # 没有 quarantine 属性（只有从浏览器下载的文件才会被加上），所以能直接启动。
       - name: 桌面版 E2E（真实打包产物）
         working-directory: e2e
-        run: npm run test:desktop
+        shell: bash
+        run: |
+          if [ -f ../frontend/vite.config.ts ] && [ -f ../uv.lock ]; then
+            pnpm run test:desktop
+          else
+            npm run test:desktop
+          fi
 
       - name: 上传桌面版 E2E 报告
         if: always()
@@ -250,5 +295,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve-tag.outputs.tag }}
+          GH_REPO: ${{ github.repository }}
         # DMG 和 zip 都是 200MB+，正是最容易撞 408 的那两个，务必走带重试的脚本
         run: bash scripts/upload-release-assets.sh "$TAG" 'desktop/build/installer/*.dmg' 'desktop/build/installer/*.zip'

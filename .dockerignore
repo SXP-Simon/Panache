@@ -1,0 +1,16 @@
+.git
+**/node_modules
+.venv
+venv
+**/__pycache__
+.ruff_cache
+.pytest_cache
+preview_outputs
+desktop/build
+frontend/dist
+e2e/test-results
+e2e/playwright-report
+backend/temp
+backend/logs
+backend/tasks.db*
+*.log

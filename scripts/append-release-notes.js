@@ -28,7 +28,11 @@ if (!tag) {
 const version = tag.replace(/^v/, "");
 
 function gh(args) {
-  return execFileSync("gh", args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  // Forks may default gh to the parent repository; always resolve this checkout's origin.
+  const origin = execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8" }).trim();
+  const repository = process.env.GITHUB_REPOSITORY || origin.replace(/^.*github\.com[:/]/u, "").replace(/\.git$/u, "");
+  if (!/^[\w.-]+\/[\w.-]+$/u.test(repository)) throw new Error("无法确定当前发布仓库");
+  return execFileSync("gh", [...args, "--repo", repository], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
 }
 
 const section = `${MARKER}

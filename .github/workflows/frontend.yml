@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - "frontend/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".dockerignore"
+      - ".github/workflows/frontend.yml"
 
 jobs:
   build-and-push:
@@ -27,7 +32,7 @@ jobs:
       - name: Build and Push web Image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: .
           file: ./frontend/dockerfile.frontend
           push: true
           tags: 14790897/frontend-handwriting:latest

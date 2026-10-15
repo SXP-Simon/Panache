@@ -24,6 +24,19 @@ if [ -z "$tag" ] || [ "$#" -lt 2 ]; then
 fi
 shift
 
+# Fork 环境的 gh 默认可能指向上游，上传必须明确当前仓库。
+repository="${GITHUB_REPOSITORY:-${GH_REPO:-}}"
+if [ -z "$repository" ]; then
+  origin_url="$(git remote get-url origin)"
+  repository="${origin_url#https://github.com/}"
+  repository="${repository#git@github.com:}"
+  repository="${repository%.git}"
+fi
+if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  echo "无法确定上传仓库，请设置 GITHUB_REPOSITORY 或 GH_REPO" >&2
+  exit 1
+fi
+
 max_attempts="${UPLOAD_MAX_ATTEMPTS:-3}"
 base_delay="${UPLOAD_RETRY_DELAY:-30}"
 
@@ -48,7 +61,7 @@ printf '  %s\n' "${files[@]}"
 for file in "${files[@]}"; do
   attempt=1
   while :; do
-    if gh release upload "$tag" "$file" --clobber; then
+    if gh release upload "$tag" "$file" --clobber --repo "$repository"; then
       echo "OK   $file"
       break
     fi

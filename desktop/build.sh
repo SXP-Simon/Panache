@@ -2,7 +2,7 @@
 # 一键构建桌面版（按当前平台出 Windows 或 macOS 包）。
 #
 #   bash desktop/build.sh              # 完整构建：前端 dist → 后端可执行文件 → 桌面安装包
-#   bash desktop/build.sh --skip-deps  # 跳过 npm ci / pip install（依赖已装好时更快）
+#   bash desktop/build.sh --skip-deps  # 跳过 pnpm install / uv sync（依赖已装好时更快）
 #   bash desktop/build.sh --app-only   # 只出 Electron 目录版（不生成 NSIS / DMG）
 #
 # 产物：
@@ -33,63 +33,29 @@ for arg in "$@"; do
   esac
 done
 
-# 优先用 PYTHON 指定的解释器（CI 上没有 venv），否则找仓库根目录的 venv ——
-# 系统 Python 的 fastapi/starlette 版本组合起不来。
-# 在 git worktree 里构建时 venv 通常只在主工作区（git worktree list 的第一项），
-# 与 e2e/playwright.config.js 的查找顺序保持一致。
-find_python() {
-  if [ -n "${PYTHON:-}" ]; then
-    echo "$PYTHON"
-    return 0
-  fi
-  local roots=("$ROOT") main_root
-  main_root="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
-  if [ -n "$main_root" ] && [ "$main_root" != "$ROOT" ]; then
-    roots+=("$main_root")
-  fi
-  local r
-  for r in "${roots[@]}"; do
-    if [ -x "$r/venv/Scripts/python.exe" ]; then echo "$r/venv/Scripts/python.exe"; return 0; fi
-    if [ -x "$r/venv/bin/python" ]; then echo "$r/venv/bin/python"; return 0; fi
-  done
-  return 1
-}
+# 2026-10-15：所有运行/打包依赖以 uv.lock 为准，--skip-deps 使用已同步的环境。
+cd "$ROOT"
+if [ "$SKIP_DEPS" = false ]; then
+  uv sync --locked --extra build
+  pnpm install --frozen-lockfile
+fi
 
-PYTHON="$(find_python)" || {
-  echo "找不到 venv（已查找：$ROOT 及主工作区），请先按 AGENTS.md 在仓库根目录创建 venv 并安装 backend/requirements.txt，或用 PYTHON=<解释器> 指定" >&2
-  exit 1
-}
-
-# --skip-deps 对前端和 desktop 一视同仁；有 lockfile 时用 npm ci 保证可复现
-ensure_node_deps() {
-  local dir="$1"
-  if [ -d "$dir/node_modules" ]; then
-    return 0
-  fi
-  if [ "$SKIP_DEPS" = true ]; then
-    echo "!! $dir/node_modules 不存在，但已指定 --skip-deps，跳过安装" >&2
-    return 0
-  fi
-  echo "==> 安装 $dir 的 npm 依赖"
-  if [ -f "$dir/package-lock.json" ]; then
-    (cd "$dir" && npm ci --no-audit --no-fund)
+if [ -z "${PYTHON:-}" ]; then
+  if [ -x "$ROOT/.venv/Scripts/python.exe" ]; then
+    PYTHON="$ROOT/.venv/Scripts/python.exe"
+  elif [ -x "$ROOT/.venv/bin/python" ]; then
+    PYTHON="$ROOT/.venv/bin/python"
   else
-    (cd "$dir" && npm install --no-audit --no-fund)
+    echo "找不到 .venv；请先运行 uv sync --locked --extra build，或设置 PYTHON" >&2
+    exit 1
   fi
-}
+fi
 
 echo "==> 使用 Python: $PYTHON"
 "$PYTHON" --version
 
-if [ "$SKIP_DEPS" = false ]; then
-  echo "==> 安装打包依赖"
-  "$PYTHON" -m pip install --disable-pip-version-check -q -r "$DESKTOP/requirements-build.txt"
-fi
-
 echo "==> 构建前端"
-ensure_node_deps "$ROOT/frontend"
-cd "$ROOT/frontend"
-npm run build
+pnpm --filter handwrite run build
 
 echo "==> 打包后端 (PyInstaller onedir)"
 cd "$ROOT"
@@ -151,12 +117,11 @@ PY
 fi
 
 echo "==> 打包 Electron 应用"
-ensure_node_deps "$DESKTOP"
 cd "$DESKTOP"
 if [ "$APP_ONLY" = true ]; then
-  npm run pack
+  pnpm run pack
 else
-  npm run dist
+  pnpm run dist
 fi
 
 echo

@@ -1,22 +1,40 @@
 name: Semantic Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Engineering quality"]
+    types: [completed]
+    branches: [custom-base]
+  workflow_dispatch:
+
 permissions:
-      contents: write
-      pages: write
-      id-token: write
+  contents: write
+
+concurrency:
+  group: semantic-release-custom-base
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # 检出代码
-      - uses: actions/setup-node@v4 # 设置 Node.js 环境
+      - uses: actions/checkout@v4
         with:
-          node-version: 22 # 21 已 EOL；semantic-release 24 要求 >=20.8.1
-      - run: npm install # 安装依赖 1
-      - run: npx semantic-release
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || 'custom-base' }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}

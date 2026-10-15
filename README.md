@@ -13,19 +13,19 @@
 ## 🌟 自用分支增强特性 (Key Features)
 
 ### 1. 全场景手写上下竖式分式渲染 (Vertical Fraction Engine)
-针对手写作业、实验报告及数学公式排版，彻底解决字体库倾斜分号（如 `½`）或斜杠（`1/2`）在手写纸面上突兀的问题：
+针对手写作业、实验报告及数学公式排版，改善字体库斜线分式（如 `½`）或斜杠（`1/2`）在手写纸面上突兀的问题：
 - **键盘数值分式自动转换**：形如 `1/2`、`3/4`、`22/7`、`0.00005/1.1062` 等输入自动转换为工整的上下竖式分数。
 - **代数复合公式与微商比值**：形如 `(a+b)/(c+d)`、`(\epsilon(x_1))/(|x_1|)`、`ds/s`、`dt/t` 自动解析为上下居中分数线排版。
-- **递归复合繁分式支持**：分母中包含真分数或复合式（如 $\frac{gt \cdot dt}{\frac{1}{2}gt^2}$）时，自动采用黄金分割基线递归多层微分子排版，拒绝任何横向斜杠。
+- **递归复合繁分式支持**：分母中包含真分数或复合式（如 $\frac{gt \cdot dt}{\frac{1}{2}gt^2}$）时，递归布局分子、分母与水平分数线。
 
 ### 2. 手写根式上方横线封顶与括号消除 (Radical Vinculum Engine)
 - 支持 `\sqrt{...}`、`\sqrt[n]{...}`、`√(...)`、`³√(8)`、`√x` 等各类数学根式；
-- 按照人类真实书写习惯，根号顶部右侧精准延伸出水平封顶横线（vinculum），完全覆盖被开方表达式并自动消除多余外层括号；
-- 完美支持根式与上下竖式分式互相多层嵌套（例如 $\sqrt{\frac{1}{2}}$ 与 $\frac{\sqrt{x+1}}{2}$）。
+- 按照人类真实书写习惯，根号顶部右侧延伸出水平封顶横线（vinculum），完全覆盖被开方表达式并自动消除多余外层括号；
+- 支持根式与上下竖式分式互相多层嵌套（例如 $\sqrt{\frac{1}{2}}$ 与 $\frac{\sqrt{x+1}}{2}$）。
 
 ### 3. 真实数学字形 Fallback 引擎 (Glyph Fallback Engine)
 - 原生手写中文字体通常缺失大量数学 Unicode 符号（如角标 $\text{x}_1, \text{x}_2$、上标 $\text{R}^3$、数学逻辑符号 $\Rightarrow, \in, \le, \ge, \to$ 等）。
-- 引擎底层动态挂载备用高覆盖率开源字库，在主手写字体缺失字形时自动按同比例无缝绘制真实符号，**彻底消除方块问号或空白占位符**。
+- 引擎底层动态挂载备用高覆盖率开源字库，在主手写字体缺失字形时自动按同比例无缝绘制真实符号，减少缺字导致的方块与空白。
 
 ### 4. 高可靠两阶段 Markdown 清洗与格式转换 (Clean Markdown)
 将用户粘贴的 Markdown/富文本作业内容清洗为适合手写纯文本排版：
@@ -41,26 +41,52 @@
 
 ## 🚀 快速启动与开发指南
 
-### 本地前后端启动
+工具链：Node.js 24+、pnpm 10.13.1、Python 3.12+、uv。前端使用 React、Vite、TypeScript 7 原生编译器与 Oxlint；后端使用 Pyright strict 和 Ruff。
 
 ```bash
-# 1. 启动前端 SPA (开发代理端口 8080)
-cd frontend
-npm run serve
+# 仓库根目录安装并锁定依赖
+pnpm install --frozen-lockfile
+uv sync --locked --extra dev
 
-# 2. 启动 FastAPI 后端 (端口 5005)
-# 必须使用项目根目录的 venv 虚拟环境
+# 开发服务（分别在两个终端启动）
+pnpm --filter handwrite run serve
 cd backend
-../venv/Scripts/python.exe -m uvicorn app:app --reload --host 0.0.0.0 --port 5005
-# Linux / macOS: ../venv/bin/python -m uvicorn app:app --reload --host 0.0.0.0 --port 5005
+uv run --project .. uvicorn app:app --reload --host 127.0.0.1 --port 5005
 ```
 
-### 运行自用功能验证测试
+前端位于 `http://127.0.0.1:8080`，开发代理将 `/api` 请求转发到后端 5005 端口。
 
 ```bash
-# 验证前端 Markdown 增强清洗单元测试
-cd frontend
-npm run test:clean-markdown
+# 以下命令在仓库根目录执行
+pnpm run quality:check
+pnpm run test:unit
+pnpm --filter handwriting-web-e2e exec playwright install chromium
+pnpm run test:all
+pnpm --filter handwrite run build
+
+# 按当前平台构建桌面版
+bash desktop/build.sh
+```
+
+`pnpm install` 自动安装 Lefthook。提交前检查 TypeScript、Oxlint、格式、Pyright 和 Ruff；推送前运行完整测试。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，建议按最小独立改动提交。
+
+```text
+fix(math): 修正嵌套根式的横线范围
+
+背景：说明可复现的问题与影响。
+
+解决手段：说明本次独立变更。
+
+收益：列出验证结果与可测量的改善。
+```
+
+自用发布从 `custom-base` 触发：工程质量检查通过后由 semantic-release 自动决定版本、更新版本文件并建立 Release；桌面工作流随后构建 Windows 与 Apple 芯片 macOS 安装包。`main` 保持上游同步用途。
+
+部署构建使用根目录作为 Docker context：
+
+```bash
+docker build -f frontend/dockerfile.frontend -t handwriting-frontend .
+docker build -f backend/dockerfile.backend -t handwriting-backend .
 ```
 
 ---

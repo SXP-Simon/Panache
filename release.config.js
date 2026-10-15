@@ -1,5 +1,5 @@
 module.exports = {
-  branches: ["main"], // 指定要发布的分支 (通常是 main 或 master)
+  branches: ["custom-base"], // 自用版本从 custom-base 发布，main 仅同步上游
   plugins: [
     "@semantic-release/commit-analyzer", // 分析提交信息，确定版本更新类型（major/minor/patch）
     "@semantic-release/release-notes-generator", // 根据提交生成 changelog
@@ -8,7 +8,10 @@ module.exports = {
     // （前端产物在 frontend/dist 且被 .gitignore 忽略），从来没匹配到东西；
     // 而 docs/**/* 只会把仓库里的截图挂上去，属于噪音。
     // 桌面版的安装包/便携版由 .github/workflows/desktop_release.yml 单独上传。
-    "@semantic-release/github", // 发布到 GitHub，生成 Release
+    [
+      "@semantic-release/github",
+      { successComment: false, failComment: false, releasedLabels: false },
+    ],
     [
       "@semantic-release/exec",
       {
