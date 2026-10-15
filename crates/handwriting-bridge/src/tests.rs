@@ -48,7 +48,10 @@ fn local_engine_lifecycle_and_abi() {
         "invalid_upload"
     );
     let fields: HashMap<String, String> = [
-        ("text", "第一页\n---\n第二页"),
+        (
+            "text",
+            "第一页 √((a)/(b)) + xₙ²\n---\n第二页 ((a)/(b))/((c)/(d)) + (AB)⃗",
+        ),
         ("width", "420"),
         ("height", "320"),
         ("font_size", "32"),
@@ -72,7 +75,7 @@ fn local_engine_lifecycle_and_abi() {
         }
         panic!("worker timed out")
     };
-    for mode in ["preview", "pdf", "zip", "cancel", "invalid"] {
+    for mode in ["preview", "math", "pdf", "zip", "cancel", "invalid"] {
         let mut fields = fields.clone();
         if mode == "pdf" || mode == "zip" {
             fields.insert("preview".into(), "false".into());
@@ -84,7 +87,31 @@ fn local_engine_lifecycle_and_abi() {
         if mode == "invalid" {
             fields.insert("width".into(), "1000000".into());
         }
-        let submitted = call("submit", fields, HashMap::new(), "").unwrap();
+        // 2026-10-15：公式经移动端同一 C ABI 进入真实 worker，不只测试直接 Rust 函数。
+        let submitted = if mode == "math" {
+            fields.insert(
+                "text".into(),
+                "√((a)/(b)) + xₙ²\n---\n((a)/(b))/((c)/(d)) + (AB)⃗".into(),
+            );
+            let input = CString::new(
+                json!({
+                    "command":"submit", "data_dir":root.path(), "font_dir":font_dir,
+                    "fields":fields
+                })
+                .to_string(),
+            )
+            .unwrap();
+            let response: Value = unsafe {
+                let output = handwriting_bridge_call(input.as_ptr());
+                let response = serde_json::from_slice(CStr::from_ptr(output).to_bytes()).unwrap();
+                handwriting_bridge_free(output);
+                response
+            };
+            assert_eq!(response["ok"], true, "{response}");
+            response["data"].clone()
+        } else {
+            call("submit", fields, HashMap::new(), "").unwrap()
+        };
         let id = submitted["task_id"].as_str().unwrap();
         if mode == "cancel" {
             simple("cancel", id).unwrap();
@@ -96,7 +123,7 @@ fn local_engine_lifecycle_and_abi() {
                 assert!(simple("result", id).is_err());
             }
             "invalid" => assert_eq!(state["task_status"], "failed"),
-            "preview" => {
+            "preview" | "math" => {
                 assert_eq!(state["task_status"], "completed", "{state}");
                 assert_eq!(state["pages"].as_array().unwrap().len(), 2);
                 let bytes = std::fs::read(state["pages"][0].as_str().unwrap()).unwrap();
