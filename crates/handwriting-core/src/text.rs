@@ -4,6 +4,8 @@ pub enum Node {
     Char(char),
     Fraction(Vec<Node>, Vec<Node>),
     Radical(Vec<Node>, Vec<Node>),
+    Scripts { upper: Vec<Node>, lower: Vec<Node> },
+    Accent(Vec<Node>, char),
     Image { alt: String, data: String },
     Break,
     Newline,
@@ -21,6 +23,8 @@ pub fn normalize(text: &str, english_spacing: bool) -> String {
             '∣' => s.push('|'),
             '∥' => s.push_str("||"),
             '∶' => s.push(':'),
+            // 2026-10-15：部分手写字体的 U+2212 无墨迹；使用实际手写连字符保住减法语义。
+            '−' => s.push('-'),
             _ => s.push(c),
         }
     }
@@ -54,8 +58,30 @@ pub fn normalize(text: &str, english_spacing: bool) -> String {
 
 pub fn parse(text: &str) -> Vec<Node> {
     let mut out = Vec::new();
+    let mut fenced: Option<(char, usize)> = None;
     for (i, line) in text.split('\n').enumerate() {
         let trimmed = line.trim();
+        // 2026-10-15：代码围栏内保留字面内容，数学启发式不能改写示例源码。
+        let fence = trimmed
+            .chars()
+            .next()
+            .filter(|c| "`~".contains(*c))
+            .map(|c| (c, trimmed.chars().take_while(|&v| v == c).count()))
+            .filter(|&(_, count)| count >= 3);
+        if fenced.is_some() || fence.is_some() {
+            if i > 0 {
+                out.push(Node::Newline);
+            }
+            out.extend(line.chars().map(Node::Char));
+            if let Some(open) = fenced {
+                if fence.is_some_and(|close| close.0 == open.0 && close.1 >= open.1) {
+                    fenced = None;
+                }
+            } else {
+                fenced = fence;
+            }
+            continue;
+        }
         if trimmed.len() >= 3 && trimmed.bytes().all(|b| b == b'-') {
             if !out.is_empty() && matches!(out.last(), Some(Node::Newline)) {
                 out.pop();
@@ -106,7 +132,70 @@ fn bracket_matches(cs: &[char]) -> Vec<Option<usize>> {
     result
 }
 fn token(c: char) -> bool {
-    c.is_ascii_alphanumeric() || ".%₀₁₂₃₄₅₆₇₈₉²³⁴ε".contains(c)
+    c.is_alphanumeric() || ".%".contains(c) || script_char(c).is_some()
+}
+// 2026-10-15：脚标先还原普通字符，交给所选手写字体缩小定位，避开字体中缺失/错误的 Unicode 脚标。
+pub(crate) fn script_char(c: char) -> Option<(char, bool)> {
+    for (source, target, upper) in [
+        ("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱˣʸᵏᵐ", "0123456789+-=()nixykm", true),
+        (
+            "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ",
+            "0123456789+-=()aehijklmnoprstuvxy",
+            false,
+        ),
+    ] {
+        if let Some(index) = source.chars().position(|x| x == c) {
+            return Some((target.chars().nth(index)?, upper));
+        }
+    }
+    None
+}
+fn accent(c: char) -> bool {
+    "\u{0304}\u{0305}\u{0302}\u{20d7}\u{0307}\u{0308}\u{0303}\u{0332}\u{0306}\u{0301}\u{0300}\u{030c}".contains(c)
+}
+fn protected_end(cs: &[char], start: usize) -> Option<usize> {
+    if cs[start] == '`' {
+        let count = cs[start..].iter().take_while(|&&c| c == '`').count();
+        let mut end = start + count;
+        while end < cs.len() {
+            if cs[end..].iter().take(count).filter(|&&c| c == '`').count() == count {
+                return Some((end + count).min(cs.len()));
+            }
+            end += 1;
+        }
+        return Some(cs.len());
+    }
+    if start > 0 && !cs[start - 1].is_whitespace() && !"([{\"'=:：，；".contains(cs[start - 1]) {
+        return None;
+    }
+    // 2026-10-15：普通 token 在括号处停止，避免未闭合括号长输入反复扫描整个余串。
+    let direct = cs[start..].starts_with(&['h', 't', 't', 'p', ':', '/', '/'])
+        || cs[start..].starts_with(&['h', 't', 't', 'p', 's', ':', '/', '/'])
+        || cs[start..].starts_with(&['w', 'w', 'w', '.'])
+        || cs[start] == '/'
+        || cs[start] == '\\'
+        || (cs.get(start + 1) == Some(&':')
+            && cs.get(start + 2).is_some_and(|c| *c == '/' || *c == '\\'));
+    let end = start
+        + cs[start..]
+            .iter()
+            .take_while(|c| !c.is_whitespace() && (direct || !"()[]{}\"'=:：，；".contains(**c)))
+            .count();
+    let word: String = cs[start..end].iter().collect();
+    let bare = word.trim_end_matches(|c: char| ")]},;。；，".contains(c));
+    let date = bare
+        .chars()
+        .all(|c| c.is_ascii_digit() || "/-.".contains(c))
+        && bare.matches('/').count() >= 2;
+    let path = word.starts_with('/')
+        || word.starts_with("./")
+        || word.starts_with("../")
+        || word.contains(":\\")
+        || (word.as_bytes().get(1) == Some(&b':') && word.as_bytes().get(2) == Some(&b'/'))
+        || word.starts_with("\\\\")
+        || (word.contains('/')
+            && (word.contains('_') || word.rsplit('/').next().is_some_and(|s| s.contains('.'))));
+    (date || path || word.contains("://") || word.starts_with("www.")).then_some(end)
 }
 fn nodes(cs: &[char], depth: usize) -> Vec<Node> {
     parse_inline(&cs.iter().collect::<String>(), depth + 1)
@@ -134,6 +223,11 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < cs.len() {
+        if let Some(end) = protected_end(&cs, i) {
+            out.extend(cs[i..end].iter().copied().map(Node::Char));
+            i = end;
+            continue;
+        }
         if cs[i] == '!'
             && cs.get(i + 1) == Some(&'[')
             && let Some(end) = next_square.get(i + 2).copied().flatten()
@@ -156,10 +250,18 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
         }
         let mut rad_start = None;
         let mut index = Vec::new();
-        if cs[i] == '√' {
+        if cs[i] == '√' || cs[i] == '∛' || cs[i] == '∜' {
+            if cs[i] != '√' {
+                index.push(Node::Char(if cs[i] == '∛' { '3' } else { '4' }));
+            }
             rad_start = Some(i + 1);
-        } else if cs[i..].starts_with(&['\\', 's', 'q', 'r', 't']) {
+        } else if cs[i..].starts_with(&['\\', 's', 'q', 'r', 't'])
+            && cs.get(i + 5).is_none_or(|c| !c.is_ascii_alphabetic())
+        {
             let mut p = i + 5;
+            while cs.get(p) == Some(&' ') {
+                p += 1;
+            }
             if cs.get(p) == Some(&'[')
                 && let Some(e) = pairs.get(p).copied().flatten()
             {
@@ -176,7 +278,10 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
                 p += 1;
             }
             if cs.get(p) == Some(&'√') {
-                index = nodes(&cs[i..p], depth);
+                index = cs[i..p]
+                    .iter()
+                    .map(|&c| Node::Char(script_char(c).map_or(c, |(v, _)| v)))
+                    .collect();
                 rad_start = Some(p + 1);
             }
         }
@@ -226,6 +331,67 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
                 parse_inline(d, depth + 1),
             ));
             i += 1;
+            continue;
+        }
+        if cs[i] == '('
+            && let Some(end) = pairs[i]
+            && cs.get(end + 1).is_some_and(|&c| accent(c))
+        {
+            out.push(Node::Accent(nodes(&cs[i + 1..end], depth), cs[end + 1]));
+            i = end + 2;
+            continue;
+        }
+        if accent(cs[i])
+            && let Some(base) = out.pop()
+        {
+            out.push(Node::Accent(vec![base], cs[i]));
+            i += 1;
+            continue;
+        }
+        let explicit = "^_".contains(cs[i])
+            && cs.get(i + 1).is_some_and(|c| *c == '(' || *c == '{')
+            && pairs.get(i + 1).copied().flatten().is_some();
+        if script_char(cs[i]).is_some() || explicit {
+            let (part, upper, end) = if explicit {
+                let end = pairs[i + 1].unwrap();
+                (nodes(&cs[i + 2..end], depth), cs[i] == '^', end + 1)
+            } else {
+                let upper = script_char(cs[i]).unwrap().1;
+                let mut end = i;
+                let mut part = Vec::new();
+                while end < cs.len()
+                    && let Some((normal, is_upper)) = script_char(cs[end])
+                    && is_upper == upper
+                {
+                    part.push(Node::Char(normal));
+                    end += 1;
+                }
+                (part, upper, end)
+            };
+            if let Some(Node::Scripts {
+                upper: sup,
+                lower: sub,
+            }) = out.last_mut()
+            {
+                let slot = if upper { sup } else { sub };
+                if slot.is_empty() {
+                    *slot = part;
+                    i = end;
+                    continue;
+                }
+            }
+            out.push(if upper {
+                Node::Scripts {
+                    upper: part,
+                    lower: vec![],
+                }
+            } else {
+                Node::Scripts {
+                    upper: vec![],
+                    lower: part,
+                }
+            });
+            i = end;
             continue;
         }
         // 括号表达式或连续 token 的分式，嵌套结构受深度上限约束。

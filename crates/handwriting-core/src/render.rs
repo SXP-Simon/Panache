@@ -4,16 +4,12 @@ use crate::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use fontdue::{Font, FontSettings};
-use image::{GrayImage, Luma, Rgba, RgbaImage};
+use image::{GrayImage, RgbaImage};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use rand_distr::{Distribution, StandardNormal};
-use std::{
-    collections::HashMap,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 #[derive(Clone, Default, Debug)]
@@ -67,261 +63,15 @@ pub struct RenderRequest {
     pub fonts: FontBook,
     pub limits: Limits,
 }
-fn normal(rng: &mut ChaCha8Rng, sigma: f32) -> f32 {
-    if sigma == 0. {
-        0.
-    } else {
-        let n: f32 = StandardNormal.sample(rng);
-        n * sigma
-    }
-}
-#[derive(Clone)]
-struct Glyph {
-    mask: GrayImage,
-    advance: f32,
-}
-struct Glyphs<'a> {
-    book: &'a FontBook,
-    cache: HashMap<(char, u32), Glyph>,
-    cache_bytes: usize,
-    max_width: u32,
-    max_height: u32,
-}
-impl Glyphs<'_> {
-    fn glyph(&mut self, c: char, size: f32) -> Result<Glyph> {
-        let size = size.clamp(1., 2048.).round();
-        let key = (c, size as u32);
-        if let Some(g) = self.cache.get(&key) {
-            return Ok(g.clone());
-        }
-        let font = self.book.for_char(c);
-        let metrics = font.metrics(c, size);
-        if metrics.width > self.max_width as usize || metrics.height > self.max_height as usize {
-            return Err(Error::new("invalid_layout", "字形尺寸超过页面"));
-        }
-        let (m, data) = font.rasterize(c, size);
-        let ascent = font
-            .horizontal_line_metrics(size)
-            .map(|l| l.ascent)
-            .unwrap_or(size);
-        let top = (ascent - m.height as f32 - m.ymin as f32).round().max(0.) as u32;
-        let w = (m.width as i32 + m.xmin.max(0))
-            .max(m.advance_width.ceil() as i32)
-            .max(1) as u32;
-        let h = (top + m.height as u32).max(size as u32);
-        self.check_size(w, h)?;
-        let mut mask = GrayImage::new(w, h);
-        for y in 0..m.height {
-            for x in 0..m.width {
-                let xx = x as i32 + m.xmin;
-                if xx >= 0 && xx < w as i32 {
-                    mask[(xx as u32, y as u32 + top)] = Luma([data[y * m.width + x]]);
-                }
-            }
-        }
-        let glyph = Glyph {
-            mask,
-            advance: if c == ' ' {
-                m.advance_width
-            } else {
-                (m.width as f32).max(m.advance_width)
-            },
-        };
-        // 有界缓存，防止长文档和随机字号不断增长。
-        if self.cache.len() >= 1024 || self.cache_bytes + glyph.mask.len() > 8 * 1024 * 1024 {
-            self.cache.clear();
-            self.cache_bytes = 0;
-        }
-        self.cache_bytes += glyph.mask.len();
-        self.cache.insert(key, glyph.clone());
-        Ok(glyph)
-    }
-    fn check_size(&self, w: u32, h: u32) -> Result<()> {
-        if w > self.max_width || h > self.max_height {
-            Err(Error::new("invalid_layout", "公式或字形尺寸超过页面"))
-        } else {
-            Ok(())
-        }
-    }
-    fn sequence(&mut self, nodes: &[Node], size: f32) -> Result<Glyph> {
-        let mut glyphs = Vec::new();
-        let mut width = 0.;
-        for node in nodes {
-            let g = self.node(node, size)?;
-            width += g.advance;
-            self.check_size(width.ceil() as u32, g.mask.height())?;
-            glyphs.push(g);
-        }
-        let w = glyphs.iter().map(|g| g.advance).sum::<f32>().ceil().max(1.) as u32;
-        let h = glyphs
-            .iter()
-            .map(|g| g.mask.height())
-            .max()
-            .unwrap_or(size as u32)
-            .max(1);
-        self.check_size(w, h)?;
-        let mut mask = GrayImage::new(w, h);
-        let mut x = 0f32;
-        for g in glyphs {
-            paste_mask(&mut mask, &g.mask, x.round() as i32, 0);
-            x += g.advance;
-        }
-        Ok(Glyph {
-            mask,
-            advance: w as f32,
-        })
-    }
-    fn node(&mut self, n: &Node, size: f32) -> Result<Glyph> {
-        match n {
-            Node::Char(c) => self.glyph(*c, size),
-            Node::Fraction(num, den) => {
-                let a = self.sequence(num, size * 0.55)?;
-                let b = self.sequence(den, size * 0.55)?;
-                let w = a.mask.width().max(b.mask.width()) + 4;
-                let gap = (size * 0.07).max(2.) as u32;
-                let h = a.mask.height() + b.mask.height() + gap * 2 + 1;
-                self.check_size(w, h)?;
-                let mut mask = GrayImage::new(w, h);
-                paste_mask(&mut mask, &a.mask, ((w - a.mask.width()) / 2) as i32, 0);
-                paste_mask(
-                    &mut mask,
-                    &b.mask,
-                    ((w - b.mask.width()) / 2) as i32,
-                    (a.mask.height() + gap * 2 + 1) as i32,
-                );
-                for x in 0..w {
-                    mask[(x, a.mask.height() + gap)] = Luma([255]);
-                }
-                Ok(Glyph {
-                    mask,
-                    advance: w as f32,
-                })
-            }
-            Node::Radical(body, index) => {
-                let a = self.sequence(body, size * 0.85)?;
-                let idx = self.sequence(index, size * 0.35)?;
-                let hook = (size * 0.45).max(5.) as u32;
-                let bar = (size * 0.08).max(2.) as u32;
-                let w = hook + a.mask.width() + 3;
-                let h = a.mask.height() + bar + 2;
-                self.check_size(w, h)?;
-                let mut mask = GrayImage::new(w, h);
-                paste_mask(&mut mask, &a.mask, hook as i32, (bar + 2) as i32);
-                if !index.is_empty() {
-                    paste_mask(&mut mask, &idx.mask, 0, 0);
-                }
-                imageproc::drawing::draw_line_segment_mut(
-                    &mut mask,
-                    (0., h as f32 * 0.55),
-                    (hook as f32 * 0.3, h as f32 * 0.85),
-                    Luma([255]),
-                );
-                imageproc::drawing::draw_line_segment_mut(
-                    &mut mask,
-                    (hook as f32 * 0.3, h as f32 * 0.85),
-                    (hook as f32 * 0.7, bar as f32),
-                    Luma([255]),
-                );
-                imageproc::drawing::draw_line_segment_mut(
-                    &mut mask,
-                    (hook as f32 * 0.7, bar as f32),
-                    ((w - 1) as f32, bar as f32),
-                    Luma([255]),
-                );
-                Ok(Glyph {
-                    mask,
-                    advance: w as f32,
-                })
-            }
-            _ => Ok(Glyph {
-                mask: GrayImage::new(1, 1),
-                advance: 0.,
-            }),
-        }
-    }
-}
-fn paste_mask(dest: &mut GrayImage, src: &GrayImage, x: i32, y: i32) {
-    for (xx, yy, p) in src.enumerate_pixels() {
-        let dx = x + xx as i32;
-        let dy = y + yy as i32;
-        if dx >= 0 && dy >= 0 && dx < dest.width() as i32 && dy < dest.height() as i32 {
-            dest[(dx as u32, dy as u32)][0] = dest[(dx as u32, dy as u32)][0].max(p[0]);
-        }
-    }
-}
-// 2026-10-12：四邻域连通区域整体扰动；旋转方向沿用 handright，算法许可见 NOTICE。
-fn perturb(
-    mask: &mut GrayImage,
-    canvas: &mut RgbaImage,
-    p: &Parameters,
-    rng: &mut ChaCha8Rng,
-    cancel: &Cancellation,
-) -> Result<()> {
-    let (w, h) = mask.dimensions();
-    let mut stack = Vec::new();
-    let mut component = Vec::new();
-    for y in 0..h {
-        if y % 32 == 0 {
-            cancel.check()?;
-        }
-        for x in 0..w {
-            if mask[(x, y)][0] < 128 {
-                continue;
-            }
-            stack.push((x, y));
-            mask[(x, y)] = Luma([0]);
-            let (mut minx, mut maxx, mut miny, mut maxy) = (x, x, y, y);
-            while let Some((xx, yy)) = stack.pop() {
-                component.push((xx, yy));
-                minx = minx.min(xx);
-                maxx = maxx.max(xx);
-                miny = miny.min(yy);
-                maxy = maxy.max(yy);
-                if component.len() % 8192 == 0 {
-                    cancel.check()?;
-                }
-                for (nx, ny) in [
-                    (xx as i32 - 1, yy as i32),
-                    (xx as i32 + 1, yy as i32),
-                    (xx as i32, yy as i32 - 1),
-                    (xx as i32, yy as i32 + 1),
-                ] {
-                    if nx >= 0
-                        && ny >= 0
-                        && nx < w as i32
-                        && ny < h as i32
-                        && mask[(nx as u32, ny as u32)][0] >= 128
-                    {
-                        mask[(nx as u32, ny as u32)] = Luma([0]);
-                        stack.push((nx as u32, ny as u32));
-                    }
-                }
-            }
-            let cx = (minx + maxx) as f32 / 2.;
-            let cy = (miny + maxy) as f32 / 2.;
-            let dx = normal(rng, p.perturb_x_sigma);
-            let dy = normal(rng, p.perturb_y_sigma);
-            let angle = normal(rng, p.perturb_theta_sigma);
-            let ink = normal(rng, p.ink_depth_sigma);
-            let fill = Rgba([
-                (p.fill[0] as f32 + ink).clamp(0., 255.) as u8,
-                (p.fill[1] as f32 + ink).clamp(0., 255.) as u8,
-                (p.fill[2] as f32 + ink).clamp(0., 255.) as u8,
-                p.fill[3],
-            ]);
-            for (xx, yy) in component.drain(..) {
-                let rx = xx as f32 - cx;
-                let ry = yy as f32 - cy;
-                let nx = (rx * angle.cos() + ry * angle.sin() + cx + dx).round() as i32;
-                let ny = (ry * angle.cos() - rx * angle.sin() + cy + dy).round() as i32;
-                if nx >= 0 && ny >= 0 && nx < w as i32 && ny < h as i32 {
-                    use image::Pixel;
-                    canvas[(nx as u32, ny as u32)].blend(&fill);
-                }
-            }
-        }
-    }
-    Ok(())
+mod glyph;
+mod ink;
+use glyph::{Glyph, Glyphs};
+use ink::{blank_paper, normal, paste_mask, perturb};
+// 2026-10-15：先缓存整行，知道最高根式/最低分母后再统一落笔，避免后出现的公式撞进上一行。
+struct LineUnit {
+    glyph: Glyph,
+    x: i32,
+    dy: i32,
 }
 struct Pages<'a, F>
 where
@@ -335,6 +85,8 @@ where
     cancel: &'a Cancellation,
     x: f32,
     y: f32,
+    previous_bottom: f32,
+    line: Vec<LineUnit>,
     dirty: bool,
     count: usize,
     max_pages: usize,
@@ -342,8 +94,8 @@ where
     stopped: bool,
 }
 impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
-    fn flush(&mut self, force: bool) -> Result<()> {
-        if !self.dirty && !force {
+    fn emit_page(&mut self, force: bool) -> Result<()> {
+        if (!self.dirty && !force) || self.stopped {
             return Ok(());
         }
         self.cancel.check()?;
@@ -362,17 +114,89 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
         self.count += 1;
         self.stopped = self.p.preview && !self.p.full_preview && !self.p.pdf_save;
         self.x = self.p.left_margin;
-        self.y = self.p.top_margin + self.p.line_spacing - self.p.font_size;
+        self.y = self.p.top_margin + self.p.line_spacing;
+        self.previous_bottom = self.p.top_margin;
         self.dirty = false;
         Ok(())
     }
-    fn newline(&mut self) -> Result<()> {
-        self.x = self.p.left_margin;
-        self.y += self.p.line_spacing;
-        if self.y > self.canvas.height() as f32 - self.p.bottom_margin - self.p.font_size {
-            self.flush(true)?;
+    fn finish_line(&mut self) -> Result<()> {
+        if self.line.is_empty() {
+            return Ok(());
         }
+        let mut units = std::mem::take(&mut self.line);
+        let top = self.p.top_margin;
+        let bottom = self.canvas.height() as f32 - self.p.bottom_margin;
+        let available = (bottom - top).max(1.);
+        let gap = (self.p.font_size * 0.12).round().max(2.);
+        let bounds = |units: &[LineUnit]| {
+            let visible: Vec<_> = units.iter().filter(|u| u.glyph.ink).collect();
+            (
+                visible
+                    .iter()
+                    .map(|u| u.glyph.top + u.dy)
+                    .min()
+                    .unwrap_or(0),
+                visible
+                    .iter()
+                    .map(|u| u.glyph.bottom() + u.dy)
+                    .max()
+                    .unwrap_or(0),
+            )
+        };
+        let (mut min_y, mut max_y) = bounds(&units);
+        if (max_y - min_y) as f32 > available {
+            let factor = available / (max_y - min_y) as f32;
+            for u in &mut units {
+                let old_top = u.glyph.top;
+                let old_dy = u.dy;
+                u.glyph = u.glyph.clone().fit(
+                    u.glyph.mask.width() as f32 * factor,
+                    (u.glyph.mask.height() as f32 * factor).max(1.),
+                );
+                u.dy = ((old_top + old_dy - min_y) as f32 * factor).floor() as i32 - u.glyph.top;
+            }
+            (min_y, max_y) = bounds(&units);
+        }
+        let mut anchor = self.y.max(top - min_y as f32);
+        if self.dirty {
+            anchor = anchor.max(self.previous_bottom + gap - min_y as f32);
+        }
+        if anchor + max_y as f32 > bottom && self.dirty {
+            self.emit_page(false)?;
+            if self.stopped {
+                return Ok(());
+            }
+            anchor = self.y.max(top - min_y as f32);
+        }
+        if anchor + max_y as f32 > bottom {
+            anchor = bottom - max_y as f32;
+        }
+        for u in units {
+            paste_mask(
+                &mut self.mask,
+                &u.glyph.mask,
+                u.x + u.glyph.left,
+                (anchor.round() as i32) + u.dy + u.glyph.top,
+            );
+        }
+        self.previous_bottom = anchor + max_y as f32;
+        self.y = anchor + self.p.line_spacing;
+        self.x = self.p.left_margin;
+        self.dirty = true;
         Ok(())
+    }
+    fn flush(&mut self, force: bool) -> Result<()> {
+        self.finish_line()?;
+        self.emit_page(force)
+    }
+    fn newline(&mut self) -> Result<()> {
+        if self.line.is_empty() {
+            self.y += self.p.line_spacing;
+            self.x = self.p.left_margin;
+            Ok(())
+        } else {
+            self.finish_line()
+        }
     }
 }
 /// 每次仅交付一页像素；调用方负责编码和释放，进度不携带像素。
@@ -389,20 +213,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     let background = match (p.width, p.height) {
         (Some(w), Some(h)) => {
             p.validate(w, h, &r.limits)?;
-            let mut bg = RgbaImage::from_pixel(w, h, Rgba([255, 255, 255, 255]));
-            if p.underlined {
-                let mut y = p.top_margin + p.line_spacing;
-                while y < h as f32 - p.bottom_margin {
-                    imageproc::drawing::draw_line_segment_mut(
-                        &mut bg,
-                        (p.left_margin, y),
-                        (w as f32 - p.right_margin, y),
-                        Rgba([0, 0, 0, 255]),
-                    );
-                    y += p.line_spacing;
-                }
-            }
-            bg
+            blank_paper(w, h, p)
         }
         (None, None) => imaging::decode(
             r.background
@@ -421,13 +232,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     let (w, h) = background.dimensions();
     p.validate(w, h, &r.limits)?;
     let nodes = text::parse(&text::normalize(&r.text, p.english_spacing));
-    let mut glyphs = Glyphs {
-        book: &r.fonts,
-        cache: HashMap::new(),
-        cache_bytes: 0,
-        max_width: w,
-        max_height: h,
-    };
+    let mut glyphs = Glyphs::new(&r.fonts);
     let mut pages = Pages {
         canvas: background.clone(),
         background,
@@ -436,7 +241,9 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
         rng: ChaCha8Rng::seed_from_u64(p.seed),
         cancel,
         x: p.left_margin,
-        y: p.top_margin + p.line_spacing - p.font_size,
+        y: p.top_margin + p.line_spacing,
+        previous_bottom: p.top_margin,
+        line: Vec::new(),
         dirty: false,
         count: 0,
         max_pages: r.limits.max_pages,
@@ -456,21 +263,29 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                     .take_while(|n| !matches!(n, Node::Newline | Node::Break))
                     .cloned()
                     .collect();
-                let mut prefix = 0f32;
-                let mut max_prefix = 0f32;
+                let mut cursor = 0f32;
+                let mut width = 0f32;
                 for n in rest {
-                    max_prefix = max_prefix.max(prefix);
-                    prefix += glyphs.node(&n, p.font_size)?.advance + p.word_spacing;
+                    let g = glyphs.node(&n, p.font_size)?;
+                    width = width.max(cursor + g.right() as f32);
+                    cursor += if p.grid_layout {
+                        let cell = (p.font_size + p.word_spacing).max(1.);
+                        if matches!(n, Node::Char(_)) {
+                            cell
+                        } else {
+                            (g.advance.max(g.right() as f32) / cell).ceil().max(1.) * cell
+                        }
+                    } else {
+                        g.advance + p.word_spacing
+                    };
                 }
-                let unit = glyphs.glyph('　', p.font_size)?.advance + p.word_spacing;
-                if unit > 0. {
-                    pages.x +=
-                        (((right - p.font_size - p.left_margin - max_prefix) / unit).floor() - 1.)
-                            .max(0.)
-                            * unit;
-                }
+                pages.x = (right - width).max(p.left_margin);
             }
             Node::Image { alt, data } => {
+                pages.finish_line()?;
+                if pages.stopped {
+                    break;
+                }
                 perturb(
                     &mut pages.mask,
                     &mut pages.canvas,
@@ -495,7 +310,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                     imaging::scale(alt),
                 );
                 let top = if pages.dirty {
-                    pages.y + p.font_size + p.line_spacing
+                    pages.previous_bottom + p.line_spacing
                 } else {
                     p.top_margin
                 };
@@ -513,39 +328,18 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                 image::imageops::overlay(&mut pages.canvas, &image, x as i64, top as i64);
                 pages.dirty = true;
                 pages.x = p.left_margin;
-                pages.y = top + image.height() as f32 + p.line_spacing * 2. - p.font_size;
+                pages.previous_bottom = top + image.height() as f32;
+                pages.y = pages.previous_bottom + p.line_spacing;
             }
             node => {
-                let closing = matches!(node,Node::Char(c) if "，。》？；：’”】｝、！％）,.>?;:]}!%)′″℃℉".contains(*c));
-                if pages.x > right - p.font_size && !closing {
-                    pages.newline()?;
-                    if pages.stopped {
-                        break;
-                    }
-                }
-                if pages.y > h as f32 - p.bottom_margin - p.font_size {
-                    pages.flush(false)?;
-                    if pages.stopped {
-                        break;
-                    }
-                }
                 let size =
                     (p.font_size + normal(&mut pages.rng, p.font_size_sigma)).clamp(1., 2048.);
-                let g = glyphs.node(node, size)?;
-                if g.mask.width() as f32 > right - p.left_margin {
-                    return Err(Error::new("invalid_layout", "公式或字形宽度超过版心"));
-                }
-                let yy = pages.y + normal(&mut pages.rng, p.line_spacing_sigma);
-                let grid_jitter = if p.grid_layout {
-                    normal(&mut pages.rng, p.word_spacing_sigma)
-                } else {
-                    0.
-                };
-                let xx = pages.x + grid_jitter;
+                let mut g = glyphs.node(node, size)?;
+                let mut compound = !matches!(node, Node::Char(_));
                 if pages.rng.random::<f32>() < p.strikethrough_probability
                     && !matches!(node,Node::Char(c) if c.is_whitespace())
                 {
-                    let candidates: Vec<char> = r
+                    let candidates: Vec<_> = r
                         .text
                         .chars()
                         .filter(|c| !c.is_whitespace() && !"，。！？,.!?".contains(*c))
@@ -556,47 +350,87 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                             candidates[pages.rng.random_range(0..candidates.len())],
                             size,
                         )?;
-                        paste_mask(
-                            &mut pages.mask,
-                            &wrong.mask,
-                            xx.round() as i32,
-                            yy.round() as i32,
-                        );
                         let length = (p.font_size * 2f32.sqrt()
                             + normal(&mut pages.rng, p.strikethrough_length_sigma))
-                        .max(0.);
+                        .clamp(0., (w as f32 + h as f32).min(16384.));
                         let angle = (45. + normal(&mut pages.rng, p.strikethrough_angle_sigma))
                             .to_radians();
                         let width = (p.strikethrough_width
                             + normal(&mut pages.rng, p.strikethrough_width_sigma))
-                        .clamp(1., 256.) as u32;
-                        for offset in 0..width {
-                            let sy = yy + length / 7. + offset as f32;
-                            imageproc::drawing::draw_line_segment_mut(
-                                &mut pages.mask,
-                                (xx + length / 7., sy),
-                                (
-                                    xx + length / 7. + length * angle.cos() * 5. / 7.,
-                                    sy + length * angle.sin() * 5. / 7.,
-                                ),
-                                Luma([255]),
-                            );
-                        }
-                        pages.x += wrong.advance + p.word_spacing;
+                        .clamp(1., (w.min(h) as f32).clamp(1., 256.))
+                            as i32;
+                        let sy = wrong.top as f32 + length / 7.;
+                        let path = vec![
+                            ((length / 7.).round() as i32, sy.round() as i32),
+                            (
+                                (length / 7. + length * angle.cos() * 5. / 7.).round() as i32,
+                                (sy + length * angle.sin() * 5. / 7.).round() as i32,
+                            ),
+                        ];
+                        // 2026-10-15：正确字写在错字和完整删除线之后，不能让较长删除线划到正确内容。
+                        let stroke_right =
+                            path.iter().map(|p| p.0).max().unwrap_or(0) + width / 2 + 2;
+                        let shift = (wrong.advance + p.word_spacing)
+                            .max(wrong.right() as f32)
+                            .max(stroke_right as f32)
+                            .round() as i32;
+                        g = Glyphs::compose(
+                            g.advance + shift as f32,
+                            vec![(wrong, 0, 0), (g, shift, 0)],
+                            vec![(path, width)],
+                        )?;
+                        compound = true;
                     }
                 }
-                paste_mask(
-                    &mut pages.mask,
-                    &g.mask,
-                    (pages.x + grid_jitter).round() as i32,
-                    yy.round() as i32,
-                );
-                pages.x += if p.grid_layout {
-                    p.font_size + p.word_spacing
+                let usable_width = right - p.left_margin;
+                let usable_height = h as f32 - p.top_margin - p.bottom_margin;
+                g = g.fit(usable_width, usable_height);
+                let jitter_x = if p.grid_layout {
+                    normal(&mut pages.rng, p.word_spacing_sigma)
                 } else {
-                    g.advance + p.word_spacing + normal(&mut pages.rng, p.word_spacing_sigma)
+                    0.
                 };
-                pages.dirty = true;
+                let mut x = (pages.x + jitter_x)
+                    .round()
+                    .max(p.left_margin - g.left as f32);
+                if !pages.line.is_empty() && x + g.right() as f32 > right {
+                    pages.newline()?;
+                    if pages.stopped {
+                        break;
+                    }
+                    x = (pages.x + jitter_x)
+                        .round()
+                        .max(p.left_margin - g.left as f32);
+                }
+                x = x
+                    .min(right - g.right() as f32)
+                    .max(p.left_margin - g.left as f32);
+                let dy = normal(&mut pages.rng, p.line_spacing_sigma)
+                    .round()
+                    .clamp(-usable_height * 0.25, usable_height * 0.25)
+                    as i32;
+                let advance = if p.grid_layout {
+                    let cell = (p.font_size + p.word_spacing).max(1.);
+                    if compound {
+                        (g.advance.max(g.right() as f32) / cell).ceil().max(1.) * cell
+                    } else {
+                        cell
+                    }
+                } else {
+                    let step =
+                        g.advance + p.word_spacing + normal(&mut pages.rng, p.word_spacing_sigma);
+                    if matches!(node, Node::Char(_)) {
+                        step.max(1.)
+                    } else {
+                        step.max(g.right() as f32).max(1.)
+                    }
+                };
+                pages.x = x + advance;
+                pages.line.push(LineUnit {
+                    glyph: g,
+                    x: x.round() as i32,
+                    dy,
+                });
             }
         }
         i += 1;
