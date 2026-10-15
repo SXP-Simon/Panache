@@ -1,109 +1,108 @@
 # Local Development
 
-See [AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md) at the repository root for branch responsibilities,
-development conventions, and documentation rules. Consult source code and relevant tests for
-implementation details.
+This page applies to `custom-base`. See [Architecture and Technology Stack](architecture.md) for
+module responsibilities and data flow, and
+[AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md) for branch rules
+and development conventions.
 
-## Requirements
+## Environment and dependencies
 
-- **Python 3.10 or 3.11** (3.8 – 3.13 all work)
-- **Node.js 20 or higher** (a Playwright requirement, for E2E)
+Use Node.js 24+, pnpm 10.13.1, Python 3.12+, and uv. From the repository root:
 
-## Start the backend (port 5005)
-
-**Use the repository's venv, not your system Python.** The system environment's `fastapi` +
-`starlette` combination prevents the app from starting, with
-`TypeError: Router.__init__() got an unexpected keyword argument 'on_startup'`.
-
-Create the virtualenv and install dependencies first:
-
-```shell
-python -m venv venv
-venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+```bash
+pnpm install --frozen-lockfile
+uv sync --locked --extra dev
 ```
 
-(On Linux / macOS use `venv/bin/python` instead of `venv/Scripts/python.exe`.)
+pnpm manages the frontend, Electron, and E2E workspaces. uv maintains the root `.venv` from
+`pyproject.toml` and `uv.lock`. Use that environment for the backend and checks.
 
-Then start it:
+## Start the application
 
-```shell
+Run these in separate terminals:
+
+```bash
+# Terminal one: repository root
+pnpm --filter handwrite run serve
+
+# Terminal two: enter backend from the repository root
 cd backend
-../venv/Scripts/python.exe -m uvicorn app:app --reload --host 0.0.0.0 --port 5005
+uv run --project .. uvicorn app:app --reload --host 127.0.0.1 --port 5005
 ```
 
-## Start the frontend (port 8080)
+Open <http://127.0.0.1:8080>. Vite proxies `/api` to `127.0.0.1:5005`; the frontend uses
+same-origin `/api` URLs.
 
-```shell
-cd frontend
-npm install
-npm run serve
+In VS Code, `Ctrl+Shift+B` installs dependencies, starts both servers, and opens the browser.
+`F5` offers Chrome / Edge debugging. See `.vscode/tasks.json` and `.vscode/launch.json`.
+
+## Checks, tests, and builds
+
+Run these from the repository root:
+
+```bash
+# TypeScript, Oxlint, formatting, Ruff, and Pyright
+pnpm run quality:check
+
+# Commit conventions, frontend conversion/generation, desktop storage, backend unit tests
+pnpm run test:unit
+
+# Web E2E: install Chromium on first use
+pnpm --filter handwriting-web-e2e exec playwright install chromium
+pnpm --filter handwriting-web-e2e run test
+
+# Production frontend build; PWA cache upgrade checks
+pnpm --filter handwrite run build
+pnpm run test:sw-upgrade
+
+# Unit tests + frontend build + PWA upgrades + Web E2E
+pnpm run test:all
 ```
 
-Open <http://localhost:8080>. The dev server proxies `/api` to `127.0.0.1:5005`, so no CORS setup is
-needed locally.
+Web E2E uses the real frontend and backend for rendering and downloads, with route interception for
+selected error cases. Missing development servers are started and stopped automatically; existing
+local servers are reused. Automatically started backends receive `CPU_USAGE_LIMIT=100`; reused
+servers retain their existing environment. Set `E2E_PYTHON` if interpreter discovery fails.
+Failure screenshots and traces go to `e2e/test-results/`. Open the HTML report with
+`pnpm --filter handwriting-web-e2e run report`.
 
-VS Code users can press `Ctrl+Shift+B` — there are tasks that bring up both sides in parallel.
+Desktop tests drive the packaged application separately and are not included in `test:all`:
 
-## Running the tests
-
-**Backend unit tests** —
-
-```shell
-cd backend
-../venv/Scripts/python.exe -m pytest
-```
-
-**End-to-end tests (Playwright)** — `e2e/` drives the **real frontend and backend** through complete
-flows (actually rendering images, actually downloading attachments); a few branches that are hard to
-trigger for real (such as the queue-full 503) are simulated with route interception.
-
-```shell
-cd e2e
-npm install
-npx playwright install chromium
-npm test
-```
-
-- Dev servers that are not running are started automatically (backend 5005, frontend 8080) and shut
-  down afterwards.
-- Ones that are already running are reused rather than restarted.
-- The run sets `CPU_USAGE_LIMIT=100` so that a dev machine saturated by webpack does not trip the
-  backend's overload guard.
-- Failure screenshots, videos and traces go to `e2e/test-results/`; open the HTML report with
-  `npm run report`.
-- If no Python interpreter is found, point at one with `E2E_PYTHON`.
-
-Every pull request runs this via `.github/workflows/e2e.yml`.
-
-**Desktop end-to-end** — this drives the real packaged build, so build it first:
-
-```shell
+```bash
 bash desktop/build.sh --app-only
-cd e2e && npm run test:desktop
+pnpm --filter handwriting-web-e2e run test:desktop
 ```
 
-## What the code looks like
+The desktop build uses uv's `build` extra. Prepare dependencies yourself before `--skip-deps`:
 
-| Path | Contents |
-|---|---|
-| `frontend/src/views/HomeView.vue` | The main page: parameters, preview, generation flow |
-| `frontend/src/views/TextInput.vue` | Text box and document upload |
-| `frontend/src/components/` | Letter layout, generation status, splash animation, PWA prompt |
-| `frontend/src/i18n.js` | Chinese and English strings |
-| `backend/app.py` | Every route plus the rendering logic (~1300 lines) |
-| `backend/task_store.py` | SQLite task queue (WAL, 30-minute expiry) |
-| `backend/identify.py` | Detects margins and line spacing from a background image |
-| `backend/pdf.py` | PDF generation |
+```bash
+uv sync --locked --extra dev --extra build
+bash desktop/build.sh --app-only --skip-deps
+```
 
-A request comes in, the task is submitted and written to SQLite, a `task_id` is returned immediately,
-a background coroutine queues the render, the frontend gets progress over a WebSocket (falling back to
-polling), and finally fetches the result.
+Electron and PyInstaller build for the current platform; the backend is not cross-compiled.
+`uv sync` / `uv run` adjust the environment to the requested extras. Do not run quality checks
+or installation commands that resynchronize the same `.venv` concurrently with desktop packaging.
+See [Desktop App](desktop.md) for packaging and data directories.
+
+## Where to make changes
+
+- UI composition and local interactions: `frontend/src/components/`; shared UI: `src/shared/`.
+- Shared client state: `frontend/src/features/*/store.ts`; cross-domain actions: `features/workspace/`.
+- Server contracts and Query options: `frontend/src/api/`; storage adapters: `src/persistence/`.
+- Pure text, math, and layout conversion: `frontend/src/utils/`; translations: `src/i18n.ts`.
+- Backend tasks and rendering: `backend/app.py`, `task_store.py`, and math layout modules.
+- Desktop processes and bridge: `desktop/main.js`, `preload.js`, and `studio-storage.js`.
+
+Consult the [architecture page](architecture.md) for ownership, draft recovery, and task resumption.
+Read source and tests for exact fields and parameters.
 
 ## Commit conventions
 
-- **Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) —**
-  semantic-release derives the version number from them, and getting it wrong bumps the wrong version.
-- User-visible strings need **both Chinese and English**, added to `frontend/src/i18n.js`.
-- Elements that E2E needs to click get a `data-testid`; tests use `getByTestId` only and never rely on
-  copy or CSS classes.
-- Do not hand-edit `CHANGELOG.md` or version numbers — the release pipeline owns them.
+`pnpm install` installs Lefthook. Commits run the complete quality gate; pushes run the full test
+command. Fix failures instead of skipping hooks. Each commit should contain one reviewable change,
+use `type(scope): description`, and include separate, non-empty `背景：`, `解决手段：`, and `收益：`
+paragraphs explaining the background, solution, and benefit.
+
+Provide both Chinese and English user-visible strings and `data-testid` attributes for E2E actions.
+semantic-release manages release versions, tags, and `CHANGELOG.md`.

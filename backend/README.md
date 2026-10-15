@@ -1,13 +1,15 @@
 # Handwriting Web Backend
 
-手写生成服务后端，基于 FastAPI。
+手写生成服务后端，基于 Python 3.12+ 与 FastAPI。项目的状态分层、任务流和桌面存储边界见
+[架构与技术栈](../docs/architecture.md)，完整开发与验证入口见[本地开发](../docs/development.md)。
 
 ## 快速启动
 
 ```bash
+# 仓库根目录：通过 uv.lock 准备依赖与 .venv
+uv sync --locked --extra dev
 cd backend
-pip install -r requirements.txt
-uvicorn app:app --reload --port 5005
+uv run --project .. uvicorn app:app --reload --host 127.0.0.1 --port 5005
 ```
 
 ## 接口列表
