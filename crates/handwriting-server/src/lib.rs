@@ -260,26 +260,18 @@ impl Server {
             .get("text")
             .cloned()
             .ok_or_else(|| Error::new("invalid_parameter", "缺少 text"))?;
-        // 2026-10-12：只解析实际缺字所需的备用字体，避免每个任务预加载大字体。
-        let mut missing: Vec<_> = text
-            .chars()
-            .filter(|c| !c.is_control() && primary.lookup_glyph_index(*c) == 0)
-            .collect();
-        missing.sort_unstable();
-        missing.dedup();
-        let mut fallbacks = Vec::new();
-        for name in ["霞鹜文楷.ttf", "霞鹜漫黑.ttf"] {
-            if !missing.is_empty() && self.0.fonts.iter().any(|f| f == name) {
-                let font = self.font(name)?;
-                missing.retain(|c| font.lookup_glyph_index(*c) == 0);
-                fallbacks.push(font);
+        let fonts = FontBook::with_text_fallbacks(primary, &text, |name| {
+            if self.0.fonts.iter().any(|available| available == name) {
+                self.font(name).map(Some)
+            } else {
+                Ok(None)
             }
-        }
+        })?;
         let request = RenderRequest {
             text,
             params: p.clone(),
             background: files.get("background_image").map(|f| f.bytes.clone()),
-            fonts: FontBook::from_fonts(primary, fallbacks),
+            fonts,
             limits: self.0.config.limits.clone(),
         };
         self.update(id, |t| {

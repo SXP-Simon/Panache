@@ -1,6 +1,7 @@
 //! 跨平台生成核心；2026-10-12：不依赖 HTTP、Flutter 或全局工作目录。
 pub mod document;
 pub mod export;
+pub mod fonts;
 pub mod imaging;
 mod parameters;
 pub mod render;

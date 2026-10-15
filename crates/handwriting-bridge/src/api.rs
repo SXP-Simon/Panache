@@ -294,16 +294,13 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
         }
         FontBook::load(&fs::read(request.font_dir.join(name)).map_err(io_error)?)?
     };
-    let mut fallback = vec![];
-    if text
-        .chars()
-        .any(|c| !c.is_control() && primary.lookup_glyph_index(c) == 0)
-        && names.iter().any(|n| n == "霞鹜漫黑.ttf")
-    {
-        fallback.push(FontBook::load(
-            &fs::read(request.font_dir.join("霞鹜漫黑.ttf")).map_err(io_error)?,
-        )?);
-    }
+    let fonts = FontBook::with_text_fallbacks(primary, &text, |name| {
+        if names.iter().any(|available| available == name) {
+            FontBook::load(&fs::read(request.font_dir.join(name)).map_err(io_error)?).map(Some)
+        } else {
+            Ok(None)
+        }
+    })?;
     cancel.check()?;
     let background = request
         .files
@@ -314,7 +311,7 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
         text,
         params: params.clone(),
         background,
-        fonts: FontBook::from_fonts(primary, fallback),
+        fonts,
         limits: limits(),
     };
     let mut pdf = export::PdfExport::new();
