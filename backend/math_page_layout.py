@@ -156,10 +156,13 @@ def install_math_page_layout(core, is_math_glyph, measure_bbox):
                     x = min(x, right - bbox[2])
                 units.append((image, bbox, x, jitter_y))
                 if grid:
-                    cursor = x + math.ceil(max(advance, bbox[2]) / cell_width) * cell_width
+                    # 2026-10-15：普通文字保留用户的固定网格字距，复合单元才额外占格。
+                    cells = math.ceil(max(advance, bbox[2]) / cell_width) if is_math_glyph(char) or strike else 1
+                    cursor = x + cells * cell_width
                 else:
                     step = core.gauss(rand, advance + tpl.get_word_spacing(), tpl.get_word_spacing_sigma())
-                    cursor = x + max(1, step, bbox[2])
+                    # 2026-10-15：负字距是普通文字的显式参数，不能被数学行的防碰撞规则覆盖。
+                    cursor = x + max(1, step, bbox[2] if is_math_glyph(char) or strike else 1)
                 start += 1
             if start < len(text) and text[start] == "\n":
                 start += 1

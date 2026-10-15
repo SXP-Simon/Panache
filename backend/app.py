@@ -621,8 +621,8 @@ def apply_right_align(text, template):
             bbox = _get_rendered_text_bbox(char, font, path)
             if grid:
                 cell = max(1, font.size + word_spacing)
-                return math.ceil(max(step, bbox[2]) / cell) * cell
-            return max(1, step + word_spacing, bbox[2])
+                return math.ceil(max(step, bbox[2]) / cell) * cell if is_math_glyph(char) else cell
+            return max(1, step + word_spacing, bbox[2] if is_math_glyph(char) else 1)
         left, _, right, _ = font.getbbox(char)
         return (right - left) + word_spacing
 

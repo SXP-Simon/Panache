@@ -204,3 +204,14 @@ def test_right_aligned_math_keeps_the_formula_on_its_original_row(source, grid):
     assert (aligned_box[1], aligned_box[3]) == (plain_box[1], plain_box[3])
     assert aligned_box[0] > plain_box[0] + 40
     assert_inside(aligned, tpl)
+
+
+@pytest.mark.parametrize("features,spacing,step", [(frozenset(), -8, 6), ({Feature.GRID_LAYOUT}, -11, 13)])
+def test_mixed_document_keeps_explicit_negative_spacing_for_plain_characters(features, spacing, step):
+    tpl = template(word_spacing=spacing, features=features)
+    pages, _ = draft(synthetic_core(), "AAAA\n§", tpl)
+    first_row = occupied_runs(pages[0], "y")[0]
+    plain_line = pages[0].crop((0, first_row[0], pages[0].width, first_row[-1] + 1))
+    left, _, right, _ = plain_line.getbbox()
+    # 2026-10-15：普通字宽 12，flow 的 advance+字距及 grid 的字号+字距均保留。
+    assert right - left == 12 + 3 * step
