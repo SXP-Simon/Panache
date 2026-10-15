@@ -1,3 +1,16 @@
+# [1.1.0](https://github.com/SXP-Simon/handwriting-web/compare/v1.0.2...v1.1.0) (2026-10-15)
+
+
+### Bug Fixes
+
+* **docs:** 更新数学公式预览图像 ([e7f783f](https://github.com/SXP-Simon/handwriting-web/commit/e7f783f8b5502150967a66dfc1795244d3053a79))
+* **ui:** 放大纸张与手写参数的默认值 ([ee19fb9](https://github.com/SXP-Simon/handwriting-web/commit/ee19fb95b64840953b4df8f28ca975a62b085d26))
+
+
+### Features
+
+* **ui:** 优化工作台交互与绿色视觉层次 ([6336a24](https://github.com/SXP-Simon/handwriting-web/commit/6336a24f4f85945a5c83d941229b907917c11373))
+
 ## [1.0.2](https://github.com/SXP-Simon/handwriting-web/compare/v1.0.1...v1.0.2) (2026-10-15)
 
 
