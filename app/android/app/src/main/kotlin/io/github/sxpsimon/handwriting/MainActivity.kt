@@ -1,4 +1,4 @@
-package top.liuweiqing.handwriting_app
+package io.github.sxpsimon.handwriting
 
 import io.flutter.embedding.android.FlutterActivity
 
