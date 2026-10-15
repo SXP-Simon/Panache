@@ -1,6 +1,6 @@
 <!--
 PR 标题必须遵循 Conventional Commits（feat: / fix: / chore: / test: ...），semantic-release 靠它决定版本号。
-写法：类型: 英文动词开头的简短描述，例如 feat: add one-click Chinese letter formatting
+写法：类型(实际路径): 清晰描述，例如 fix(fe/src/components): 修复预览操作
 -->
 
 ## Problem
@@ -28,7 +28,7 @@ PR 标题必须遵循 Conventional Commits（feat: / fix: / chore: / test: ...�
 ## Checklist
 
 - [ ] 标题是 Conventional Commits 格式
-- [ ] 新增的用户可见文字已同时提供中英文翻译（`frontend/src/i18n.js`）
+- [ ] 新增的用户可见文字已同时提供中英文翻译（`frontend/src/i18n.ts`）
 - [ ] 需要被 `e2e/` 测试点到的元素已加 `data-testid`
 - [ ] 未手动修改 `CHANGELOG.md` 和版本号
 

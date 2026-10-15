@@ -154,7 +154,7 @@ check run. Only application changes enter release analysis; images build when th
 Desktop releases consume the corresponding release result and build its exact tag, with manual
 rebuilds still available. Documentation deploys follow documentation inputs on `custom-base`.
 `main` mirrors upstream and does not trigger custom application builds or releases. Legacy standalone
-backend, E2E, and MySQL workflows retain manual entry points without duplicating automatic checks.
+backend and E2E workflows retain manual entry points without duplicating automatic checks.
 
 Docker publishing requires your own `FRONTEND_IMAGE` and `BACKEND_IMAGE` repository variables and
 the corresponding registry credentials. Without an image address, login, building, and pushing are
