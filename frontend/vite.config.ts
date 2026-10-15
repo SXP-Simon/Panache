@@ -25,9 +25,17 @@ export default defineConfig({
             .filter((name) => /\.(?:woff2|css|txt|md)$/.test(name))
             .map((name) => `fonts/lxgw-wenkai/${name}`),
         ];
+        const brandVersion = createHash('sha256')
+          .update(readFileSync(new URL('./src/assets/brand.svg', import.meta.url)))
+          .digest('hex')
+          .slice(0, 12);
+        const versionUrls = publicPaths
+          .filter((name) => /\.(?:png|svg|ico)$/.test(name))
+          .map((name) => `${name}?v=${brandVersion}`);
         const shellPaths = [
           'index.html',
           ...publicPaths,
+          ...versionUrls,
           ...Object.keys(bundle).filter((name) => name.startsWith('assets/')),
         ];
         const contentHash = createHash('sha256').update(JSON.stringify(shellPaths));

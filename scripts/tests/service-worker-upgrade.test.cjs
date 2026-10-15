@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs/promises");
 const http = require("node:http");
 const path = require("node:path");
@@ -14,7 +15,16 @@ const mime = {
   ".js": "text/javascript", ".css": "text/css", ".html": "text/html",
   ".json": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
+  ".webmanifest": "application/manifest+json",
 };
+
+async function iconBytes(page, urls) {
+  return page.evaluate(async (sources) => Promise.all(sources.map(async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Icon request failed: ${url}`);
+    return { url, bytes: [...new Uint8Array(await response.arrayBuffer())] };
+  })), urls);
+}
 
 async function loadWenKai(page) {
   return page.evaluate(async () => {
@@ -69,6 +79,9 @@ for (const script of ["service-worker.js", "sw.js"]) {
   test(`cached legacy ${script} upgrades without running the React entry point`, { timeout: 45_000 }, async () => {
     let migrated = false;
     let networkFontRequests = 0;
+    let legacyIconRequests = 0;
+    const oldIcon = '<svg xmlns="http://www.w3.org/2000/svg"><text>legacy cached icon</text></svg>';
+    const iconVersion = createHash('sha256').update(await fs.readFile(path.join(root, 'frontend/src/assets/brand.svg'))).digest('hex').slice(0, 12);
     const legacyPage = `<!doctype html><title>Legacy cached page</title><p id="legacy">Old Vue/ad page</p><script>navigator.serviceWorker.register('/${script}')</script>`;
     const legacyWorker = `
       self.addEventListener('install', event => event.waitUntil((async () => {
@@ -89,10 +102,16 @@ for (const script of ["service-worker.js", "sw.js"]) {
     `;
     const server = http.createServer((request, response) => {
       void (async () => {
-        const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+        const requestUrl = new URL(request.url ?? "/", "http://localhost");
+        const pathname = requestUrl.pathname;
         if (pathname.endsWith('.woff2')) networkFontRequests += 1;
         response.setHeader("Cache-Control", "no-store");
-        if (pathname === `/${script}` && !migrated) {
+        if (pathname === '/icon.svg' && !requestUrl.search && !migrated) {
+          legacyIconRequests += 1;
+          response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          response.setHeader('Content-Type', 'image/svg+xml');
+          response.end(oldIcon);
+        } else if (pathname === `/${script}` && !migrated) {
           response.setHeader("Content-Type", "text/javascript");
           response.end(legacyWorker);
         } else if (!migrated && (pathname === "/" || pathname === "/index.html")) {
@@ -122,9 +141,12 @@ for (const script of ["service-worker.js", "sw.js"]) {
       const applicationContext = await browser.newContext();
       let offline = false;
       const offlineFontResponses = new Map();
+      const offlineIconResponses = new Map();
       applicationContext.on('response', (response) => {
         if (offline && new URL(response.url()).pathname.endsWith('.woff2'))
           offlineFontResponses.set(response.url(), response.fromServiceWorker());
+        if (offline && new URL(response.url()).searchParams.has('v'))
+          offlineIconResponses.set(response.url(), response.fromServiceWorker());
       });
       const page = await applicationContext.newPage();
       await page.goto(origin);
@@ -132,6 +154,9 @@ for (const script of ["service-worker.js", "sw.js"]) {
       await page.reload();
       assert.equal(await page.locator("#legacy").count(), 1);
       assert.ok(await page.evaluate(() => navigator.serviceWorker.controller));
+      for (let attempt = 0; attempt < 2; attempt += 1)
+        assert.equal(await page.evaluate(async () => (await fetch('/icon.svg', { cache: 'force-cache' })).text()), oldIcon);
+      assert.equal(legacyIconRequests, 1, 'The second bare-icon request must reuse the old year-long HTTP cache');
       migrated = true;
       // A browser update downloads the worker directly, even while the old worker serves its cached HTML.
       await page.evaluate(async () => {
@@ -157,6 +182,21 @@ for (const script of ["service-worker.js", "sw.js"]) {
       await page.reload();
       await page.getByTestId("text-input").waitFor();
       assert.deepEqual(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map((registration) => new URL(registration.active.scriptURL).pathname)), ['/studio-worker.js']);
+      const iconUrls = await page.evaluate(async () => {
+        const urls = [...document.querySelectorAll('link[rel="icon"],link[rel="apple-touch-icon"]')].map((link) => link.href);
+        for (const manifest of ['/manifest.json', '/site.webmanifest'])
+          for (const icon of (await (await fetch(manifest)).json()).icons)
+            urls.push(new URL(icon.src, new URL(manifest, location.href)).href);
+        return [...new Set(urls)];
+      });
+      assert.ok(iconUrls.length >= 4, 'HTML and both manifests must reference the versioned brand assets');
+      for (const url of iconUrls) {
+        assert.equal(new URL(url).origin, origin);
+        assert.equal(new URL(url).searchParams.get('v'), iconVersion, 'Icon URLs must follow the actual brand SVG content hash');
+      }
+      const currentIcons = await iconBytes(page, iconUrls);
+      for (const icon of currentIcons)
+        assert.deepEqual(Buffer.from(icon.bytes), await fs.readFile(path.join(dist, new URL(icon.url).pathname)), `Versioned icon must contain the new canonical brand bytes: ${icon.url}`);
       const apiResult = await page.evaluate(async () => (await fetch('/api/generate_handwriting/task/old')).json());
       assert.equal(apiResult.source, 'network-only');
       await page.evaluate(() => {
@@ -202,6 +242,7 @@ for (const script of ["service-worker.js", "sw.js"]) {
       });
       assert.ok(cachedRequests.some((url) => /\/assets\/latexToUnicode-/.test(url)));
       for (const url of fontUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
+      for (const url of iconUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
       assert.ok(cachedRequests.every((url) => !new URL(url).pathname.startsWith('/api/')));
       const cacheSession = await applicationContext.newCDPSession(page);
       await cacheSession.send('Network.clearBrowserCache');
@@ -216,6 +257,9 @@ for (const script of ["service-worker.js", "sw.js"]) {
         const offlineFaces = await loadWenKai(fontPage);
         assert.deepEqual(offlineFaces, onlineFaces);
         await expectOfflineCustomGlyphs(fontPage, offlineSession);
+        assert.deepEqual(await iconBytes(fontPage, iconUrls), currentIcons, 'Versioned brand bytes must survive a fresh offline navigation');
+        for (const url of iconUrls)
+          assert.equal(offlineIconResponses.get(url), true, `${url} must be served by the service worker offline`);
         for (const url of fontUrls)
           assert.equal(offlineFontResponses.get(url), true, `${url} must be served by the service worker offline`);
         assert.equal(networkFontRequests, fontRequestsBeforeOffline, 'Offline fonts must not reach the HTTP server');
