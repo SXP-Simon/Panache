@@ -5,3 +5,10 @@ backend/requirements.txt text diff
 
 # Shell entry points must remain executable in Git Bash and Linux containers.
 *.sh text eol=lf
+# Oxfmt uses LF consistently on Windows and Linux; binary frontend assets stay untouched.
+frontend/**/*.ts text eol=lf
+frontend/**/*.tsx text eol=lf
+frontend/**/*.css text eol=lf
+frontend/**/*.json text eol=lf
+frontend/**/*.html text eol=lf
+frontend/**/*.webmanifest text eol=lf
