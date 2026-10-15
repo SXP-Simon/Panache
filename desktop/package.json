@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "description": "手写体生成器桌面版（Electron 外壳 + 内置后端）",
-  "author": "liuweiqing",
+  "author": "SXP-Simon",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -19,7 +19,7 @@
   "build": {
     "electronVersion": "33.4.11",
     "npmRebuild": false,
-    "appId": "top.liuweiqing.handwriting",
+    "appId": "io.github.sxp-simon.handwriting",
     "productName": "HandwritingWeb",
     "directories": {
       "output": "build/installer"
@@ -30,6 +30,10 @@
       "preload.js",
       "splash.html",
       "package.json",
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE"
+      },
       {
         "from": "../frontend/public/fonts/lxgw-wenkai",
         "to": "fonts/lxgw-wenkai",
