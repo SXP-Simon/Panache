@@ -2,30 +2,26 @@
 
 ## The whole flow
 
-1. **Enter text** — type into the middle text box, or click "Choose File" to upload a document.
-2. **Pick a font** — choose one of the server's fonts, or upload your own `.ttf`.
+1. **Enter text** — type in "Text & formulas", or import a document. Use "Convert LaTeX" before rendering formulas.
+2. **Pick a font** — choose a server font or upload one in "Handwriting & paper". Interface typography does not affect the paper font.
 3. **Set the paper** — either give a width and height (the app generates ruled paper), or upload a background image.
 4. **Tune parameters** — the defaults are fine to start with; see [Parameters](parameters.md) to fine-tune.
-5. **Click "Preview Handwrite Image"** — the result appears on the right, with page navigation if there is more than one page.
-6. **Export** — "Generate Full Handwriting Image" gives you a zip of PNGs; "Generate PDF" gives you a merged PDF.
+5. **Click "Generate preview"** — inspect the result in "Preview"; enable "Preview all pages" to check multiple pages.
+6. **Export** — use "ZIP" for full-page PNGs or "PDF" for a merged document.
 
 !!! tip "Preview before you export"
-    Previewing renders only the first page, so you can iterate on parameters quickly.
-    Exporting renders every page. With long text, preview first to save time.
+    Preview renders only the first page by default. Enable "Preview all pages" to check the full
+    document. ZIP and PDF exports always process every page.
 
 ## The interface is three columns
 
-The current layout splits the workspace in three, left to right:
+The wide-screen workspace has three areas, which rearrange on narrower screens:
 
-- **Left · Settings** — font, paper, font size, line spacing, margins, and the jitter options under "More".
-- **Middle · Text** — the text box, document upload, and the letter-layout button.
-- **Right · Preview** — the rendered result and its page controls.
+- **Text & formulas** — text, document import, LaTeX / Markdown conversion, letter layout, and images.
+- **Preview** — rendered pages, navigation, zoom, and export.
+- **Handwriting & paper** — fonts, dimensions, margins, natural variation, cross-out effects, and presets.
 
-The left and right columns are resizable: drag the divider, or double-click it to restore
-the default width. Your widths are remembered between visits.
-
-Prefer the old look? The **"Old layout"** button in the top bar switches back. Both layouts
-edit the same content, so you can switch back and forth freely.
+Detailed settings are grouped into collapsible sections. The header switches language and theme.
 
 ## Entering text
 
@@ -34,19 +30,16 @@ edit the same content, so you can switch back and forth freely.
     format appears in the file picker, but the server rejects it with
     "doc文件暂不支持" (`.doc` files are not supported yet). Re-save as `.docx` first.
 
-- The text box keeps its contents across page reloads, as does the uploaded document.
+- Text, settings, and uploaded assets are saved on this device. Check the save status; clearing site data or storage failures can affect recovery.
 - Uploading a document only **fills the text box** — you can keep editing afterwards.
-- A page estimate shows below the text area. On `handwrite.14790897.xyz` a single run is
-  capped at 10 pages, and the estimate warns you before you hit the truncation.
+- This fork has no fixed 10-page truncation. Long documents remain subject to hardware and [server limits](../self-hosting/fonts-and-limits.md).
 
 ## Choosing a font
 
 Two options, pick one:
 
 - **Use a server font** — select it from the dropdown. These are the fonts placed in `ttf_files/` at deploy time.
-- **Upload your own** — click "Choose File" and pick a `.ttf`. The file is only sent to the backend
-  when the uploaded filename matches the one selected in the dropdown, so **remember to select it
-  in the dropdown** after uploading.
+- **Upload your own** — use "Upload font" for `.ttf`, `.otf`, or `.ttc`. The upload is selected automatically; selecting a server font switches rendering to that font.
 
 ## Setting the paper
 
@@ -61,23 +54,22 @@ with your own ruled paper.
 
 ## Remembering your parameters
 
-The three buttons in the top bar manage parameter snapshots, stored in your browser:
+The settings panel manages parameter snapshots stored on this device:
 
 - **Save Settings** — store the current parameters.
 - **Load Settings** — bring them back.
-- **Reset Settings** — restore the defaults.
+- **Reset defaults** — restore the defaults.
 
-The "Built-in Preset" dropdown is a different thing: a ready-made parameter set. There is
-currently one, **"Small with underlines (Yunyan)"**. It requires the `云烟体.ttf` font and
-requires that no background image is set — if either is missing it tells you instead of
-failing silently.
+Built-in choices include "Small ruled · Yunyan", "Natural handwriting", and "Neat handwriting".
+Remove the background before applying paper presets; the Yunyan preset requires its font.
+See [Architecture](../architecture.md) for draft and preset storage boundaries.
 
 ## Queueing and waiting
 
 The backend only renders a limited number of jobs at a time. When it is busy you will see:
 
-- A "generating" message and a cooldown countdown under the text area.
-- A wait countdown in the top bar when the queue is full, telling you roughly how long.
+- Task state in the workspace and progress in the preview area.
+- A retry countdown and temporarily disabled submit buttons when the queue is full.
 
 Progress is pushed over a WebSocket; if that connection cannot be established the client
 falls back to polling, and the interface looks the same either way.

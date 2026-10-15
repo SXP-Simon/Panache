@@ -4,6 +4,8 @@
 
 本分支为自用定制基准分支。基于原开源项目构建，针对理工科/作业抄写场景进行了深度排版增强，包括高可靠 Markdown 符号清洗、Word 公式兼容、字形 Fallback 引擎以及全自动手写上下竖式分式渲染。
 
+📖 **[使用与部署文档](https://heliannuits.me/handwriting-web/)** · [桌面版下载](https://github.com/SXP-Simon/handwriting-web/releases)
+
 📖 **[👉 点击查看原项目 README 文档 (Upstream README)](./README_upstream.md)**
 
 ![手写数学公式、竖式分式与封顶根式排版预览](./docs/assets/images/math_formula_preview.png)
@@ -41,7 +43,22 @@
 
 ## 🚀 快速启动与开发指南
 
-工具链：Node.js 24+、pnpm 10.13.1、Python 3.12+、uv。前端使用 React、Vite、TypeScript 7 原生编译器与 Oxlint；后端使用 Pyright strict 和 Ruff。
+### 当前技术栈与架构
+
+| 层 | 技术与职责 |
+|---|---|
+| 前端界面 | React、TypeScript、Vite；项目样式、Tailwind CSS、Motion、Lucide |
+| 状态与请求 | Zustand 管理客户端业务状态；TanStack Query 管理服务端数据，Fetch + Valibot 负责请求和校验 |
+| 本地保存 | Web：localStorage + IndexedDB；桌面：受限 Electron IPC + 应用数据目录 |
+| 后端与渲染 | FastAPI、SQLite 任务队列、handrightbeta、Pillow、数学排版模块与 PyMuPDF |
+| 桌面与验证 | Electron + PyInstaller；Playwright、Node 测试、pytest；Oxlint / Oxfmt、Ruff / Pyright |
+
+界面、业务状态、跨域操作、API 与持久化各有独立职责。详细说明见
+**[架构与技术栈](docs/architecture.md)**，开发与验证命令见[本地开发](docs/development.md)。
+
+### 开发环境
+
+工具链：Node.js 24+、pnpm 10.13.1、Python 3.12+、uv。具体依赖版本以工程清单和锁文件为准。
 
 ```bash
 # 仓库根目录安装并锁定依赖
@@ -74,7 +91,7 @@ Electron 外壳只使用 Electron 和 Node 内置模块，后端由 PyInstaller 
 `npmRebuild` 保持关闭，避免打包器在 pnpm 工作区中再次安装生产依赖并裁剪构建工具。
 新增原生 Node 运行依赖时，需要同步调整对应的安装与重建配置。
 
-`pnpm install` 自动安装 Lefthook。提交前检查 TypeScript、Oxlint、格式、Pyright 和 Ruff；推送前运行完整测试。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，建议按最小独立改动提交。
+`pnpm install` 自动安装 Lefthook。提交前按暂存区实际路径选择质量检查，推送前按全部待推送提交选择相关测试；缺失比较基线时执行完整验证。scope 按真实路径区分 `fe/` 与 `be/`，不能用于跳过检查。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，按最小独立改动提交。完整手动入口与规则见[本地开发](./docs/development.md#按需检查与-ci)。
 
 ```text
 fix(math): 修正嵌套根式的横线范围

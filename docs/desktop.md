@@ -3,11 +3,10 @@
 不想开浏览器、或者想要个能离线跑的本体，可以装桌面版。桌面版把后端和前端打包在一起，
 双击就能用，不依赖网络。
 
-![桌面版界面](desktop-app-screenshot.png)
-
 ## 下载
 
-到 [Releases 页面](https://github.com/14790897/handwriting-web/releases) 找最新的版本，按系统和芯片选：
+在本 fork 的 [Releases 页面](https://github.com/SXP-Simon/handwriting-web/releases) 查找安装包，按系统和芯片选择。
+若尚无所需平台的自用构建，请按下文从 `custom-base` 构建；上游安装包不代表本 fork 的功能。
 
 | 系统 | 文件 |
 |---|---|
@@ -29,7 +28,7 @@ macOS 会拦下它。在 macOS 15 及以上，提示可能直接说**「文件�
   文件本身没坏。
 - 也可能是**文件真的损坏，或者被人改过**。从非官方渠道拿到的安装包尤其要警惕。
 
-所以要**先确认安装包是从本仓库的 [Releases 页面](https://github.com/14790897/handwriting-web/releases) 下载的**。
+所以要**先确认安装包是从本仓库的 [Releases 页面](https://github.com/SXP-Simon/handwriting-web/releases) 下载的**。
 确认来源无误，再用下面的方式放行；**来源存疑就不要绕过这个提示，也不要打开它**。
 
 确认之后，在终端里执行一次：
@@ -45,10 +44,9 @@ xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 
 ## 和在线版有什么不同
 
-功能完全一样，差别只在下面这些：
+桌面版使用同一份 React 前端和 Python 渲染服务，主要区别是：
 
-- **没有 10 页上限** —— 那个限制只加在 `handwrite.14790897.xyz` 上。桌面版是本机跑的，
-  受限于你自己机器的性能，想渲染多少页都行。
+- **本机生成** —— 无固定 10 页截断，仍受内存、纸张尺寸和机器性能约束。
 - **不上报统计** —— 不加载 Google Analytics、Microsoft Clarity、Sentry 和客服插件。
 - **不联网下载 pandoc** —— 没有 pandoc 时用 `python-docx` 处理 `.docx`。
 - **不受过载保护干扰** —— CPU 占用守卫被放开，本机不至于请求自己都被 429 拦掉。
@@ -68,6 +66,7 @@ xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 - `temp/` —— 渲染出来的图片
 - `logs/` —— 日志
 - 字体
+- `studio/` —— 编辑器草稿、预设与上传资源，独立于后端任务的有效期
 
 ## 自己构建
 
@@ -82,5 +81,5 @@ PYTHON=python bash desktop/build.sh   # 指定解释器（CI 用）
 
 产物在 `desktop/build/`。开发调试时先 `--app-only`，再在 `desktop/` 下 `npx electron .` 直接跑。
 
-要改桌面版相关代码，先读仓库根的 [`AGENTS.md`](https://github.com/14790897/handwriting-web/blob/main/AGENTS.md) ——
-里面写了构建期编码、签名、跨站请求防护这些踩过的坑。
+开发约定见仓库根的 [`AGENTS.md`](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md)，
+存储与退出保存见[架构说明](architecture.md)。修改构建、安全或跨平台行为时，以相应源码和测试为准。

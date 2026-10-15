@@ -50,14 +50,23 @@ Users need to download within that window — after expiry the same `task_id` re
 
 ## Overload protection
 
-The backend watches its own CPU usage and returns `429` for new requests above the threshold, to avoid
-being crushed:
+The backend samples system CPU usage and returns `429` for new requests above the threshold:
 
 ```shell
 CPU_USAGE_LIMIT=90   # default 90 (percent); 100 effectively disables it
 ```
 
 The E2E tests and the desktop build set it to 100 precisely so this guard stays out of the way.
+
+## Text length and page count
+
+This fork has no fixed ten-page truncation. The old restriction documented for
+`handwrite.14790897.xyz` described an upstream instance, not this fork.
+
+The backend retains a public-instance text limit only when the request base URL is exactly
+`https://handwrite.sixiangjia.de/` and the text exceeds 10,000 characters. A normal self-hosted
+address does not match that condition. CPU protection, queue capacity, paper pixel validation,
+memory, and proxy timeouts still apply. Read `backend/app.py` for the actual checks.
 
 ## Rate limiting
 
@@ -72,7 +81,7 @@ generous than submitting a job). When you are throttled you get a `429`.
 
 ## Fonts
 
-- **Fonts baked into the image** come from the repository's `font_assets/` and are included at build time.
+- **Fonts baked into the Docker image** come from the repository's `ttf_files/`, copied to `/app/font_assets` at build time.
 - **Your own fonts** go in `ttf_files/` — see [Docker Deployment](docker.md#fonts).
 - Both appear in the font dropdown.
 

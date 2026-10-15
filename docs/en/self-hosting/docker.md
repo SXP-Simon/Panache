@@ -1,29 +1,34 @@
 # Docker Deployment
 
-Docker Compose is the easiest way to run your own instance: three containers, one command.
+Docker Compose builds the frontend and backend from this fork by default. Automatic image updates
+are optional.
 
 ## Requirements
 
 - Docker and Docker Compose installed
-- A machine that can run containers (the defaults are sized for roughly 1 core / 2 GB)
+- Enough memory and disk allocated to Docker; larger sheets and longer text consume more resources
 
 ## Bring it up
 
 ```shell
-git clone https://github.com/14790897/handwriting-web.git
+git clone --branch custom-base https://github.com/SXP-Simon/handwriting-web.git
 cd handwriting-web
-docker compose up -d
+docker compose up -d --build frontend backend
 ```
 
 The default port is **2345** — open <http://localhost:2345>.
 
-## What the three containers do
+## Services and images
 
 | Service | Image | Role |
 |---|---|---|
-| `frontend` | `14790897/frontend-handwriting` | Nginx. Serves the pages and proxies `/api/` to the backend. Host `2345` → container `80`. |
-| `backend` | `14790897/backend-handwriting` | FastAPI — the part that actually does the work. Its port is bound to **`127.0.0.1:5005` only**, never exposed publicly. |
-| `watchtower` | `containrrr/watchtower` | Pulls new images every 6 hours and rolling-restarts, giving you automatic updates. |
+| `frontend` | `handwriting-frontend:local` | Built locally. Nginx serves the pages and proxies `/api/`; host `2345` → container `80`. |
+| `backend` | `handwriting-backend:local` | Built locally. FastAPI is bound to host `127.0.0.1:5005` only. |
+| `watchtower` | `containrrr/watchtower:latest` | Optional `auto-update` profile; updates only containers carrying the enabled label. |
+
+Both application services use `pull_policy: never` by default and do not pull upstream images.
+`FRONTEND_IMAGE` and `BACKEND_IMAGE` override image tags; explicitly choose local building or
+registry pulls for your deployment.
 
 The backend is deliberately not exposed to the internet — outside traffic always goes through Nginx
 first. To change the public port, edit the left-hand number in the frontend's `"2345:80"` mapping
@@ -61,15 +66,36 @@ These fonts are what appears in the font dropdown.
   docker compose logs -f backend
   ```
 
-## Updating
+## Updating local builds
 
-- **Automatic** — watchtower checks every 6 hours and rolling-restarts when a new image appears.
-- **Manual** —
+Save any local changes before updating the custom branch and rebuilding:
 
-  ```shell
-  docker compose pull
-  docker compose up -d
-  ```
+```shell
+git pull --ff-only origin custom-base
+docker compose up -d --build frontend backend
+```
+
+## Optional: automatic registry image updates
+
+Watchtower is useful only if you publish your own images. Set your image addresses and enable
+the labels in `.env`, for example:
+
+```dotenv
+FRONTEND_IMAGE=your-account/handwriting-frontend:latest
+BACKEND_IMAGE=your-account/handwriting-backend:latest
+WATCHTOWER_ENABLE=true
+```
+
+Pull and start them explicitly:
+
+```shell
+docker compose pull --policy always frontend backend
+docker compose --profile auto-update up -d --no-build frontend backend watchtower
+```
+
+Watchtower checks enabled containers every six hours. Private registries also require pull
+credentials. It controls containers through the Docker socket; enable it only when automatic
+updates are needed. Local builds do not depend on it.
 
 ## Stopping and cleaning up
 
@@ -80,12 +106,8 @@ docker compose down -v       # the same, plus remove Docker-managed volumes
 
 !!! note "`-v` does not delete your fonts or logs"
     `ttf_files` and `logs` are **bind mounts** onto host directories, not Docker-managed volumes, so
-    `-v` leaves them alone. This Compose file defines no named volumes at all, so `-v` removes nothing
-    extra here. To wipe them, delete the host directories yourself:
-
-    ```shell
-    rm -rf ttf_files logs
-    ```
+    `-v` leaves them alone. This Compose file defines no named volumes. Manage host font and log
+    directories separately when you need to remove those files.
 
 ## Reverse proxy and HTTPS
 

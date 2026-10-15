@@ -1,7 +1,7 @@
 # Parameters
 
-There are two groups: the ones **visible in the left panel**, and the **jitter** settings
-folded away under "More".
+The "Handwriting & paper" panel groups basic settings, paper, natural variation, and cross-out
+effects. These are the default values; a restored draft or preset can have different values.
 
 !!! info "What jitter is for"
     Handwriting looks handwritten because no two characters are identical. The backend adds a
@@ -13,26 +13,26 @@ folded away under "More".
 
 | Parameter | Default | Meaning |
 |---|---:|---|
-| Font Size | `124` | Character size in pixels. Bigger text means fewer characters per sheet. |
-| Line Spacing | `200` | Baseline-to-baseline distance. Must exceed the font size or lines will overlap. |
+| Font Size | `160` | Character size in pixels. Bigger text means fewer characters per sheet. |
+| Line Spacing | `260` | Baseline-to-baseline distance. Must exceed the font size or lines will overlap. |
 | Top Margin | `50` | Distance from the text block to the top edge. |
 | Bottom Margin | `50` | Distance to the bottom edge. |
 | Left Margin | `50` | Distance to the left edge. |
 | Right Margin | `50` | Distance to the right edge; `>>>` right-alignment measures from here too. |
 | Word Spacing | `1` | Extra gap between characters. |
-| Width | `2481` | Paper width. Mutually exclusive with a background image. |
-| Height | `3507` | Paper height. Mutually exclusive with a background image. |
+| Width | `2800` | Paper width. Mutually exclusive with a background image. |
+| Height | `3960` | Paper height. Mutually exclusive with a background image. |
 
-`2481 × 3507` is A4 at 300 DPI, and the defaults are sized around A4.
+The default paper has approximately A4 proportions. Pixel dimensions do not prescribe a print DPI.
 
 ## Toggles
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| Add underline | on | Draws a rule under every line. Also decides whether auto-generated paper is ruled. |
-| Auto-adjust English spacing | off | Widens the gaps between English words so they don't run together. Irrelevant for Chinese. |
+| Ruled paper | on | Draws a rule under every line. Also decides whether auto-generated paper is ruled. |
+| Wider English word spacing | off | Widens the gaps between English words so they don't run together. Irrelevant for Chinese. |
 
-## Jitter (under "More")
+## Natural variation
 
 | Parameter | Default | Meaning |
 |---|---:|---|
@@ -58,15 +58,15 @@ Use these to leave a few "crossed out" marks on the page.
 
 ## Built-in preset
 
-The "Built-in Preset" dropdown applies a complete tuned parameter set.
+The presets dropdown offers "Small ruled · Yunyan", "Natural handwriting", and "Neat handwriting".
 
 **Small with underlines (Yunyan)** — small text in the Yunyan font, generous line spacing and
 margins, with underlines:
 
 | Parameter | Preset | (Default for comparison) |
 |---|---:|---|
-| Font Size | `70` | 124 |
-| Line Spacing | `100` | 200 |
+| Font Size | `70` | 160 |
+| Line Spacing | `100` | 260 |
 | All four margins | `150` | 50 |
 | Font Size Sigma | `1` | 2 |
 | Line Spacing Sigma | `1` | 0 |
@@ -84,6 +84,6 @@ The preset has two requirements: the `云烟体.ttf` font must be available, and
 - **Characters are colliding** → raise Line Spacing or Word Spacing.
 - **Looks too tidy to be handwriting** → raise Perturb X Sigma and Perturb Y Sigma.
 - **Looks too chaotic** → lower Perturb Theta Sigma first; it affects the impression the most.
-- **Want to fit more per page** → lower Font Size and Line Spacing, or shrink the paper.
-- **Changed a parameter and nothing happened** → you have to click "Preview Handwrite Image"
+- **Want to fit more per page** → lower Font Size, Line Spacing, or margins.
+- **Changed a parameter and nothing happened** → you have to click "Generate preview"
   again. The preview does not re-render on its own.

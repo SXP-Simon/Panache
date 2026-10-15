@@ -1,12 +1,11 @@
-# 手写文字生成
+# 手写工作室
 
-把一段文字渲染成看起来像手写的图片 —— 选字体、调参数、排好版，导出 PNG 打包或 PDF。
+Simon 自用 fork 的 `custom-base` 分支：React / TypeScript 工作台、Python / FastAPI
+渲染服务与 Electron 桌面版。输入文字、转换 LaTeX、调整笔迹，导出 PNG 打包或 PDF。
 
-- 在线使用：<https://handwrite.sixiangjia.de>
-- 视频介绍：<https://www.bilibili.com/video/BV1DM4y1W7fp/>
-- 电报讨论群：<https://t.me/+zFImOziSNullOTE1>
-
-![新版界面](https://raw.githubusercontent.com/14790897/handwriting-web/main/image-new-ui.png)
+本站是[项目文档](https://heliannuits.me/handwriting-web/)，不提供生成 API。
+使用应用请[本地启动](development.md)、[自行部署](self-hosting/docker.md)或使用[桌面版](desktop.md)。
+`main` 同步上游，Flutter / Rust 迁移版由独立的 `flutter` 分支维护。
 
 ## 能做什么
 
@@ -14,7 +13,11 @@
 
 - **自定义字体**
 
-    上传自己的 `.ttf` 字体，或者从服务器已安装的字体里选一个。
+    上传自己的字体，或者从服务器已安装的字体里选一个；界面字体与纸张手写字体独立。
+
+- **数学与文本转换**
+
+    LaTeX 转写、Markdown 清理、分式、根式与上下标排版。模块职责见[架构与技术栈](architecture.md)。
 
 - **背景图片**
 
@@ -39,11 +42,11 @@
 
 - **预览与导出**
 
-    先在右侧预览，满意后再导出整页 PNG（打包成 zip）或合并成 PDF。
+    先预览，满意后再导出整页 PNG（打包成 zip）或合并成 PDF。
 
 - **内置预设**
 
-    「小字加下划线（云烟体）」一键套用一组调好的参数。
+    选择内置笔迹预设，或保存并载入自己的设置。
 
 </div>
 
@@ -54,3 +57,9 @@
 - 要用分页和右对齐 → [排版标记](guide/layout-markers.md)
 - 想自己搭一个 → [Docker 部署](self-hosting/docker.md)
 - 想改代码 → [本地开发](development.md)
+
+## 来源
+
+本项目基于 [14790897/handwriting-web](https://github.com/14790897/handwriting-web)。
+原作者的[演示站](https://handwrite.sixiangjia.de/)与[介绍视频](https://www.bilibili.com/video/BV1DM4y1W7fp/)
+属于上游项目，其界面、功能与限制可能不同于本 fork。

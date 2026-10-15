@@ -10,25 +10,27 @@ but rejected by the server.
 
 ## I uploaded my own font but the output still uses the old one
 
-Uploading the file is not enough — you also have to **select it in the font dropdown**. The file
-is only sent to the backend when the selected name matches the uploaded filename.
+Uploads are selected automatically. If you switched fonts afterwards, select the uploaded file's
+name again in the dropdown.
 
-Also make sure you uploaded a `.ttf`.
+The picker accepts `.ttf`, `.otf`, and `.ttc`; make sure the file is a valid font.
 
 ## Generation seems stuck
 
 Most likely it is queued. Check two places:
 
-- **Below the text area** — is there a "generating" message?
-- **Top bar** — a wait countdown appears when the queue is full.
+- **Workspace state** — check whether the task is queued or processing.
+- **Preview area** — check progress; a retry countdown appears when the queue is full.
 
-The backend handles a limited number of jobs at a time, so busy periods mean waiting. It could also
-be the 3-second cooldown right after a previous run.
+The backend handles a limited number of jobs at a time. When a task fails, follow the message and
+check that the backend is reachable.
 
 ## Output got truncated partway
 
-On `handwrite.14790897.xyz` a single run is capped at 10 pages and the rest is dropped. Split the
-text into several runs, or [self-host](../self-hosting/docker.md) — a self-hosted instance has no cap.
+First check whether you generated the default single-page preview. Enable "Preview all pages" or
+export ZIP / PDF. The ten-page restriction documented for `handwrite.14790897.xyz` belonged to an
+upstream instance; this fork has no such fixed truncation. Long documents still depend on available
+memory, proxy timeouts, and [server limits](../self-hosting/fonts-and-limits.md).
 
 ## Width/height and background image can't both be set
 
@@ -38,7 +40,8 @@ image and it is used as the base. To switch, clear the other one first (the back
 
 ## There are rules on the generated paper and I don't want them
 
-Uncheck **"Add underline"**. Auto-generated paper obeys the same toggle — turn it off for plain white.
+Uncheck **"Ruled paper"** for plain generated paper. Lines already present in a background image
+are not removed by this option.
 
 ## Characters collide, or it looks too messy
 
@@ -55,7 +58,8 @@ That is by design — it removes every blank line and re-indents by two spaces p
 
 ## Can I use this commercially?
 
-The **code** is MIT licensed — see [LICENSE](https://github.com/14790897/handwriting-web/blob/main/LICENSE).
+The **code** is MIT licensed — see [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE).
+Retain the original authors' and contributors' licence and copyright notices when distributing it.
 
 **Fonts are a separate matter.** The fonts bundled in the repository and any fonts you upload each
 carry their own licence, and whether you may use them commercially depends on that licence. Check the
@@ -63,7 +67,5 @@ licences of the files in `ttf_files/` yourself — do not assume they are MIT al
 
 ## Where do I ask questions?
 
-- GitHub Issues: <https://github.com/14790897/handwriting-web/issues> — including error logs gets you
-  a much faster answer.
-- Telegram group: <https://t.me/+zFImOziSNullOTE1>
-- There is also a feedback form on the site itself.
+- This fork's GitHub Issues: <https://github.com/SXP-Simon/handwriting-web/issues>. Include the version,
+  reproduction steps, and relevant logs; avoid publishing private document text.
