@@ -196,3 +196,38 @@ fn accents_span_whole_base_and_leave_clear_air() {
         }
     }
 }
+
+#[test]
+fn scripts_follow_actual_base_height_and_natural_ink_width() {
+    for book in books() {
+        for size in [24., 40., 70.] {
+            let mut glyphs = Glyphs::new(book);
+            for letter in ['x', 'H', 'g'] {
+                let base = glyphs.unit(&[Node::Char(letter)], size).unwrap();
+                let upper = glyphs
+                    .scripts(&[Node::Char('2')], &[], size, &base, 0)
+                    .unwrap();
+                let lower = glyphs
+                    .scripts(&[], &[Node::Char('n')], size, &base, 0)
+                    .unwrap();
+                assert!(
+                    upper.bottom() > base.top && upper.bottom() < base.bottom(),
+                    "{letter}/{size}: floating superscript"
+                );
+                assert!(
+                    (lower.top - base.bottom()).abs() <= (size * 0.25) as i32,
+                    "{letter}/{size}: floating subscript"
+                );
+                let combined = glyphs
+                    .sequence(&text::parse(&format!("{letter}ₙ²")), size)
+                    .unwrap();
+                assert!(
+                    combined.advance < base.mask.width() as f32 + size,
+                    "{letter}/{size}: excessive trailing bearing"
+                );
+                let chinese = glyphs.unit(&[Node::Char('中')], size).unwrap();
+                assert_eq!(chinese.advance, glyphs.glyph('中', size).unwrap().advance);
+            }
+        }
+    }
+}

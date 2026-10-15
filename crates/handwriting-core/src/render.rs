@@ -35,11 +35,14 @@ pub struct RenderRequest {
 }
 mod glyph;
 mod ink;
+mod units;
 use glyph::{Glyph, Glyphs};
-use ink::{blank_paper, normal, paste_mask, perturb};
+use ink::{blank_paper, normal, paint_math_unit, paste_mask, perturb};
+use units::{keeps_grid_cell, layout_units};
 // 2026-10-15：先缓存整行，知道最高根式/最低分母后再统一落笔，避免后出现的公式撞进上一行。
 struct LineUnit {
     glyph: Glyph,
+    rigid: bool,
     x: i32,
     dy: i32,
 }
@@ -142,12 +145,22 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
             anchor = bottom - max_y as f32;
         }
         for u in units {
-            paste_mask(
-                &mut self.mask,
-                &u.glyph.mask,
+            let origin = (
                 u.x + u.glyph.left,
-                (anchor.round() as i32) + u.dy + u.glyph.top,
+                anchor.round() as i32 + u.dy + u.glyph.top,
             );
+            if u.rigid {
+                paint_math_unit(
+                    &mut self.canvas,
+                    &u.glyph.mask,
+                    origin,
+                    self.p,
+                    &mut self.rng,
+                    self.cancel,
+                )?;
+            } else {
+                paste_mask(&mut self.mask, &u.glyph.mask, origin.0, origin.1);
+            }
         }
         self.previous_bottom = anchor + max_y as f32;
         self.y = anchor + self.p.line_spacing;
@@ -202,6 +215,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     let (w, h) = background.dimensions();
     p.validate(w, h, &r.limits)?;
     let nodes = text::parse(&text::normalize(&r.text, p.english_spacing));
+    let units = layout_units(&nodes);
     let mut glyphs = Glyphs::new(&r.fonts);
     let mut pages = Pages {
         canvas: background.clone(),
@@ -222,32 +236,26 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     };
     let right = w as f32 - p.effective_right_margin();
     let mut i = 0;
-    while i < nodes.len() && !pages.stopped {
+    while i < units.len() && !pages.stopped {
         cancel.check()?;
-        match &nodes[i] {
+        match &units[i][0] {
             Node::Break => pages.flush(false)?,
             Node::Newline => pages.newline()?,
             Node::RightAlign => {
-                let rest: Vec<_> = nodes[i + 1..]
+                let rest = units[i + 1..]
                     .iter()
-                    .take_while(|n| !matches!(n, Node::Newline | Node::Break))
-                    .cloned()
-                    .collect();
+                    .take_while(|unit| !matches!(unit[0], Node::Newline | Node::Break));
                 let mut cursor = 0f32;
                 let mut width = 0f32;
-                for n in rest {
-                    let g = glyphs.node(&n, p.font_size)?;
+                for unit in rest {
+                    let g = glyphs.unit(unit, p.font_size)?;
                     width = width.max(cursor + g.right() as f32);
-                    cursor += if p.grid_layout {
-                        let cell = (p.font_size + p.word_spacing).max(1.);
-                        if matches!(n, Node::Char(_)) {
-                            cell
-                        } else {
-                            (g.advance.max(g.right() as f32) / cell).ceil().max(1.) * cell
-                        }
-                    } else {
-                        g.advance + p.word_spacing
-                    };
+                    cursor += g.step(
+                        unit,
+                        p,
+                        0.,
+                        unit.len() > 1 || !matches!(unit[0], Node::Char(_)),
+                    );
                 }
                 pages.x = (right - width).max(p.left_margin);
             }
@@ -304,8 +312,8 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
             node => {
                 let size =
                     (p.font_size + normal(&mut pages.rng, p.font_size_sigma)).clamp(1., 2048.);
-                let mut g = glyphs.node(node, size)?;
-                let mut compound = !matches!(node, Node::Char(_));
+                let mut g = glyphs.unit(units[i], size)?;
+                let mut compound = units[i].len() > 1 || !matches!(node, Node::Char(_));
                 if pages.rng.random::<f32>() < p.strikethrough_probability
                     && !matches!(node,Node::Char(c) if c.is_whitespace())
                 {
@@ -355,7 +363,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                 let usable_width = right - p.left_margin;
                 let usable_height = h as f32 - p.top_margin - p.bottom_margin;
                 g = g.fit(usable_width, usable_height);
-                let jitter_x = if p.grid_layout {
+                let jitter_x = if p.grid_layout && keeps_grid_cell(units[i]) {
                     normal(&mut pages.rng, p.word_spacing_sigma)
                 } else {
                     0.
@@ -379,25 +387,16 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                     .round()
                     .clamp(-usable_height * 0.25, usable_height * 0.25)
                     as i32;
-                let advance = if p.grid_layout {
-                    let cell = (p.font_size + p.word_spacing).max(1.);
-                    if compound {
-                        (g.advance.max(g.right() as f32) / cell).ceil().max(1.) * cell
-                    } else {
-                        cell
-                    }
+                let extra = if p.grid_layout && keeps_grid_cell(units[i]) {
+                    0.
                 } else {
-                    let step =
-                        g.advance + p.word_spacing + normal(&mut pages.rng, p.word_spacing_sigma);
-                    if matches!(node, Node::Char(_)) {
-                        step.max(1.)
-                    } else {
-                        step.max(g.right() as f32).max(1.)
-                    }
+                    normal(&mut pages.rng, p.word_spacing_sigma)
                 };
+                let advance = g.step(units[i], p, extra, compound);
                 pages.x = x + advance;
                 pages.line.push(LineUnit {
                     glyph: g,
+                    rigid: compound,
                     x: x.round() as i32,
                     dy,
                 });

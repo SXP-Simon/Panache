@@ -114,3 +114,6 @@ pub(super) fn blank_paper(w: u32, h: u32, p: &Parameters) -> RgbaImage {
     }
     bg
 }
+
+mod rigid;
+pub(super) use rigid::paint_math_unit;

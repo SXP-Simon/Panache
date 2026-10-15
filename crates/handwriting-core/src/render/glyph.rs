@@ -1,6 +1,6 @@
 //! 2026-10-15：测量与绘制共享基线坐标和真实墨迹边界；复合数学结构不依赖私用区字符。
 use super::{FontBook, paste_mask};
-use crate::{Error, Result, text::Node};
+use crate::{Error, Parameters, Result, text::Node};
 use image::{GrayImage, Luma};
 use std::collections::HashMap;
 
@@ -26,6 +26,27 @@ impl Glyph {
             left: 0,
             top: 0,
             ink: false,
+        }
+    }
+    pub(super) fn compact(mut self, size: f32) -> Self {
+        self.left = 0;
+        self.advance = if self.ink {
+            self.mask.width() as f32 + (size * 0.045).round().max(1.)
+        } else {
+            (size * 0.25).round().max(1.)
+        };
+        self
+    }
+    pub(super) fn step(&self, unit: &[Node], p: &Parameters, extra: f32, compound: bool) -> f32 {
+        if p.grid_layout && super::units::keeps_grid_cell(unit) {
+            (p.font_size + p.word_spacing).max(1.)
+        } else {
+            let step = self.advance + p.word_spacing + extra;
+            if compound {
+                step.max(self.right() as f32).max(1.)
+            } else {
+                step.max(1.)
+            }
         }
     }
     pub fn fit(mut self, width: f32, height: f32) -> Self {
@@ -209,28 +230,16 @@ impl<'a> Glyphs<'a> {
             previous = point;
         }
     }
-    #[cfg(test)]
-    pub fn sequence(&mut self, nodes: &[Node], size: f32) -> Result<Glyph> {
-        self.sequence_at(nodes, size, 0)
-    }
-    fn sequence_at(&mut self, nodes: &[Node], size: f32, depth: usize) -> Result<Glyph> {
-        let mut x: f32 = 0.;
-        let mut children = Vec::new();
-        let mut child_bytes = 0usize;
-        for n in nodes {
-            let g = self.node_at(n, size, depth + 1)?;
-            child_bytes = child_bytes.saturating_add(g.mask.len());
-            if child_bytes > 16_000_000 {
-                return Err(Error::new("invalid_layout", "数学子结构超过内存预算"));
+    pub fn unit(&mut self, nodes: &[Node], size: f32) -> Result<Glyph> {
+        if nodes.len() == 1 {
+            let mut glyph = self.node(&nodes[0], size)?;
+            if matches!(nodes[0], Node::Char(_)) && !super::units::keeps_grid_cell(nodes) {
+                glyph = glyph.compact(size);
             }
-            let at = x.round() as i32;
-            x += g.advance;
-            children.push((g, at, 0));
-            if x > 32768. {
-                return Err(Error::new("invalid_layout", "数学结构过宽"));
-            }
+            Ok(glyph)
+        } else {
+            self.sequence(nodes, size)
         }
-        Self::compose(x, children, vec![])
     }
     pub fn node(&mut self, n: &Node, size: f32) -> Result<Glyph> {
         self.node_at(n, size, 0)
@@ -298,26 +307,7 @@ impl<'a> Glyphs<'a> {
             }
             Node::Scripts { upper, lower } => {
                 let base = self.glyph('x', size)?;
-                let mut advance: f32 = 0.;
-                let mut children = Vec::new();
-                for (nodes, is_upper) in [(upper, true), (lower, false)] {
-                    if nodes.is_empty() {
-                        continue;
-                    }
-                    let g = self.sequence_at(
-                        nodes,
-                        (size * 0.65).round().max(8.).min(size),
-                        depth + 1,
-                    )?;
-                    let dy = if is_upper {
-                        base.top + (size * 0.10).round() as i32 - g.bottom()
-                    } else {
-                        base.bottom() - (size * 0.10).round() as i32 - g.top
-                    };
-                    advance = advance.max(g.advance + (size * 0.03).round().max(1.));
-                    children.push((g, 0, dy));
-                }
-                Self::compose(advance, children, vec![])
+                self.scripts(upper, lower, size, &base, depth)
             }
             Node::Accent(nodes, mark) => {
                 let body = self.sequence_at(nodes, size, depth + 1)?;
@@ -404,5 +394,6 @@ impl<'a> Glyphs<'a> {
     }
 }
 
+mod sequence;
 #[cfg(test)]
 mod tests;
