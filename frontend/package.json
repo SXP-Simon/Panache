@@ -14,9 +14,11 @@
     "test:letter-format": "node tests/chineseLetterFormatter.test.cjs",
     "test:clean-markdown": "node tests/cleanMarkdown.test.cjs",
     "test:latex-unicode": "node tests/latexToUnicode.test.cjs",
-    "test:inline-image": "node tests/inlineImageManager.test.cjs"
+    "test:inline-image": "node tests/inlineImageManager.test.cjs",
+    "test:generation": "node --test tests/generation.test.cjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.3",
     "katex": "0.18.9",
     "lucide-react": "^1.57.0",
     "motion": "^14.2.0",

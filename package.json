@@ -12,7 +12,7 @@
     "quality:python": "uv run --extra dev ruff check . && uv run --extra dev ruff format --check . && uv run --extra dev pyright",
     "quality:check": "node scripts/run-quality-checks.cjs",
     "test:hooks": "node --test scripts/tests/check-commit-message.test.cjs scripts/tests/install-hooks.test.cjs scripts/tests/run-quality-checks.test.cjs",
-    "test:frontend": "pnpm --filter handwrite run test:letter-format && pnpm --filter handwrite run test:clean-markdown && pnpm --filter handwrite run test:latex-unicode && pnpm --filter handwrite run test:inline-image",
+    "test:frontend": "pnpm --filter handwrite run test:letter-format && pnpm --filter handwrite run test:clean-markdown && pnpm --filter handwrite run test:latex-unicode && pnpm --filter handwrite run test:inline-image && pnpm --filter handwrite run test:generation",
     "test:unit": "pnpm run test:hooks && pnpm run test:frontend && uv run --extra dev python -m pytest backend/tests",
     "test:sw-upgrade": "node --test scripts/tests/service-worker-upgrade.test.cjs",
     "test:all": "pnpm run test:unit && pnpm --filter handwrite run build && pnpm run test:sw-upgrade && pnpm --filter handwriting-web-e2e run test"
