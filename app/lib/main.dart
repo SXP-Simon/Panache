@@ -3,6 +3,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/foundation.dart';
 
 import 'l10n/app_localizations.dart';
+import 'theme/handwriting_theme.dart';
 import 'screens/workbench.dart';
 import 'services/workspace.dart';
 import 'services/licenses.dart';
@@ -46,28 +47,6 @@ class _HandwritingAppState extends State<HandwritingApp> {
     super.dispose();
   }
 
-  ThemeData theme(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF62833A),
-      brightness: brightness,
-    );
-    return ThemeData(
-      useMaterial3: true,
-      fontFamily: 'packages/handwriting_assets/LXGW WenKai',
-      colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-        isDense: true,
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        color: scheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      ),
-    );
-  }
-
   Widget workbench({int destination = 0}) => Workbench(
     workspace: widget.workspace,
     initialDestination: destination,
@@ -86,8 +65,8 @@ class _HandwritingAppState extends State<HandwritingApp> {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-    theme: theme(Brightness.light),
-    darkTheme: theme(Brightness.dark),
+    theme: handwritingTheme(Brightness.light),
+    darkTheme: handwritingTheme(Brightness.dark),
     themeMode: mode,
     home: workbench(),
     routes: {

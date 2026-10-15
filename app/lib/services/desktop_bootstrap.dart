@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/handwriting_theme.dart';
 import 'desktop_backend.dart';
 import 'workspace.dart';
 import 'mobile_api.dart';
@@ -134,10 +135,9 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
       locale: const Locale('zh'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF007BFF),
-      ),
+      theme: handwritingTheme(Brightness.light),
+      darkTheme: handwritingTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: Builder(
         builder: (context) {
           final l = AppLocalizations.of(context)!;
