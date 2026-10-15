@@ -231,3 +231,34 @@ test("Python 与桌面打包使用独立 job，打包后不再执行会移除 bu
   assert.doesNotMatch(desktop.split("run: bash desktop/build.sh --app-only --skip-deps")[1], /\buv (?:run|sync)\b/u);
   assert.match(desktop, /run: pnpm --filter handwriting-web-e2e run test:desktop/u);
 });
+
+// Included in the existing hook/CI policy entry point; no platform builds or
+// GitHub mutations are performed by these isolated controller tests.
+require("./flutter-release.test.cjs");
+
+test("Flutter assets pin source and keep write permission out of build jobs", () => {
+  const workflow = source("flutter_release");
+  assert.match(workflow, /workflows: \["Semantic Release"\]/u);
+  assert.match(workflow, /branches: \[custom-base\]/u);
+  assert.match(workflow, /run-id: \$\{\{ github\.event\.workflow_run\.id \}\}/u);
+  assert.match(workflow, /ref: \$\{\{ needs\.resolve\.outputs\.flutter_sha \}\}/u);
+  assert.match(workflow, /ref: \$\{\{ github\.workflow_sha \}\}/u);
+  assert.match(workflow, /node scripts\/flutter-release\.cjs resolve/u);
+  assert.match(workflow, /upload-release-assets\.sh/u);
+  assert.match(workflow, /EXPECTED_APP_VERSION=\$HANDWRITING_BUILD_VERSION/u);
+  const desktop = workflow.split("\n  desktop:\n")[1].split("\n  android:\n")[0];
+  const android = workflow.split("\n  android:\n")[1].split("\n  publish:\n")[0];
+  assert.doesNotMatch(desktop + android, /contents: write|GH_TOKEN:/u);
+  assert.match(android, /outputs\.android == 'true'/u);
+  for (const secret of ["KEYSTORE_BASE64", "STORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD"]) {
+    assert.ok(workflow.includes(`secrets.HANDWRITING_ANDROID_${secret} != ''`));
+  }
+  assert.match(android, /apksigner.*verify/u);
+  assert.match(android, /CN=Android Debug/u);
+  assert.doesNotMatch(workflow, /flutter build ipa|--clobber/u);
+  const plan = planChanges([".github/workflows/flutter_release.yml"]);
+  assert.equal(plan.hooks, true);
+  assert.equal(plan.frontend, false);
+  assert.equal(plan.desktop_e2e, false);
+  assert.equal(plan.release, false);
+});

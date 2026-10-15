@@ -1,0 +1,308 @@
+name: Flutter Release Assets
+
+on:
+  workflow_run:
+    workflows: ["Semantic Release"]
+    types: [completed]
+    branches: [custom-base]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing custom-base release tag
+        required: true
+        type: string
+      flutter_ref:
+        description: Full Flutter commit SHA; required only when this release has no source manifest
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: flutter-release-assets-${{ inputs.tag || github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  resolve:
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.head_branch == 'custom-base'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      build_number: ${{ steps.plan.outputs.build_number }}
+      flutter_sha: ${{ steps.plan.outputs.flutter_sha }}
+      android: ${{ steps.plan.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Locate only the triggering release result
+        id: result
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          COUNT="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}/artifacts?per_page=100" --jq '[.artifacts[] | select(.name == "release-result" and .expired == false)] | length')"
+          if [ "$COUNT" = 0 ]; then
+            echo "No release result; no Flutter packages required."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          elif [ "$COUNT" = 1 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Ambiguous release-result artifacts"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.result.outputs.available == 'true'
+        with:
+          name: release-result
+          path: release-result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Pin checked Flutter source to the exact published release
+        id: plan
+        if: github.event_name == 'workflow_dispatch' || steps.result.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          RELEASE_RESULT_FILE: ${{ github.event_name != 'workflow_dispatch' && 'release-result/release-result.json' || '' }}
+          MANUAL_TAG: ${{ inputs.tag }}
+          MANUAL_FLUTTER_SHA: ${{ inputs.flutter_ref }}
+          ANDROID_SIGNING_READY: ${{ secrets.HANDWRITING_ANDROID_KEYSTORE_BASE64 != '' && secrets.HANDWRITING_ANDROID_STORE_PASSWORD != '' && secrets.HANDWRITING_ANDROID_KEY_ALIAS != '' && secrets.HANDWRITING_ANDROID_KEY_PASSWORD != '' }}
+        run: node scripts/flutter-release.cjs resolve
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.tag != ''
+        with:
+          name: flutter-release-plan
+          path: release-plan/Flutter-source.json
+          if-no-files-found: error
+
+  desktop:
+    needs: resolve
+    if: needs.resolve.outputs.tag != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: macos-14
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      HANDWRITING_BUILD_VERSION: ${{ needs.resolve.outputs.version }}
+      HANDWRITING_BUILD_NUMBER: ${{ needs.resolve.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.flutter_sha }}
+          path: flutter-source
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: flutter-release-plan
+          path: release-plan
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: flutter-source
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - name: Build pinned Flutter desktop source with the release version
+        working-directory: flutter-source
+        shell: bash
+        run: python scripts/build-flutter-desktop.py --version "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+      - name: Validate the packaged backend and displayed release version
+        working-directory: flutter-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          BINARY="$(find target/desktop-package -type f \( -name handwriting-server -o -name handwriting-server.exe \) -print -quit)"
+          BINARY="$(python -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$BINARY")"
+          cd app
+          flutter test test/desktop_backend_test.dart --dart-define="DESKTOP_BACKEND_EXECUTABLE=$BINARY" --dart-define="EXPECTED_APP_VERSION=$HANDWRITING_BUILD_VERSION"
+      - name: Stage Flutter-prefixed archive and provenance
+        shell: bash
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          PACKAGE="$(find flutter-source/target/desktop-package -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print -quit)"
+          node scripts/flutter-release.cjs stage release-plan/Flutter-source.json release-assets "$TARGET_PLATFORM" "$PACKAGE"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter-release-${{ matrix.platform }}
+          path: release-assets/
+          if-no-files-found: error
+
+  android:
+    needs: resolve
+    if: needs.resolve.outputs.tag != '' && needs.resolve.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HANDWRITING_BUILD_VERSION: ${{ needs.resolve.outputs.version }}
+      HANDWRITING_BUILD_NUMBER: ${{ needs.resolve.outputs.build_number }}
+      HANDWRITING_ANDROID_STORE_PASSWORD: ${{ secrets.HANDWRITING_ANDROID_STORE_PASSWORD }}
+      HANDWRITING_ANDROID_KEY_ALIAS: ${{ secrets.HANDWRITING_ANDROID_KEY_ALIAS }}
+      HANDWRITING_ANDROID_KEY_PASSWORD: ${{ secrets.HANDWRITING_ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.flutter_sha }}
+          path: flutter-source
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: flutter-release-plan
+          path: release-plan
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - name: Install the supplied release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HANDWRITING_ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/handwriting-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          echo "HANDWRITING_ANDROID_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+      - name: Build only a formally signed release APK
+        working-directory: flutter-source/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build apk --release --target-platform android-arm64,android-x64 --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs build/app/outputs/flutter-apk/app-release.apk | tee "$RUNNER_TEMP/apk-signature.txt"
+          if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature.txt"; then
+            echo "::error::Debug-signed APK cannot be uploaded as a release"
+            exit 1
+          fi
+      - name: Stage the signed APK
+        run: node scripts/flutter-release.cjs stage release-plan/Flutter-source.json release-assets android-arm64-x64 flutter-source/app/build/app/outputs/flutter-apk/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter-release-android-arm64-x64
+          path: release-assets/
+          if-no-files-found: error
+      - name: Remove signing key
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/handwriting-release.jks"
+
+  publish:
+    needs: [resolve, desktop, android]
+    if: >-
+      always() && needs.resolve.outputs.tag != '' && needs.resolve.result == 'success'
+      && needs.desktop.result == 'success'
+      && (needs.android.result == 'success' || (needs.resolve.outputs.android == 'false' && needs.android.result == 'skipped'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/download-artifact@v4
+        with:
+          name: flutter-release-plan
+          path: release-plan
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: flutter-release-*
+          path: downloaded
+      - name: Verify and publish the complete Flutter package set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          ANDROID: ${{ needs.resolve.outputs.android }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          find downloaded -type f ! -name Flutter-source.json -exec cp {} release-assets/ \;
+          node scripts/flutter-release.cjs verify release-plan/Flutter-source.json release-assets "$ANDROID"
+          bash scripts/upload-release-assets.sh "$TAG" 'release-assets/*'
+          {
+            echo '### Flutter packages added to this release'
+            echo 'These Flutter desktop archives are separate from the Electron installers. Source SHA and checks are fixed in Flutter-source.json.'
+            echo 'macOS packages are ad-hoc signed and not notarized; no unsigned iOS IPA is published.'
+            if [ "$ANDROID" != true ]; then
+              echo 'Android APK omitted: formal release signing secrets are not fully configured. No debug-signed APK is published.'
+            fi
+            echo '<details><summary>Pinned source manifest</summary>'
+            echo
+            echo '```json'
+            cat release-plan/Flutter-source.json
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"

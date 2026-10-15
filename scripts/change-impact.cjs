@@ -96,7 +96,7 @@ function planChanges(paths, { full = false, reason = "actual Git paths", head_sh
       else if (workflow === "test_backend.yml") enable("python", "unit_python");
       else if (workflow === "e2e.yml") enable("e2e");
       else if (workflow === "desktop_release.yml") desktop();
-      else if (workflow === "semantic_release.yml") enable("hooks");
+      else if (["semantic_release.yml", "flutter_release.yml"].includes(workflow)) enable("hooks");
       else allChecks();
       continue;
     }
