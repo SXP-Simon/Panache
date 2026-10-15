@@ -922,6 +922,12 @@ def init_glyph_fallback_engine():
             return variant
 
         core._get_font = cached_get_font
+        # 2026-10-15：只对含复合数学字形的文本按实际墨迹调整换行与行距。
+        try:
+            from math_page_layout import install_math_page_layout
+        except ImportError:
+            from backend.math_page_layout import install_math_page_layout
+        install_math_page_layout(core, is_math_glyph, _get_rendered_text_bbox)
         logger.info(f"真实字形 Fallback 引擎挂载成功，已加载 {len(_FALLBACK_FONTS_POOL)} 款备用字库")
     except Exception as e:
         logger.warning(f"挂载字形 Fallback 引擎失败: {e}")
