@@ -14,6 +14,7 @@ import SettingsPanel from './components/SettingsPanel';
 import PreviewPanel from './components/PreviewPanel';
 import Button from './shared/ui/Button';
 import Modal from './shared/ui/Modal';
+import GitHubIcon from './shared/ui/GitHubIcon';
 import { Languages, Moon, Sun, CircleHelp, MonitorDown, ArrowUpRight } from './shared/icons';
 export default function App() {
   const locale = usePreferencesStore((state) => state.locale);
@@ -49,15 +50,27 @@ function Studio() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a className="brand" href="/" aria-label={t('app')}>
+        <div className="brand">
           <span className="brand-mark">
             <img src={brandIcon} alt="" aria-hidden="true" />
           </span>
           <span>
-            <strong>{t('app')}</strong>
-            <small>HANDWRITING STUDIO</small>
+            <a className="brand-home" href="/">
+              {t('app')}
+            </a>
+            <a
+              className="project-source-link"
+              href="https://github.com/SXP-Simon/handwriting-web"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="project-source-link"
+              aria-label={`${t('projectSource')}: SXP-Simon/handwriting-web`}
+            >
+              <GitHubIcon />
+              <span>SXP-Simon/handwriting-web</span>
+            </a>
           </span>
-        </a>
+        </div>
         <nav className="header-nav">
           <span className="nav-active">{t('workspace')}</span>
           <Button

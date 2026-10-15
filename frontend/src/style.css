@@ -326,18 +326,11 @@ input[type='range'] {
   width: 100%;
   height: 100%;
 }
-.brand strong {
+.brand-home {
   display: block;
   font-size: 17px;
   font-weight: 650;
   letter-spacing: 0.03em;
-}
-.brand small {
-  display: block;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--muted-foreground);
-  margin-top: 4px;
 }
 .header-nav {
   display: flex;
@@ -917,7 +910,24 @@ input[type='color'] {
 .project-source-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--green-ink);
+  white-space: nowrap;
+}
+.project-source-link svg {
+  flex-shrink: 0;
+}
+.project-source-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.project-source-link:focus-visible {
+  outline: 2px solid var(--green-ink);
+  outline-offset: 4px;
+  border-radius: 3px;
 }
 .local-dot {
   width: 4px;
@@ -1114,11 +1124,14 @@ input[type='color'] {
 }
 @media (max-width: 720px) {
   .app-header {
-    height: 64px;
-    padding: 0 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: auto;
+    padding: 10px 12px;
     gap: 6px;
   }
   .brand {
+    grid-column: 1 / -1;
     min-width: 0;
     flex: 1;
     gap: 8px;
@@ -1127,14 +1140,12 @@ input[type='color'] {
   .brand > span:last-child {
     min-width: 0;
   }
-  .brand strong {
+  .brand-home {
     font-size: 15px;
     line-height: 1.2;
     letter-spacing: 0;
   }
-  .brand small {
-    display: none;
-  }
+
   .brand-mark {
     width: 34px;
     height: 34px;
