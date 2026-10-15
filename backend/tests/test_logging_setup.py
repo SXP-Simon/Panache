@@ -2,12 +2,14 @@
 """2026-10-15：日志定位、颜色隔离、轮转和桌面协议回归."""
 
 import asyncio
+import codecs
 import inspect
 import io
 import logging
 import logging.config
 import os
 import re
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -228,3 +230,64 @@ def test_generation_lifecycle_logs_task_and_duration_without_payload(monkeypatch
     if fail:
         assert "RuntimeError: render failed" in output
         assert "Traceback (most recent call last):" in output
+
+
+@pytest.mark.parametrize("encoding", ["cp1252", "cp936"])
+def test_default_stderr_is_utf8_in_real_process_with_legacy_encoding(tmp_path, encoding):
+    script = tmp_path / "encoding_probe.py"
+    source = (
+        "import logging, sys\n"
+        "from logging_setup import DiagnosticStreamHandler\n"
+        "def emit_message():\n"
+        "    logger = logging.getLogger('encoding-probe')\n"
+        "    logger.setLevel(logging.INFO)\n"
+        "    logger.addHandler(DiagnosticStreamHandler())\n"
+        "    logger.info('\\x1b[31m中文消息\\x1b[0m \\udcff')\n"
+        "    sys.stdout.write(sys.stdout.encoding)\n"
+        "emit_message()\n"
+    )
+    script.write_text(source, encoding="utf-8")
+    environment = {
+        **os.environ,
+        "PYTHONIOENCODING": encoding,
+        "PYTHONUTF8": "0",
+        "PYTHONPATH": str(Path(logs.__file__).parent),
+    }
+
+    async def capture() -> tuple[bytes, bytes]:
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(script),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=environment,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15)
+        finally:
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+        assert process.returncode == 0
+        return stdout, stderr
+
+    stdout, stderr = asyncio.run(capture())
+    output = stderr.decode("utf-8", errors="strict")
+    assert "中文消息 \\udcff" in output
+    assert "encoding_probe.py:7 | emit_message()" in output
+    assert "\x1b" not in output
+    assert "UnicodeEncodeError" not in output
+    assert "Logging error" not in output
+    assert codecs.lookup(stdout.decode("ascii")).name == codecs.lookup(encoding).name
+
+
+def test_explicit_text_wrapper_keeps_callers_encoding():
+    binary = io.BytesIO()
+    stream = io.TextIOWrapper(binary, encoding="cp1252", errors="replace")
+    handler = logs.DiagnosticStreamHandler(stream)
+    try:
+        assert stream.encoding == "cp1252"
+        assert stream.errors == "replace"
+    finally:
+        handler.close()
+        stream.close()

@@ -2,6 +2,7 @@
 """2026-10-15：统一终端诊断与按进程隔离的 UTF-8 轮转日志."""
 
 import copy
+import io
 import logging
 import os
 import re
@@ -9,7 +10,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from threading import RLock
-from typing import TextIO
+from typing import TextIO, cast
 
 _ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-_])")
 _COLORS = {
@@ -112,7 +113,10 @@ class DiagnosticStreamHandler(logging.StreamHandler[TextIO]):
     def __init__(self, stream: TextIO | None = None) -> None:
         """2026-10-15：创建独立于桌面 stdout 握手协议的诊断通道."""
         destination = stream if stream is not None else sys.stderr
-        super().__init__(destination)
+        # 2026-10-15：Windows 管道可能继承本地代码页，默认诊断通道统一输出 UTF-8。
+        if stream is None and isinstance(destination, io.TextIOWrapper):
+            destination.reconfigure(encoding="utf-8", errors="backslashreplace")
+        super().__init__(cast("TextIO", destination))
         self.setFormatter(
             DiagnosticFormatter(color=destination.isatty() and "NO_COLOR" not in os.environ)
         )

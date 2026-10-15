@@ -96,6 +96,8 @@ module.exports = defineConfig({
         // 测试机和 CI runner 的 CPU 常被 dev server + 浏览器占满，
         // 会触发 app.py 的 CPU 过载保护（429），把阈值放到 100 避免误伤
         CPU_USAGE_LIMIT: "100",
+        PYTHONUTF8: "1",
+        PYTHONIOENCODING: "utf-8",
       },
     },
     {
