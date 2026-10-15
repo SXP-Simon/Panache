@@ -56,6 +56,8 @@ uv run --project .. uvicorn app:app --reload --host 127.0.0.1 --port 5005
 
 前端位于 `http://127.0.0.1:8080`，开发代理将 `/api` 请求转发到后端 5005 端口。
 
+VS Code 中按 `Ctrl+Shift+B` 一键安装依赖、启动前后端并打开浏览器；按 `F5` 可选择内置 Chrome / Edge 浏览器调试，服务日志分别显示在独立终端。
+
 ```bash
 # 以下命令在仓库根目录执行
 pnpm run quality:check

@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "全栈开发：Chrome 浏览器调试",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:8080",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "⚡ 全栈开发 - 同时启动前后端",
+      "sourceMaps": true
+    },
+    {
+      "name": "全栈开发：Edge 浏览器调试",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:8080",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "⚡ 全栈开发 - 同时启动前后端",
+      "sourceMaps": true
+    }
+  ]
+}

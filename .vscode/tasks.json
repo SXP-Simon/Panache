@@ -2,19 +2,54 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "🚀 一键启动项目并打开浏览器",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "⚡ 全栈开发 - 同时启动前后端",
+        "🌐 打开开发页面"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "⚡ 全栈开发 - 同时启动前后端",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "frontend",
+        "backend"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "frontend",
       "type": "shell",
       "command": "pnpm",
-      "args": ["--filter", "handwrite", "run", "serve"],
-      "options": {
-        "cwd": "${workspaceFolder}"
+      "windows": {
+        "command": "pnpm.cmd"
       },
-      "group": "build",
-      "isBackground": true,
+      "args": [
+        "--filter",
+        "handwrite",
+        "run",
+        "dev"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "NO_COLOR": "1"
+        }
+      },
       "problemMatcher": {
-        "owner": "webpack",
+        "owner": "vite",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}/frontend"
+        ],
         "pattern": {
-          "regexp": "^ERROR in (.*)\\((\\d+),(\\d+)\\): (.*)$",
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(.*)$",
           "file": 1,
           "line": 2,
           "column": 3,
@@ -22,205 +57,251 @@
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "^\\s*webpack",
-          "endsPattern": "Local:\\s+http://localhost:\\d+"
+          "beginsPattern": "VITE v\\S+",
+          "endsPattern": "Local:\\s+http://127\\.0\\.0\\.1:8080/"
         }
       },
       "presentation": {
-        "echo": true,
         "reveal": "always",
+        "panel": "dedicated",
         "focus": false,
-        "panel": "new",
-        "showReuseMessage": true,
-        "clear": false
+        "clear": true
+      },
+      "detail": "准备 pnpm 依赖并启动 Vite：http://127.0.0.1:8080",
+      "dependsOn": "📦 安装前端依赖",
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
       }
     },
     {
       "label": "backend",
-      "type": "shell",
-      // uvicorn app:app --reload
-      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "type": "process",
+      "command": "uv",
       "args": [
-        "-m",
+        "run",
+        "--locked",
+        "--extra",
+        "dev",
+        "--project",
+        "..",
         "uvicorn",
         "app:app",
         "--reload",
         "--host",
-        "0.0.0.0",
+        "127.0.0.1",
         "--port",
         "5005"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/backend"
-      },
-      "group": "build",
-      "isBackground": true,
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": false,
-        "panel": "new",
-        "showReuseMessage": true,
-        "clear": false
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "PYTHONUTF8": "1",
+          "PYTHONIOENCODING": "utf-8"
+        }
       },
       "problemMatcher": {
         "owner": "python",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
         "pattern": {
-          "regexp": "^\\s*File \"(.+)\", line (\\d+).*$",
+          "regexp": "^.*\\| .*\\[(?:ERROR|CRITICAL)\\s*\\].*\\| [^|]+ \\| (.+):(\\d+) \\| [^|]+ \\| (.*)$",
           "file": 1,
-          "line": 2
+          "line": 2,
+          "message": 3
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": ".*Serving Flask app.*",
-          "endsPattern": ".*Debugger PIN:.*"
+          "beginsPattern": "Will watch for changes|Started reloader process|Started server process",
+          "endsPattern": "Application startup complete\\."
         }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true
+      },
+      "detail": "使用 uv 项目环境启动 FastAPI 热重载：http://127.0.0.1:5005",
+      "dependsOn": "🐍 安装后端依赖",
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
       }
     },
     {
-      "label": "⚡ 全栈开发 - 同时启动前后端",
-      "dependsOrder": "parallel",
-      "dependsOn": ["frontend", "backend"],
-      "group": {
-        "kind": "build",
-        "isDefault": true
+      "label": "🌐 打开开发页面",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "--locked",
+        "--extra",
+        "dev",
+        "python",
+        "-m",
+        "webbrowser",
+        "-t",
+        "http://127.0.0.1:8080"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
       },
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": false,
-        "panel": "new",
-        "showReuseMessage": true,
-        "clear": true
-      }
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "detail": "在系统默认浏览器打开已经启动的前端"
     },
     {
       "label": "📦 安装前端依赖",
       "type": "shell",
       "command": "pnpm",
-      "args": ["install"],
+      "windows": {
+        "command": "pnpm.cmd"
+      },
+      "args": [
+        "install",
+        "--frozen-lockfile"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "group": "build",
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
         "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
-      },
-      "problemMatcher": []
+        "panel": "dedicated"
+      }
     },
     {
       "label": "🐍 安装后端依赖",
-      "type": "shell",
+      "type": "process",
       "command": "uv",
-      "args": ["sync"],
+      "args": [
+        "sync",
+        "--locked",
+        "--extra",
+        "dev"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "group": "build",
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
         "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
-      },
-      "problemMatcher": []
+        "panel": "dedicated"
+      }
     },
     {
       "label": "🔧 安装所有依赖",
       "dependsOrder": "parallel",
-      "dependsOn": ["📦 安装前端依赖", "🐍 安装后端依赖"],
-      "group": "build",
+      "dependsOn": [
+        "📦 安装前端依赖",
+        "🐍 安装后端依赖"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "✅ 工程质量检查",
+      "type": "shell",
+      "command": "pnpm",
+      "windows": {
+        "command": "pnpm.cmd"
+      },
+      "args": [
+        "run",
+        "quality:check"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
         "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": true
+        "panel": "dedicated"
       }
+    },
+    {
+      "label": "🧪 单元测试",
+      "type": "shell",
+      "command": "pnpm",
+      "windows": {
+        "command": "pnpm.cmd"
+      },
+      "args": [
+        "run",
+        "test:unit"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "group": "test"
     },
     {
       "label": "🏗️ 构建前端项目",
       "type": "shell",
       "command": "pnpm",
-      "args": ["--filter", "handwrite", "run", "build"],
+      "windows": {
+        "command": "pnpm.cmd"
+      },
+      "args": [
+        "--filter",
+        "handwrite",
+        "run",
+        "build"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "group": "build",
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
         "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
+        "panel": "dedicated"
       },
-      "problemMatcher": ["$eslint-stylish"]
+      "group": "build"
     },
     {
       "label": "🐳 启动Docker Compose",
-      "type": "shell",
-      "command": "docker-compose",
-      "args": ["up", "-d"],
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "up",
+        "-d"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "group": "build",
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
         "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
-      },
-      "problemMatcher": []
+        "panel": "dedicated"
+      }
     },
     {
       "label": "🛑 停止Docker Compose",
-      "type": "shell",
-      "command": "docker-compose",
-      "args": ["down"],
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "down"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "group": "build",
+      "problemMatcher": [],
       "presentation": {
-        "echo": true,
         "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "🧹 清理前端构建",
-      "type": "shell",
-      "command": "rmdir",
-      "args": ["/s", "/q", "dist"],
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
-      "group": "build",
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": true,
-        "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
-      },
-      "problemMatcher": []
+        "panel": "dedicated"
+      }
     }
   ]
 }
