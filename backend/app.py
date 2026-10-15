@@ -175,9 +175,6 @@ def cleanup_marked_directories() -> None:
             logger.warning("Failed to inspect cleanup marker %s", marker, exc_info=True)
 
 
-# 获取环境变量
-mysql_host = get_environment_value("MYSQL_HOST", "db")
-enable_user_auth = get_environment_value("ENABLE_USER_AUTH", "false")
 # 桌面版（Electron + PyInstaller 打包）标志，由 desktop_main.py 设置
 DESKTOP_MODE = get_environment_value("DESKTOP_MODE", "false").lower() == "true"
 
@@ -763,7 +760,7 @@ def _nonnegative_float(data: dict[str, str], key: str) -> float:
     return value
 
 
-def _generation_rejection(base_url: str, data: dict[str, str]) -> Response | None:
+def _generation_rejection(data: dict[str, str]) -> Response | None:
     cpu_usage = psutil.cpu_percent(interval=1)
     if cpu_usage > float(get_environment_value("CPU_USAGE_LIMIT", "90")):
         return JSONResponse(
@@ -772,15 +769,6 @@ def _generation_rejection(base_url: str, data: dict[str, str]) -> Response | Non
                 "message": f"CPU usage is too high. Please retry. Current usage: {cpu_usage}%",
             },
             status_code=429,
-        )
-    public_text_limit = 10000
-    if len(data["text"]) > public_text_limit and base_url == "https://handwrite.sixiangjia.de/":
-        return JSONResponse(
-            {
-                "status": "error",
-                "message": "The text is too long. Please build your own application.",
-            },
-            status_code=500,
         )
     if int(data["line_spacing"]) <= 0 or int(data["font_size"]) <= 0:
         raise HTTPException(status_code=400, detail="Font size and line spacing must be positive")
@@ -931,7 +919,6 @@ def _pdf_response(images: Iterable[Image.Image], report: ReportProgress) -> Resp
 
 
 def _render_handwriting(
-    base_url: str,
     params: GenerateHandwritingParams,
     background_image: bytes | None,
     font_file: bytes | None,
@@ -945,7 +932,7 @@ def _render_handwriting(
         report("validating", "正在校验参数", 5)
         data = model_to_dict(params)
         report("system_check", "正在检查服务器负载", 10)
-        rejection = _generation_rejection(base_url, data)
+        rejection = _generation_rejection(data)
         if rejection is not None:
             return rejection
         report("prepare_background", "正在准备背景图", 20)
@@ -981,7 +968,6 @@ def _render_handwriting(
 
 
 async def generate_handwriting_impl(
-    base_url: str,
     params: GenerateHandwritingParams,
     background_image: UploadFile | str | bytes | None = None,
     font_file: UploadFile | str | bytes | None = None,
@@ -990,12 +976,10 @@ async def generate_handwriting_impl(
     """2026-10-15：异步读取上传文件，在线程完整消费惰性渲染结果与导出文件."""
     background = await _upload_bytes(background_image)
     font = await _upload_bytes(font_file)
-    return await asyncio.to_thread(
-        _render_handwriting, base_url, params, background, font, progress_hook
-    )
+    return await asyncio.to_thread(_render_handwriting, params, background, font, progress_hook)
 
 
-async def run_generation_task(task_id: str, base_url: str, payload: GenerationPayload) -> None:
+async def run_generation_task(task_id: str, payload: GenerationPayload) -> None:
     """通过并发信号量执行任务并持久化进度和结果."""
     started_at = time.perf_counter()
     logger.info("Generation task started, task_id=%s elapsed=0.000s", task_id)
@@ -1026,7 +1010,6 @@ async def run_generation_task(task_id: str, base_url: str, payload: GenerationPa
             await push_task_status_update(task_id)
 
             response = await generate_handwriting_impl(
-                base_url=base_url,
                 progress_hook=progress_notify,
                 **payload,
             )
@@ -1083,6 +1066,8 @@ async def generate_handwriting(
     font_file: Annotated[UploadFile | str | None, File()] = None,
 ) -> JSONResponse:
     """接收生成请求并返回可轮询的持久化任务 ID."""
+    # 2026-10-15：保留请求参数供限流装饰器使用，业务入队不依赖部署域名。
+    del request
     cleanup_expired_generation_tasks()
 
     # ── 并发上限检查 ────────────────────────────────────────────────────
@@ -1136,7 +1121,7 @@ async def generate_handwriting(
         response_headers={},
         error_message="",
     )
-    background_tasks.add_task(run_generation_task, task_id, str(request.base_url), payload)
+    background_tasks.add_task(run_generation_task, task_id, payload)
 
     return JSONResponse({"status": "accepted", "task_id": task_id})
 

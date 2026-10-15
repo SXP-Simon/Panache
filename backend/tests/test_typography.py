@@ -57,7 +57,6 @@ class TypographyTest(unittest.TestCase):
         ):
             asyncio.run(
                 generate_handwriting_impl(
-                    "http://localhost/",
                     params,
                     font_file=b"test-font",
                 )

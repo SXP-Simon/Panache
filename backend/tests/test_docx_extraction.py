@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 from pathlib import Path
 
-import pytest
 from docx import Document
 
 from backend.docx_extractor import extract_text_from_docx
@@ -19,14 +18,15 @@ def test_extract_text_from_docx_basic(tmp_path):
     assert "第二行测试文本\t带制表符" in extracted
 
 
-def test_extract_text_from_exec_docx_if_present():
-    exec_docx_path = r"C:\Users\Simon\Downloads\exec.docx"
-    if not Path(exec_docx_path).exists():
-        pytest.skip("exec.docx not found at local downloads path")
+def test_extract_math_symbols_from_generated_docx(tmp_path: Path) -> None:
+    """2026-10-15：自行构建数学文本样本，不依赖开发者目录中的私有文档."""
+    doc_path = tmp_path / "math.docx"
+    formulas = ["LG6={a∣a∈Σ}", "N⇒ND⇒NDD⇒NDDD", "S→1∣3∣5∣7∣9", "E⇒E+T⇒T+T"]
+    doc = Document()
+    for formula in formulas:
+        doc.add_paragraph(formula)
+    doc.save(str(doc_path))
 
-    extracted = extract_text_from_docx(exec_docx_path)
-    # 验证关键数学公式与推导符号完整提取
-    assert "LG6={a∣a∈Σ" in extracted or "LG6={a" in extracted
-    assert "N⇒ND⇒NDD⇒NDDD" in extracted
-    assert "S→1∣3∣5∣7∣9" in extracted
-    assert "E⇒E+T⇒T+T" in extracted
+    extracted = extract_text_from_docx(str(doc_path))
+    for formula in formulas:
+        assert formula in extracted

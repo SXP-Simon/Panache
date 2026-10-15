@@ -212,7 +212,6 @@ def test_generation_lifecycle_logs_task_and_duration_without_payload(monkeypatch
     asyncio.run(
         app.run_generation_task(
             "logged-task",
-            "http://localhost/",
             {
                 "params": GenerateHandwritingParams.model_construct(text="PRIVATE正文"),
                 "background_image": b"PRIVATEbase64",
