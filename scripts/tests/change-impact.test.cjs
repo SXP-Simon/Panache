@@ -11,7 +11,7 @@ function selected(plan) {
 }
 
 test("仓库说明不启动应用工具链，文档站输入只选择文档构建", () => {
-  for (const file of ["README.md", "AGENTS.md", "backend/README.md", "frontend/README.md", "LICENSE"]) {
+  for (const file of ["README.md", "AGENTS.md", "backend/README.md", "frontend/README.md", "LICENSE", ".github/ISSUE_TEMPLATE/config.yml"]) {
     const plan = planChanges([file]);
     assert.deepEqual(selected(plan), [], file);
     assert.deepEqual(qualityCommands(plan), []);

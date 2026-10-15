@@ -18,17 +18,19 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 这个 job 只 clone 代码、pip install、跑 mkdocs，不需要写权限。
-    # 构建依赖（这里是从 PyPI 装的包）一旦被投毒，能拿到的就只是这些权限，
-    # 所以只给 contents: read，别把 pages / id-token 一起给它。
+    # 构建只读取源码和 Pages 配置，部署写权限留给 deploy job。
     permissions:
       contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v4
         with:
           # 默认会把 GITHUB_TOKEN 写进 .git/config 供后续步骤使用，
           # 这里不推代码，没必要留着给构建期的第三方代码读。
           persist-credentials: false
+
+      - name: Verify GitHub Pages configuration
+        uses: actions/configure-pages@v5
 
       - uses: actions/setup-python@v5
         with:

@@ -18,6 +18,9 @@ function planChanges(paths, { full = false, reason = "actual Git paths", head_sh
   for (const file of normalized) {
     // Python configuration and source take precedence over directory labels and documentation suffixes.
     if (/\.(?:py|pyi|spec)$/.test(file)) enable("python");
+    if (file.startsWith(".github/ISSUE_TEMPLATE/")) {
+      scopes.add("docs"); continue;
+    }
     if (file.startsWith("docs/") || file === "mkdocs.yml" || file === "CHANGELOG.md") {
       scopes.add("docs"); enable("docs"); continue;
     }
