@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/SXP-Simon/handwriting-web/compare/v1.2.0...v1.3.0) (2026-10-15)
+
+
+### Bug Fixes
+
+* **scripts:** 按提交距离选择 fork 的最近发布基线 ([84ed8ca](https://github.com/SXP-Simon/handwriting-web/commit/84ed8caeff1ca145cd8b8b2f6b375b6395b3509f))
+
+
+### Features
+
+* **fe/src:** 在工作台页脚提供开源仓库入口 ([9439443](https://github.com/SXP-Simon/handwriting-web/commit/9439443546460fb2574ff26598521824259720f1))
+* **scripts:** 将 Flutter 签名产物接入版本发布 ([4ea9876](https://github.com/SXP-Simon/handwriting-web/commit/4ea987648e6e0bd1ddb8e43921097e6d06dd3340))
+
 # [1.2.0](https://github.com/SXP-Simon/handwriting-web/compare/v1.1.0...v1.2.0) (2026-10-15)
 
 
