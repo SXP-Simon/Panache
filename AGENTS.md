@@ -53,7 +53,7 @@ flutter build web --release
 - 页面组合独立的 `widgets/` 和 `screens/dialogs/`；输入控制器与局部导航由页面持有，不通过 part 或 extension 共享父 State。职责和存储边界见 [客户端架构](docs/flutter-architecture.md)。
 - 使用绿色 Material Design 3 主题及中英文霞鹜文楷 UI；纸张渲染字体由用户选择，不能被主题字体覆盖。第三方字体保留各自许可。
 - 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开当前 fork 的 GitHub Issues，不接入旧邮件服务。
-- `flutter` 分支的相关路径 push 和 pull request 触发 Flutter、Rust 与 Android/iOS 模拟器验证；桌面打包保持 pull request/手动入口，不自动发版。
+- `flutter` 分支的相关路径 push 和 pull request 触发 Flutter、Rust 与 Android/iOS 模拟器验证；桌面检查保持 pull request/手动入口。发布由 `custom-base` 的 Flutter Release Assets 工作流编排，使用固定且通过检查的 Flutter SHA，产物加入同一个 Release。
 
 ## 编码与协作约定
 
@@ -63,7 +63,7 @@ flutter build web --release
 - 每次远程推送都需要用户明确授权。
 - UI 复用现有 Flutter Material Design 3 主题；用户可见文字同时维护 `app/lib/l10n/app_zh.arb` 和 `app_en.arb`。
 - 除非用户明确要求，不使用 Browser Use 验证。
-- 保留 `CHANGELOG.md` 历史记录，不手改版本号或手动打 tag。旧版发布流水线已移除，重写版自动发布尚未接入。
+- 保留 `CHANGELOG.md` 历史记录，不手改版本号或手动打 tag。发布构建通过参数和 `HANDWRITING_BUILD_VERSION` 注入发布版本，不修改分支源码版本文件；补跑使用 Release 中固定的来源清单。
 
 ## 平台约束
 
