@@ -28,7 +28,16 @@
       "main.js",
       "preload.js",
       "splash.html",
-      "package.json"
+      "package.json",
+      {
+        "from": "../frontend/public/fonts/lxgw-wenkai",
+        "to": "fonts/lxgw-wenkai",
+        "filter": [
+          "*.css",
+          "*.woff2",
+          "OFL.txt"
+        ]
+      }
     ],
     "extraResources": [
       {

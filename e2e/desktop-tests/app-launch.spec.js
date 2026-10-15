@@ -54,6 +54,39 @@ test.describe("桌面版启动与打包完整性", () => {
     expect(fs.existsSync(path.join(desktop.dataDir, "temp"))).toBe(true);
   });
 
+  test("独立启动与错误页使用随包携带的完整文楷字库", async ({ desktop }) => {
+    const result = await desktop.app.evaluate(async ({ app, BrowserWindow }) => {
+      const splash = new BrowserWindow({
+        show: false,
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+      });
+      try {
+        await splash.loadFile(`${app.getAppPath()}/splash.html`);
+        return await splash.webContents.executeJavaScript(`(async () => {
+          const fonts = await document.fonts.load('16px "LXGW WenKai"', '中文 English 0123 龘');
+          window.showError('启动失败 Error 龘');
+          return {
+            faces: fonts.map(face => ({ family: face.family, status: face.status })),
+            heading: getComputedStyle(document.querySelector('h1')).fontFamily,
+            error: getComputedStyle(document.querySelector('#error')).fontFamily,
+            stylesheets: Array.from(document.styleSheets, sheet => sheet.href).filter(Boolean)
+          };
+        })()`);
+      } finally {
+        splash.destroy();
+      }
+    });
+    expect(result.faces.length).toBeGreaterThanOrEqual(2);
+    for (const face of result.faces) {
+      expect(face.family.replaceAll(/["']/g, "")).toBe("LXGW WenKai");
+      expect(face.status).toBe("loaded");
+    }
+    expect(result.heading.replaceAll(/["']/g, "")).toBe("LXGW WenKai");
+    expect(result.error.replaceAll(/["']/g, "")).toBe("LXGW WenKai");
+    expect(result.stylesheets.length).toBeGreaterThanOrEqual(1);
+    expect(result.stylesheets.every((url) => url.startsWith("file://"))).toBe(true);
+  });
+
   test("站点与静态资源由打包的 dist 提供（同源，无需跨域）", async ({ desktop }) => {
     const index = await httpRequest({ port: desktop.port, reqPath: "/" });
     expect(index.status).toBe(200);

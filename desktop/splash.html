@@ -4,11 +4,12 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'"
     />
     <title>手写体生成器</title>
+    <link rel="stylesheet" href="fonts/lxgw-wenkai/fonts.css" />
     <style>
-      /* 配色与圆角沿用站点既有设计语言（见 AGENTS.md） */
+      /* 后端就绪前，启动页也从随包资源加载文楷。 */
       html,
       body {
         height: 100%;
@@ -20,7 +21,7 @@
         align-items: center;
         justify-content: center;
         gap: 18px;
-        font-family: Avenir, Helvetica, Arial, sans-serif;
+        font-family: 'LXGW WenKai';
         background: #f8f9fa;
         color: #333;
         user-select: none;
