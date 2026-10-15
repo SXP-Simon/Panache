@@ -1,3 +1,5 @@
+import 'math_segments.dart';
+
 String expandImages(String text, Map<String, String> images) {
   var result = text.replaceAllMapped(
     RegExp(r'!\[(插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|[^\]]+)?)\](?!\()'),
@@ -34,13 +36,36 @@ String cleanMarkdown(
 }) {
   var s = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   final protected = <String>[];
+  var tokenPrefix = '\uE100HW';
+  while (s.contains(tokenPrefix)) {
+    tokenPrefix += '\uE100';
+  }
+  String protect(String source) {
+    protected.add(source);
+    return '$tokenPrefix${protected.length - 1}\uE101';
+  }
+
+  final math = StringBuffer();
+  var cursor = 0;
+  for (final segment in scanMathSegments(s)) {
+    math.write(s.substring(cursor, segment.start));
+    final source = s.substring(segment.start, segment.end);
+    // Links and images retain the existing Markdown extraction rules.
+    math.write(
+      source.startsWith('![') || source.startsWith('[')
+          ? source
+          : protect(source),
+    );
+    cursor = segment.end;
+  }
+  math.write(s.substring(cursor));
+  s = math.toString();
   s = s.replaceAllMapped(
     RegExp(
       r'!\[[^\]]*\]\((?:data:image/[^)]+|img:?_?\d+)\)|!\[插图(?:[ \t]*[#:_-]?[ \t]*\d+)?(?:\|[^\]]+)?\](?!\()',
     ),
     (m) {
-      protected.add(m[0]!);
-      return '\uE000${protected.length - 1}\uE001';
+      return protect(m[0]!);
     },
   );
   s = s.replaceFirst(RegExp(r'^---[ \t]*\n[\s\S]*?\n---[ \t]*\n?'), '');
@@ -145,7 +170,7 @@ String cleanMarkdown(
     (m) => '${m[1]}${m[2]}',
   );
   s = s.replaceAllMapped(
-    RegExp('\uE000(\\d+)\uE001'),
+    RegExp('${RegExp.escape(tokenPrefix)}(\\d+)\uE101'),
     (m) => protected[int.parse(m[1]!)],
   );
   return s.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
