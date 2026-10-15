@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/SXP-Simon/handwriting-web/compare/v1.0.0...v1.0.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **desktop:** 避免打包时裁剪工作区构建依赖 ([f1ba704](https://github.com/SXP-Simon/handwriting-web/commit/f1ba7042ea4b98de6bcb159371f043a55c3bf552))
+
 # 1.0.0 (2026-10-15)
 
 
