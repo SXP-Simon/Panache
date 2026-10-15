@@ -1,0 +1,16 @@
+source_dir: scripts/hooks
+
+pre-commit:
+  scripts:
+    engineering-quality.cjs:
+      runner: node
+
+commit-msg:
+  commands:
+    conventional-message:
+      run: node scripts/check-commit-message.cjs "{1}"
+
+pre-push:
+  scripts:
+    full-tests.cjs:
+      runner: node

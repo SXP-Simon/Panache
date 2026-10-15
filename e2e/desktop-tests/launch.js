@@ -6,28 +6,28 @@
 // 的开发形态：后端可执行文件、asar 里的站点、extraResources 里的 backend 目录
 // 都按「用户装到的那个东西」的布局走。用 _electron 需要 Electron 二进制本身，
 // 不需要下载浏览器，也不需要 desktop/node_modules。
-const { _electron: electron } = require("@playwright/test");
-const crypto = require("crypto");
-const fs = require("fs");
-const http = require("http");
-const net = require("net");
-const os = require("os");
-const path = require("path");
+const { _electron: electron } = require('@playwright/test');
+const crypto = require('crypto');
+const fs = require('fs');
+const http = require('http');
+const net = require('net');
+const os = require('os');
+const path = require('path');
 
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
-const APP_NAME = "HandwritingWeb";
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const APP_NAME = 'HandwritingWeb';
 
 // electron-builder 在 macOS 上按架构分目录（mac-arm64 / mac / mac-universal），
 // 可执行文件埋在 .app 包里；Windows 则是平铺的 win-unpacked。
 function defaultAppExe() {
-  const installer = path.join(REPO_ROOT, "desktop", "build", "installer");
-  if (process.platform === "darwin") {
-    const candidates = ["mac-arm64", "mac", "mac-universal"].map((dir) =>
-      path.join(installer, dir, `${APP_NAME}.app`, "Contents", "MacOS", APP_NAME)
+  const installer = path.join(REPO_ROOT, 'desktop', 'build', 'installer');
+  if (process.platform === 'darwin') {
+    const candidates = ['mac-arm64', 'mac', 'mac-universal'].map((dir) =>
+      path.join(installer, dir, `${APP_NAME}.app`, 'Contents', 'MacOS', APP_NAME),
     );
     return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
   }
-  return path.join(installer, "win-unpacked", `${APP_NAME}.exe`);
+  return path.join(installer, 'win-unpacked', `${APP_NAME}.exe`);
 }
 
 // 后端冷启动要载入 sklearn/opencv（实测本机约 5-10 秒，CI 更慢），
@@ -46,7 +46,7 @@ function appExePath() {
   if (!fs.existsSync(fallback)) {
     throw new Error(
       `找不到打包后的桌面版：${fallback}\n` +
-        "先构建（bash desktop/build.sh --app-only），或用 DESKTOP_APP_EXE 指定可执行文件"
+        '先构建（bash desktop/build.sh --app-only），或用 DESKTOP_APP_EXE 指定可执行文件',
     );
   }
   return fallback;
@@ -56,21 +56,21 @@ function appExePath() {
 // macOS 用 $HOME/Library/Application Support/HandwritingWeb。所以隔离要作用在 Electron
 // 进程的那个环境变量上，隔离出来的目录就是应用真正会去写数据的地方。
 function prepareIsolatedEnv() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hww-desktop-e2e-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hww-desktop-e2e-'));
   const env = { ...process.env };
   let dataDir;
-  if (process.platform === "darwin") {
-    env.HOME = path.join(root, "home");
-    dataDir = path.join(env.HOME, "Library", "Application Support", APP_NAME);
+  if (process.platform === 'darwin') {
+    env.HOME = path.join(root, 'home');
+    dataDir = path.join(env.HOME, 'Library', 'Application Support', APP_NAME);
   } else {
-    env.LOCALAPPDATA = path.join(root, "localappdata");
+    env.LOCALAPPDATA = path.join(root, 'localappdata');
     dataDir = path.join(env.LOCALAPPDATA, APP_NAME);
   }
   fs.mkdirSync(dataDir, { recursive: true });
 
   // 下载落盘目录：main.js 的 downloadDir() 认这个变量，默认是系统的「下载」文件夹。
   // 不隔离的话测试会往用户真实的下载文件夹里丢文件。
-  const downloadsDir = path.join(root, "downloads");
+  const downloadsDir = path.join(root, 'downloads');
   env.HANDWRITING_DOWNLOAD_DIR = downloadsDir;
   fs.mkdirSync(downloadsDir, { recursive: true });
 
@@ -78,9 +78,9 @@ function prepareIsolatedEnv() {
 }
 
 function logTail(dataDir, lines = 40) {
-  const logPath = path.join(dataDir, "backend-console.log");
+  const logPath = path.join(dataDir, 'backend-console.log');
   try {
-    return fs.readFileSync(logPath, "utf8").split("\n").slice(-lines).join("\n");
+    return fs.readFileSync(logPath, 'utf8').split('\n').slice(-lines).join('\n');
   } catch (error) {
     return `(读不到 ${logPath}：${error.message})`;
   }
@@ -91,17 +91,17 @@ function logTail(dataDir, lines = 40) {
 async function waitForFontOptions(page, timeout = 60_000) {
   const deadline = Date.now() + timeout;
   for (;;) {
-    const count = await page.getByTestId("font-select").locator("option").count();
+    const count = await page.getByTestId('font-select').locator('option').count();
     if (count > 0) return count;
     if (Date.now() > deadline) {
-      throw new Error("字体列表 60 秒内没加载出来（/api/fonts_info 可能失败了）");
+      throw new Error('字体列表 60 秒内没加载出来（/api/fonts_info 可能失败了）');
     }
     await page.waitForTimeout(200);
   }
 }
 
 async function waitForHome(page) {
-  await page.getByTestId("preview-btn").waitFor({ timeout: 60_000 });
+  await page.getByTestId('preview-btn').waitFor({ timeout: 60_000 });
   await waitForFontOptions(page);
 }
 
@@ -114,7 +114,7 @@ async function launchDesktopApp() {
   // 立刻 app.quit()，现象是窗口一直不出现。
   const app = await electron.launch({
     executablePath: exe,
-    args: [`--user-data-dir=${path.join(root, "userdata")}`],
+    args: [`--user-data-dir=${path.join(root, 'userdata')}`],
     env,
   });
 
@@ -127,11 +127,11 @@ async function launchDesktopApp() {
   // 中断的半截 PDF 同样以 %PDF- 开头，会被当成结果读进来。
   await app.evaluate(({ session }) => {
     const states = (globalThis.__hwwDownloads = {});
-    session.defaultSession.on("will-download", (event, item) => {
+    session.defaultSession.on('will-download', (event, item) => {
       const name = item.getFilename();
-      states[name] = "started";
+      states[name] = 'started';
       // done 的第二个参数是 completed / cancelled / interrupted
-      item.once("done", (doneEvent, state) => {
+      item.once('done', (doneEvent, state) => {
         states[name] = state;
       });
     });
@@ -159,7 +159,7 @@ async function launchDesktopApp() {
     fs.rmSync(root, { recursive: true, force: true });
     throw new Error(
       `桌面版启动失败：等待 ${APP_READY_TIMEOUT_MS} ms 后窗口停在 ${url}\n` +
-        `${error.message}\n后端日志末尾：\n${tail}`
+        `${error.message}\n后端日志末尾：\n${tail}`,
     );
   }
 
@@ -170,7 +170,7 @@ async function launchDesktopApp() {
     exe,
     dataDir,
     downloadsDir,
-    logPath: path.join(dataDir, "backend-console.log"),
+    logPath: path.join(dataDir, 'backend-console.log'),
     url: `http://127.0.0.1:${port}`,
     async close() {
       // app.close() 没有超时，后端若在退出前崩掉、主进程弹了原生错误框，它会一直等下去 ——
@@ -193,8 +193,20 @@ async function launchDesktopApp() {
   };
 }
 
-// 从 SPA 里重新进入首页：应用是 SPA，导航一次即可把上一个用例的表单状态清掉
+// 2026-10-15：清理持久化草稿和设置，隔离共享 Electron worker 的各用例。
 async function resetHome(desktop) {
+  await desktop.page.evaluate(() => {
+    for (const key of [
+      'studio.draft',
+      'studio.settings',
+      'studio.preset',
+      'studio.theme',
+      'studio.locale',
+      'text',
+    ]) {
+      localStorage.removeItem(key);
+    }
+  });
   await desktop.page.goto(desktop.url);
   await waitForHome(desktop.page);
 }
@@ -210,38 +222,38 @@ async function waitForDownload(desktop, filename, timeout = 120_000) {
       .evaluate((electronModule, name) => globalThis.__hwwDownloads?.[name] ?? null, filename)
       .catch(() => null);
 
-    if (state === "cancelled" || state === "interrupted") {
+    if (state === 'cancelled' || state === 'interrupted') {
       throw new Error(`下载 ${filename} 未完成：${state}`);
     }
-    if (state === "completed" && fs.existsSync(file)) return file;
+    if (state === 'completed' && fs.existsSync(file)) return file;
     if (Date.now() > deadline) {
-      const listed = fs.readdirSync(desktop.downloadsDir).join(", ") || "(空)";
+      const listed = fs.readdirSync(desktop.downloadsDir).join(', ') || '(空)';
       throw new Error(
-        `等下载完成超时：${file}（状态：${state ?? "未开始"}）\n目录里现有：${listed}`
+        `等下载完成超时：${file}（状态：${state ?? '未开始'}）\n目录里现有：${listed}`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
 }
 
-function httpRequest({ port, reqPath, method = "GET", headers = {}, timeout = 15_000 }) {
+function httpRequest({ port, reqPath, method = 'GET', headers = {}, timeout = 15_000 }) {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { host: "127.0.0.1", port, path: reqPath, method, headers, timeout },
+      { host: '127.0.0.1', port, path: reqPath, method, headers, timeout },
       (res) => {
         const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () =>
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () =>
           resolve({
             status: res.statusCode,
             headers: res.headers,
             body: Buffer.concat(chunks),
-          })
+          }),
         );
-      }
+      },
     );
-    req.on("timeout", () => req.destroy(new Error(`请求超时：${reqPath}`)));
-    req.on("error", reject);
+    req.on('timeout', () => req.destroy(new Error(`请求超时：${reqPath}`)));
+    req.on('error', reject);
     req.end();
   });
 }
@@ -252,7 +264,7 @@ async function waitForBackendDown(port, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      await httpRequest({ port, reqPath: "/api/version", timeout: 3000 });
+      await httpRequest({ port, reqPath: '/api/version', timeout: 3000 });
     } catch (error) {
       return true;
     }
@@ -265,31 +277,31 @@ async function waitForBackendDown(port, timeoutMs = 30_000) {
 // 同源 → 101；被 Origin 校验拒绝 → uvicorn 在 accept 之前 close，按 ASGI 约定回 403。
 function websocketHandshake({ port, reqPath, origin, timeout = 15_000 }) {
   return new Promise((resolve, reject) => {
-    const socket = net.connect({ host: "127.0.0.1", port });
-    let received = "";
+    const socket = net.connect({ host: '127.0.0.1', port });
+    let received = '';
     const done = (error) => {
       socket.destroy();
       error ? reject(error) : resolve(received);
     };
 
     socket.setTimeout(timeout);
-    socket.on("timeout", () => done(new Error("WebSocket 握手超时")));
-    socket.on("error", (error) => done(error));
-    socket.on("connect", () => {
+    socket.on('timeout', () => done(new Error('WebSocket 握手超时')));
+    socket.on('error', (error) => done(error));
+    socket.on('connect', () => {
       const lines = [
         `GET ${reqPath} HTTP/1.1`,
         `Host: 127.0.0.1:${port}`,
-        "Upgrade: websocket",
-        "Connection: Upgrade",
-        `Sec-WebSocket-Key: ${crypto.randomBytes(16).toString("base64")}`,
-        "Sec-WebSocket-Version: 13",
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        `Sec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}`,
+        'Sec-WebSocket-Version: 13',
       ];
       if (origin) lines.push(`Origin: ${origin}`);
-      socket.write(`${lines.join("\r\n")}\r\n\r\n`);
+      socket.write(`${lines.join('\r\n')}\r\n\r\n`);
     });
-    socket.on("data", (chunk) => {
-      received += chunk.toString("latin1");
-      if (received.includes("\r\n")) done();
+    socket.on('data', (chunk) => {
+      received += chunk.toString('latin1');
+      if (received.includes('\r\n')) done();
     });
   });
 }

@@ -1,9 +1,28 @@
 {
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.13.1"
+  },
+  "scripts": {
+    "prepare": "node scripts/install-hooks.cjs",
+    "hooks:install": "node scripts/install-hooks.cjs",
+    "quality:frontend": "pnpm --filter handwrite run typecheck && pnpm --filter handwrite run lint && pnpm --filter handwrite run format:check",
+    "quality:python": "uv run --extra dev ruff check . && uv run --extra dev ruff format --check . && uv run --extra dev pyright",
+    "quality:check": "node scripts/run-quality-checks.cjs",
+    "test:hooks": "node --test scripts/tests/check-commit-message.test.cjs scripts/tests/install-hooks.test.cjs scripts/tests/run-quality-checks.test.cjs",
+    "test:frontend": "pnpm --filter handwrite run test:letter-format && pnpm --filter handwrite run test:clean-markdown && pnpm --filter handwrite run test:latex-unicode && pnpm --filter handwrite run test:inline-image",
+    "test:unit": "pnpm run test:hooks && pnpm run test:frontend && uv run --extra dev python -m pytest backend/tests",
+    "test:sw-upgrade": "node --test scripts/tests/service-worker-upgrade.test.cjs",
+    "test:all": "pnpm run test:unit && pnpm --filter handwrite run build && pnpm run test:sw-upgrade && pnpm --filter handwriting-web-e2e run test"
+  },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.1",
-    "semantic-release": "^24.2.2"
+    "semantic-release": "^24.2.2",
+    "lefthook": "2.2.2"
   }
 }

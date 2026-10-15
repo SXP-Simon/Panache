@@ -1,0 +1,93 @@
+name: Engineering quality
+
+on:
+  push:
+    branches: [custom-base]
+  pull_request:
+    branches: [custom-base, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engineering-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality and tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      SENTRY_DSN: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install OpenCV system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libglib2.0-0
+      - name: Install locked dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          uv sync --locked --extra dev
+      - name: Validate new commit messages
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BASE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            node scripts/check-commit-message.cjs --range "$PR_BASE..$PR_HEAD"
+          elif [ "$PUSH_BASE" = "0000000000000000000000000000000000000000" ]; then
+            node scripts/check-commit-message.cjs --range "$HEAD_SHA"
+          else
+            node scripts/check-commit-message.cjs --range "$PUSH_BASE..$HEAD_SHA"
+          fi
+      - name: Strict quality gates
+        run: pnpm run quality:check
+      - name: Unit and hook regression tests
+        run: pnpm run test:unit
+      - name: Frontend production build
+        run: pnpm --filter handwrite run build
+      - name: Install Chromium
+        if: runner.os == 'Linux'
+        run: pnpm --filter handwriting-web-e2e exec playwright install --with-deps chromium
+      - name: Legacy service worker retirement regression
+        if: runner.os == 'Linux'
+        run: pnpm run test:sw-upgrade
+      - name: Browser E2E
+        if: runner.os == 'Linux'
+        run: pnpm --filter handwriting-web-e2e run test
+      - name: Upload browser report
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7

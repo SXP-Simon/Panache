@@ -50,7 +50,7 @@ test.describe("桌面版启动与打包完整性", () => {
     const html = index.body.toString("utf8");
     expect(html).toContain('<div id="app">');
 
-    const assetPath = html.match(/src="(\/js\/[^"]+\.js)"/)?.[1];
+    const assetPath = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
     expect(assetPath, "首页 HTML 里没有引用打包后的 js").toBeTruthy();
     const asset = await httpRequest({ port: desktop.port, reqPath: assetPath });
     expect(asset.status).toBe(200);

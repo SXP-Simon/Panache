@@ -1,6 +1,8 @@
 const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
 
-test('Markdown cleaning and LaTeX conversion preserve prose and mathematical structure', async ({ page }) => {
+test('Markdown cleaning and LaTeX conversion preserve prose and mathematical structure', async ({
+  page,
+}) => {
   await openHome(page);
   const input = page.getByTestId('text-input');
   await input.fill(String.raw`# Result
@@ -16,7 +18,9 @@ The result (a)/(b) is useful. a<b>c
 C(n, k)+x_(A) and $\unknown{x}$`);
 });
 
-test('converted nested fractions and radicals render through the real backend', async ({ page }, testInfo) => {
+test('converted nested fractions and radicals render through the real backend', async ({
+  page,
+}, testInfo) => {
   await openHome(page);
   await useSmallCanvas(page, { fontSize: 40, lineSpacing: 110 });
   await page.getByTestId('width-input').fill('800');
@@ -28,5 +32,7 @@ $\mathbb{R}\subseteq\mathbb{C}$`);
   await expect(page.getByTestId('text-input')).toHaveValue('(√(a+(b)/(c)))/(d)\n2√(x)+⁵√(y)\nℝ⊆ℂ');
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);
-  await page.getByTestId('preview-image').screenshot({ path: testInfo.outputPath('math-preview.png') });
+  await page
+    .getByTestId('preview-image')
+    .screenshot({ path: testInfo.outputPath('math-preview.png') });
 });
