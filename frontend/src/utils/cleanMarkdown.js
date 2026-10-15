@@ -1,3 +1,5 @@
+import { mapMathSegments } from './mathSegments.js';
+
 /**
  * Markdown 标记清洗与纯文本提取工具模块
  * 用于将用户复制/导入的 Markdown 内容（标题、加粗、斜体、引用、链接、代码块、表格等）
@@ -106,7 +108,18 @@ export function cleanMarkdown(text, options = {}) {
 
   const tableMode = options.tableMode || 'list';
 
-  let s = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // 2026-10-15：公式先占位，防止 HTML、列表、斜体和表格清洗改写数学语义。
+  // 占位符无 Markdown 标记且不含竖线；检查前缀避免与用户原文冲突。
+  let mathPrefix = '\ue100MATH';
+  while (text.includes(mathPrefix)) mathPrefix += '\ue100';
+  const mathSources = [];
+  let s = mapMathSegments(text, (source, segment) => {
+    if (segment.kind !== 'math' && !segment.safeMathLiteral) return source;
+    const token = `${mathPrefix}${mathSources.length}\ue101`;
+    mathSources.push(source);
+    return token;
+  });
+  s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // 1. 移除文档顶部的 YAML / TOML Front Matter
   s = s.replace(/^---[ \t]*\n[\s\S]*?\n---[ \t]*\n?/, '');
@@ -217,7 +230,8 @@ export function cleanMarkdown(text, options = {}) {
     .map(l => l.replace(/[ \t]+$/, ''))
     .join('\n');
 
-  return s.trim();
+  s = s.trim();
+  return s.replace(new RegExp(`${mathPrefix}(\\d+)\ue101`, 'g'), (_, index) => mathSources[Number(index)]);
 }
 
 /**

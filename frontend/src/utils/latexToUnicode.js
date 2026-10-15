@@ -1,8 +1,10 @@
 import katex from 'katex';
+import { scanMathSegments } from './mathSegments.js';
 
 /**
  * LaTeX 公式转 Unicode 数学文本工具模块
- * 采用 KaTeX 工业级词法/语法树（AST）解析器 + 正则兼容兜底的双层设计
+ * 共享范围扫描器隔离公式与正文，使用 KaTeX AST 转换受支持的数学节点。
+ * 无法可靠转换时保留源码；裸宏仅在明确的局部参数范围内尝试转换。
  * 将用户输入或粘贴的 LaTeX 语法 ($...$、\mid、\frac、\sqrt、\alpha、产生式等) 转换为排版清晰的 Unicode 字符
  */
 
@@ -142,12 +144,12 @@ const LATEX_SYMBOL_MAP = {
   '\\beta': 'β',
   '\\gamma': 'γ',
   '\\delta': 'δ',
-  '\\epsilon': 'ε',
+  '\\epsilon': 'ϵ',
   '\\varepsilon': 'ε',
   '\\zeta': 'ζ',
   '\\eta': 'η',
   '\\theta': 'θ',
-  '\\vartheta': 'θ',
+  '\\vartheta': 'ϑ',
   '\\iota': 'ι',
   '\\kappa': 'κ',
   '\\lambda': 'λ',
@@ -162,7 +164,7 @@ const LATEX_SYMBOL_MAP = {
   '\\varsigma': 'ς',
   '\\tau': 'τ',
   '\\upsilon': 'υ',
-  '\\phi': 'φ',
+  '\\phi': 'ϕ',
   '\\varphi': 'φ',
   '\\chi': 'χ',
   '\\psi': 'ψ',
@@ -185,475 +187,315 @@ const SUBSCRIPT_MAP = {
   'n': 'ₙ', 'o': 'ₒ', 'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ', 'v': 'ᵥ', 'x': 'ₓ', 'y': 'ᵧ'
 };
 
-/**
- * 将单段公式或文本中的 LaTeX 语法转换为可读 Unicode 数学文本
- * @param {string} text 输入文本（可包含 $...$、\mid、\frac、\sqrt 等）
- * @returns {string} 转换后的文本
- */
-// 只在线性化的数学区域中移除对齐符，避免删除正文中的 R&D 等文本。
-function cleanMathLayout(text) {
-  return text
-    .replace(/\\(?:text|mathrm|mathbf|mathit|operatorname)\{[^{}]*\}|\\&|&/g, token => token === '&' ? '' : token)
-    .replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n)?/g, '\n');
+// 2026-10-15：仅完整可表示的上下标使用 Unicode，避免 a^b 被误写成 ab。
+function script(text, superscript) {
+  const map = superscript ? SUPERSCRIPT_MAP : SUBSCRIPT_MAP;
+  const chars = Array.from(text);
+  if (superscript && /^[′″‴⁗]+$/.test(text)) return text;
+  return chars.length && chars.every(c => map[c])
+    ? chars.map(c => map[c]).join('')
+    : `${superscript ? '^' : '_'}(${text})`;
 }
 
-// 处理矩阵环境：将二维 & 与 \\ 布局转为带括号或方括号的数学表达
-function flattenMatrixLayout(name, body) {
-  const openBracket = name === 'pmatrix' ? '(' : name === 'bmatrix' ? '[' : name === 'Bmatrix' ? '{' : name === 'vmatrix' || name === 'Vmatrix' ? '|' : '[';
-  const closeBracket = name === 'pmatrix' ? ')' : name === 'bmatrix' ? ']' : name === 'Bmatrix' ? '}' : name === 'vmatrix' || name === 'Vmatrix' ? '|' : ']';
-  
-  // 替换矩阵内部换行符 \\
-  const cleanedRowsText = body.replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n)?/g, '\n');
-  const rows = cleanedRowsText.split('\n')
-    .map(r => r.trim())
-    .filter(r => r.length > 0);
-  
-  if (rows.length === 0) return `${openBracket}${closeBracket}`;
-  
-  const formattedRows = rows.map(r => {
-    // 按列分割 &
-    const cols = r.split('&').map(c => c.trim()).filter(c => c.length > 0);
-    return cols.join('  ');
-  });
-
-  return `${openBracket} ${formattedRows.join(' ; ')} ${closeBracket}`;
-}
-
-function stripMathLayout(text) {
-  // 1. 矩阵环境降级平铺：matrix, pmatrix, bmatrix, Bmatrix, vmatrix, Vmatrix
-  const matrixEnv = /\\begin\{(matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix)\}(?:\[(?:t|c|b)\])?([\s\S]*?)\\end\{\1\}/g;
-  let s = text.replace(matrixEnv, (_, name, body) => flattenMatrixLayout(name, body));
-
-  // 2. 线性多行公式环境
-  const environment = /\\begin\{(aligned|align\*?|equation\*?|gather\*?|gathered|multline\*?|split)\}(?:\[(?:t|c|b)\])?([\s\S]*?)\\end\{\1\}/g;
-  s = s.replace(environment, (_, name, body) => cleanMathLayout(stripMathLayout(body)).trim());
-  s = s.replace(/\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$\$([\s\S]*?)\$\$|\$([^$\n]*?)\$/g,
-    (_, display, inline, dollars, single) => cleanMathLayout(display ?? inline ?? dollars ?? single).trim());
-  // 单独粘贴的公式行也可能没有 $ 包裹，行尾的 \\\\ 是换行而非正文。
-  return s.replace(/[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]*\])?[ \t]*(?:\r?\n|$)/g, '\n');
-}
-
-function unwrapBoxes(text) {
-  // 用括号深度匹配参数，支持 \\boxed{\\frac{a}{b}} 和多层 boxed。
-  const command = /\\(?:boxed|fbox)(?![a-zA-Z])\s*\{/g;
-  let result = '';
-  let cursor = 0;
-  let match;
-  while ((match = command.exec(text))) {
-    let depth = 1;
-    let end = command.lastIndex;
-    for (; end < text.length && depth > 0; end++) {
-      if (text[end] === '\\') { end++; continue; }
-      if (text[end] === '{') depth++;
-      if (text[end] === '}') depth--;
-    }
-    if (depth !== 0) continue; // 不完整的参数保留，不能截掉后续正文。
-    result += text.slice(cursor, match.index) + unwrapBoxes(text.slice(command.lastIndex, end - 1));
-    cursor = end;
-    command.lastIndex = end;
-  }
-  return result + text.slice(cursor);
-}
-
-// 常见数字手写真分数映射（映射到底层手写竖式分数渲染器）
-const VULGAR_FRACTION_MAP = {
-  '1/2': '½',
-  '1/3': '⅓',
-  '2/3': '⅔',
-  '1/4': '¼',
-  '3/4': '¾',
-  '1/5': '⅕',
-  '2/5': '⅖',
-  '3/5': '⅗',
-  '4/5': '⅘',
-  '1/6': '⅙',
-  '5/6': '⅚',
-  '1/8': '⅛',
-  '3/8': '⅜',
-  '5/8': '⅝',
-  '7/8': '⅞',
-  '4/3': '\ue001',
-  '1/9': '\ue002',
-  '1/10': '\ue003',
+const FRACTIONS = {
+  '1/2': '½', '1/3': '⅓', '2/3': '⅔', '1/4': '¼', '3/4': '¾',
+  '1/5': '⅕', '2/5': '⅖', '3/5': '⅗', '4/5': '⅘', '1/6': '⅙',
+  '5/6': '⅚', '1/8': '⅛', '3/8': '⅜', '5/8': '⅝', '7/8': '⅞',
+  '4/3': '\ue001', '1/9': '\ue002', '1/10': '\ue003',
 };
 
-function unwrapFractions(text) {
-  // 基于深度平衡匹配参数，彻底解决多层嵌套分式解析失败的问题：\frac{4\pi R^2 dR}{\frac{4}{3}\pi R^3}
-  const fracPattern = /\\(?:frac|dfrac|tfrac)(?![a-zA-Z])\s*\{/g;
-  let result = '';
-  let cursor = 0;
-  let match;
+const EXTRA_SYMBOLS = {
+  '\\langle': '⟨', '\\rangle': '⟩', '\\lfloor': '⌊', '\\rfloor': '⌋',
+  '\\lceil': '⌈', '\\rceil': '⌉', '\\lVert': '||', '\\rVert': '||',
+  '\\Vert': '||', '\\prime': '′', '\\doubleprime': '″',
+  '\\bigcup': '⋃', '\\bigcap': '⋂', '\\bigsqcup': '⨆',
+  '\\bigvee': '⋁', '\\bigwedge': '⋀', '\\biguplus': '⨄',
+  '\\aleph': 'ℵ', '\\hbar': 'ℏ', '\\ell': 'ℓ', '\\Re': 'ℜ', '\\Im': 'ℑ',
+  '\\angle': '∠', '\\perp': '⊥', '\\degree': '°', '\\%': '%',
+  '\\&': '&', '\\$': '$', '\\_': '_', '\\#': '#',
+  '\\ldotp': '.', '\\colon': ':', '\\lt': '<', '\\gt': '>',
+  '\\not': '̸', '\\smallsetminus': '\\', '\\triangle': '△',
+};
+Object.assign(LATEX_SYMBOL_MAP, EXTRA_SYMBOLS);
 
-  while ((match = fracPattern.exec(text))) {
-    // 1. 匹配分子
-    let depth = 1;
-    let numEnd = fracPattern.lastIndex;
-    for (; numEnd < text.length && depth > 0; numEnd++) {
-      if (text[numEnd] === '\\') { numEnd++; continue; }
-      if (text[numEnd] === '{') depth++;
-      if (text[numEnd] === '}') depth--;
-    }
-    if (depth !== 0) continue;
-    const numerator = text.slice(fracPattern.lastIndex, numEnd - 1);
+const MAX_FORMULA_LENGTH = 16000;
+const MAX_FORMULA_DEPTH = 64;
 
-    // 2. 匹配分母（紧跟在后面的花括号）
-    let denomStart = numEnd;
-    while (denomStart < text.length && /\s/.test(text[denomStart])) {
-      denomStart++;
-    }
-    if (text[denomStart] !== '{') continue;
-
-    depth = 1;
-    let denomEnd = denomStart + 1;
-    for (; denomEnd < text.length && depth > 0; denomEnd++) {
-      if (text[denomEnd] === '\\') { denomEnd++; continue; }
-      if (text[denomEnd] === '{') depth++;
-      if (text[denomEnd] === '}') depth--;
-    }
-    if (depth !== 0) continue;
-    const denominator = text.slice(denomStart + 1, denomEnd - 1);
-
-    // 递归解析分子和分母内部的嵌套分式
-    const parsedNum = unwrapFractions(numerator).trim();
-    const parsedDenom = unwrapFractions(denominator).trim();
-
-    // 若分子分母属于常见手写简单分数，直接转换为真分数上下竖式字形
-    const fracKey = `${parsedNum}/${parsedDenom}`;
-    const replacement = VULGAR_FRACTION_MAP[fracKey] || `(${parsedNum})/(${parsedDenom})`;
-
-    result += text.slice(cursor, match.index) + replacement;
-    cursor = denomEnd;
-    fracPattern.lastIndex = denomEnd;
+function withinBudget(text) {
+  if (text.length > MAX_FORMULA_LENGTH) return false;
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\') { i++; continue; }
+    if (text[i] === '{' && ++depth > MAX_FORMULA_DEPTH) return false;
+    if (text[i] === '}') depth--;
   }
-
-  return result + text.slice(cursor);
+  return true;
 }
 
-
-// 深度平衡匹配解析根号：支持 \sqrt{...} 以及多层嵌套如 \sqrt{\sum (x_i - \bar{x})^2}
-function unwrapSqrt(text) {
-  const sqrtPattern = /\\sqrt(?:\s*\[([^{}]+)\])?\s*\{/g;
-  let result = '';
-  let cursor = 0;
-  let match;
-
-  while ((match = sqrtPattern.exec(text))) {
-    const rootIndex = match[1];
-    let depth = 1;
-    let end = sqrtPattern.lastIndex;
-    for (; end < text.length && depth > 0; end++) {
-      if (text[end] === '\\') { end++; continue; }
-      if (text[end] === '{') depth++;
-      if (text[end] === '}') depth--;
-    }
-    if (depth !== 0) continue;
-
-    const inner = text.slice(sqrtPattern.lastIndex, end - 1);
-    // 递归解析根号内部可能嵌套的内容
-    const parsedInner = unwrapSqrt(inner);
-    let replacement = `√(${parsedInner})`;
-    if (rootIndex) {
-      const supN = rootIndex.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
-      replacement = `${supN}√(${parsedInner})`;
-    }
-
-    result += text.slice(cursor, match.index) + replacement;
-    cursor = end;
-    sqrtPattern.lastIndex = end;
-  }
-
-  return result + text.slice(cursor);
+function symbol(text) {
+  if (Object.prototype.hasOwnProperty.call(LATEX_SYMBOL_MAP, text)) return LATEX_SYMBOL_MAP[text];
+  if (text.startsWith('\\')) throw new Error('Unmapped math symbol');
+  return text;
 }
 
-/**
- * 基于 KaTeX AST 将语法树节点递归转换为清晰的 Unicode 文本
- * @param {object|array} node KaTeX AST 节点或节点列表
- * @returns {string}
- */
-function astNodeToUnicode(node) {
+// 不用逐字替换混合普通脚标；集合字体也保留字形含义。
+function blackboard(text) {
+  const legacy = { C: 'ℂ', H: 'ℍ', N: 'ℕ', P: 'ℙ', Q: 'ℚ', R: 'ℝ', Z: 'ℤ' };
+  return Array.from(text).map(c => {
+    if (legacy[c]) return legacy[c];
+    if (/[A-Z]/.test(c)) return String.fromCodePoint(0x1d538 + c.charCodeAt(0) - 65);
+    if (/[a-z]/.test(c)) return String.fromCodePoint(0x1d552 + c.charCodeAt(0) - 97);
+    if (/[0-9]/.test(c)) return String.fromCodePoint(0x1d7d8 + Number(c));
+    throw new Error('Unsupported blackboard glyph');
+  }).join('');
+}
+
+function astNodeToUnicode(node, depth = 0, arrayMode = 'standalone') {
+  if (depth > MAX_FORMULA_DEPTH) throw new Error('Math nesting limit');
   if (!node) return '';
-  if (Array.isArray(node)) {
-    return node.map(astNodeToUnicode).join('');
-  }
-
+  const child = (n, mode = arrayMode) => astNodeToUnicode(n, depth + 1, mode);
+  if (Array.isArray(node)) return node.map(n => child(n)).join('');
   switch (node.type) {
     case 'mathord':
     case 'textord':
-    case 'atom': {
-      const text = node.text || '';
-      if (text === '\\|') return '||';
-      if (text === '\\{') return '{';
-      if (text === '\\}') return '}';
-      if (text === '\\&') return '&';
-      if (text === '\\%') return '%';
-      if (text === '\\$') return '$';
-      if (LATEX_SYMBOL_MAP[text]) return LATEX_SYMBOL_MAP[text];
-      if (text.startsWith('\\')) {
-        const cmdName = text.slice(1);
-        return LATEX_SYMBOL_MAP[text] || cmdName;
-      }
-      return text;
-    }
-
-    case 'op': {
-      if (node.name && LATEX_SYMBOL_MAP[node.name]) {
-        return LATEX_SYMBOL_MAP[node.name];
-      }
-      if (node.name) {
-        return node.name.replace(/^\\/, '');
-      }
-      return node.body ? astNodeToUnicode(node.body) : '';
-    }
-
+    case 'atom':
+      return symbol(node.text || '');
+    case 'op':
+      return node.name ? (LATEX_SYMBOL_MAP[node.name] || node.name.replace(/^\\/, '')) : child(node.body);
+    case 'operatorname':
+      return child(node.body);
     case 'genfrac': {
-      const num = astNodeToUnicode(node.numer).trim();
-      const den = astNodeToUnicode(node.denom).trim();
-      // 常见手写真分数映射（映射到底层手写竖式分数渲染器）
-      const fracKey = `${num}/${den}`;
-      if (VULGAR_FRACTION_MAP[fracKey]) {
-        return VULGAR_FRACTION_MAP[fracKey];
+      const num = child(node.numer).trim();
+      const den = child(node.denom).trim();
+      if (!node.hasBarLine) {
+        if (node.leftDelim === '(' && node.rightDelim === ')') return `C(${num}, ${den})`;
+        throw new Error('Unsupported fraction without a bar');
       }
-      return `(${num})/(${den})`;
+      const fraction = FRACTIONS[`${num}/${den}`] || `(${num})/(${den})`;
+      return `${node.leftDelim ? symbol(node.leftDelim) : ''}${fraction}${node.rightDelim ? symbol(node.rightDelim) : ''}`;
     }
-
     case 'sqrt': {
-      const body = astNodeToUnicode(node.body);
-      if (node.index) {
-        const idx = astNodeToUnicode(node.index);
-        const supIdx = idx.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
-        return `${supIdx}√(${body})`;
-      }
-      return `√(${body})`;
+      const body = child(node.body);
+      if (!node.index) return `√(${body})`;
+      const index = child(node.index);
+      const sup = script(index, true);
+      if (sup.startsWith('^')) throw new Error('Unsupported radical index');
+      return `${sup}√(${body})`;
     }
-
     case 'supsub': {
-      let base = astNodeToUnicode(node.base);
-      if (node.sub) {
-        const subText = astNodeToUnicode(node.sub);
-        base += subText.split('').map(c => SUBSCRIPT_MAP[c] || c).join('');
-      }
-      if (node.sup) {
-        const supText = astNodeToUnicode(node.sup);
-        base += supText.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
-      }
-      return base;
+      // 装饰在整个表达式上时保留分组，避免 underbrace{x+y}_n → x+yₙ。
+      const base = child(node.base);
+      const grouped = node.base?.type === 'horizBrace' || (
+        Array.from(base).length > 1 && (
+          ['ordgroup', 'genfrac', 'sqrt'].includes(node.base?.type) ||
+          (node.base?.type === 'op' && node.base.body)
+        )
+      );
+      return `${grouped ? `(${base})` : base}${node.sub ? script(child(node.sub), false) : ''}${node.sup ? script(child(node.sup), true) : ''}`;
     }
-
+    case 'horizBrace':
+      return child(node.base);
     case 'accent': {
-      const base = astNodeToUnicode(node.base);
-      if (node.label === '\\bar' || node.label === '\\overline') {
-        return base.length === 1 ? `${base}\u0304` : `(${base})\u0304`;
-      }
-      if (node.label === '\\hat') {
-        return base.length === 1 ? `${base}\u0302` : `(${base})\u0302`;
-      }
-      if (node.label === '\\vec') {
-        return base.length === 1 ? `${base}\u20D7` : `(${base})\u20D7`;
-      }
-      return base;
+      const base = child(node.base);
+      const marks = {
+        '\\bar': '\u0304', '\\hat': '\u0302', '\\widehat': '\u0302',
+        '\\vec': '\u20d7', '\\tilde': '\u0303', '\\widetilde': '\u0303',
+        '\\dot': '\u0307', '\\ddot': '\u0308', '\\breve': '\u0306',
+        '\\acute': '\u0301', '\\grave': '\u0300', '\\check': '\u030c',
+      };
+      if (!marks[node.label]) throw new Error('Unsupported accent');
+      return `${Array.from(base).length === 1 ? base : `(${base})`}${marks[node.label]}`;
     }
-
     case 'overline': {
-      const base = astNodeToUnicode(node.body);
-      return base.length === 1 ? `${base}\u0304` : `(${base})\u0304`;
+      const base = child(node.body);
+      return `${Array.from(base).length === 1 ? base : `(${base})`}\u0304`;
     }
-
-    case 'underline': {
-      return astNodeToUnicode(node.body);
-    }
-
+    case 'underline':
+      return child(node.body);
     case 'array': {
-      // 矩阵或多行公式环境
-      if (node.colSeparationType === 'align') {
-        // 对齐环境（如 aligned）：行与行之间换行，列之间直接拼接
-        const rows = node.body.map(row => {
-          return row.map(cell => astNodeToUnicode(cell)).join('').trim();
-        });
-        return rows.filter(r => r.length > 0).join('\n');
+      if (node.cols?.some(col => col.type === 'separator') || node.hLinesBeforeRow?.some(lines => lines.length)) {
+        throw new Error('Matrix separator has mathematical meaning');
       }
-      // 矩阵环境：列用双空格，行用分号
-      const rows = node.body.map(row => {
-        return row.map(cell => astNodeToUnicode(cell).trim()).filter(c => c.length > 0).join('  ');
-      });
-      return ` ${rows.join(' ; ')} `;
+      const rows = node.body.map(row => row.map(cell => child(cell)));
+      if (node.colSeparationType === 'align' || node.colSeparationType === 'gather') {
+        return rows.map(row => row.map((cell, i) => `${i > 0 && i % 2 === 0 ? '  ' : ''}${cell}`).join('').trim()).join('\n');
+      }
+      if (arrayMode === 'cases') return ` ${rows.map(row => row.join('  ')).join(' ; ')} `;
+      // 保留空单元格的位置，不能 filter(Boolean)。
+      const content = ` ${rows.map(row => row.join('  ')).join(' ; ')} `;
+      return arrayMode === 'standalone' ? `[${content}]` : content;
     }
-
-    case 'delimsizing': {
-      const delimiter = node.delim || '';
-      return delimiter === '.' ? '' : (LATEX_SYMBOL_MAP[delimiter] || delimiter);
-    }
-
     case 'leftright': {
-      let l = node.left || '';
-      let r = node.right || '';
-      if (l === '.') l = '';
-      if (r === '.') r = '';
-      if (LATEX_SYMBOL_MAP[l]) l = LATEX_SYMBOL_MAP[l];
-      if (LATEX_SYMBOL_MAP[r]) r = LATEX_SYMBOL_MAP[r];
-      return `${l}${astNodeToUnicode(node.body)}${r}`;
+      const left = node.left === '.' ? '' : symbol(node.left || '');
+      const right = node.right === '.' ? '' : symbol(node.right || '');
+      const cases = left === '{' && !right && node.body.some(n => n.type === 'array');
+      return `${left}${child(node.body, cases ? 'cases' : 'matrix')}${cases ? '}' : right}`;
     }
-
+    case 'delimsizing':
+      return node.delim === '.' ? '' : symbol(node.delim || '');
+    case 'font':
+      if (node.font === 'mathbb') return blackboard(child(node.body));
+      if (['mathrm', 'mathnormal', 'mathit', 'mathbf', 'boldsymbol', 'mathsf', 'mathtt', 'texttt', 'textsf', 'textbf', 'textit', 'textrm'].includes(node.font)) return child(node.body);
+      throw new Error('Unsupported mathematical font');
     case 'text':
     case 'styling':
+    case 'sizing':
     case 'ordgroup':
     case 'color':
-    case 'enclose':
-      return astNodeToUnicode(node.body);
-
-    case 'htmlmathml':
-      if (node.mathml) return astNodeToUnicode(node.mathml);
-      return astNodeToUnicode(node.html);
-
     case 'mclass':
-      return astNodeToUnicode(node.body);
-
+      return child(node.body);
+    case 'enclose':
+      if (['\\fbox', '\\colorbox', '\\fcolorbox'].includes(node.label)) return child(node.body);
+      throw new Error('Unsupported enclosure changes mathematical meaning');
+    case 'htmlmathml':
+      return child(node.mathml);
     case 'spacing':
-      return node.text || ' ';
-
+      return node.text === '\\!' ? '' : node.text === '\\qquad' ? '    ' : node.text === '\\quad' ? '  ' : ' ';
     case 'kern':
-      return node.dimension && node.dimension.number >= 1 ? '  ' : ' ';
-
+      return node.dimension?.number > 0 ? ' ' : '';
+    case 'cr':
+      return '\n';
+    case 'internal':
+      return '';
     default:
-      if (node.body) return astNodeToUnicode(node.body);
-      return node.text || '';
+      // KaTeX 能解析不等于本转换器能无损线性化；未知节点让整个公式保留原文。
+      throw new Error(`Unsupported math node: ${node.type}`);
   }
 }
 
-/**
- * 尝试通过 KaTeX AST 将一段纯公式转换为 Unicode 数学文本
- * 若解析失败则返回 null
- * @param {string} formulaText
- * @returns {string|null}
- */
-function tryConvertFormulaViaKatex(formulaText) {
-  if (!formulaText || typeof formulaText !== 'string') return null;
-  const trimmed = formulaText.trim();
-  if (!trimmed) return '';
-
+function tryConvertFormulaViaKatex(text) {
+  if (!withinBudget(text)) return null;
   try {
-    const ast = katex.__parse(trimmed, { throwOnError: false, displayMode: true });
-    if (ast && ast.length > 0) {
-      return astNodeToUnicode(ast);
-    }
-  } catch (e) {
-    // 忽略 KaTeX 解析异常，回退至正则流水线
+    // 粘贴来的 \text{R&D} 常未转义 &；仅在文字参数中兼容，不改矩阵分列符。
+    const negated = {
+      equiv: '≢', subseteq: '⊈', supseteq: '⊉', subset: '⊄', supset: '⊅',
+      in: '∉', ni: '∌', parallel: '∦', mid: '∤', leq: '≰', geq: '≱',
+      '=': '≠', '<': '≮', '>': '≯',
+    };
+    let normalized = text.replace(/\\not(?![a-zA-Z])\s*(?:\\([a-zA-Z]+)|([=<>]))/g,
+      (raw, command, character) => negated[command || character] || raw);
+    // overlay 不能作为普通前缀文字拼接，否则会否定前一个变量。
+    if (/\\not(?![a-zA-Z])/.test(normalized)) return null;
+    normalized = normalized.replace(/\\(?:text|textrm|textbf|textit)\s*\{[^{}]*\}/g,
+      token => token.replace(/(\\.)|&/g, (match, escaped) => escaped || '\\&'));
+    // __parse 属于内部接口；显式失败回退、回归测试与预算共同约束升级风险。
+    const ast = katex.__parse(normalized, {
+      throwOnError: true, displayMode: true, strict: 'ignore', trust: false,
+      maxExpand: 500, maxSize: 20, macros: {},
+    });
+    return astNodeToUnicode(ast);
+  } catch {
+    return null;
   }
-  return null;
+}
+
+// 无定界符时只尝试明显的数学行，避免把英文正文吞进数学模式。
+function isBareFormula(text) {
+  if (!/[\\^_]/.test(text)) return false;
+  const rest = text
+    .replace(/\\(?:text|operatorname|mathrm)\s*\{[^{}]*\}/g, '')
+    .replace(/\\[a-zA-Z]+|\\./g, '')
+    .replace(/\b(?:sin|cos|tan|log|ln|lim|max|min|det)\b/g, '');
+  return !/[a-zA-Z]{2,}/.test(rest) && !Array.from(rest).some(c => c.codePointAt(0) > 127);
+}
+
+function argumentEnd(text, start) {
+  let cursor = start;
+  if (text[cursor] === '{' || text[cursor] === '[') {
+    const open = text[cursor], close = open === '{' ? '}' : ']';
+    let depth = 1;
+    while (++cursor < text.length && depth) {
+      if (text[cursor] === '\\') { cursor++; continue; }
+      if (text[cursor] === open) depth++;
+      if (text[cursor] === close) depth--;
+    }
+    return depth ? start : cursor;
+  }
+  const token = /^(?:\\[a-zA-Z]+|\\.|[^\s])/u.exec(text.slice(cursor));
+  return token ? cursor + token[0].length : start;
+}
+
+// 正文中孤立的裸宏只消费自己的参数，不改周围空格、路径或标识符。
+function convertBareText(text) {
+  const lines = text.split('\n');
+  return lines.map((line, lineIndex) => {
+    if (!withinBudget(line)) return line;
+    if (isBareFormula(line.trim())) {
+      const converted = tryConvertFormulaViaKatex(line.trim());
+      if (converted !== null) {
+        const output = lineIndex < lines.length - 1 && converted.endsWith('\n') ? converted.slice(0, -1) : converted;
+        return line.match(/^\s*/)[0] + output + line.match(/\s*$/)[0];
+      }
+      return line;
+    }
+    const command = /\\([a-zA-Z]+|[^a-zA-Z\n])|(?<![\w])([a-zA-Z0-9])((?:[_^](?:\{[^{}]*\}|[a-zA-Z0-9]))+)/g;
+    let result = '', cursor = 0, match;
+    while ((match = command.exec(line))) {
+      let end = command.lastIndex;
+      if (match[1]) {
+        const name = match[1];
+        if (name === '\\') {
+          result += line.slice(cursor, match.index) + '\n';
+          cursor = end;
+          continue;
+        }
+        const arity = /^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset)$/.test(name) ? 2
+          : /^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|tilde|widetilde|dot|ddot|underbrace|overbrace)$/.test(name) ? 1 : 0;
+        if (arity && /^\s+[a-zA-Z]/.test(line.slice(end))) {
+          // 正文提及 “Use \frac in prose” 没有明确参数，不把 in 消费成 i/n。
+          result += line.slice(cursor, end);
+          cursor = end;
+          continue;
+        }
+        if (name === 'sqrt') {
+          const next = end + (line.slice(end).match(/^\s*/)[0].length);
+          if (line[next] === '[') end = argumentEnd(line, next);
+        }
+        for (let i = 0; i < arity; i++) {
+          const next = end + line.slice(end).match(/^\s*/)[0].length;
+          const after = argumentEnd(line, next);
+          if (after === next) { end = line.length; break; }
+          end = after;
+        }
+        // 连续裸宏的上下标属于同一原子。
+        while (line[end] === '_' || line[end] === '^') {
+          const after = argumentEnd(line, end + 1);
+          if (after === end + 1) break;
+          end = after;
+        }
+      }
+      const raw = line.slice(match.index, end);
+      const converted = tryConvertFormulaViaKatex(raw);
+      result += line.slice(cursor, match.index) + (converted ?? raw);
+      cursor = end;
+      command.lastIndex = end;
+    }
+    return result + line.slice(cursor);
+  }).join('\n');
 }
 
 export function convertLatexToUnicode(text) {
-  if (!text || typeof text !== 'string') {
-    return '';
+  if (!text || typeof text !== 'string') return '';
+  let result = '', cursor = 0;
+  for (const segment of scanMathSegments(text)) {
+    result += convertBareText(text.slice(cursor, segment.start));
+    const raw = text.slice(segment.start, segment.end);
+    result += segment.kind === 'math' ? (tryConvertFormulaViaKatex(segment.body) ?? raw) : raw;
+    cursor = segment.end;
   }
-
-  // 1. 先进行盒模型展开与数学环境降级（aligned、矩阵、行尾换行符）
-  let s = unwrapBoxes(stripMathLayout(text));
-
-  // 2. 如果包含 $...$, $$...$$, \[...\], \(...\)，优先用 KaTeX AST 解析公式块
-  const mathDelimRegex = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^$\n]+?)\$/g;
-  s = s.replace(mathDelimRegex, (match, d1, d2, d3, d4) => {
-      const expr = (d1 ?? d2 ?? d3 ?? d4 ?? '').trim();
-      if (!expr) return '';
-      const astResult = tryConvertFormulaViaKatex(expr);
-      if (astResult !== null) {
-        return astResult;
-      }
-      return expr;
-    });
-
-  // 3. 针对未加 $ 包裹但含有明确复合公式（如整行 r = \frac{...}{...} 或 \sqrt{...}）的行进行 KaTeX AST 解析
-  const lines = s.split('\n');
-  const processedLines = lines.map(line => {
-    const trimmed = line.trim();
-    if (
-      trimmed.length > 0 &&
-      /\\(?:frac|dfrac|tfrac|sqrt|sum|prod|int|cos|sin|tan|lim)\b/.test(trimmed)
-    ) {
-      const astResult = tryConvertFormulaViaKatex(trimmed);
-      if (astResult !== null) {
-        return astResult;
-      }
-    }
-    return line;
-  });
-  s = processedLines.join('\n');
-
-  // 4. 正则流水线保底：处理未进入 AST 或分散在正文中的零散标记
-  s = unwrapFractions(s);
-  s = unwrapSqrt(s);
-
-  // 4.1 处理统计与代数修饰符：\bar{x} -> x̄, \hat{x} -> x̂, \vec{x} -> x⃗
-  const resolveAccentContent = (raw) => {
-    const trimmed = raw.trim();
-    if (LATEX_SYMBOL_MAP[trimmed]) return LATEX_SYMBOL_MAP[trimmed];
-    return trimmed;
-  };
-  s = s.replace(/\\(bar|overline)\{([^{}]+)\}/g, (_, type, content) => {
-    const base = resolveAccentContent(content);
-    return base.length === 1 ? `${base}\u0304` : `(${base})\u0304`;
-  });
-  s = s.replace(/\\hat\{([^{}]+)\}/g, (_, content) => {
-    const base = resolveAccentContent(content);
-    return base.length === 1 ? `${base}\u0302` : `(${base})\u0302`;
-  });
-  s = s.replace(/\\vec\{([^{}]+)\}/g, (_, content) => {
-    const base = resolveAccentContent(content);
-    return base.length === 1 ? `${base}\u20D7` : `(${base})\u20D7`;
-  });
-
-  // 4.2 处理 \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \operatorname{...} -> 保留内部文字
-  s = s.replace(/\\(text|mathrm|mathbf|mathit|operatorname|textbf|textit|textsf|texttt)\{([^{}]+)\}/g, '$2');
-
-  // 4.3 剥离 \left 和 \right 前缀
-  s = s.replace(/\\left(?![a-zA-Z])\s*([([{|.])?/g, '$1');
-  s = s.replace(/\\right(?![a-zA-Z])\s*([)\]}|.])?/g, '$1');
-  // 括号尺寸只影响排版；正文中的公式走正则兜底时仍需保留实际括号。
-  s = s.replace(/\\(?:big|Big)g?[lmr]?(?![a-zA-Z])[ \t]*/g, '');
-
-  // 4.4 替换标准宏命令与特殊符号
-  for (const [cmd, sym] of Object.entries(LATEX_SYMBOL_MAP)) {
-    const cleanCmd = cmd.replace(/^\\+/, '');
-    const isWordCmd = /[a-zA-Z]$/.test(cleanCmd);
-    const escaped = cleanCmd.replace(/([|{}[\]()])/g, '\\$1');
-    const regex = isWordCmd ? new RegExp('\\\\' + escaped + '(?![a-zA-Z])', 'g') : new RegExp('\\\\' + escaped, 'g');
-    s = s.replace(regex, sym);
-  }
-
-  // 4.5 替换上标与下标：x^{2} -> x²，x_1 -> x₁，A_{1} -> A₁
-  s = s.replace(/\^\{([0-9+\-=()nixykm]+)\}/g, (match, p1) => {
-    return p1.split('').map(c => SUPERSCRIPT_MAP[c] || c).join('');
-  });
-  s = s.replace(/\^([0-9+\-=()nixykm])/g, (match, p1) => {
-    return SUPERSCRIPT_MAP[p1] || match;
-  });
-
-  s = s.replace(/(?:\\_|_)\{([0-9+\-=()aehijklmnoprstuvxy]+)\}/g, (match, p1) => {
-    return p1.split('').map(c => SUBSCRIPT_MAP[c] || c).join('');
-  });
-  s = s.replace(/(?:\\_|_)([0-9+\-=()aehijklmnoprstuvxy])/g, (match, p1) => {
-    return SUBSCRIPT_MAP[p1] || match;
-  });
-
-  // 4.6 清理多余的 $ 与 $$ 标记
-  s = s.replace(/\$\$(.*?)\$\$/gs, '$1');
-  s = s.replace(/\$(.*?)\$/g, '$1');
-
-  // 4.7 清理多余的 LaTeX 空格调整符
-  s = s.replace(/\\[,;:! ]/g, ' ');
-
-  // 4.8 清理转义百分号与其它未识别命令
-  s = s.replace(/\\%/g, '%');
-  s = s.replace(/\\([a-zA-Z]+)/g, '$1');
-
-  return s.replace(/\\&/g, '&');
+  return result + convertBareText(text.slice(cursor));
 }
 
-/**
- * 判断文本中是否包含 LaTeX 公式标记
- * @param {string} text
- * @returns {boolean}
- */
 export function hasLatexMarkup(text) {
   if (!text || typeof text !== 'string') return false;
-  return /\$|\\(?:begin\{|end\{|boxed\b|fbox\b|(?:big|Big)g?[lmr]?(?![a-zA-Z])|[()[\]]|\\)|\\(mid|frac|sqrt|alpha|beta|Rightarrow|rightarrow|to|sum|prod|in|leq|geq|neq|text|mathrm)|\^\{|_\{/.test(text);
+  let cursor = 0;
+  for (const segment of scanMathSegments(text)) {
+    if (segment.kind === 'math' || hasBareMarkup(text.slice(cursor, segment.start))) return true;
+    cursor = segment.end;
+  }
+  return hasBareMarkup(text.slice(cursor));
+}
+
+function hasBareMarkup(text) {
+  return /\\(?:[a-zA-Z]+)(?![a-zA-Z])|\\\\|(?<![\w])[a-zA-Z0-9][_^](?:\{|[a-zA-Z0-9])/.test(text);
 }

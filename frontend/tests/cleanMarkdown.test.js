@@ -114,6 +114,99 @@ test("handles discrete math markdown content with tables, lists, and formulas cl
   assert.ok(!output.includes("|"));
 });
 
+test("preserves math operators, delimiters, blank lines and environments", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const formula = String.raw`$$
+- x + y
++ z
+
+
+a<b>c
+$$`;
+  const environment = String.raw`\begin{aligned}
+x &= 1 \\
++ y &= 2
+\end{aligned}`;
+  assert.equal(cleanMarkdown(`# 标题\n${formula}\n\n${environment}`), `标题\n${formula}\n\n${environment}`);
+  assert.equal(cleanMarkdown(String.raw`**结论** $a<b>c$，\(x_1 * x_2\) 与 \[x<y\]`), String.raw`结论 $a<b>c$，\(x_1 * x_2\) 与 \[x<y\]`);
+});
+
+test("keeps formula pipes inside one Markdown table cell", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const input = '| formula | value |\n|---|---|\n| $|x|$ | 1 |';
+  assert.equal(cleanMarkdown(input), '1. formula: $|x|$ (value: 1)');
+});
+
+test("preserves incomplete and over-budget formulas during Markdown cleanup", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const sources = [
+    '$unclosed <b>c',
+    String.raw`\[x<y>z`,
+    String.raw`\begin{equation}x<y>z`,
+    '$1+x<y>z',
+    '$1+' + 'x'.repeat(32769) + '<b>c$',
+    '$' + '{'.repeat(65) + 'x<y>z' + '}'.repeat(65) + '$',
+  ];
+  for (const source of sources) assert.equal(cleanMarkdown('**标题**\n' + source), '标题\n' + source);
+});
+
+test("math placeholders cannot collide and code retains its original cleaning behavior", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  assert.equal(cleanMarkdown('\ue100MATH0\ue101 **粗体** $a<b>c$'), '\ue100MATH0\ue101 粗体 $a<b>c$');
+  assert.equal(cleanMarkdown('```text\n**code** $x$\n```'), 'code $x$');
+  assert.equal(cleanMarkdown('`**code**`'), 'code');
+});
+
+test("shared scanner isolates nested formulas, escaped delimiters and literal content", async () => {
+  const { scanMathSegments, mapMathSegments } = await import('../src/utils/mathSegments.js');
+  const nested = String.raw`\begin{pmatrix}1&\begin{matrix}a&b\\c&d\end{matrix}\\0&1\end{pmatrix}`;
+  const input = String.raw`正文 $x+1$ \$5 and $10 \(y\) ` + nested;
+  const math = scanMathSegments(input).filter(segment => segment.kind === 'math');
+  assert.deepEqual(math.map(segment => segment.body), ['x+1', 'y', nested]);
+  assert.equal(mapMathSegments(input), input);
+  assert.equal(mapMathSegments(input, () => undefined), input);
+  const protectedInputs = [
+    '`$x$ \\frac{a}{b}`',
+    '```latex\n$x$\n```',
+    'https://example.com/$x$/a',
+    String.raw`C:\temp\new_folder\$x$`,
+    String.raw`\\server\folder\$x$`,
+    '/tmp/a_$x$/file',
+    './a_$x$/file',
+    'assets/font_x.ttf',
+    'mydir/a_1.txt',
+    'a/x_1.txt',
+    String.raw`mydir\a_1.txt`,
+    'src/x_2/y^2.txt',
+    '素材/a_1.txt',
+    '![插图 1|50%]',
+    '![formula $x$](img:a)',
+    'Cost $5 and $10.',
+    '$unclosed',
+    String.raw`\[unclosed`,
+    String.raw`\begin{matrix}x`,
+  ];
+  for (const source of protectedInputs) {
+    assert.equal(scanMathSegments(source).some(segment => segment.kind === 'math'), false, source);
+    assert.equal(mapMathSegments(source, (original, segment) => segment.kind === 'math' ? 'BAD' : original), source);
+  }
+  assert.equal(scanMathSegments('$5+2$')[0].kind, 'math');
+  assert.equal(scanMathSegments('$1+x_2$10')[0].body, '1+x_2');
+  assert.equal(scanMathSegments('$1+x_2$10')[0].kind, 'math');
+  assert.equal(scanMathSegments('a/b').length, 0);
+  assert.equal(scanMathSegments('$1+x<y')[0].safeMathLiteral, true);
+  assert.equal(scanMathSegments('$' + 'x'.repeat(32769) + '$')[0].safeMathLiteral, true);
+  assert.equal(scanMathSegments(String.raw`\$x\$`).length, 0);
+  assert.equal(scanMathSegments('\\(x\n+y\\)')[0].body, 'x\n+y');
+  assert.equal(scanMathSegments('$' + 'x'.repeat(32769) + '$')[0].kind, 'literal');
+  assert.equal(scanMathSegments('$' + '{'.repeat(65) + 'x' + '}'.repeat(65) + '$')[0].kind, 'literal');
+  const deep = String.raw`\begin{matrix}`.repeat(65) + 'x' + String.raw`\end{matrix}`.repeat(65);
+  assert.equal(scanMathSegments(deep)[0].kind, 'literal');
+  assert.equal(scanMathSegments(String.raw`\begin{a}x\end{b}`)[0].kind, 'literal');
+  const segments = scanMathSegments(input);
+  for (let index = 1; index < segments.length; index++) assert.ok(segments[index - 1].end <= segments[index].start);
+});
+
 async function runAll() {
   let passed = 0;
   for (const { name, run } of tests) {
