@@ -4,6 +4,10 @@ publish_to: none
 environment:
   sdk: ^3.13.4
 flutter:
+  fonts:
+    - family: LXGW WenKai
+      fonts:
+        - asset: font_assets/霞鹜文楷.ttf
   assets:
     - font_assets/
     - licenses/
