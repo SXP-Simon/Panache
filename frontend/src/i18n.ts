@@ -23,6 +23,21 @@ const words = {
   ],
   characters: ['字', 'characters'],
   localDraft: ['草稿仅保存在本机', 'Draft saved on this device'],
+  savingDraft: ['正在保存到本机…', 'Saving on this device…'],
+  savedDraft: ['已保存到本机', 'Saved on this device'],
+  failedDraft: ['尚未保存，请检查本地存储', 'Not saved. Check local storage.'],
+  restoreFailed: [
+    '部分本地数据无法恢复，请检查保存内容或重新上传文件。',
+    'Some saved data could not be restored. Check your saved content or upload the files again.',
+  ],
+  invalidPaperWidth: [
+    '左右边距与字号之和超过纸张宽度，请增加宽度或减小边距、字号。',
+    'The side margins and font size exceed the paper width. Increase the width or reduce margins or font size.',
+  ],
+  invalidPaperArea: [
+    '纸张总像素超过限制，请减小纸张宽度或高度。',
+    'The paper exceeds the pixel limit. Reduce its width or height.',
+  ],
   import: ['导入文档', 'Import document'],
   insertImage: ['插入图片', 'Insert image'],
   latex: ['转换 LaTeX', 'Convert LaTeX'],
@@ -110,6 +125,10 @@ const words = {
   ready: ['准备就绪', 'Ready to write'],
   working: ['正在生成手写作品…', 'Creating your handwriting…'],
   uploaded: ['文档已导入', 'Document imported'],
+  importDiscarded: [
+    '正文已更新，未覆盖为稍早导入的文档',
+    'Your document changed. The earlier import was not applied.',
+  ],
   backgroundLoaded: ['背景图片已加载。', 'Paper background loaded.'],
   previewLoaded: ['预览图像已加载。', 'Preview images loaded.'],
   downloadBrowser: [
@@ -125,8 +144,8 @@ const words = {
     'The margins and line spacing exceed the paper height.',
   ],
   networkError: [
-    '连接失败，请检查后端服务后重试',
-    'Connection failed. Check the backend and try again.',
+    '网络连接失败，请检查后端服务后重试',
+    'Network connection failed. Check the backend and try again.',
   ],
   queueBusy: ['服务器繁忙，队列已满，预计', 'The queue is full. Retry in'],
   queueSuffix: ['秒后可重试', 'seconds'],
@@ -136,7 +155,10 @@ const words = {
     '生成失败，请调整参数后重试',
     'Generation failed. Adjust your settings and try again.',
   ],
-  storageUnavailable: ['浏览器不允许保存本地设置', 'Your browser cannot save local settings.'],
+  storageUnavailable: [
+    '无法保存到本机，请检查存储权限或可用空间',
+    'Could not save on this device. Check storage permissions or free space.',
+  ],
   presetBackground: [
     '请先移除背景图片，再应用纸张预设。',
     'Remove the background image before applying a paper preset.',
