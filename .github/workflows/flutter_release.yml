@@ -239,9 +239,17 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64 --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+          OUTPUT_DIR="build/app/outputs/flutter-apk"
+          rm -f "$OUTPUT_DIR"/app-arm64-v8a-release.apk "$OUTPUT_DIR"/app-x86_64-release.apk
           for ABI in arm64-v8a x86_64; do
-            APK="build/app/outputs/flutter-apk/app-${ABI}-release.apk"
+            case "$ABI" in
+              arm64-v8a) TARGET_PLATFORM="android-arm64" ;;
+              x86_64) TARGET_PLATFORM="android-x64" ;;
+              *) echo "::error::Unsupported ABI: $ABI"; exit 1 ;;
+            esac
+            flutter build apk --release --target-platform "$TARGET_PLATFORM" --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+            mv "$OUTPUT_DIR/app-release.apk" "$OUTPUT_DIR/app-${ABI}-release.apk"
+            APK="$OUTPUT_DIR/app-${ABI}-release.apk"
             "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apk-signature-${ABI}.txt"
             if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature-${ABI}.txt"; then
               echo "::error::Debug-signed APK cannot be uploaded as a release"
