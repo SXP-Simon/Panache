@@ -310,8 +310,10 @@ function astNodeToUnicode(node, depth = 0, arrayMode = 'standalone') {
       const base = child(node.body);
       return `${Array.from(base).length === 1 ? base : `(${base})`}\u0304`;
     }
-    case 'underline':
-      return child(node.body);
+    case 'underline': {
+      const base = child(node.body);
+      return `${Array.from(base).length === 1 ? base : `(${base})`}\u0332`;
+    }
     case 'array': {
       if (node.cols?.some(col => col.type === 'separator') || node.hLinesBeforeRow?.some(lines => lines.length)) {
         throw new Error('Matrix separator has mathematical meaning');

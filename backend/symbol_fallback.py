@@ -215,9 +215,65 @@ _SUB_TO_TEXT = str.maketrans("₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐ�
 _SUPER_CHARS = frozenset(chr(cp) for cp in _SUPER_TO_TEXT)
 _SUB_CHARS = frozenset(chr(cp) for cp in _SUB_TO_TEXT)
 
+# 2026-10-15：组合附加符绑定完整基底，独立私用区避免与分式、根式和脚标冲突。
+_ACCENT_MAP: Dict[str, Tuple[str, str]] = {}
+_ACCENT_KEYS: Dict[Tuple[str, str], str] = {}
+_DYNAMIC_ACCENT_COUNTER = 0x100000
+_ACCENT_MARKS = frozenset("\u0304\u0302\u20d7\u0332\u0307\u0308\u0303\u0306\u0301\u0300\u030c")
+
 
 def is_math_glyph(char: str) -> bool:
-    return char in _VULGAR_FRACTION_MAP or char in _RADICAL_MAP or char in _SCRIPT_MAP
+    return char in _VULGAR_FRACTION_MAP or char in _RADICAL_MAP or char in _SCRIPT_MAP or char in _ACCENT_MAP
+
+
+def register_dynamic_accent(body: str, mark: str) -> str:
+    """2026-10-15：带预算注册重音，超限保留可读基底及原组合符。"""
+    global _DYNAMIC_ACCENT_COUNTER
+    key = (body, mark)
+    with _REGISTRY_LOCK:
+        if key in _ACCENT_KEYS:
+            return _ACCENT_KEYS[key]
+        node_depth = 1 + max((_MATH_NODE_DEPTH.get(ch, 0) for ch in body), default=0)
+        if mark not in _ACCENT_MARKS or len(_ACCENT_MAP) >= _MAX_DYNAMIC_EXPRESSIONS or node_depth > _MAX_MATH_DEPTH:
+            return (body if len(body) == 1 else f"({body})") + mark
+        char = chr(_DYNAMIC_ACCENT_COUNTER)
+        _DYNAMIC_ACCENT_COUNTER += 1
+        _ACCENT_MAP[char], _ACCENT_KEYS[key], _MATH_NODE_DEPTH[char] = key, char, node_depth
+        return char
+
+
+def _convert_accent_segment(text: str) -> str:
+    output = []
+    for char in text:
+        if char not in _ACCENT_MARKS or not output:
+            output.append(char)
+            continue
+        if output[-1] == ")":
+            depth, start = 1, len(output) - 2
+            while start >= 0:
+                if output[start] == ")":
+                    depth += 1
+                elif output[start] == "(":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                start -= 1
+            if depth or start == len(output) - 2:
+                output.append(char)
+                continue
+            body = "".join(output[start + 1:-1])
+        elif output[-1].isalnum() or is_math_glyph(output[-1]):
+            start, body = len(output) - 1, output[-1]
+        else:
+            output.append(char)
+            continue
+        output[start:] = register_dynamic_accent(body, char)
+    return "".join(output)
+
+
+def convert_accents_to_drawn(text: str) -> str:
+    """2026-10-15：括号是前端的基底范围标记，组合符不再占独立横向字位。"""
+    return _transform_math_segments(text, _convert_accent_segment)
 
 
 def register_dynamic_script(content: str, superscript: bool) -> str:
@@ -545,6 +601,9 @@ def convert_radicals_to_drawn(text: str, _depth: int = 0) -> str:
     if _depth >= _MAX_MATH_DEPTH:
         return text
 
+    # 2026-10-15：直接粘贴的立方根/四次根也使用可伸展封顶，代码与路径保留字面字符。
+    text = _transform_math_segments(text, lambda segment: segment.replace("∛", "³√").replace("∜", "⁴√"))
+
     # 1. 深度平衡解析 LaTeX \\sqrt[n]{...} 和 \\sqrt{...}
     def _resolve_latex_sqrt(s: str) -> str:
         p_sqrt = re.compile(r"\\sqrt(?:\s*\[([^{}]+)\])?\s*\{")
@@ -727,6 +786,45 @@ def _layout_script(content, superscript, font, font_path, memo):
 
 def _layout_math_char(char, font, font_path, memo):
     size = getattr(font, 'size', 30)
+    if char in _ACCENT_MAP:
+        content, mark = _ACCENT_MAP[char]
+        body = _layout_math_text(content, font, font_path, memo)
+        left, top, right, bottom = body.bbox
+        right = max(left + 1, right - 1)
+        center = (left + right) // 2
+        gap = max(2, round(size * 0.10))
+        thickness = max(1, round(size * 0.035))
+        rise = max(3, round(size * 0.15))
+        y = top - gap - rise
+        if mark == '\u0332':
+            points = (((left, bottom + gap), (right, bottom + gap)),)
+        elif mark == '\u0304':
+            points = (((left, top - gap), (right, top - gap)),)
+        elif mark == '\u20d7':
+            head = max(3, min(round(size * 0.16), (right - left) // 3))
+            points = (((left, y), (right, y)),
+                      ((right - head, y - rise), (right, y), (right - head, y + rise)))
+        elif mark == '\u0302':
+            points = (((left, top - gap), (center, y), (right, top - gap)),)
+        elif mark in ('\u0307', '\u0308'):
+            radius = max(1, round(size * 0.035))
+            centers = (center,) if mark == '\u0307' else (center - max(2, round(size * 0.12)), center + max(2, round(size * 0.12)))
+            points = tuple(((x - radius, top - gap - radius), (x + radius, top - gap - radius)) for x in centers)
+        elif mark == '\u0303':
+            width = max(1, right - left)
+            points = (((left, y + rise // 2), (left + width // 4, y),
+                       (left + 3 * width // 4, y + rise), (right, y + rise // 2)),)
+        elif mark == '\u0306':
+            points = (((left, y), (left + (right - left) // 4, y + rise),
+                       (left + 3 * (right - left) // 4, y + rise), (right, y)),)
+        elif mark == '\u030c':
+            points = (((left, y), (center, top - gap), (right, y)),)
+        elif mark == '\u0301':
+            points = (((center - rise // 2, top - gap), (center + rise // 2, y)),)
+        else:
+            points = (((center - rise // 2, y), (center + rise // 2, top - gap)),)
+        # 2026-10-15：路径由同一组合盒计算边界，箭头头部、下划线和叠加重音均参与分页。
+        return _compose_box(body.advance, ((body, 0, 0),), tuple((path, thickness) for path in points))
     if char in _SCRIPT_MAP:
         parts = [_layout_script(content, superscript, font, font_path, memo)
                  for content, superscript in _SCRIPT_MAP[char]]
@@ -781,6 +879,8 @@ def _layout_math_char(char, font, font_path, memo):
 def _layout_math_text(text, font, font_path=None, memo=None):
     if memo is None:
         memo = {}
+    # 2026-10-15：分式/根式注册时保留的基底文本也可包含前端组合附加符。
+    text = convert_accents_to_drawn(text)
     font_path = font_path or getattr(font, 'path', None)
     key = (text, id(font))
     if key in memo:
@@ -972,6 +1072,6 @@ def normalize_text_for_font(text: str, font_path: Optional[str] = None) -> str:
     cleaned = clean_invisible_and_special_characters(text)
     return _transform_math_segments(
         cleaned,
-        lambda segment: convert_scripts_to_drawn(convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment))),
+        lambda segment: convert_accents_to_drawn(convert_scripts_to_drawn(convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment)))),
     )
 

@@ -38,6 +38,14 @@ CASES = [
     ("quadratic", r"x = \frac{−b ± \sqrt{b² − 4ac}}{2a}"),
     ("continued_fraction", r"x = \frac{1}{1 + \frac{1}{1 + \frac{1}{2}}}"),
     ("adjacent_structures", r"\sqrt{x}\sqrt{y} + \frac{1}{2}\frac{3}{4} = z"),
+    ("statistical_mean", r"x̄ = \frac{x₁ + x₂ + x₃}{3}"),
+    ("vector_group", "(AB)⃗ + (BC)⃗ = (AC)⃗"),
+    ("wide_hat", "(xy)̂ + ẑ"),
+    ("underline", "(a+b)̲ = x̲"),
+    ("derivatives_accents", "ẍ + 2ẋ + x = 0"),
+    ("accent_nested_root", r"(\sqrt{x²+1})⃗ + ȳ"),
+    ("accent_nested_fraction", r"(\frac{a}{b})̄ + \frac{x̄}{ÿ}"),
+    ("stacked_accents", "x̄̂ + (aₙ+bₙ)̄"),
 ]
 
 
