@@ -1,10 +1,7 @@
-# Handwritten text generation website
+# Handwriting Web (Simon's Enhanced Edition)
 
-![star](https://atomgit.com/liuweiqing147/handwriting-web/star/badge.svg)
-
-Welcome to my handwritten text generation site! This platform allows you to use existing fonts to create images that mimic handwritten text.
-
-URL: https://handwrite.sixiangjia.de
+This fork turns text and mathematics into handwritten images using custom fonts and layout settings.
+Run the application locally, self-host it, or download a [desktop build](https://github.com/SXP-Simon/handwriting-web/releases).
 
 On `custom-base`, the React workspace combines the document editor, preview, and handwriting settings with a responsive layout.
 The screenshots below show the original upstream application:
@@ -15,7 +12,7 @@ An alternative layout from the original upstream application:
 
 ![Old interface](image.png)
 
-📖 **Full documentation (user guide / self-hosting / development): https://mygithub.sixiangjia.de/handwriting-web/en/**
+📖 **[Documentation: user guide, self-hosting, and development](https://heliannuits.me/handwriting-web/en/)**
 
 ## Fork branches and upstream synchronization
 
@@ -92,7 +89,7 @@ Once you're happy with the preview, you can generate a full set of images. The i
 
 ## How to build it yourself
 
-Use `docker-compose up -d` in the project directory, the default port is 2345
+Run `docker compose up -d --build` from the `custom-base` checkout, then open port 2345.
 
 To add fonts, font files are placed in ttf_files in the project root directory
 
@@ -102,10 +99,10 @@ I hope you enjoy using my handwriting generator site to create your personalized
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=14790897%2Fhandwriting-web&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=SXP-Simon%2Fhandwriting-web&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=14790897/handwriting-web&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SXP-Simon/handwriting-web&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SXP-Simon/handwriting-web&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SXP-Simon/handwriting-web&type=date&legend=top-left" />
  </picture>
 </a>

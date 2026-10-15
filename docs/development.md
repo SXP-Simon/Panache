@@ -147,3 +147,17 @@ Engineering quality 在推送到 `custom-base`、面向 `custom-base` 的 PR 与
 
 Docker 发布需配置自有镜像地址变量 `FRONTEND_IMAGE`、`BACKEND_IMAGE` 和相应仓库凭据；
 未配置镜像地址时不执行登录、构建或推送，不沿用上游账号地址。
+
+## 文档站
+
+MkDocs 将 `docs/` 中的 Markdown 生成静态文档，`mkdocs.yml` 负责导航、主题、仓库链接与站点地址。
+文档站位于 <https://heliannuits.me/handwriting-web/>；它使用 GitHub Pages，不运行 FastAPI 手写应用。
+手写应用的运行方式见[Docker 部署](self-hosting/docker.md)与本页的本地启动说明。
+
+仓库 Settings → Pages 的构建来源需选 GitHub Actions。`Deploy Docs` 在 `custom-base` 的文档输入变化时
+发布，也可手动选择分支运行。`github-pages` 环境需允许所选部署分支。
+本站沿用个人 Pages 已配置的域名；修改站点地址时，同时更新 `site_url` 与文档入口链接。
+
+```bash
+uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
+```

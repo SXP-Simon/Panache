@@ -1,19 +1,16 @@
-site_name: 手写文字生成
-site_description: 把文字渲染成手写体图片，可调参数、支持分页、导出 PNG / PDF
-site_url: https://mygithub.sixiangjia.de/handwriting-web/
-repo_url: https://github.com/14790897/handwriting-web
-repo_name: 14790897/handwriting-web
-edit_uri: edit/main/docs/
+site_name: 手写工作室 · Simon
+site_description: Simon 自用手写工作室的使用、数学排版与部署文档
+site_url: https://heliannuits.me/handwriting-web/
+repo_url: https://github.com/SXP-Simon/handwriting-web
+repo_name: SXP-Simon/handwriting-web
+edit_uri: edit/custom-base/docs/
 
 theme:
   name: material
   language: zh
-  # 站点自己的图标，直接取自 frontend/public（和主站、桌面版用的是同一张）。
-  # 路径按 Material 的惯例放，正好覆盖掉主题自带的那个默认 favicon。
-  favicon: assets/images/favicon.png
-  # 页眉图标。原图是近白底 + 黑笔迹的方图，直接放上去在黑顶栏里就是一块白方块，
-  # 所以换成反相后的透明版本（白笔迹、无底），两种配色下顶栏都是深色的，白色都看得清。
-  logo: assets/images/logo.png
+  # 与手写应用共用图标。
+  favicon: assets/images/icon.svg
+  logo: assets/images/icon.svg
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default

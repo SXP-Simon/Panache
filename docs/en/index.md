@@ -1,18 +1,13 @@
-# Handwriting Generator
+# Handwriting Studio
 
-Turn a block of text into an image that looks handwritten — pick a font, tune the
-parameters, lay it out, then export a zip of PNGs or a PDF.
+The `custom-base` branch of Simon's fork combines a React / TypeScript workspace, a Python /
+FastAPI rendering service, and an Electron desktop app. Enter text, convert LaTeX, tune the
+handwriting, then export a zip of PNGs or a PDF.
 
-- Live site: <https://handwrite.sixiangjia.de>
-- Video walkthrough (Chinese): <https://www.bilibili.com/video/BV1DM4y1W7fp/>
-- Telegram group (Chinese): <https://t.me/+zFImOziSNullOTE1>
-
-![The interface](https://raw.githubusercontent.com/14790897/handwriting-web/main/image-new-ui.png)
-
-!!! note "The app's own English is partial"
-    The interface is translatable (Chinese and English), but some runtime dialogs and toasts
-    are still Chinese-only. These docs describe the Chinese UI; labels are given in both
-    languages where it matters.
+This [documentation site](https://heliannuits.me/handwriting-web/) does not provide a generation
+API. To use the app, [run it locally](development.md), [self-host](self-hosting/docker.md), or use the
+[desktop app](desktop.md). `main` mirrors upstream; the separate `flutter` branch maintains the
+Flutter / Rust migration.
 
 ## What it does
 
@@ -20,7 +15,12 @@ parameters, lay it out, then export a zip of PNGs or a PDF.
 
 - **Custom fonts**
 
-    Upload your own `.ttf`, or pick one of the fonts already installed on the server.
+    Upload your own font, or select a server font. Interface typography is independent of the handwriting font.
+
+- **Math and text conversion**
+
+    Convert LaTeX, clean Markdown, and lay out fractions, radicals, and scripts.
+    See [Architecture and Technology Stack](architecture.md) for module responsibilities.
 
 - **Background image**
 
@@ -48,11 +48,11 @@ parameters, lay it out, then export a zip of PNGs or a PDF.
 
 - **Preview and export**
 
-    Preview on the right, then export every page as PNGs (zipped) or as a single PDF.
+    Preview the result, then export every page as PNGs (zipped) or as a single PDF.
 
 - **Built-in preset**
 
-    "Small with underlines (Yunyan)" applies a ready-tuned parameter set.
+    Apply built-in handwriting presets, or save and load your own settings.
 
 </div>
 
@@ -63,3 +63,10 @@ parameters, lay it out, then export a zip of PNGs or a PDF.
 - Need page breaks and right alignment → [Layout Markers](guide/layout-markers.md)
 - Want to run your own instance → [Docker Deployment](self-hosting/docker.md)
 - Want to change the code → [Local Development](development.md)
+
+## Credits
+
+This project is based on [14790897/handwriting-web](https://github.com/14790897/handwriting-web).
+The original author's [demo](https://handwrite.sixiangjia.de/) and
+[video introduction](https://www.bilibili.com/video/BV1DM4y1W7fp/) belong to the upstream project.
+Their interface, features, and limits may differ from this fork.

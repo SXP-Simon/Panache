@@ -159,3 +159,19 @@ backend, E2E, and MySQL workflows retain manual entry points without duplicating
 Docker publishing requires your own `FRONTEND_IMAGE` and `BACKEND_IMAGE` repository variables and
 the corresponding registry credentials. Without an image address, login, building, and pushing are
 skipped. Configure your own namespace instead of the upstream account.
+
+## Documentation site
+
+MkDocs builds the Markdown under `docs/` into a static site. `mkdocs.yml` configures navigation,
+the theme, repository links, and the site URL. The documentation is hosted at
+<https://heliannuits.me/handwriting-web/> using GitHub Pages; it does not run the FastAPI handwriting app.
+See [Docker Deployment](self-hosting/docker.md) or the local startup instructions above to run the app.
+
+Select GitHub Actions as the build source in Settings → Pages. `Deploy Docs` publishes documentation
+changes on `custom-base`, and can also be dispatched manually for a selected branch. The
+`github-pages` environment must allow that deployment branch. The site inherits the domain already
+configured for the account's Pages site; update both `site_url` and documentation links when changing it.
+
+```bash
+uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
+```

@@ -1,29 +1,32 @@
 # Docker 部署
 
-自己搭一个实例，最省事的方式是 Docker Compose：三个容器，一条命令起来。
+Docker Compose 默认从本 fork 的源码构建前后端两个容器；自动更新服务按需启用。
 
 ## 前置条件
 
 - 装了 Docker 和 Docker Compose
-- 一台能跑容器的机器（默认配置按 1 核 / 2 GB 左右的规格调的）
+- 为 Docker 分配足够内存与磁盘；大纸张和长文本会增加渲染资源消耗
 
 ## 起来
 
 ```shell
-git clone https://github.com/14790897/handwriting-web.git
+git clone --branch custom-base https://github.com/SXP-Simon/handwriting-web.git
 cd handwriting-web
-docker compose up -d
+docker compose up -d --build frontend backend
 ```
 
 默认端口是 **2345**，打开 <http://localhost:2345> 就能用。
 
-## 三个容器分别干什么
+## 服务与镜像
 
 | 服务 | 镜像 | 作用 |
 |---|---|---|
-| `frontend` | `14790897/frontend-handwriting` | Nginx，对外提供页面，并把 `/api/` 反代到后端。宿主机 `2345` → 容器 `80`。 |
-| `backend` | `14790897/backend-handwriting` | FastAPI，真正干活的地方。端口**只绑在 `127.0.0.1:5005`**，不对外。 |
-| `watchtower` | `containrrr/watchtower` | 每 6 小时拉一次新镜像并滚动重启，实现自动更新。 |
+| `frontend` | `handwriting-frontend:local` | 从本地源码构建；Nginx 提供页面并转发 `/api/`，宿主机 `2345` → 容器 `80`。 |
+| `backend` | `handwriting-backend:local` | 从本地源码构建；FastAPI 端口只绑定到宿主机 `127.0.0.1:5005`。 |
+| `watchtower` | `containrrr/watchtower:latest` | 可选的 `auto-update` profile；仅更新带启用标签的容器。 |
+
+前后端默认 `pull_policy: never`，不会拉取上游镜像。可用 `FRONTEND_IMAGE`、`BACKEND_IMAGE`
+修改镜像标签，但仍需明确选择本地构建或远端拉取方式。
 
 后端刻意不暴露到公网 —— 外部的请求一律先进 Nginx 再由它转发。想换个对外端口，改
 `docker-compose.yml` 里 frontend 的 `"2345:80"` 左边那个数字。
@@ -59,15 +62,34 @@ docker compose restart backend
   docker compose logs -f backend
   ```
 
-## 更新
+## 更新本地构建
 
-- **自动** —— watchtower 每 6 小时检查一次，有新镜像就滚动重启。
-- **手动** ——
+确认工作区改动已妥善保存，再同步自用分支并重建：
 
-  ```shell
-  docker compose pull
-  docker compose up -d
-  ```
+```shell
+git pull --ff-only origin custom-base
+docker compose up -d --build frontend backend
+```
+
+## 可选：远端镜像自动更新
+
+只有自行发布了镜像，才需要 Watchtower。在 `.env` 中设置自己的镜像地址和启用标签，例如：
+
+```dotenv
+FRONTEND_IMAGE=your-account/handwriting-frontend:latest
+BACKEND_IMAGE=your-account/handwriting-backend:latest
+WATCHTOWER_ENABLE=true
+```
+
+首次拉取并启动：
+
+```shell
+docker compose pull --policy always frontend backend
+docker compose --profile auto-update up -d --no-build frontend backend watchtower
+```
+
+Watchtower 每 6 小时检查带标签的容器。私有仓库还需配置相应的拉取认证。
+它通过 Docker socket 管理容器，只应在需要自动更新时启用；本地构建不依赖它。
 
 ## 停掉 / 清掉
 
@@ -78,12 +100,7 @@ docker compose down -v       # 同上，另外删掉 Docker 管理的卷
 
 !!! note "`-v` 删不掉你的字体和日志"
     `ttf_files` 和 `logs` 是**绑定挂载**到宿主机目录的，不属于 Docker 管理的卷，
-    所以 `-v` 不会碰它们。这份 Compose 甚至没有定义任何具名卷，`-v` 在这里什么都不会额外删。
-    想彻底清干净，得自己删宿主机上的目录：
-
-    ```shell
-    rm -rf ttf_files logs
-    ```
+    所以 `-v` 不会碰它们。这份 Compose 没有定义具名卷；删除本机字体或日志需自行处理对应目录。
 
 ## 反向代理和 HTTPS
 

@@ -2,10 +2,9 @@
 
 ## Preview
 
-Click **"Preview Handwrite Image"** in the top bar and the result appears in the right column.
+Click **"Generate preview"** and inspect the result in the preview area.
 
-- **Preview renders only the first page** — the point is to check your parameters fast without
-  waiting for the whole document.
+- **Preview renders only the first page by default**. Enable "Preview all pages" for a full preview.
 - When the text runs to several pages, page controls appear below the preview: "Previous",
   "Next", and "Page x / y".
 - After changing any parameter you must **click preview again**. The preview does not re-render
@@ -13,7 +12,7 @@ Click **"Preview Handwrite Image"** in the top bar and the result appears in the
 
 ## Exporting images (zip)
 
-Click **"Generate Full Handwriting Image"** and the backend renders every page to PNG and packages
+Click **"ZIP"** in the preview area and the backend renders every page to PNG and packages
 them as `images.zip`.
 
 - The archive contains one PNG per page, in order.
@@ -22,7 +21,7 @@ them as `images.zip`.
 
 ## Exporting a PDF
 
-Click **"Generate PDF"** and the backend merges every page into a single `images.pdf`. No more
+Click **"PDF"** and the backend merges every page into a single `images.pdf`. No more
 pasting images into a document by hand.
 
 !!! tip "Which one?"
@@ -31,16 +30,14 @@ pasting images into a document by hand.
 
 ## Page count and limits
 
-- A **page estimate** appears below the text area, so you can see roughly how many pages you are
-  heading for while you type.
-- On `handwrite.14790897.xyz` a single run renders **at most 10 pages**; anything beyond that is
-  truncated. Both the estimate and an over-limit dialog warn you in advance. A self-hosted instance
-  has no such cap, but it is still subject to
-  [resource limits](../self-hosting/fonts-and-limits.md).
+- The page controls count the pages rendered for this preview. A default single-page preview does
+  not mean that the full document has only one page.
+- The 10-page limit mentioned for `handwrite.14790897.xyz` in older documentation described an
+  upstream instance. This fork does not truncate at a fixed ten pages, but long documents remain
+  subject to [resource and request limits](../self-hosting/fonts-and-limits.md).
 
 ## Queueing, cooldowns and failures
 
-- **Cooldown** — 3 seconds between runs, with a countdown on the button.
 - **Queueing** — the backend handles a limited number of jobs at once. When the queue is full a
   wait countdown appears, telling you roughly how long.
 - **Progress** — generation state is pushed over a WebSocket; if that fails the client falls back

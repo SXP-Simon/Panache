@@ -3,12 +3,11 @@
 If you would rather not use a browser, or want something that works offline, there is a desktop build.
 It bundles the backend and frontend together — double-click and it runs, no network needed.
 
-![Desktop app interface](../desktop-app-screenshot.png)
-
 ## Download
 
-Go to the [Releases page](https://github.com/14790897/handwriting-web/releases), find the latest
-version, and pick by system and chip:
+Look for installers on this fork's [Releases page](https://github.com/SXP-Simon/handwriting-web/releases)
+and choose by system and chip. If your platform has no custom build yet, build `custom-base` as
+described below. Upstream installers do not represent this fork's features.
 
 | System | File |
 |---|---|
@@ -33,7 +32,7 @@ file is **"damaged"** outright.
   installers obtained from anywhere other than the official channel.
 
 So **first confirm you downloaded the installer from this repository's
-[Releases page](https://github.com/14790897/handwriting-web/releases)**. If the source checks out, use one
+[Releases page](https://github.com/SXP-Simon/handwriting-web/releases)**. If the source checks out, use one
 of the methods below to let it through. **If you cannot verify where it came from, do not bypass the
 warning and do not open the app.**
 
@@ -51,10 +50,9 @@ Hence the "verify the source first" step above is not boilerplate.
 
 ## How it differs from the web version
 
-The features are identical; only these things differ:
+The desktop build uses the same React frontend and Python rendering service. The main differences are:
 
-- **No 10-page cap** — that limit applies only to `handwrite.14790897.xyz`. The desktop build runs on your
-  own machine, so it is bounded by your hardware instead of an arbitrary page count.
+- **Local generation** — there is no fixed ten-page truncation, but memory, paper dimensions, and hardware still constrain rendering.
 - **No analytics** — Google Analytics, Microsoft Clarity, Sentry and the chat widget are not loaded.
 - **No pandoc download** — `.docx` files are handled by `python-docx` when pandoc is absent.
 - **No overload guard interference** — the CPU guard is relaxed so the app cannot rate-limit itself.
@@ -75,6 +73,7 @@ Roughly:
 - `temp/` — rendered images
 - `logs/` — logs
 - fonts
+- `studio/` — editor drafts, presets, and uploaded assets, independent of backend task expiry
 
 ## Building it yourself
 
@@ -90,6 +89,6 @@ PYTHON=python bash desktop/build.sh   # pick the interpreter (used by CI)
 Artifacts land in `desktop/build/`. For development, run `--app-only` first, then `npx electron .` from
 `desktop/`.
 
-Before changing anything desktop-related, read [`AGENTS.md`](https://github.com/14790897/handwriting-web/blob/main/AGENTS.md)
-at the repository root — it documents the build-time encoding, signing and cross-site request protection
-pitfalls that have already been hit. (It is written in Chinese.)
+Read [`AGENTS.md`](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md) for development
+conventions and [Architecture](architecture.md) for persistence and saving before exit. Consult the
+corresponding source and tests before changing build, security, or platform behavior.
