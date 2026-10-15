@@ -53,7 +53,7 @@ Hence the "verify the source first" step above is not boilerplate.
 The desktop build uses the same React frontend and Python rendering service. The main differences are:
 
 - **Local generation** — there is no fixed ten-page truncation, but memory, paper dimensions, and hardware still constrain rendering.
-- **No analytics** — Google Analytics, Microsoft Clarity, Sentry and the chat widget are not loaded.
+- **Error reporting disabled** — the desktop runtime disables Sentry; the frontend does not load analytics or chat scripts.
 - **No pandoc download** — `.docx` files are handled by `python-docx` when pandoc is absent.
 - **No overload guard interference** — the CPU guard is relaxed so the app cannot rate-limit itself.
 

@@ -76,8 +76,8 @@ margins, with underlines:
 | Probability of a strikethrough occurring | `0` | 0.005 |
 | Add underline | on | on |
 
-The preset has two requirements: the `云烟体.ttf` font must be available, and there must be
-**no background image** set. If either is unmet it tells you rather than failing quietly.
+Remove the background image before applying paper presets. The Yunyan preset selects `云烟体.ttf`
+when that font is installed; otherwise it keeps the currently selected font.
 
 ## Tuning tips
 

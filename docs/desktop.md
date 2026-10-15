@@ -39,7 +39,7 @@ xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 
 或者去「系统设置 → 隐私与安全性」，在提示里点**「仍要打开」**。
 
-这两条命令等于让系统不再拦这个应用。它们之所以必要，只是因为项目没有 Apple 开发者证书去签名和公证，
+这两种方式可以让系统不再拦这个应用。它们之所以必要，只是因为项目没有 Apple 开发者证书去签名和公证，
 **并不代表这个包一定安全** —— 所以上面那句「先确认来源」不是客套话。
 
 ## 和在线版有什么不同
@@ -47,7 +47,7 @@ xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
 桌面版使用同一份 React 前端和 Python 渲染服务，主要区别是：
 
 - **本机生成** —— 无固定 10 页截断，仍受内存、纸张尺寸和机器性能约束。
-- **不上报统计** —— 不加载 Google Analytics、Microsoft Clarity、Sentry 和客服插件。
+- **禁用错误上报** —— 桌面运行环境禁用 Sentry；前端不加载统计或客服脚本。
 - **不联网下载 pandoc** —— 没有 pandoc 时用 `python-docx` 处理 `.docx`。
 - **不受过载保护干扰** —— CPU 占用守卫被放开，本机不至于请求自己都被 429 拦掉。
 

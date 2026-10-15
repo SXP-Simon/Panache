@@ -61,7 +61,8 @@ The settings panel manages parameter snapshots stored on this device:
 - **Reset defaults** — restore the defaults.
 
 Built-in choices include "Small ruled · Yunyan", "Natural handwriting", and "Neat handwriting".
-Remove the background before applying paper presets; the Yunyan preset requires its font.
+Remove the background before applying paper presets; the Yunyan preset uses its font when installed
+and otherwise keeps the current selection.
 See [Architecture](../architecture.md) for draft and preset storage boundaries.
 
 ## Queueing and waiting

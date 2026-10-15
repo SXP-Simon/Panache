@@ -6,8 +6,6 @@
 
 📖 **[使用与部署文档](https://heliannuits.me/handwriting-web/)** · [桌面版下载](https://github.com/SXP-Simon/handwriting-web/releases)
 
-📖 **[👉 点击查看原项目 README 文档 (Upstream README)](./README_upstream.md)**
-
 ![手写数学公式、竖式分式与封顶根式排版预览](./docs/assets/images/math_formula_preview.png)
 
 ---
@@ -94,7 +92,7 @@ Electron 外壳只使用 Electron 和 Node 内置模块，后端由 PyInstaller 
 `pnpm install` 自动安装 Lefthook。提交前按暂存区实际路径选择质量检查，推送前按全部待推送提交选择相关测试；缺失比较基线时执行完整验证。scope 按真实路径区分 `fe/` 与 `be/`，不能用于跳过检查。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，按最小独立改动提交。完整手动入口与规则见[本地开发](./docs/development.md#按需检查与-ci)。
 
 ```text
-fix(math): 修正嵌套根式的横线范围
+fix(be/math_page_layout.py): 修正嵌套根式的横线范围
 
 背景：说明可复现的问题与影响。
 
@@ -132,4 +130,8 @@ Watchtower 默认关闭；仅在镜像已发布到自己的 registry 时，设�
 - **`main`**：严格保持与上游官方仓库（[upstream/main](https://github.com/14790897/handwriting-web)）一致，仅用于拉取上游最新发布代码与功能同步，严禁直接在 `main` 上开发业务私有逻辑。
 - **`flutter`**：从自用基线建立，使用 `cherry-pick -x` 接入 [HakimYu 的 Flutter/Rust 迁移](https://github.com/HakimYu/handwriting/tree/refactor/flutter-rust)。独立维护，不整分支合回 `custom-base`；数学优化需另行移植。
 - **上游吸收方式**：`main` 保留完整上游历史；`custom-base` 经审查选择性 cherry-pick 功能修复，通常不吸收纯发布版本提交。详细规则见 [AGENTS.md](./AGENTS.md#项目与分支)。
-- **原项目文档**：若需查阅原项目历史说明、自部署 Docker 配置或视频介绍，请参阅 [README_upstream.md](./README_upstream.md)。
+
+## 来源与授权
+
+本项目基于 [14790897/handwriting-web](https://github.com/14790897/handwriting-web)。
+代码授权见 [LICENSE](./LICENSE)；随附字体按各自授权使用。

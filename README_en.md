@@ -4,13 +4,9 @@ This fork turns text and mathematics into handwritten images using custom fonts 
 Run the application locally, self-host it, or download a [desktop build](https://github.com/SXP-Simon/handwriting-web/releases).
 
 On `custom-base`, the React workspace combines the document editor, preview, and handwriting settings with a responsive layout.
-The screenshots below show the original upstream application:
+The handwriting renderer supports nested fractions, radicals, scripts, and fallback glyphs:
 
-![New interface](image-new-ui.png)
-
-An alternative layout from the original upstream application:
-
-![Old interface](image.png)
+![Handwritten mathematics preview](docs/assets/images/math_formula_preview.png)
 
 📖 **[Documentation: user guide, self-hosting, and development](https://heliannuits.me/handwriting-web/en/)**
 
@@ -42,15 +38,16 @@ outgoing refs before a push. Missing comparison history falls back to full valid
 use `fe/...` for `frontend/...` and `be/...` for `backend/...`; they do not control which checks run.
 See [Local Development](docs/en/development.md#selective-checks-and-ci) for the manual full checks and CI gate.
 
-## Function
+## Features
 
 ### Custom Fonts
 
 You can upload your own fonts to generate a unique handwriting style that suits your needs.
 
-### Background picture
+### Background images
 
-Upload your desired background image to add a personal touch to your handwriting. If you don't have a background image, don't worry! Just specify the width and height of the picture, and my website will automatically generate a background picture with horizontal lines for you.
+Upload a background image or set the paper dimensions. Generated paper can include ruled lines;
+the background detector can estimate margins and line spacing from an uploaded image.
 
 ### Tunable parameters
 
@@ -77,32 +74,29 @@ The markers control layout and are not printed in the generated handwriting.
 
 ### Extract text from various file types
 
-My site can extract text content from various file types, allowing you to upload text easily.
+Import `.docx`, `.pdf`, `.txt`, or `.rtf` documents to fill the editor. Convert older `.doc` files
+to `.docx` before importing them.
 
 ### Preview function
 
-I added a preview feature to the right side of the website. This allows you to conveniently review how your handwritten text image will look before finalizing it.
+Preview the first page by default, or enable a full-document preview. After changing text or settings,
+generate a new preview to see the result.
 
 ### Complete image generation
 
-Once you're happy with the preview, you can generate a full set of images. The images will be conveniently packaged into a zip file for easy download.
+Export all pages as a ZIP of PNG images or as one PDF.
 
 ## How to build it yourself
 
-Run `docker compose up -d --build` from the `custom-base` checkout, then open port 2345.
+Run `docker compose up -d --build` from the `custom-base` checkout, then open
+<http://127.0.0.1:2345>. Compose builds the current source; place additional fonts in `ttf_files/`.
+See [Docker deployment](docs/en/self-hosting/docker.md) for configuration and optional image updates.
 
-To add fonts, font files are placed in ttf_files in the project root directory
+For local development, install Node.js 24+, pnpm, Python 3.12+, and uv, then follow
+[Local Development](docs/en/development.md). Desktop build instructions are in
+[Desktop App](docs/en/desktop.md).
 
-## Conclusion
+## Credits and licensing
 
-I hope you enjoy using my handwriting generator site to create your personalized handwriting pictures!
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=SXP-Simon%2Fhandwriting-web&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SXP-Simon/handwriting-web&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SXP-Simon/handwriting-web&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SXP-Simon/handwriting-web&type=date&legend=top-left" />
- </picture>
-</a>
+Based on [14790897/handwriting-web](https://github.com/14790897/handwriting-web).
+See [LICENSE](LICENSE) for the code license; bundled fonts carry their own licenses.

@@ -1,129 +1,72 @@
 # Handwriting Web Backend
 
-手写生成服务后端，基于 Python 3.12+ 与 FastAPI。项目的状态分层、任务流和桌面存储边界见
-[架构与技术栈](../docs/architecture.md)，完整开发与验证入口见[本地开发](../docs/development.md)。
+手写生成服务后端，使用 Python 3.12+ 与 FastAPI。架构与存储边界见
+[架构与技术栈](../docs/architecture.md)，开发与验证入口见[本地开发](../docs/development.md)。
 
-## 快速启动
+## 启动与检查
 
 ```bash
-# 仓库根目录：通过 uv.lock 准备依赖与 .venv
+# 仓库根目录：准备依赖与 .venv
 uv sync --locked --extra dev
 cd backend
 uv run --project .. uvicorn app:app --reload --host 127.0.0.1 --port 5005
 ```
 
-## 接口列表
+以下检查从仓库根目录运行：
+
+```bash
+pnpm run quality:python
+uv run --extra dev python -m pytest backend/tests
+```
+
+## 接口
 
 | 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/generate_handwriting` | POST | 提交手写生成任务 |
+|---|---|---|
+| `/api/generate_handwriting` | POST | 提交任务并返回任务 ID |
 | `/api/generate_handwriting/task/{task_id}` | GET | 查询任务状态 |
 | `/api/generate_handwriting/task/{task_id}/result` | GET | 获取生成结果 |
+| `/api/generate_handwriting/ws/{task_id}` | WebSocket | 观测任务进度 |
 | `/api/fonts_info` | GET | 获取可用字体列表 |
-| `/api/textfileprocess` | POST | 文本处理 |
-| `/api/imagefileprocess` | POST | 图片处理 |
+| `/api/version` | GET | 获取应用版本 |
+| `/api/textfileprocess` | POST | 提取文档正文 |
+| `/api/imagefileprocess` | POST | 检测背景边距与行距 |
 
-## 并发架构
+请求字段与校验以 `task_types.py` 为准，路由与生成编排在 `app.py`，
+任务持久化在 `task_store.py`，数学字形与页面排版在独立的 `math_*.py` 和 `symbol_fallback.py` 中。
 
-```
-请求 → MAX_ACTIVE_TASKS=8（队列上限）→ Semaphore(2)（实际并发）→ 生成任务
-```
+## 队列与资源
 
-- **MAX_ACTIVE_TASKS**：pending + processing 总数上限，超出返回 503
-- **Semaphore(2)**：同时执行的生成任务数，通过 asyncio.Semaphore 控制
+任务存入 SQLite，由信号量限制同时执行的渲染数量；队列满时返回 `503`，
+CPU 过载或接口限流时返回 `429`。默认并发、容量和过期规则见
+[字体与资源限制](../docs/self-hosting/fonts-and-limits.md)。
 
-## 压测方法
+服务端数据生命周期与编辑器草稿独立。WebSocket 不可用时，前端通过状态接口轮询。
+客户端取消观测不代表删除服务端任务。
 
-### 环境准备
+## 压测
 
-```bash
-pip install locust
-```
-
-### 方式一：完整流程测试（测端到端体验）
-
-模拟真实用户：提交任务 → 轮询等待 → 获取结果。
+先在另一终端启动本地后端。以下命令从仓库根目录运行；Locust 通过临时依赖执行，
+不加入应用运行依赖。
 
 ```bash
-cd backend/tests
-locust -f locustfile.py --host=http://127.0.0.1:5005 --headless -u 8 -r 1 --run-time 60s
+# 完整流程：提交、等待、获取结果
+uv run --extra dev --with locust locust -f backend/tests/locustfile.py --host=http://127.0.0.1:5005 --headless -u 8 -r 1 --run-time 60s HandwritingUser
+
+# 仅提交任务：观察队列达到上限时的拒绝行为
+uv run --extra dev --with locust locust -f backend/tests/locustfile.py --host=http://127.0.0.1:5005 --headless -u 8 -r 1 --run-time 30s HandwritingSubmitOnly
+
+# 交互模式：打开 http://127.0.0.1:8089
+uv run --extra dev --with locust locust -f backend/tests/locustfile.py --host=http://127.0.0.1:5005 HandwritingUser
+
+# pytest 并发流程验证：需要实际运行的后端
+uv run --extra dev python -m pytest backend/tests/test_generate_concurrency.py -v
 ```
 
-**参数说明**：
-- `-u 8`：8 个并发用户
-- `-r 1`：每秒启动 1 个用户（预热）
-- `--run-time 60s`：压测持续 60 秒
+Locust 的 `-u` 是并发用户数、`-r` 是每秒启动用户数、`--run-time` 是运行时长；
+末尾的类名选择场景。仅提交场景不会等待渲染完成，因此会持续增加服务端负载。
+评估结果需同时记录机器、容器配额、字体、纸张尺寸和文本长度，不能把某次耗时当作固定性能保证。
 
-**关键指标**：
-- 失败率 < 1%（在 8 并发以内）
-- 单任务平均完成时间：3~8s
-
-### 方式二：纯提交测试（测接口吞吐量）
-
-只测 `/api/generate_handwriting` 接口，不管任务是否完成。
-
-```bash
-locust -f locustfile.py --host=http://127.0.0.1:5005 --headless -u 50 -r 10 --run-time 30s -t HandwritingSubmitOnly
-```
-
-**参数说明**：
-- `-u 50`：50 个并发用户
-- `-r 10`：每秒启动 10 个用户
-- `-t HandwritingSubmitOnly`：只运行纯提交测试类
-
-### 方式三：UI 模式
-
-```bash
-locust -f locustfile.py --host=http://127.0.0.1:5005
-```
-
-浏览器打开 http://localhost:8089 进行配置和压测。
-
-### 方式四：使用 pytest 压测
-
-```bash
-cd backend
-HANDWRITING_BASE_URL=http://127.0.0.1:5005 \
-HANDWRITING_LOAD_REQUESTS=6 \
-HANDWRITING_LOAD_CONCURRENCY=4 \
-pytest tests/test_generate_concurrency.py -v
-```
-
-**环境变量**：
-- `HANDWRITING_BASE_URL`：后端地址（默认 http://127.0.0.1:5005）
-- `HANDWRITING_LOAD_REQUESTS`：总请求数
-- `HANDWRITING_LOAD_CONCURRENCY`：并发数
-- `HANDWRITING_TASK_TIMEOUT`：任务超时时间（秒）
-- `HANDWRITING_POLL_INTERVAL`：轮询间隔（秒）
-
-## 性能数据
-
-### 实际压测结果（Locust，8 并发用户，60s）
-
-| 接口 | 请求数 | 失败率 | 平均耗时 | P95 耗时 |
-|------|--------|--------|---------|---------|
-| GET /api/fonts_info | 8 | 0% | 4.8s | 7.4s |
-| POST /api/generate_handwriting | 28 | 0% | 9.4s | 17s |
-| GET /task/{id}/status | 6 | 0% | 3~17s | - |
-| GET /task/{id}/result | 5 | 0% | ~100ms | - |
-
-**汇总：47 请求，0 失败，失败率 0%**
-
-### 性能瓶颈分析
-
-| 并发数 | 失败率 | 说明 |
-|--------|--------|------|
-| 8 | **0%** | 安全范围 |
-| 16 | > 50% | 触发 503 队列满 |
-| 50 | > 90% | 大部分请求被拒绝 |
-
-**瓶颈**：
-- Semaphore(2) 限制实际并发执行数为 2
-- CPU 密集渲染任务受 GIL 限制
-- 每个任务平均耗时 ~17s（RPS 约 0.5）
-
-## 注意事项
-
-1. **503 队列满**：当活跃任务数达到 8 时，新请求会被拒绝
-2. **429 CPU 过载**：当 CPU 使用率 > 90% 时，任务会被限流
-3. **压测建议**：先小规模压测（8 并发），确认稳定后再逐步加压
+pytest 场景可通过 `HANDWRITING_BASE_URL`、`HANDWRITING_LOAD_REQUESTS`、
+`HANDWRITING_LOAD_CONCURRENCY`、`HANDWRITING_TASK_TIMEOUT`、`HANDWRITING_POLL_INTERVAL`
+和 `HANDWRITING_TEXT_REPEAT` 配置目标与负载。

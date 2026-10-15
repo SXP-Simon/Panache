@@ -67,6 +67,5 @@ Flutter / Rust migration.
 ## Credits
 
 This project is based on [14790897/handwriting-web](https://github.com/14790897/handwriting-web).
-The original author's [demo](https://handwrite.sixiangjia.de/) and
-[video introduction](https://www.bilibili.com/video/BV1DM4y1W7fp/) belong to the upstream project.
-Their interface, features, and limits may differ from this fork.
+See [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE) for the code license.
+Fonts carry their own licenses.

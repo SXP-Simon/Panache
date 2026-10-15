@@ -131,6 +131,8 @@ semantic-release manages release versions, tags, and `CHANGELOG.md`.
 Local hooks and CI share `scripts/change-impact.cjs`. The planner reads actual Git paths rather
 than commit types or scopes. Multiple areas select the union of their checks; deletions and renames
 also count.
+For CI pushes, application paths since the latest stable release tag are also included, so a later
+documentation push cannot cancel earlier application validation and leave those changes unpublished.
 
 - Before a commit, hooks inspect staged paths, run the related quality checks, and check whitespace errors. Related unstaged changes stop validation so that checks cannot test a newer working-tree version in place of the staged version.
 - Before a push, hooks read every ref supplied by Git and test the affected commit ranges. Resolve related uncommitted changes first; switch to the pushed version if it differs from the current checkout.

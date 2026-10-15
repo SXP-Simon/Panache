@@ -32,8 +32,7 @@ pasting images into a document by hand.
 
 - The page controls count the pages rendered for this preview. A default single-page preview does
   not mean that the full document has only one page.
-- The 10-page limit mentioned for `handwrite.14790897.xyz` in older documentation described an
-  upstream instance. This fork does not truncate at a fixed ten pages, but long documents remain
+- There is no fixed ten-page truncation, but long documents remain
   subject to [resource and request limits](../self-hosting/fonts-and-limits.md).
 
 ## Queueing, cooldowns and failures

@@ -45,8 +45,9 @@ frontend turns into a wait countdown. The backlog is bounded.
 TTL = 30 minutes
 ```
 
-Tasks and their rendered images are cleaned up after 30 minutes, so the disk does not fill up.
-Users need to download within that window — after expiry the same `task_id` returns 404.
+Expiry is measured from the task's last update. Submission, status, and result requests clean up
+expired tasks and their response files. Download within that window; expired task IDs return 404.
+Temporary files also have scheduled cleanup, but disk usage still needs monitoring.
 
 ## Overload protection
 
@@ -60,13 +61,9 @@ The E2E tests and the desktop build set it to 100 precisely so this guard stays 
 
 ## Text length and page count
 
-This fork has no fixed ten-page truncation. The old restriction documented for
-`handwrite.14790897.xyz` described an upstream instance, not this fork.
-
-The backend retains a public-instance text limit only when the request base URL is exactly
-`https://handwrite.sixiangjia.de/` and the text exceeds 10,000 characters. A normal self-hosted
-address does not match that condition. CPU protection, queue capacity, paper pixel validation,
-memory, and proxy timeouts still apply. Read `backend/app.py` for the actual checks.
+There is no fixed ten-page truncation or domain-specific text-length restriction.
+CPU protection, queue capacity, paper pixel validation, memory, and proxy timeouts still constrain
+long documents. Read `backend/app.py` for the actual checks.
 
 ## Rate limiting
 

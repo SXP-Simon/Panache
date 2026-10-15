@@ -61,5 +61,4 @@ Simon 自用 fork 的 `custom-base` 分支：React / TypeScript 工作台、Pyth
 ## 来源
 
 本项目基于 [14790897/handwriting-web](https://github.com/14790897/handwriting-web)。
-原作者的[演示站](https://handwrite.sixiangjia.de/)与[介绍视频](https://www.bilibili.com/video/BV1DM4y1W7fp/)
-属于上游项目，其界面、功能与限制可能不同于本 fork。
+代码授权见 [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE)，字体使用各自授权。

@@ -28,8 +28,7 @@ check that the backend is reachable.
 ## Output got truncated partway
 
 First check whether you generated the default single-page preview. Enable "Preview all pages" or
-export ZIP / PDF. The ten-page restriction documented for `handwrite.14790897.xyz` belonged to an
-upstream instance; this fork has no such fixed truncation. Long documents still depend on available
+export ZIP / PDF. There is no fixed ten-page truncation. Long documents still depend on available
 memory, proxy timeouts, and [server limits](../self-hosting/fonts-and-limits.md).
 
 ## Width/height and background image can't both be set
