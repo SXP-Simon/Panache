@@ -96,7 +96,7 @@ function main() {
   // gh release edit 没有 --notes-append，只能把拼好的整段正文写回去
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "release-notes-"));
   const file = path.join(dir, "body.md");
-  fs.writeFileSync(file, `${prefix.trimEnd()}\n\n${section}<!-- /download-guide -->${suffix}`, "utf8");
+  fs.writeFileSync(file, `${prefix.trimEnd()}\n\n${section}<!-- /download-guide -->${suffix}`.trimEnd() + "\n", "utf8");
   try {
     gh(["release", "edit", tag, "--notes-file", file]);
     console.log(`已把「下载哪个包」追加到 ${tag}`);
