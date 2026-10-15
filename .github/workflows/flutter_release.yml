@@ -152,7 +152,10 @@ jobs:
       - name: Build pinned Flutter desktop source with the release version
         working-directory: flutter-source
         shell: bash
-        run: python scripts/build-flutter-desktop.py --version "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+        run: |
+          set -euo pipefail
+          FLUTTER_BIN="$(python -c 'import shutil; print(shutil.which("flutter") or "flutter")')"
+          python scripts/build-flutter-desktop.py --flutter "$FLUTTER_BIN" --version "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
       - name: Validate the packaged backend and displayed release version
         working-directory: flutter-source
         shell: bash
