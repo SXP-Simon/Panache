@@ -247,9 +247,12 @@ jobs:
               x86_64) TARGET_PLATFORM="android-x64" ;;
               *) echo "::error::Unsupported ABI: $ABI"; exit 1 ;;
             esac
-            flutter build apk --release --target-platform "$TARGET_PLATFORM" --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
-            mv "$OUTPUT_DIR/app-release.apk" "$OUTPUT_DIR/app-${ABI}-release.apk"
             APK="$OUTPUT_DIR/app-${ABI}-release.apk"
+            flutter build apk --release --split-per-abi --target-platform "$TARGET_PLATFORM" --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+            if [ ! -f "$APK" ]; then
+              echo "::error::Missing split APK: $APK"
+              exit 1
+            fi
             "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apk-signature-${ABI}.txt"
             if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature-${ABI}.txt"; then
               echo "::error::Debug-signed APK cannot be uploaded as a release"
