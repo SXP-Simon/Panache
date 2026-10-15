@@ -94,6 +94,7 @@ test('reset removes background and uploaded font and preset cannot override a ba
   page,
 }) => {
   await openHome(page);
+  const initialFont = await page.getByTestId('font-select').inputValue();
   await useSmallCanvas(page);
   const font = path.join(__dirname, '..', '..', 'backend', 'font_assets', '云烟体.ttf');
   await page.getByTestId('font-file-input').setInputFiles({
@@ -111,7 +112,7 @@ test('reset removes background and uploaded font and preset cannot override a ba
   await page.getByTestId('reset-settings-btn').click();
   await expect(page.getByTestId('width-input')).toBeEnabled();
   await expect(page.getByTestId('font-size-input')).toHaveValue('124');
-  await expect(page.getByTestId('font-select')).toHaveValue('云烟体.ttf');
+  await expect(page.getByTestId('font-select')).toHaveValue(initialFont);
   await expect(
     page.getByTestId('font-select').locator('option[value="reset-upload.ttf"]'),
   ).toHaveCount(0);
