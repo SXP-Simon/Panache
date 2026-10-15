@@ -40,6 +40,11 @@ storage boundaries, and [Local Development](docs/en/development.md) for setup an
 The toolchain requires Node.js 24+, pnpm 10.13.1, Python 3.12+, and uv; manifests and lockfiles specify
 the exact dependency versions.
 
+Lefthook and CI select checks from actual Git paths: the staged changes before a commit and all
+outgoing refs before a push. Missing comparison history falls back to full validation. Commit scopes
+use `fe/...` for `frontend/...` and `be/...` for `backend/...`; they do not control which checks run.
+See [Local Development](docs/en/development.md#selective-checks-and-ci) for the manual full checks and CI gate.
+
 ## Function
 
 ### Custom Fonts

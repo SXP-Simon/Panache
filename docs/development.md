@@ -40,8 +40,12 @@ VS Code 的 `Ctrl+Shift+B` 任务会安装依赖、并行启动服务并打开�
 以下命令均在仓库根目录执行：
 
 ```bash
-# TypeScript、Oxlint、格式、Ruff 与 Pyright
+# 完整质量检查：前后端静态检查、hooks 与桌面存储检查
 pnpm run quality:check
+
+# 查看暂存区将触发的检查；按暂存区运行相关测试
+pnpm run checks:plan -- --staged
+pnpm run test:affected -- --staged
 
 # 提交约定、前端转换与生成、桌面存储、后端单元测试
 pnpm run test:unit
@@ -64,12 +68,13 @@ Web E2E 驱动真实前后端进行渲染与下载，部分异常分支使用路
 找不到解释器时，可通过 `E2E_PYTHON` 指定。失败截图与 trace 位于
 `e2e/test-results/`，用 `pnpm --filter handwriting-web-e2e run report` 打开 HTML 报告。
 
-桌面测试单独驱动打包产物，不包含在 `test:all` 中：
+桌面测试单独构建并驱动打包产物，不包含在 `test:all` 中：
 
 ```bash
-bash desktop/build.sh --app-only
-pnpm --filter handwriting-web-e2e run test:desktop
+pnpm run test:desktop
 ```
+
+已有目录版产物时，可以直接运行 `pnpm --filter handwriting-web-e2e run test:desktop`。
 
 桌面构建使用 uv 的 `build` extra；`--skip-deps` 前需自行准备环境：
 
@@ -96,9 +101,49 @@ bash desktop/build.sh --app-only --skip-deps
 
 ## 提交约定
 
-`pnpm install` 自动安装 Lefthook。提交前执行完整质量门禁，推送前执行完整测试；
-不能通过跳过 hook 代替修复。每个提交聚焦一个可独立审阅的变更，使用
+`pnpm install` 自动安装 Lefthook。已有自定义 hooks 时需先整合，不能直接覆盖。
+每个提交聚焦一个可独立审阅的变更，使用
 `type(scope): 描述`，正文包含独立、非空的「背景：」「解决手段：」「收益：」段落。
+
+scope 描述真实代码路径；前后端分别以 `fe/`、`be/` 为别名，例如：
+
+```text
+fix(fe/src/components): 改善参数面板的键盘操作
+fix(be/math_page_layout.py): 修复公式分页边界
+test(scripts): 补充检查范围的回归测试
+ci(scripts): 调整检查范围与工作流的衔接
+docs(docs/development.md): 说明本地验证入口
+```
+
+`fe/` 对应 `frontend/`，`be/` 对应 `backend/`；scope 中的目录或文件应覆盖本次实际改动。
+新约定不要求改写历史提交。提交说明校验始终执行，普通提交不能通过跳过 CI 的标记免检。
 
 用户可见文字同时提供中英文；E2E 操作元素添加 `data-testid`。
 版本文件、发布 tag 与 `CHANGELOG.md` 由 semantic-release 管理。
+
+## 按需检查与 CI
+
+本地 hooks 和 CI 共用 `scripts/change-impact.cjs`，从 Git 实际改动路径规划检查，
+不根据提交类型或 scope 跳过检查。多个范围取检查集合的并集；删除与重命名也参与判断。
+
+- 提交前读取暂存区，执行相关质量检查和空白错误检查。相关文件存在未暂存修改时会停止，避免用工作区的新版本替代暂存版本进行验证。
+- 推送前读取 Git 提供的全部待推送 ref，运行这些提交实际影响的测试。相关未提交修改需要先处理；待推送版本与当前检出版本不一致时需切换后验证。
+- 新分支或缺失比较基线时执行完整验证；手动运行 Engineering quality 也执行完整验证。只删除远端 ref 时无需运行应用测试。
+- `pnpm run quality:check` 保留完整质量检查；`test:all` 保留完整 Web 测试，`test:desktop` 单独验证打包桌面版。`pnpm run test:affected -- --all` 可主动运行全部按需测试组。
+
+一般情况下，纯说明文档不触发应用检查；`docs/` 和 MkDocs 配置触发文档构建。
+前端改动选择前端质量、单元测试、构建及相关浏览器验证；后端改动选择 Python 质量、单元测试及相关接口验证。
+桌面桥、存储与打包入口改动增加桌面验证；共享依赖或无法归类的输入扩大检查范围。
+精确映射以 `scripts/change-impact.cjs` 及其测试为准。
+
+Engineering quality 在推送到 `custom-base`、面向 `custom-base` 的 PR 与手动运行时启动。
+轻量范围规划和 `Engineering quality gate` 始终运行，其余质量、Docker、文档与桌面任务按计划执行。
+分支保护应选择稳定的汇总门禁 `Engineering quality gate`。
+
+自动发布和镜像构建消费同一次成功检查的计划与提交哈希：只有应用相关改动才进入版本分析，
+镜像只在相应输入变化时构建。桌面发布读取对应版本发布的结果，构建确切的 tag；手动补构建入口保留。
+文档部署只监听 `custom-base` 的文档输入。`main` 用于镜像同步上游，不触发自用构建与发布。
+旧的独立后端、E2E 与 MySQL 工作流仅保留手动入口，避免重复自动执行。
+
+Docker 发布需配置自有镜像地址变量 `FRONTEND_IMAGE`、`BACKEND_IMAGE` 和相应仓库凭据；
+未配置镜像地址时不执行登录、构建或推送，不沿用上游账号地址。

@@ -67,6 +67,7 @@ cd ..
 
 # 工程质量门禁与构建
 pnpm run quality:check
+pnpm run checks:plan -- --staged
 pnpm --filter handwrite run build
 
 # 单元测试与全部测试（包含浏览器 E2E）
@@ -76,18 +77,22 @@ pnpm run test:all
 
 # 桌面版构建
 bash desktop/build.sh
+# 构建并测试桌面目录版
+pnpm run test:desktop
 ```
 
-自用发布从 `custom-base` 进行：工程质量工作流通过后触发 semantic-release，再由桌面工作流构建安装包。`main` 只同步上游。
+自用发布从 `custom-base` 进行：工程质量工作流通过且实际改动涉及应用时触发 semantic-release，再由桌面工作流按本次发布结果构建安装包。`main` 只同步上游。
 桌面版按构建机的平台与架构出包，产物上传使用 `scripts/upload-release-assets.sh`。
 
 本地 `pnpm install` 自动安装 Lefthook；需要重装时运行 `pnpm run hooks:install`。
-提交前执行完整质量门禁，推送前执行完整测试；CI 直接运行相同检查，不安装本机 hooks。
+Lefthook 与 CI 共享 `scripts/change-impact.cjs`，根据真实 Git 改动路径选择必要检查；提交前检查暂存区，推送前检查全部待推送 ref 的提交范围。缺失比较基线时执行完整检查。
+手动完整检查入口保留 `quality:check`、`test:all` 与独立的 `test:desktop`；CI 不安装本机 hooks，始终运行范围规划与汇总门禁。
 已有自定义 hooks 必须先整合，不能通过覆盖或跳过检查安装新 hooks。
 
 ## 开发约定
 
 - 提交遵循 Conventional Commits；正文必须包含「背景：」「解决手段：」「收益：」三个独立非空段落，每个提交聚焦一个逻辑变更。
+- scope 对应实际改动路径：前端用 `fe/…` 对应 `frontend/…`，后端用 `be/…` 对应 `backend/…`；其他范围使用实际目录，如 `scripts`、`desktop`、`docs`。scope 只描述职责，不控制检查是否执行。
 - 提交消息由 `scripts/check-commit-message.cjs` 校验；只有发布流程生成的精确版本发布消息可免正文，普通提交不能使用跳过 CI 的指令。CI 不追溯规则引入前的历史提交。
 - 根据改动运行相关检查，提交前处理新增错误。
 - 用户可见文字同时提供中英文，复用前端的集中翻译入口。

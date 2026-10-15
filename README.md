@@ -89,7 +89,7 @@ Electron 外壳只使用 Electron 和 Node 内置模块，后端由 PyInstaller 
 `npmRebuild` 保持关闭，避免打包器在 pnpm 工作区中再次安装生产依赖并裁剪构建工具。
 新增原生 Node 运行依赖时，需要同步调整对应的安装与重建配置。
 
-`pnpm install` 自动安装 Lefthook。提交前检查 TypeScript、Oxlint、格式、Pyright 和 Ruff；推送前运行完整测试。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，建议按最小独立改动提交。
+`pnpm install` 自动安装 Lefthook。提交前按暂存区实际路径选择质量检查，推送前按全部待推送提交选择相关测试；缺失比较基线时执行完整验证。scope 按真实路径区分 `fe/` 与 `be/`，不能用于跳过检查。提交必须遵循 Conventional Commits，正文包含非空的「背景：」「解决手段：」「收益：」三段，按最小独立改动提交。完整手动入口与规则见[本地开发](./docs/development.md#按需检查与-ci)。
 
 ```text
 fix(math): 修正嵌套根式的横线范围

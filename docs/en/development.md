@@ -41,8 +41,12 @@ In VS Code, `Ctrl+Shift+B` installs dependencies, starts both servers, and opens
 Run these from the repository root:
 
 ```bash
-# TypeScript, Oxlint, formatting, Ruff, and Pyright
+# Full quality checks: frontend/backend analysis, hooks, and desktop storage
 pnpm run quality:check
+
+# Preview checks selected for staged paths; run their affected tests
+pnpm run checks:plan -- --staged
+pnpm run test:affected -- --staged
 
 # Commit conventions, frontend conversion/generation, desktop storage, backend unit tests
 pnpm run test:unit
@@ -66,12 +70,13 @@ servers retain their existing environment. Set `E2E_PYTHON` if interpreter disco
 Failure screenshots and traces go to `e2e/test-results/`. Open the HTML report with
 `pnpm --filter handwriting-web-e2e run report`.
 
-Desktop tests drive the packaged application separately and are not included in `test:all`:
+Desktop tests build and drive the packaged application separately and are not included in `test:all`:
 
 ```bash
-bash desktop/build.sh --app-only
-pnpm --filter handwriting-web-e2e run test:desktop
+pnpm run test:desktop
 ```
+
+To test an existing packaged directory, run `pnpm --filter handwriting-web-e2e run test:desktop` directly.
 
 The desktop build uses uv's `build` extra. Prepare dependencies yourself before `--skip-deps`:
 
@@ -99,10 +104,58 @@ Read source and tests for exact fields and parameters.
 
 ## Commit conventions
 
-`pnpm install` installs Lefthook. Commits run the complete quality gate; pushes run the full test
-command. Fix failures instead of skipping hooks. Each commit should contain one reviewable change,
+`pnpm install` installs Lefthook. Integrate existing custom hooks before installation instead of
+overwriting them. Each commit should contain one reviewable change,
 use `type(scope): description`, and include separate, non-empty `背景：`, `解决手段：`, and `收益：`
 paragraphs explaining the background, solution, and benefit.
 
+Use scopes that describe actual paths, with `fe/` and `be/` aliases for frontend and backend:
+
+```text
+fix(fe/src/components): improve keyboard access to parameter controls
+fix(be/math_page_layout.py): correct formula page boundaries
+test(scripts): cover changed-path check selection
+ci(scripts): connect affected checks with workflows
+docs(docs/development.md): explain local validation commands
+```
+
+`fe/` maps to `frontend/`; `be/` maps to `backend/`. The file or directory named by a scope should
+cover the actual change. This convention does not require rewriting historical commits.
+Commit messages are always validated; ordinary commits cannot opt out with skip-CI markers.
+
 Provide both Chinese and English user-visible strings and `data-testid` attributes for E2E actions.
 semantic-release manages release versions, tags, and `CHANGELOG.md`.
+
+## Selective checks and CI
+
+Local hooks and CI share `scripts/change-impact.cjs`. The planner reads actual Git paths rather
+than commit types or scopes. Multiple areas select the union of their checks; deletions and renames
+also count.
+
+- Before a commit, hooks inspect staged paths, run the related quality checks, and check whitespace errors. Related unstaged changes stop validation so that checks cannot test a newer working-tree version in place of the staged version.
+- Before a push, hooks read every ref supplied by Git and test the affected commit ranges. Resolve related uncommitted changes first; switch to the pushed version if it differs from the current checkout.
+- A new branch or missing comparison baseline selects full validation. Manual Engineering quality runs also select full validation. Deleting remote refs alone does not require application tests.
+- `pnpm run quality:check` retains full quality validation. `test:all` retains the complete Web test suite, while `test:desktop` validates the packaged desktop app separately. Use `pnpm run test:affected -- --all` to run every affected-test group explicitly.
+
+Ordinary prose-only changes do not trigger application checks; changes to `docs/` or MkDocs
+configuration select the documentation build. Frontend changes select frontend quality, unit tests,
+builds, and relevant browser checks. Backend changes select Python quality, unit tests, and relevant
+API checks. Desktop bridge, storage, and packaging entry points add desktop validation. Shared
+dependencies and unclassified inputs expand the check set. Read `scripts/change-impact.cjs` and its
+tests for exact mappings.
+
+Engineering quality runs for pushes to `custom-base`, PRs targeting `custom-base`, and manual runs.
+Lightweight planning and `Engineering quality gate` always run; quality, Docker, documentation,
+and packaged desktop jobs run when selected. Use the stable `Engineering quality gate` check for
+branch protection.
+
+Automatic release and image workflows consume the plan and commit SHA from the same successful
+check run. Only application changes enter release analysis; images build when their inputs change.
+Desktop releases consume the corresponding release result and build its exact tag, with manual
+rebuilds still available. Documentation deploys follow documentation inputs on `custom-base`.
+`main` mirrors upstream and does not trigger custom application builds or releases. Legacy standalone
+backend, E2E, and MySQL workflows retain manual entry points without duplicating automatic checks.
+
+Docker publishing requires your own `FRONTEND_IMAGE` and `BACKEND_IMAGE` repository variables and
+the corresponding registry credentials. Without an image address, login, building, and pushing are
+skipped. Configure your own namespace instead of the upstream account.
