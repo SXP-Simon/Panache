@@ -1,5 +1,8 @@
 name: Rust 后端
 on:
+  push:
+    branches: ["flutter"]
+    paths: ["VERSION", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
   pull_request:
     paths: ["VERSION", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
   workflow_dispatch:
