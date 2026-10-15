@@ -252,6 +252,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
             <div key={image.id} className="inline-image-row">
               <button
                 className="inline-image-trigger"
+                data-testid={`inline-image-preview-${image.index}`}
                 type="button"
                 aria-label={`${t('imagePreview')} ${image.alt}`}
                 onClick={() => setActiveImageIndex(image.index)}
@@ -262,6 +263,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
                 <span>{image.alt}</span>
                 <input
                   type="range"
+                  data-testid={`inline-image-scale-${image.index}`}
                   min="20"
                   max="700"
                   step="10"
@@ -274,6 +276,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
                 variant="ghost"
                 size="icon"
                 aria-label={t('removeImage')}
+                data-testid={`inline-image-remove-${image.index}`}
                 onClick={() => removeImage(image.index)}
               >
                 <X size={15} />
@@ -282,11 +285,16 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
           ))}
         </div>
       )}
-      <div className="symbol-strip">
-        <span>{t('symbols')}</span>
+      <div className="symbol-strip" data-testid="symbol-strip">
+        <span data-testid="symbol-strip-label">{t('symbols')}</span>
         {['⇒', '→', '∈', 'Σ', 'α', 'β', 'π', '²', '³', '√', '≤', '≥', '≠', '|', '∑', '∞'].map(
           (symbol) => (
-            <button key={symbol} type="button" onClick={() => insert(symbol)}>
+            <button
+              key={symbol}
+              type="button"
+              data-testid={`quick-symbol-${symbol}`}
+              onClick={() => insert(symbol)}
+            >
               {symbol}
             </button>
           ),
@@ -316,6 +324,7 @@ export default function EditorPanel({ workspace: w }: { workspace: Workspace }) 
             {[50, 100, 200, 300, 500, 700].map((scale) => (
               <Button
                 key={scale}
+                data-testid={`image-scale-${scale}`}
                 size="small"
                 onClick={() => changeScale(activeImage.index, String(scale))}
               >

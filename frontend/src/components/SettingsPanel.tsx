@@ -121,6 +121,7 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
                 size="icon"
                 variant="ghost"
                 aria-label={t('removeBackground')}
+                data-testid="remove-background-btn"
                 onClick={w.removeBackground}
               >
                 <X size={14} />
@@ -221,7 +222,9 @@ export default function SettingsPanel({ workspace: w }: { workspace: Workspace }
         >
           <p className="help-text">{t('detectBody')}</p>
           <footer className="modal-actions">
-            <Button onClick={() => setDetectOpen(false)}>{t('cancel')}</Button>
+            <Button data-testid="detect-background-cancel" onClick={() => setDetectOpen(false)}>
+              {t('cancel')}
+            </Button>
             <Button
               variant="primary"
               data-testid="detect-background-confirm"

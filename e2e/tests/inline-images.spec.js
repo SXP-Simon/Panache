@@ -20,7 +20,7 @@ test('inline image upload, scale, reload, expanded request and removal', async (
   const text = page.getByTestId('text-input');
   await expect(text).toHaveValue(/!\[插图 1\]/);
   await expect(text).not.toHaveValue(/data:image/);
-  const scale = page.getByRole('slider');
+  const scale = page.getByTestId('inline-image-scale-1');
   await scale.fill('150');
   await expect(text).toHaveValue(/!\[插图 1\|150%\]/);
   await page.reload();
@@ -33,7 +33,7 @@ test('inline image upload, scale, reload, expanded request and removal', async (
   expect(body).toContain('data:image/png;base64,');
   expect(body).toContain('150%');
   await expectPreviewImageLoaded(page);
-  await page.getByRole('button', { name: '删除插图', exact: true }).click();
+  await page.getByTestId('inline-image-remove-1').click();
   await expect(text).not.toHaveValue(/!\[插图/);
   await expect(scale).toHaveCount(0);
 });

@@ -85,7 +85,9 @@ export default function Modal({
       }}
     >
       <header className="modal-heading">
-        <h2 id={titleId}>{title}</h2>
+        <h2 id={titleId} data-testid={`${testId ?? 'modal'}-title`}>
+          {title}
+        </h2>
         <Button size="icon" variant="ghost" aria-label={closeLabel} onClick={onClose}>
           <X size={18} />
         </Button>

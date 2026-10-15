@@ -24,7 +24,7 @@ test('dialog content clicks keep it open and backdrop click closes it', async ({
   const opener = page.getByTestId('guide-btn');
   await opener.click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('heading').click();
+  await page.getByTestId('modal-title').click();
   await expect(dialog).toBeVisible();
   await page.mouse.click(5, 5);
   await expect(dialog).toHaveCount(0);

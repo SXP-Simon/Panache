@@ -21,6 +21,18 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await openHome(page);
     await fillText(page, 'A'.repeat(1000) + '\n' + '中文公式 $x^2$ '.repeat(30));
+    const symbolLayout = await page.getByTestId('symbol-strip').evaluate((strip) => {
+      const label = strip.querySelector('[data-testid="symbol-strip-label"]');
+      const text = document.createRange();
+      text.selectNodeContents(label);
+      return {
+        lines: new Set([...text.getClientRects()].map((rect) => Math.round(rect.top))).size,
+        labelWrap: getComputedStyle(label).whiteSpace,
+        overflow: strip.scrollWidth > strip.clientWidth + 1,
+        symbols: strip.querySelectorAll('button').length,
+      };
+    });
+    expect(symbolLayout).toEqual({ lines: 1, labelWrap: 'nowrap', overflow: false, symbols: 16 });
     const layout = await metrics(page);
     expect(layout.overflow).toBe(false);
     expect(layout.panels.every((panel) => panel.width >= 260)).toBe(true);

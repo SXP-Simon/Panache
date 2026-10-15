@@ -413,6 +413,7 @@ h2 svg {
 }
 .symbol-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   padding: 10px 17px;
@@ -420,11 +421,14 @@ h2 svg {
   background: color-mix(in oklch, var(--muted) 30%, transparent);
 }
 .symbol-strip span {
+  flex-shrink: 0;
+  white-space: nowrap;
   color: var(--muted-foreground);
   font-size: 10px;
-  margin-right: auto;
+  margin-right: 8px;
 }
 .symbol-strip button {
+  flex: 0 0 24px;
   min-width: 24px;
   height: 28px;
   background: transparent;

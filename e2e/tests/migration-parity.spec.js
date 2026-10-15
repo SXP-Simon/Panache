@@ -104,7 +104,7 @@ test('reset removes background and uploaded font and preset cannot override a ba
   await page
     .getByTestId('background-image-input')
     .setInputFiles(path.join(__dirname, '..', 'fixtures', 'sample-page.png'));
-  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByTestId('detect-background-cancel').click();
   await page.getByTestId('builtin-preset-select').selectOption('smallUnderlined');
   await expect(page.getByTestId('font-size-input')).toHaveValue('50');
   await expect(page.getByTestId('message-info')).toContainText('先移除背景');
@@ -156,10 +156,10 @@ test('inline preview supports original 700% scale and image paste', async ({ pag
     element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: transfer }));
   }, image);
   await expect(page.getByTestId('text-input')).toHaveValue(/!\[插图 1\]/);
-  await page.getByRole('button', { name: '插图预览 插图 1', exact: true }).click();
+  await page.getByTestId('inline-image-preview-1').click();
   const dialog = page.getByTestId('image-preview-modal');
   await expect(dialog.getByRole('img')).toBeVisible();
-  await dialog.getByRole('button', { name: '700%', exact: true }).click();
+  await page.getByTestId('image-scale-700').click();
   await expect(page.getByTestId('active-scale-badge')).toHaveText('700%');
   await page.getByTestId('scale-slider').fill('20');
   await expect(page.getByTestId('active-scale-badge')).toHaveText('20%');
@@ -173,7 +173,7 @@ test('quick symbol inserts at selection and keeps the following typed character 
   await openHome(page);
   await fillText(page, 'abcdef');
   await page.getByTestId('text-input').evaluate((element) => element.setSelectionRange(3, 3));
-  await page.getByRole('button', { name: 'α', exact: true }).click();
+  await page.getByTestId('quick-symbol-α').click();
   await expect(page.getByTestId('text-input')).toBeFocused();
   await page.keyboard.type('Z');
   await expect(page.getByTestId('text-input')).toHaveValue('abcαZdef');

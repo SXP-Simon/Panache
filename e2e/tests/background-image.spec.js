@@ -82,11 +82,11 @@ test('取消识别保留背景，可移除背景恢复尺寸输入', async ({ pa
   await page.getByTestId('background-image-input').setInputFiles(SAMPLE_PAGE);
   const dialog = page.getByRole('dialog', { name: '自动识别纸张' });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByTestId('detect-background-cancel').click();
   await expect(dialog).toHaveCount(0);
   expect(detected).toBe(false);
   await expect(page.getByTestId('width-input')).toBeDisabled();
-  await page.getByRole('button', { name: '移除背景', exact: true }).click();
+  await page.getByTestId('remove-background-btn').click();
   await expect(page.getByTestId('width-input')).toBeEnabled();
   await expect(page.getByTestId('height-input')).toBeEnabled();
 });
@@ -96,7 +96,7 @@ test('背景图作为真实生成文件发送，纸张尺寸由图片决定', as
   await useSmallCanvas(page, { fontSize: 32, lineSpacing: 50 });
   await fillText(page, '有背景的手写预览');
   await page.getByTestId('background-image-input').setInputFiles(SAMPLE_PAGE);
-  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByTestId('detect-background-cancel').click();
   const submitted = page.waitForRequest(
     (request) => request.url().endsWith('/api/generate_handwriting') && request.method() === 'POST',
   );
