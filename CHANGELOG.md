@@ -1,3 +1,20 @@
+# [1.2.0](https://github.com/SXP-Simon/handwriting-web/compare/v1.1.0...v1.2.0) (2026-10-15)
+
+
+### Bug Fixes
+
+* **be:** 移除旧站点限制并保持生成策略与部署解耦 ([ec0e662](https://github.com/SXP-Simon/handwriting-web/commit/ec0e662337b961152975069b4f7532cfd6b432ae))
+* **desktop:** 从许可源目录筛选文件并验证实际发行包 ([0eb4064](https://github.com/SXP-Simon/handwriting-web/commit/0eb4064d4d4c58a79b0dfed46e680a4f7b67cb65))
+* **desktop:** 使用自用发行身份并随包保留许可 ([76b228e](https://github.com/SXP-Simon/handwriting-web/commit/76b228e10ec21fb85942d94f6ac194adcb9d63ae))
+* **fe/public:** 移除指向上游实例的过时站点地图 ([cb64688](https://github.com/SXP-Simon/handwriting-web/commit/cb64688a5a5093e0349f71f40b9d659d13da3a38))
+* **scripts:** 累计未发布应用路径避免后续推送漏检漏发版 ([86816d5](https://github.com/SXP-Simon/handwriting-web/commit/86816d52f78da9759579714e73479df3ee0046b3))
+
+
+### Features
+
+* **api:** 统一请求契约与生成任务缓存 ([bfce708](https://github.com/SXP-Simon/handwriting-web/commit/bfce708e1459ff5dcc2d645e2a2d6628b4c075d4))
+* **desktop-storage:** 封装受限存储桥与退出前保存 ([4f15c5a](https://github.com/SXP-Simon/handwriting-web/commit/4f15c5aa2078702e3c4ec1d66f83bf7abd1738e2))
+
 # [1.1.0](https://github.com/SXP-Simon/handwriting-web/compare/v1.0.2...v1.1.0) (2026-10-15)
 
 
