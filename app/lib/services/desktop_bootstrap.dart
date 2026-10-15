@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/settings.dart';
 import '../theme/handwriting_theme.dart';
 import 'desktop_backend.dart';
 import 'workspace.dart';
@@ -72,7 +73,11 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
         await current.stop();
         return;
       }
-      final readyWorkspace = Workspace(api: api, managedBackend: true);
+      final readyWorkspace = Workspace(
+        api: api,
+        managedBackend: true,
+        settingsFactory: usesMobileBackend ? Settings.notebook : Settings.new,
+      );
       candidate = readyWorkspace;
       await readyWorkspace.initialize();
       if (!mounted || closing || !readyWorkspace.connected) {
