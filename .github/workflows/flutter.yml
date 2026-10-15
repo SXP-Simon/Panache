@@ -1,6 +1,9 @@
 name: Flutter UI
 
 on:
+  push:
+    branches: ["flutter"]
+    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", ".github/workflows/flutter.yml"]
   pull_request:
     paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", ".github/workflows/flutter.yml"]
   workflow_dispatch:
