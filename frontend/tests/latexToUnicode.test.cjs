@@ -133,6 +133,11 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     assert.equal(hasLatexMarkup(input), true, input);
   }
   assert.equal(hasLatexMarkup('R&D https://example.com'), false);
+  for (const source of ['(x)^2', '[x]_1', '3x^2']) {
+    assert.equal(hasLatexMarkup(source), true, source);
+  }
+  assert.equal(hasLatexMarkup('}^2'), false);
+  assert.equal(convert('}^2'), '}^2');
   for (const source of [String.raw`\hat{x}`, 'x^2', 'x_A', String.raw`$\binom{n}{k}$`]) {
     assert.equal(hasLatexMarkup(source), true, source);
   }

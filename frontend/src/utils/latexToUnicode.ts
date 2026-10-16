@@ -736,7 +736,7 @@ export function hasLatexMarkup(text: string) {
 }
 
 function hasBareMarkup(text: string) {
-  return /\\(?:[a-zA-Z]+)(?![a-zA-Z])|\\\\|(?<![\w])(?:[0-9]*[a-zA-Z]|[0-9]|[)\]])[_^](?:\{|[a-zA-Z0-9])/.test(
+  return /\\(?:[a-zA-Z]+)(?![a-zA-Z])|\\\\|(?:(?<![\w])(?:[0-9]*[a-zA-Z]|[0-9])|[)\]])[_^](?:\{|[a-zA-Z0-9])/.test(
     text,
   );
 }
