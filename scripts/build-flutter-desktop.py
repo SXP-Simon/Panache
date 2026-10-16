@@ -39,7 +39,7 @@ def main():
         shutil.rmtree(output)
     output.mkdir(parents=True)
     if target == 'macos':
-        source = next((ROOT / 'app/build/macos/Build/Products/Release').glob('*.app'))
+        source = ROOT / 'app/build/macos/Build/Products/Release/Panache.app'
         bundle = output / source.name
         shutil.copytree(source, bundle, symlinks=True)
         backend = bundle / 'Contents/Resources/backend'
@@ -48,7 +48,7 @@ def main():
             source = ROOT / 'app/build/windows/x64/runner/Release'
         else:
             source = ROOT / 'app/build/linux' / ('arm64' if platform.machine() in ('arm64', 'aarch64') else 'x64') / 'release/bundle'
-        bundle = output / 'HandwritingWeb'
+        bundle = output / 'Panache'
         shutil.copytree(source, bundle, symlinks=True)
         backend = bundle / 'backend'
     # macOS 的 Xcode 构建阶段已包含 sidecar，分发时直接复用。
@@ -65,10 +65,10 @@ def main():
     if target == 'macos':
         run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))
         run('codesign', '--verify', '--deep', '--strict', str(bundle))
-        archive = output / f'HandwritingWeb-{version}-{platform.machine()}.zip'
+        archive = output / f'Panache-{version}-{platform.machine()}.zip'
         run('ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(bundle), str(archive))
     else:
-        archive = shutil.make_archive(str(output / f'HandwritingWeb-{version}-{platform.machine()}'), 'zip' if target == 'windows' else 'gztar', root_dir=output, base_dir=bundle.name)
+        archive = shutil.make_archive(str(output / f'Panache-{version}-{platform.machine()}'), 'zip' if target == 'windows' else 'gztar', root_dir=output, base_dir=bundle.name)
     print(f'独立客户端：{bundle}\n分发包：{archive}')
 
 

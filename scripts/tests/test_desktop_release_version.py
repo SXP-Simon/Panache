@@ -27,7 +27,7 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 "assets/licenses/font-license.txt": "font license",
                 "assets/font_assets/font.ttf": "font",
                 "target/release/handwriting-server.exe": "backend",
-                "app/build/windows/x64/runner/Release/app.exe": "app",
+                "app/build/windows/x64/runner/Release/handwriting_app.exe": "app",
             }
             for name, value in files.items():
                 path = root / name
@@ -49,10 +49,30 @@ class DesktopReleaseVersionTest(unittest.TestCase):
             self.assertEqual((root / "VERSION").read_text(), "1.34.0\n")
             self.assertTrue(any("--build-name=2.3.4" in command and
                                 "--build-number=2003004" in command for command in commands))
-            archive = root / "target/desktop-package/windows/HandwritingWeb-2.3.4-AMD64.zip"
+            archive = root / "target/desktop-package/windows/Panache-2.3.4-AMD64.zip"
             with zipfile.ZipFile(archive) as package:
-                self.assertEqual(package.read("HandwritingWeb/backend/VERSION"), b"2.3.4\n")
-                self.assertIn("HandwritingWeb/backend/licenses/font-license.txt", package.namelist())
+                self.assertEqual(package.read("Panache/backend/VERSION"), b"2.3.4\n")
+                self.assertIn("Panache/handwriting_app.exe", package.namelist())
+                self.assertIn("Panache/backend/licenses/font-license.txt", package.namelist())
+
+    def test_macos_selects_panache_app_even_if_a_stale_legacy_bundle_exists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            products = root / "app/build/macos/Build/Products/Release"
+            for name in ["HandwritingWeb", "Panache"]:
+                binary = products / f"{name}.app/Contents/MacOS/{name}"
+                binary.parent.mkdir(parents=True)
+                binary.write_text(name)
+            with patch.object(MODULE, "ROOT", root), \
+                 patch.object(MODULE.platform, "system", return_value="Darwin"), \
+                 patch.object(MODULE.platform, "machine", return_value="arm64"), \
+                 patch.object(MODULE, "run") as run, \
+                 patch("sys.argv", [str(SOURCE), "--version", "2.3.4"]):
+                MODULE.main()
+            output = root / "target/desktop-package/macos"
+            self.assertTrue((output / "Panache.app/Contents/MacOS/Panache").is_file())
+            self.assertFalse((output / "HandwritingWeb.app").exists())
+            self.assertIn(str(output / "Panache-2.3.4-arm64.zip"), run.call_args.args)
 
     def test_invalid_release_inputs_fail_before_running_builds(self):
         for arguments in [["--version", "../../wrong"], ["--version", "1.2.3", "--build-number", "0"],
