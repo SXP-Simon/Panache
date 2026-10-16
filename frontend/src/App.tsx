@@ -52,7 +52,7 @@ function Studio() {
       <header className="app-header">
         <div className="brand">
           <span className="brand-mark">
-            <img src={brandIcon} alt="" aria-hidden="true" />
+            <img src={brandIcon} width={38} height={38} alt="" aria-hidden="true" />
           </span>
           <span>
             <a className="brand-home" href="/" data-testid="brand-title">
@@ -60,14 +60,14 @@ function Studio() {
             </a>
             <a
               className="project-source-link"
-              href="https://github.com/SXP-Simon/handwriting-web"
+              href="https://github.com/SXP-Simon/Panache"
               target="_blank"
               rel="noopener noreferrer"
               data-testid="project-source-link"
-              aria-label={`${t('projectSource')}: SXP-Simon/handwriting-web`}
+              aria-label={`${t('projectSource')}: SXP-Simon/Panache`}
             >
               <GitHubIcon />
-              <span>SXP-Simon/handwriting-web</span>
+              <span>SXP-Simon/Panache</span>
             </a>
           </span>
         </div>
@@ -179,7 +179,7 @@ function Studio() {
             <footer className="modal-actions">
               <a
                 className="button button--primary"
-                href="https://github.com/SXP-Simon/handwriting-web/releases"
+                href="https://github.com/SXP-Simon/Panache/releases"
                 target="_blank"
                 rel="noopener noreferrer"
               >

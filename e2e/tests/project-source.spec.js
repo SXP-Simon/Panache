@@ -6,9 +6,11 @@ for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript((language) => localStorage.setItem('studio.locale', language), locale);
       await openHome(page);
+      await expect(page).toHaveTitle('Panache');
+      await expect(page.getByTestId('brand-title')).toHaveText('Panache');
       const link = page.getByTestId('project-source-link');
-      await expect(link).toHaveText('SXP-Simon/handwriting-web');
-      await expect(link).toHaveAttribute('href', 'https://github.com/SXP-Simon/handwriting-web');
+      await expect(link).toHaveText('SXP-Simon/Panache');
+      await expect(link).toHaveAttribute('href', 'https://github.com/SXP-Simon/Panache');
       await expect(link).toHaveAttribute('target', '_blank');
       await expect(link).toBeInViewport();
       const bounds = await link.boundingBox();

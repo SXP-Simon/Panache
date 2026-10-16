@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "手写工作室 · Handwriting Studio",
-  "short_name": "手写工作室",
+  "name": "Panache",
+  "short_name": "Panache",
   "description": "支持多种字体和背景，在线生成高质量手写文字图片和PDF",
   "start_url": "/",
   "display": "standalone",
@@ -12,17 +12,17 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/web-app-manifest-192x192.png?v=0306ff6b3c6c",
+      "src": "/web-app-manifest-192x192.png?v=d5198921d452",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/web-app-manifest-512x512.png?v=0306ff6b3c6c",
+      "src": "/web-app-manifest-512x512.png?v=d5198921d452",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/icon.svg?v=0306ff6b3c6c",
+      "src": "/icon.svg?v=d5198921d452",
       "sizes": "any",
       "type": "image/svg+xml"
     }
