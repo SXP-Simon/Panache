@@ -49,7 +49,7 @@ void main() {
   test('清洗条目和引用缩进而保留独立正文及代码', () {
     expect(
       cleanMarkdown('标题\n * 条目\n   继续说明\n\n  普通缩进\n  >   引用\n > > - 嵌套条目'),
-      '标题\n条目\n继续说明\n\n  普通缩进\n引用\n嵌套条目',
+      '标题\n条目\n继续说明\n  普通缩进\n引用\n嵌套条目',
     );
     expect(
       cleanMarkdown('正文\n```text\n   - literal\n```'),

@@ -82,6 +82,45 @@ void main() {
     }
   }
 
+  for (final locale in [const Locale('zh'), const Locale('en')]) {
+    testWidgets(
+      'manual spacing survives until Markdown cleanup ${locale.languageCode}',
+      (tester) async {
+        final workspace = await openWorkbench(
+          tester,
+          size: const Size(375, 800),
+          locale: locale,
+        );
+        const manual = '第一段\n\n---\n\n第二段';
+        final input = find.byKey(const ValueKey('text-editor'));
+        await tester.enterText(input, manual);
+        await tester.pumpAndSettle();
+        expect(workspace.text, manual);
+        expect(tester.widget<TextField>(input).controller!.text, manual);
+        final l = labels(tester);
+        Future<void> openCleanup() async {
+          await tester.tap(find.byKey(const ValueKey('editor-tools')));
+          await tester.pumpAndSettle();
+          final cleanup = find.widgetWithText(ListTile, l.markdown);
+          await tester.ensureVisible(cleanup);
+          await tester.pumpAndSettle();
+          await tester.tap(cleanup);
+          await tester.pumpAndSettle();
+        }
+
+        await openCleanup();
+        await tester.tap(find.widgetWithText(TextButton, l.cancel));
+        await tester.pumpAndSettle();
+        expect(workspace.text, manual);
+        await openCleanup();
+        await tester.tap(find.widgetWithText(FilledButton, l.apply));
+        await tester.pumpAndSettle();
+        expect(workspace.text, '第一段\n第二段');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('mobile app settings name language and theme actions', (
     tester,
   ) async {
