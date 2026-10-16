@@ -4,15 +4,28 @@ import 'package:handwriting_app/utils/latex.dart';
 import 'package:handwriting_app/models/settings.dart';
 
 void main() {
-  test('Markdown 清洗保护插图、分页、右对齐和数学运算', () {
+  test('Markdown 清洗保护插图、右对齐和数学运算并移除分页空行', () {
     expect(
       cleanMarkdown('# 标题\n**正文**\n\n---\n>>>署名\n![插图 1|50%]\n3 * 5'),
-      '标题\n正文\n\n---\n>>>署名\n![插图 1|50%]\n3 * 5',
+      '标题\n正文\n>>>署名\n![插图 1|50%]\n3 * 5',
     );
     expect(
       cleanMarkdown('| 项目 | 数量 |\n| --- | --- |\n| 苹果 | 2 |'),
       '1. 项目: 苹果 (数量: 2)',
     );
+  });
+  test('清洗去掉空白行与标准化分隔符但保留行内横线', () {
+    final cleaned = cleanMarkdown(
+      '\r\n---\r\n \t\r\n甲\r\n\t---  \r\n***\r\n___\r\n<hr/>\r\n乙 --- 丙\r\n\r\n',
+    );
+    expect(cleaned, '甲\n乙 --- 丙');
+    expect(cleanMarkdown(cleaned), cleaned);
+    expect(cleanMarkdown('\n \t\n---\n'), '');
+  });
+  test('起首分页包围普通正文不能当作YAML元数据删除', () {
+    expect(cleanMarkdown('---\n第一段正文\n---\n第二段正文'), '第一段正文\n第二段正文');
+    expect(cleanMarkdown('---\ntitle: Notes\nauthor: Simon\n---\n正文'), '正文');
+    expect(cleanMarkdown('---\ntitle: Notes\n---'), '');
   });
   test('插图折叠与展开保留比例和字节', () {
     final images = <String, String>{};

@@ -16,6 +16,7 @@ Future<String?> showMarkdownDialog(
       builder: (context, update) => AlertDialog(
         title: Text(l.markdown),
         content: DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: selected,
           decoration: InputDecoration(labelText: l.tableMode),
           items: [

@@ -79,7 +79,10 @@ String cleanMarkdown(
       return protect(m[0]!);
     },
   );
-  s = s.replaceFirst(RegExp(r'^---[ \t]*\n[\s\S]*?\n---[ \t]*\n?'), '');
+  s = s.replaceFirst(
+    RegExp(r'^---[ \t]*\n(?=[ \t]*[\w-]+[ \t]*:)[\s\S]*?\n---[ \t]*(?:\n|$)'),
+    '',
+  );
   s = s
       .replaceAll(RegExp(r'<!--[\s\S]*?-->'), '')
       .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
@@ -193,7 +196,11 @@ String cleanMarkdown(
     RegExp('${RegExp.escape(tokenPrefix)}(\\d+)\uE101'),
     (m) => protected[int.parse(m[1]!)],
   );
-  return s.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  return s
+      .split('\n')
+      .where((line) => line.trim().isNotEmpty && line.trim() != '---')
+      .join('\n')
+      .trim();
 }
 
 String formatLetter(String body, String signature, String date) {
