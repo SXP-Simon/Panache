@@ -231,6 +231,21 @@ fn inline_image_scale_and_transparent_filter() {
     assert_eq!(imaging::fit(&image, 30, 30, 2.).width(), 30);
 }
 #[test]
+fn full_page_illustration_paginates_and_half_scale_leaves_room_for_text() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let mut image = RgbaImage::new(1000, 800);
+    for x in 100..900 {
+        for y in 390..410 {
+            image[(x, y)] = Rgba([0, 0, 0, 255]);
+        }
+    }
+    let data = STANDARD.encode(export::png(&image).unwrap());
+    let full = request(&format!("![图|100%](data:image/png;base64,{data})\n结尾"));
+    let half = request(&format!("![图|50%](data:image/png;base64,{data})\n结尾"));
+    assert_eq!(pages(&full).len(), 2);
+    assert_eq!(pages(&half).len(), 1);
+}
+#[test]
 fn document_order_math_entities_and_spans() {
     let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p><w:r><w:t>正文 &amp; </w:t><w:tab/><w:t>结尾</w:t></w:r><m:oMath><m:r><m:t>x²</m:t></m:r></m:oMath></w:p><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>单元格</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#;
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
