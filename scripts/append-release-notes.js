@@ -21,11 +21,11 @@ const path = require("path");
 const MARKER = "<!-- download-guide -->";
 
 const tag = process.argv[2];
-if (!tag) {
+if (!tag && require.main === module) {
   console.error("用法: node scripts/append-release-notes.js <gitTag>，例如 v1.33.0");
   process.exit(1);
 }
-const version = tag.replace(/^v/, "");
+const version = tag?.replace(/^v/, "");
 
 function gh(args) {
   // Forks may default gh to the parent repository; always resolve this checkout's origin.
@@ -35,7 +35,10 @@ function gh(args) {
   return execFileSync("gh", [...args, "--repo", repository], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
 }
 
-const section = `${MARKER}
+// The guide follows the target tag, so rebuilding an older release preserves its actual filenames.
+function downloadGuide(product, version) {
+  if (!["Panache", "HandwritingWeb"].includes(product)) throw new Error("不支持的发布产品名称");
+  return `${MARKER}
 ## 下载哪个包
 
 构建完成后，安装包会出现在本页下方的 Assets。Release 创建时构建可能仍在进行；仅下方实际出现的文件可下载。GitHub 自动提供的 Source code 是源码，不是可运行的客户端。
@@ -46,10 +49,10 @@ const section = `${MARKER}
 
 | 你的机器 | 下载这个 | 说明 |
 | --- | --- | --- |
-| Windows | \`HandwritingWeb-Setup-${version}.exe\` | **推荐**。安装版，可选安装位置，装完有桌面与开始菜单快捷方式 |
-| Windows | \`HandwritingWeb-portable-${version}.exe\` | 免安装便携版，双击直接运行 |
-| Mac（Apple 芯片，M1 及以后） | \`HandwritingWeb-${version}-arm64.dmg\` | 挂载后把 \`HandwritingWeb.app\` 拖进「应用程序」 |
-| Mac（Apple 芯片，M1 及以后） | \`HandwritingWeb-${version}-arm64.zip\` | 同一个 App 的压缩包，DMG 打不开时用这个 |
+| Windows | \`${product}-Setup-${version}.exe\` | **推荐**。安装版，可选安装位置，装完有桌面与开始菜单快捷方式 |
+| Windows | \`${product}-portable-${version}.exe\` | 免安装便携版，双击直接运行 |
+| Mac（Apple 芯片，M1 及以后） | \`${product}-${version}-arm64.dmg\` | 挂载后把 \`${product}.app\` 拖进「应用程序」 |
+| Mac（Apple 芯片，M1 及以后） | \`${product}-${version}-arm64.zip\` | 同一个 App 的压缩包，DMG 打不开时用这个 |
 
 ### Flutter 客户端
 
@@ -57,11 +60,11 @@ Flutter 界面与 Rust 离线渲染引擎，与上面的 Electron 客户端分�
 
 | 你的机器 | 文件名 | 使用方式 |
 | --- | --- | --- |
-| Windows x64 | \`Flutter-HandwritingWeb-${version}-windows-x64.zip\` | 解压整个目录后运行应用，保留同目录的资源与后端 |
-| Linux x64 | \`Flutter-HandwritingWeb-${version}-linux-x64.tar.gz\` | 解压整个目录后运行应用，需桌面 GTK 运行环境 |
-| Mac（Apple 芯片） | \`Flutter-HandwritingWeb-${version}-macos-arm64.zip\` | 解压后将其中的 App 拖入「应用程序」 |
-| Android 手机（优先选择） | \`Flutter-HandwritingWeb-${version}-android-arm64-v8a.apk\` | **推荐普通手机用户下载**，适用于 64 位 ARM 手机 |
-| Android x86_64 | \`Flutter-HandwritingWeb-${version}-android-x86_64.apk\` | 适用于 x86_64 模拟器或设备，普通 ARM 手机请选择上面的 v8a 包 |
+| Windows x64 | \`Flutter-${product}-${version}-windows-x64.zip\` | 解压完整目录，运行其中的 \`handwriting_app.exe\`，保留全部资源与后端 |
+| Linux x64 | \`Flutter-${product}-${version}-linux-x64.tar.gz\` | 解压完整目录，运行其中的 \`handwriting_app\`，需桌面 GTK 运行环境 |
+| Mac（Apple 芯片） | \`Flutter-${product}-${version}-macos-arm64.zip\` | 解压后将其中的 App 拖入「应用程序」 |
+| Android 手机（优先选择） | \`Flutter-${product}-${version}-android-arm64-v8a.apk\` | **推荐普通手机用户下载**，适用于 64 位 ARM 手机 |
+| Android x86_64 | \`Flutter-${product}-${version}-android-x86_64.apk\` | 适用于 x86_64 模拟器或设备，普通 ARM 手机请选择上面的 v8a 包 |
 
 Android 首次从旧调试版切换时，如提示签名冲突，需先卸载旧版（卸载会删除应用数据）；后续正式版沿用同一签名更新。
 两套桌面客户端目前都不提供 Intel Mac 包；iOS 尚无可直接安装的发布包。
@@ -75,15 +78,18 @@ Flutter 构建与上传进度见仓库 Actions 的 **Flutter Release Assets**；
 Electron 安装到默认位置后可执行：
 
 \`\`\`bash
-xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
+xattr -dr com.apple.quarantine /Applications/${product}.app
 \`\`\`
 
 Flutter 请将命令中的路径替换为实际安装的 App 路径。
 
 不想用命令行也行：被拦一次之后去「系统设置 → 隐私与安全性」，在下方的提示里点「仍要打开」。
 `;
+}
 
 function main() {
+  const metadata = JSON.parse(execFileSync("git", ["show", `${tag}:desktop/package.json`], { encoding: "utf8" }));
+  const section = downloadGuide(metadata.build.productName, version);
   const raw = gh(["release", "view", tag, "--json", "body", "--jq", ".body"]);
   // 正文为空时 --jq .body 会给一个字符串 "null"
   const body = raw.trim() === "null" ? "" : raw;
@@ -106,7 +112,7 @@ function main() {
   }
 }
 
-try {
+if (require.main === module) try {
   main();
 } catch (error) {
   // 故意只告警、不退出非零：这纯粹是展示文案，失败不该让发版变红。而且
@@ -114,3 +120,5 @@ try {
   // 在这里失败会连带把 Windows / macOS 桌面包一起跳过，代价远大于少一段说明。
   console.error(`!! 追加下载说明失败（不影响发版与桌面包上传）：${error.message}`);
 }
+
+module.exports = { downloadGuide };

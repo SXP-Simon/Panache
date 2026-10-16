@@ -307,7 +307,7 @@ jobs:
         working-directory: e2e
         run: npm ci --no-audit --no-fund
 
-      # 驱动刚构建出来的 mac-arm64/HandwritingWeb.app。未签名，但它是本机构建的、
+      # 驱动刚构建出来的 mac-arm64/Panache.app。未签名，但它是本机构建的、
       # 没有 quarantine 属性（只有从浏览器下载的文件才会被加上），所以能直接启动。
       - name: 桌面版 E2E（真实打包产物）
         working-directory: e2e

@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
-const { REQUIRED_WORKFLOWS, releaseVersion, sourceSha, targetTag, validateManifest, approvedRun, resolveRelease, stagePackage, verifyPackages, waitForWorkflow } = require("../flutter-release.cjs");
+const { REQUIRED_WORKFLOWS, releaseVersion, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, resolveRelease, stagePackage, verifyPackages, waitForWorkflow } = require("../flutter-release.cjs");
 
 const repository = "owner/fork";
 const sha = "a".repeat(40);
@@ -20,6 +20,7 @@ function ioFixture() {
   const refs = [];
   const files = {
     "backend/VERSION": "1.2.3\n",
+    "desktop/package.json": JSON.stringify({ build: { productName: "HandwritingWeb" } }),
     "scripts/build-flutter-desktop.py": "--version --build-number HANDWRITING_BUILD_VERSION",
     "crates/handwriting-core/src/lib.rs": "pub fn app_version() HANDWRITING_BUILD_VERSION",
     "crates/handwriting-bridge/src/api.rs": "handwriting_core::app_version()",
@@ -65,7 +66,7 @@ test("first automatic build pins exact source and all three passing push runs be
   assert.equal(result.android_initial_status, "skipped-missing-release-signing-secrets");
   assert.equal(io.writes.length, 1);
   assert.deepEqual(Object.keys(result.quality_runs), REQUIRED_WORKFLOWS);
-  assert.ok(io.refs.filter(([name]) => name !== "backend/VERSION").every(([, ref]) => ref === sha));
+  assert.ok(io.refs.filter(([name]) => !["backend/VERSION", "desktop/package.json"].includes(name)).every(([, ref]) => ref === sha));
   validateManifest(result, repository, tag);
 });
 
@@ -228,4 +229,52 @@ test("automatic retries without a manifest cannot drift to a newly advanced sour
   io.branchSha = () => assert.fail("retry must not resolve latest Flutter branch");
   await assert.rejects(resolveRelease({ ...input, runAttempt: "2" }, io), /original full Flutter SHA/);
   assert.equal(io.writes.length, 0);
+});
+
+
+test("Panache source manifests freeze download names while legacy manifests retain their names", async (t) => {
+  const io = ioFixture();
+  io.files["desktop/package.json"] = JSON.stringify({ build: { productName: "Panache" } });
+  const modern = await resolveRelease(input, io);
+  assert.equal(modern.product_name, "Panache");
+  validateManifest(modern, repository, tag);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "panache-release-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, "input.zip");
+  fs.writeFileSync(file, "archive");
+  assert.equal(path.basename(stagePackage(file, path.join(root, "modern"), "windows-x64", modern)), "Flutter-Panache-1.2.3-windows-x64.zip");
+  assert.equal(path.basename(stagePackage(file, path.join(root, "legacy"), "windows-x64", manifest())), "Flutter-HandwritingWeb-1.2.3-windows-x64.zip");
+  assert.throws(() => validateManifest({ ...modern, product_name: "../bad" }, repository, tag), /product name/);
+  const guide = require("../append-release-notes.js").downloadGuide;
+  const packageJson = require("../../desktop/package.json");
+  const notes = guide(packageJson.build.productName, "1.2.3");
+  assert.equal(packageJson.build.productName, "Panache");
+  assert.equal(packageJson.build.appId, "io.github.sxp-simon.handwriting");
+  assert.ok(notes.includes(packageJson.build.nsis.artifactName.replace("${version}", "1.2.3")));
+  assert.ok(notes.includes("Flutter-Panache-1.2.3-android-arm64-v8a.apk"));
+  assert.ok(notes.includes("/Applications/Panache.app"));
+  assert.ok(guide("HandwritingWeb", "1.2.3").includes("HandwritingWeb-Setup-1.2.3.exe"));
+});
+
+
+test("historical names require matching live GitHub repository IDs, never an alias allowlist", async () => {
+  const old = { ...manifest(), repository: "owner/old-name" };
+  const canonical = { id: 123456, full_name: repository };
+  const lookups = [];
+  const io = { repositoryInfo: async (name) => { lookups.push(name); return canonical; } };
+  assert.equal(await validatePinnedManifest(old, repository, tag, io), old);
+  assert.deepEqual(lookups.sort(), [repository, old.repository].sort());
+  assert.equal(old.repository, "owner/old-name");
+  await assert.rejects(validatePinnedManifest(old, repository, tag, {}), /does not match/);
+  await assert.rejects(validatePinnedManifest(old, repository, tag, { repositoryInfo: async (name) => ({ ...canonical, id: name === repository ? 123456 : 654321 }) }), /identity/);
+  await assert.rejects(validatePinnedManifest(old, repository, tag, { repositoryInfo: async (name) => ({ ...canonical, full_name: name }) }), /identity/);
+  await assert.rejects(validatePinnedManifest(old, repository, tag, { repositoryInfo: async () => { throw new Error("GitHub unavailable"); } }), /GitHub unavailable/);
+  await assert.rejects(validatePinnedManifest({ ...old, repository: "../invalid" }, repository, tag, io), /does not match/);
+  const pin = ioFixture();
+  pin.release = async () => ({ tag_name: tag, draft: false, assets: [{ name: "Flutter-source.json", id: 10 }] });
+  pin.manifest = async () => old;
+  pin.repositoryInfo = io.repositoryInfo;
+  pin.branchSha = () => { throw new Error("cannot re-resolve source after rename"); };
+  assert.equal((await resolveRelease(input, pin)).repository, old.repository);
+  assert.equal(pin.writes.length, 0);
 });

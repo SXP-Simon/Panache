@@ -16,7 +16,7 @@ Pending checks for the fixed SHA are polled every 30 seconds with a shared 30-mi
 
 ## Packages and signing
 
-Packages use a `Flutter-HandwritingWeb-<version>-` prefix with `windows-x64.zip`, `linux-x64.tar.gz`, `macos-arm64.zip`, and, when formally signed, `android-arm64-v8a.apk` (recommended for phones) and `android-x86_64.apk` (x86_64 emulators/devices). Each archive has a JSON provenance asset containing its source SHA, version and SHA-256. All required packages and packaged-backend version checks must pass before the retry-capable upload step.
+Packages use a `Flutter-Panache-<version>-` prefix with `windows-x64.zip`, `linux-x64.tar.gz`, `macos-arm64.zip`, and, when formally signed, `android-arm64-v8a.apk` (recommended for phones) and `android-x86_64.apk` (x86_64 emulators/devices). Each archive has a JSON provenance asset containing its source SHA, version and SHA-256. All required packages and packaged-backend version checks must pass before the retry-capable upload step.
 
 Android requires all four repository secrets: `HANDWRITING_ANDROID_KEYSTORE_BASE64`, `HANDWRITING_ANDROID_STORE_PASSWORD`, `HANDWRITING_ANDROID_KEY_ALIAS`, and `HANDWRITING_ANDROID_KEY_PASSWORD`. Without all four, APK publishing is explicitly skipped in the source manifest and job summary. A temporary signing file is removed after use; `apksigner verify` must pass and Android Debug certificates are rejected. A debug-signed local APK is not a release substitute.
 
@@ -29,3 +29,5 @@ Run **Flutter Release Assets** with an existing `tag`. A first build for a histo
 If the first run failed before creating its manifest, use Run workflow with the original SHA from its waiting logs; an automatic retry cannot resolve a newer branch.
 
 Retries recheck the same source and use the same build number. Adding signing secrets later allows the formally signed APK to be added from that source, without selecting a newer branch commit.
+
+The manifest `product_name` fixes the download package brand. Historical manifests without this field keep the original `HandwritingWeb` prefix, so retries do not rename existing release assets.

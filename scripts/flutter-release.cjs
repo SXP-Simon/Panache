@@ -33,11 +33,18 @@ function targetTag({ event, manualTag, result, sourceRunId }) {
   return result.tag;
 }
 
+function productName(manifest) {
+  const name = manifest.product_name ?? "HandwritingWeb";
+  if (!["Panache", "HandwritingWeb"].includes(name)) throw new Error("Unsupported immutable release product name.");
+  return name;
+}
+
 function validateManifest(manifest, repository, tag) {
   const version = releaseVersion(tag);
   if (manifest?.schema_version !== 1 || manifest.repository !== repository || manifest.release_tag !== tag || manifest.version !== version.version || manifest.build_number !== version.build_number) {
     throw new Error("The immutable Flutter source manifest does not match this release.");
   }
+  productName(manifest);
   sourceSha(manifest.flutter_sha);
   for (const workflow of REQUIRED_WORKFLOWS) {
     const run = manifest.quality_runs?.[workflow];
@@ -46,6 +53,19 @@ function validateManifest(manifest, repository, tag) {
     }
   }
   return manifest;
+}
+
+async function validatePinnedManifest(manifest, repository, tag, io) {
+  if (manifest?.repository === repository) return validateManifest(manifest, repository, tag);
+  if (![repository, manifest?.repository].every((name) => typeof name === "string" && /^[\w.-]+\/[\w.-]+$/u.test(name) && name.split("/").every((part) => part !== "." && part !== "..")) || typeof io.repositoryInfo !== "function") {
+    throw new Error("The immutable Flutter source manifest does not match this repository.");
+  }
+  // Names are mutable. Only GitHub's live immutable repository IDs can authorize an old name.
+  const [current, previous] = await Promise.all([io.repositoryInfo(repository), io.repositoryInfo(manifest.repository)]);
+  if (!Number.isSafeInteger(current.id) || current.id < 1 || current.id !== previous.id || typeof current.full_name !== "string" || current.full_name.toLowerCase() !== previous.full_name?.toLowerCase()) {
+    throw new Error("Historical repository name does not resolve to the current repository identity.");
+  }
+  return validateManifest(manifest, manifest.repository, tag);
 }
 
 function latestRun(runs, sha, repository) {
@@ -109,7 +129,7 @@ async function resolveRelease(input, io) {
   if ((await io.file("backend/VERSION", tag)).trim() !== version.version) throw new Error("Target tag and custom-base release version disagree.");
   const assets = release.assets.filter((asset) => asset.name === MANIFEST);
   if (assets.length > 1) throw new Error("Ambiguous Flutter source manifests on the target release.");
-  let manifest = assets.length ? validateManifest(await io.manifest(assets[0].id), input.repository, tag) : null;
+  let manifest = assets.length ? await validatePinnedManifest(await io.manifest(assets[0].id), input.repository, tag, io) : null;
   let sha;
   if (manifest) {
     sha = manifest.flutter_sha;
@@ -138,6 +158,7 @@ async function resolveRelease(input, io) {
   if (!manifest) {
     manifest = {
       schema_version: 1,
+      product_name: JSON.parse(await io.file("desktop/package.json", tag)).build.productName,
       repository: input.repository,
       release_tag: tag,
       ...version,
@@ -147,6 +168,7 @@ async function resolveRelease(input, io) {
       android_policy: "Only externally supplied release signing keys; omit APK when all signing secrets are unavailable.",
       ios_policy: "No IPA without distribution signing and provisioning.",
     };
+    productName(manifest);
     await io.publishManifest(tag, manifest); // Never overwrite this source-of-truth asset.
   }
   return manifest;
@@ -161,11 +183,11 @@ function stagePackage(input, output, platform, manifest) {
   const extension = platform.startsWith("android") ? ".apk" : platform.startsWith("linux") ? ".tar.gz" : ".zip";
   if (!input.endsWith(extension) || !fs.statSync(input).isFile()) throw new Error("Unexpected package format.");
   fs.mkdirSync(output, { recursive: true });
-  const name = `Flutter-HandwritingWeb-${manifest.version}-${platform}${extension}`;
+  const name = `Flutter-${productName(manifest)}-${manifest.version}-${platform}${extension}`;
   const destination = path.join(output, name);
   fs.copyFileSync(input, destination);
   fs.writeFileSync(path.join(output, `${name}.json`), `${JSON.stringify({
-    schema_version: 1, repository: manifest.repository, release_tag: manifest.release_tag,
+    schema_version: 1, product_name: productName(manifest), repository: manifest.repository, release_tag: manifest.release_tag,
     version: manifest.version, build_number: manifest.build_number,
     flutter_sha: manifest.flutter_sha, platform, file: name, sha256: digest(destination),
   }, null, 2)}\n`);
@@ -178,9 +200,9 @@ function verifyPackages(directory, manifest, android) {
   const platforms = new Set();
   for (const file of files.filter((name) => name.endsWith(".json"))) {
     const info = JSON.parse(fs.readFileSync(path.join(directory, file), "utf8"));
-    if (info.schema_version !== 1 || info.repository !== manifest.repository || info.release_tag !== manifest.release_tag || info.version !== manifest.version || info.build_number !== manifest.build_number || info.flutter_sha !== manifest.flutter_sha || !PLATFORMS.includes(info.platform) || platforms.has(info.platform)) throw new Error("Package provenance does not match pinned release source.");
+    if (productName(info) !== productName(manifest) || info.schema_version !== 1 || info.repository !== manifest.repository || info.release_tag !== manifest.release_tag || info.version !== manifest.version || info.build_number !== manifest.build_number || info.flutter_sha !== manifest.flutter_sha || !PLATFORMS.includes(info.platform) || platforms.has(info.platform)) throw new Error("Package provenance does not match pinned release source.");
     const extension = info.platform.startsWith("android") ? ".apk" : info.platform.startsWith("linux") ? ".tar.gz" : ".zip";
-    const expected = `Flutter-HandwritingWeb-${manifest.version}-${info.platform}${extension}`;
+    const expected = `Flutter-${productName(manifest)}-${manifest.version}-${info.platform}${extension}`;
     if (info.file !== expected || file !== `${expected}.json` || digest(path.join(directory, expected)) !== info.sha256) throw new Error("Package name or checksum does not match provenance.");
     platforms.add(info.platform);
     packages.push(expected, file);
@@ -196,6 +218,10 @@ function github(repository) {
   const api = (route) => JSON.parse(gh("api", `repos/${repository}/${route}`));
   let deadline;
   return {
+    repositoryInfo: (name) => {
+      if (!/^[\w.-]+\/[\w.-]+$/u.test(name)) throw new Error("Invalid repository name.");
+      return JSON.parse(gh("api", `repos/${name}`));
+    },
     release: (tag) => api(`releases/tags/${encodeURIComponent(tag)}`),
     file: (file, ref) => Buffer.from(api(`contents/${file}?ref=${encodeURIComponent(ref)}`).content, "base64").toString("utf8"),
     branchSha: () => api("git/ref/heads/flutter").object.sha,
@@ -241,11 +267,11 @@ async function main() {
   } else if (command === "stage" || command === "verify") {
     const [manifestFile, directory, platform, input] = args;
     const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
-    validateManifest(manifest, process.env.GITHUB_REPOSITORY, manifest.release_tag);
+    await validatePinnedManifest(manifest, process.env.GITHUB_REPOSITORY, manifest.release_tag, github(process.env.GITHUB_REPOSITORY));
     if (command === "stage") stagePackage(input, directory, platform, manifest);
     else verifyPackages(directory, manifest, platform === "true");
   } else throw new Error("Use flutter-release.cjs resolve|stage|verify.");
 }
 
-module.exports = { MANIFEST, REQUIRED_WORKFLOWS, releaseVersion, sourceSha, targetTag, validateManifest, approvedRun, sourceContract, resolveRelease, stagePackage, verifyPackages, waitForWorkflow };
+module.exports = { MANIFEST, REQUIRED_WORKFLOWS, releaseVersion, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, sourceContract, resolveRelease, stagePackage, verifyPackages, waitForWorkflow };
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });

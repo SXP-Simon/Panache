@@ -16,10 +16,10 @@ Flutter 来源必须支持显式版本构建和正式 Android 签名接口；旧
 
 ## 产物
 
-- `Flutter-HandwritingWeb-<version>-windows-x64.zip`
-- `Flutter-HandwritingWeb-<version>-linux-x64.tar.gz`
-- `Flutter-HandwritingWeb-<version>-macos-arm64.zip`
-- 配置正式签名后：`Flutter-HandwritingWeb-<version>-android-arm64-v8a.apk`（手机优先）和 `Flutter-HandwritingWeb-<version>-android-x86_64.apk`（x86_64 模拟器或设备）
+- `Flutter-Panache-<version>-windows-x64.zip`
+- `Flutter-Panache-<version>-linux-x64.tar.gz`
+- `Flutter-Panache-<version>-macos-arm64.zip`
+- 配置正式签名后：`Flutter-Panache-<version>-android-arm64-v8a.apk`（手机优先）和 `Flutter-Panache-<version>-android-x86_64.apk`（x86_64 模拟器或设备）
 
 每个包带独立 `.json` 证明文件，包含源 SHA、版本与 SHA-256。全部必要桌面包构建、打包后版本验证及证明检查通过后，统一使用带重试的上传脚本发布，避免部分构建失败时提前发布另一组包。`Flutter-` 前缀与 Electron 安装包区分。
 
@@ -49,3 +49,5 @@ Actions → Flutter Release Assets → Run workflow：
 若首次运行在写入 manifest 前失败，不能直接重跑自动运行来重新选择分支；应通过 Run workflow 显式填写首次等待日志中的原 SHA。
 
 补跑会重新核验该 SHA 的必要工作流并保持相同构建号。配置签名后，可用同一 manifest/SHA 补充正式 APK；不会移动来源，也不会选用 `flutter` 最新版本。
+
+发布清单的 `product_name` 固定下载包的产品名称。历史清单缺少该字段时继续使用原 `HandwritingWeb` 前缀，补跑不会重命名旧版本资产。
