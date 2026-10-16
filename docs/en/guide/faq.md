@@ -57,7 +57,7 @@ That is by design — it removes every blank line and re-indents by two spaces p
 
 ## Can I use this commercially?
 
-The **code** is MIT licensed — see [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE).
+The **code** is MIT licensed — see [LICENSE](https://github.com/SXP-Simon/Panache/blob/custom-base/LICENSE).
 Retain the original authors' and contributors' licence and copyright notices when distributing it.
 
 **Fonts are a separate matter.** The fonts bundled in the repository and any fonts you upload each
@@ -66,5 +66,5 @@ licences of the files in `ttf_files/` yourself — do not assume they are MIT al
 
 ## Where do I ask questions?
 
-- This fork's GitHub Issues: <https://github.com/SXP-Simon/handwriting-web/issues>. Include the version,
+- This fork's GitHub Issues: <https://github.com/SXP-Simon/Panache/issues>. Include the version,
   reproduction steps, and relevant logs; avoid publishing private document text.

@@ -1,14 +1,14 @@
-# Handwriting Web (Simon's Enhanced Edition)
+# Panache
 
 This fork turns text and mathematics into handwritten images using custom fonts and layout settings.
-Run the application locally, self-host it, or download a [desktop build](https://github.com/SXP-Simon/handwriting-web/releases).
+Run the application locally, self-host it, or download a [desktop build](https://github.com/SXP-Simon/Panache/releases).
 
 On `custom-base`, the React workspace combines the document editor, preview, and handwriting settings with a responsive layout.
 The handwriting renderer supports nested fractions, radicals, scripts, and fallback glyphs:
 
 ![Handwritten mathematics preview](docs/assets/images/math_formula_preview.png)
 
-📖 **[Documentation: user guide, self-hosting, and development](https://heliannuits.me/handwriting-web/en/)**
+📖 **[Documentation: user guide, self-hosting, and development](https://heliannuits.me/Panache/en/)**
 
 ## Fork branches and upstream synchronization
 

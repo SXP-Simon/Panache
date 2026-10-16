@@ -11,7 +11,7 @@ are optional.
 ## Bring it up
 
 ```shell
-git clone --branch custom-base https://github.com/SXP-Simon/handwriting-web.git
+git clone --branch custom-base https://github.com/SXP-Simon/Panache.git
 cd handwriting-web
 docker compose up -d --build frontend backend
 ```

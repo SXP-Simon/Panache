@@ -51,7 +51,7 @@
 
 ## 可以商用吗
 
-**代码**是 MIT 许可，见仓库里的 [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE)。
+**代码**是 MIT 许可，见仓库里的 [LICENSE](https://github.com/SXP-Simon/Panache/blob/custom-base/LICENSE)。
 分发时保留原作者及贡献者的许可和版权声明。
 
 **字体是另一回事**：仓库自带的字体和上传的字体各有各的授权，能不能商用取决于那个字体本身。
@@ -59,4 +59,4 @@
 
 ## 有问题去哪问
 
-- 本 fork 的 GitHub Issue：<https://github.com/SXP-Simon/handwriting-web/issues>。请附版本、复现步骤和相关日志，避免公开个人正文。
+- 本 fork 的 GitHub Issue：<https://github.com/SXP-Simon/Panache/issues>。请附版本、复现步骤和相关日志，避免公开个人正文。

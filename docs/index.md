@@ -1,9 +1,9 @@
-# 手写工作室
+# Panache
 
 Simon 自用 fork 的 `custom-base` 分支：React / TypeScript 工作台、Python / FastAPI
 渲染服务与 Electron 桌面版。输入文字、转换 LaTeX、调整笔迹，导出 PNG 打包或 PDF。
 
-本站是[项目文档](https://heliannuits.me/handwriting-web/)，不提供生成 API。
+本站是[项目文档](https://heliannuits.me/Panache/)，不提供生成 API。
 使用应用请[本地启动](development.md)、[自行部署](self-hosting/docker.md)或使用[桌面版](desktop.md)。
 `main` 同步上游，Flutter / Rust 迁移版由独立的 `flutter` 分支维护。
 
@@ -61,4 +61,4 @@ Simon 自用 fork 的 `custom-base` 分支：React / TypeScript 工作台、Pyth
 ## 来源
 
 本项目基于 [14790897/handwriting-web](https://github.com/14790897/handwriting-web)。
-代码授权见 [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE)，字体使用各自授权。
+代码授权见 [LICENSE](https://github.com/SXP-Simon/Panache/blob/custom-base/LICENSE)，字体使用各自授权。

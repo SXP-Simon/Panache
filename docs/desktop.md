@@ -5,7 +5,7 @@
 
 ## 下载
 
-在本 fork 的 [Releases 页面](https://github.com/SXP-Simon/handwriting-web/releases) 查找安装包，按系统和芯片选择。
+在本 fork 的 [Releases 页面](https://github.com/SXP-Simon/Panache/releases) 查找安装包，按系统和芯片选择。
 若尚无所需平台的自用构建，请按下文从 `custom-base` 构建；上游安装包不代表本 fork 的功能。
 
 | 系统 | 文件 |
@@ -28,7 +28,7 @@ macOS 会拦下它。在 macOS 15 及以上，提示可能直接说**「文件�
   文件本身没坏。
 - 也可能是**文件真的损坏，或者被人改过**。从非官方渠道拿到的安装包尤其要警惕。
 
-所以要**先确认安装包是从本仓库的 [Releases 页面](https://github.com/SXP-Simon/handwriting-web/releases) 下载的**。
+所以要**先确认安装包是从本仓库的 [Releases 页面](https://github.com/SXP-Simon/Panache/releases) 下载的**。
 确认来源无误，再用下面的方式放行；**来源存疑就不要绕过这个提示，也不要打开它**。
 
 确认之后，在终端里执行一次：
@@ -81,5 +81,5 @@ PYTHON=python bash desktop/build.sh   # 指定解释器（CI 用）
 
 产物在 `desktop/build/`。开发调试时先 `--app-only`，再在 `desktop/` 下 `npx electron .` 直接跑。
 
-开发约定见仓库根的 [`AGENTS.md`](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md)，
+开发约定见仓库根的 [`AGENTS.md`](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md)，
 存储与退出保存见[架构说明](architecture.md)。修改构建、安全或跨平台行为时，以相应源码和测试为准。

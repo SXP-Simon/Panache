@@ -1,10 +1,10 @@
-# Handwriting Studio
+# Panache
 
 The `custom-base` branch of Simon's fork combines a React / TypeScript workspace, a Python /
 FastAPI rendering service, and an Electron desktop app. Enter text, convert LaTeX, tune the
 handwriting, then export a zip of PNGs or a PDF.
 
-This [documentation site](https://heliannuits.me/handwriting-web/) does not provide a generation
+This [documentation site](https://heliannuits.me/Panache/) does not provide a generation
 API. To use the app, [run it locally](development.md), [self-host](self-hosting/docker.md), or use the
 [desktop app](desktop.md). `main` mirrors upstream; the separate `flutter` branch maintains the
 Flutter / Rust migration.
@@ -67,5 +67,5 @@ Flutter / Rust migration.
 ## Credits
 
 This project is based on [14790897/handwriting-web](https://github.com/14790897/handwriting-web).
-See [LICENSE](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/LICENSE) for the code license.
+See [LICENSE](https://github.com/SXP-Simon/Panache/blob/custom-base/LICENSE) for the code license.
 Fonts carry their own licenses.

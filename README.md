@@ -1,10 +1,10 @@
-# Handwriting Web (Simon's Enhanced Edition)
+# Panache
 
 > 老实写作业，很无聊吧
 
-本分支为自用定制基准分支。基于原开源项目构建，针对理工科/作业抄写场景进行了深度排版增强，包括高可靠 Markdown 符号清洗、Word 公式兼容、字形 Fallback 引擎以及全自动手写上下竖式分式渲染。
+Panache 是手写体生成应用，本分支为自用定制基准分支。基于原开源项目构建，针对理工科/作业抄写场景进行了深度排版增强，包括高可靠 Markdown 符号清洗、Word 公式兼容、字形 Fallback 引擎以及全自动手写上下竖式分式渲染。
 
-📖 **[使用与部署文档](https://heliannuits.me/handwriting-web/)** · [下载](https://github.com/SXP-Simon/handwriting-web/releases)
+📖 **[使用与部署文档](https://heliannuits.me/Panache/)** · [下载](https://github.com/SXP-Simon/Panache/releases)
 
 感谢 [@HakimYu](https://github.com/HakimYu) 提供的 flutter rust 分支支持，现已在 release 发布，全平台可用
 

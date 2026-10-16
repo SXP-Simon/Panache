@@ -10,3 +10,22 @@
 .changelog h1 > a {
   color: inherit;
 }
+
+/* Panache 的文档与应用共用森林绿、浅青柠与纸张层次。 */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #205c36;
+  --md-primary-bg-color: #f6ffec;
+  --md-accent-fg-color: #397943;
+  --md-default-bg-color: #fafcf7;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #243b2b;
+  --md-primary-bg-color: #d6f2bc;
+  --md-accent-fg-color: #b2e77c;
+  --md-default-bg-color: #131b16;
+}
+
+.md-header__button.md-logo img {
+  border-radius: 0.35rem;
+}

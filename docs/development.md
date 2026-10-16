@@ -2,7 +2,7 @@
 
 本文适用于 `custom-base`。技术栈、模块职责与数据流见[架构与技术栈](architecture.md)，
 分支职责和开发约定见仓库根的
-[AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md)。
+[AGENTS.md](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md)。
 
 ## 环境与依赖
 
@@ -153,7 +153,7 @@ Docker 发布需配置自有镜像地址变量 `FRONTEND_IMAGE`、`BACKEND_IMAGE
 ## 文档站
 
 MkDocs 将 `docs/` 中的 Markdown 生成静态文档，`mkdocs.yml` 负责导航、主题、仓库链接与站点地址。
-文档站位于 <https://heliannuits.me/handwriting-web/>；它使用 GitHub Pages，不运行 FastAPI 手写应用。
+文档站位于 <https://heliannuits.me/Panache/>；它使用 GitHub Pages，不运行 FastAPI 手写应用。
 手写应用的运行方式见[Docker 部署](self-hosting/docker.md)与本页的本地启动说明。
 
 仓库 Settings → Pages 的构建来源需选 GitHub Actions。`Deploy Docs` 在 `custom-base` 的文档输入变化时
@@ -163,3 +163,7 @@ MkDocs 将 `docs/` 中的 Markdown 生成静态文档，`mkdocs.yml` 负责导�
 ```bash
 uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 ```
+
+## 品牌资源
+
+产品名称为 Panache，羽毛笔图标的矢量源位于 `frontend/src/assets/brand.svg`。安装开发依赖与 Playwright Chromium 后，运行 `node scripts/generate-brand-icons.cjs` 更新站点、PWA 与文档图标；带上 Flutter 工作树的绝对路径可同步生成其平台图标。图标引用的内容哈希随生成更新，旧缓存可正确迁移。包标识、存储键与签名身份独立于显示名称。

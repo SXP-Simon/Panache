@@ -5,7 +5,7 @@ It bundles the backend and frontend together — double-click and it runs, no ne
 
 ## Download
 
-Look for installers on this fork's [Releases page](https://github.com/SXP-Simon/handwriting-web/releases)
+Look for installers on this fork's [Releases page](https://github.com/SXP-Simon/Panache/releases)
 and choose by system and chip. If your platform has no custom build yet, build `custom-base` as
 described below. Upstream installers do not represent this fork's features.
 
@@ -32,7 +32,7 @@ file is **"damaged"** outright.
   installers obtained from anywhere other than the official channel.
 
 So **first confirm you downloaded the installer from this repository's
-[Releases page](https://github.com/SXP-Simon/handwriting-web/releases)**. If the source checks out, use one
+[Releases page](https://github.com/SXP-Simon/Panache/releases)**. If the source checks out, use one
 of the methods below to let it through. **If you cannot verify where it came from, do not bypass the
 warning and do not open the app.**
 
@@ -89,6 +89,6 @@ PYTHON=python bash desktop/build.sh   # pick the interpreter (used by CI)
 Artifacts land in `desktop/build/`. For development, run `--app-only` first, then `npx electron .` from
 `desktop/`.
 
-Read [`AGENTS.md`](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md) for development
+Read [`AGENTS.md`](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md) for development
 conventions and [Architecture](architecture.md) for persistence and saving before exit. Consult the
 corresponding source and tests before changing build, security, or platform behavior.

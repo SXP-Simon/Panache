@@ -3,7 +3,7 @@
 This page describes the React / Python / Electron application on `custom-base`. `main` tracks
 upstream, while `flutter` maintains the separate Flutter / Rust application. Their implementations
 are outside this page's scope. See [Local Development](development.md) for commands and
-[AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md) for branch rules.
+[AGENTS.md](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md) for branch rules.
 
 ## Technology stack
 

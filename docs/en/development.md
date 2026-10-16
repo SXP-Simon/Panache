@@ -2,7 +2,7 @@
 
 This page applies to `custom-base`. See [Architecture and Technology Stack](architecture.md) for
 module responsibilities and data flow, and
-[AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md) for branch rules
+[AGENTS.md](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md) for branch rules
 and development conventions.
 
 ## Environment and dependencies
@@ -166,7 +166,7 @@ skipped. Configure your own namespace instead of the upstream account.
 
 MkDocs builds the Markdown under `docs/` into a static site. `mkdocs.yml` configures navigation,
 the theme, repository links, and the site URL. The documentation is hosted at
-<https://heliannuits.me/handwriting-web/> using GitHub Pages; it does not run the FastAPI handwriting app.
+<https://heliannuits.me/Panache/> using GitHub Pages; it does not run the FastAPI handwriting app.
 See [Docker Deployment](self-hosting/docker.md) or the local startup instructions above to run the app.
 
 Select GitHub Actions as the build source in Settings → Pages. `Deploy Docs` publishes documentation
@@ -179,3 +179,7 @@ uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --stri
 ```
 
 Flutter/Rust packages use the [pinned-source asset workflow](flutter-release.md) and are attached to the same `custom-base` release. APK publishing requires formal Android signing secrets.
+
+## Brand assets
+
+The product name is Panache. The quill icon source is `frontend/src/assets/brand.svg`. After installing development dependencies and Playwright Chromium, run `node scripts/generate-brand-icons.cjs` to update website, PWA and documentation icons. An optional absolute Flutter worktree path also generates its platform icons. Generation updates content hashes for cache migration. Package IDs, storage keys and signing identities are independent of the display name.

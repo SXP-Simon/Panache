@@ -10,7 +10,7 @@
 
 ## 项目与分支
 
-本仓库是 Simon 的手写体生成应用 fork。
+Panache 是 Simon 维护的手写体生成应用 fork。
 
 | 分支 | 职责 |
 |---|---|
@@ -20,7 +20,7 @@
 
 | 远端 | 仓库 |
 |---|---|
-| `origin` | `https://github.com/SXP-Simon/handwriting-web.git` |
+| `origin` | `https://github.com/SXP-Simon/Panache.git` |
 | `upstream` | `https://github.com/14790897/handwriting-web.git` |
 | `hakimyu` | `https://github.com/HakimYu/handwriting.git` |
 

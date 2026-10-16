@@ -3,7 +3,7 @@
 本文描述 `custom-base` 的 React / Python / Electron 应用。`main` 用于同步上游，
 `flutter` 独立维护 Flutter / Rust 版本；本页不描述这两个分支的实现。
 开发命令见[本地开发](development.md)，分支规则见仓库的
-[AGENTS.md](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/AGENTS.md)。
+[AGENTS.md](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md)。
 
 ## 技术栈
 
