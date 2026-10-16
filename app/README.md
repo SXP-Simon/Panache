@@ -14,7 +14,7 @@ UI 使用绿色 Material Design 3 主题，中英文统一使用霞鹜文楷。�
 - 内置/上传字体、背景上传、背景边距识别、全部现有排版/扰动/墨色/删除线参数。
 - 内置预设、自定义预设保存/加载、JSON 导入/导出、设备草稿自动保存。
 - 单页/多页预览、缩放、页码切换、PNG 保存、PDF/ZIP 导出、任务进度与队列满提示。
-- 使用指南、项目入口、开源许可，以及指向[当前 fork GitHub Issues](https://github.com/SXP-Simon/handwriting-web/issues)的反馈入口；不依赖邮件服务。账户功能未启用，旧登录/注册路由展示不可用说明。
+- 使用指南、项目入口、开源许可，以及指向[当前 fork GitHub Issues](https://github.com/SXP-Simon/Panache/issues)的反馈入口；不依赖邮件服务。账户功能未启用，旧登录/注册路由展示不可用说明。
 
 Web 第一次使用时读取同源旧 Vue `localStorage` 中的草稿与参数，保留原键；新数据写入独立的 `flutter.workspace`。旧版参数 JSON 的 camelCase 字段也可导入。字体与背景文件需重新选择；插图随草稿保存，浏览器存储容量仍有限。
 

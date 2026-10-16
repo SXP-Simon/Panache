@@ -37,7 +37,25 @@ class WorkbenchShell extends StatelessWidget {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(l.appTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/branding/panache.png',
+              key: const ValueKey('panache-brand-mark'),
+              width: 32,
+              height: 32,
+              excludeFromSemantics: true,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l.appTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(
             MediaQuery.sizeOf(context).width < 1100 &&
