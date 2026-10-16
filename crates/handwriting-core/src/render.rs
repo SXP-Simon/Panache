@@ -280,13 +280,18 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                     .decode(compact)
                     .map_err(|e| Error::new("invalid_image", e.to_string()))?;
                 let decoded = imaging::decode(&bytes, &r.limits)?;
-                let image = imaging::handdrawn(&decoded, p.seed.wrapping_add(i as u64), cancel)?;
-                let image = imaging::fit(
-                    &image,
+                // 2026-10-16：按版心缩小后再运行滤镜，避免大图产生巨型临时缓冲。
+                let fitted = imaging::fit(
+                    &decoded.to_rgba8(),
                     (w as f32 - p.left_margin - p.right_margin).max(1.) as u32,
-                    ((h as f32 - p.top_margin - p.bottom_margin) * 0.45).max(1.) as u32,
+                    (h as f32 - p.top_margin - p.bottom_margin).max(1.) as u32,
                     imaging::scale(alt),
                 );
+                let image = imaging::handdrawn(
+                    &image::DynamicImage::ImageRgba8(fitted),
+                    p.seed.wrapping_add(i as u64),
+                    cancel,
+                )?;
                 let top = if pages.dirty {
                     pages.previous_bottom + p.line_spacing
                 } else {

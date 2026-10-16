@@ -1,5 +1,5 @@
 use crate::{Error, Limits, Result, render::Cancellation};
-use image::{DynamicImage, GrayImage, ImageReader, Rgba, RgbaImage};
+use image::{DynamicImage, GrayImage, ImageDecoder, ImageReader, Rgba, RgbaImage};
 use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
@@ -15,17 +15,21 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<DynamicImage> {
     let mut image_limits = image::Limits::default();
     image_limits.max_alloc = Some(limits.max_pixels.saturating_mul(8));
     reader.limits(image_limits);
-    let (w, h) = ImageReader::new(Cursor::new(bytes))
-        .with_guessed_format()
-        .map_err(|e| Error::new("invalid_image", e.to_string()))?
-        .into_dimensions()
+    let mut decoder = reader
+        .into_decoder()
         .map_err(|e| Error::new("invalid_image", e.to_string()))?;
+    let (w, h) = decoder.dimensions();
     if w == 0 || h == 0 || u64::from(w) * u64::from(h) > limits.max_pixels {
         return Err(Error::new("image_limit", "解码图片尺寸超出限制"));
     }
-    reader
-        .decode()
-        .map_err(|e| Error::new("invalid_image", e.to_string()))
+    // 2026-10-16：应用手机照片的 EXIF 方向，避免导入后横倒或镜像。
+    let orientation = decoder
+        .orientation()
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut image = DynamicImage::from_decoder(decoder)
+        .map_err(|e| Error::new("invalid_image", e.to_string()))?;
+    image.apply_orientation(orientation);
+    Ok(image)
 }
 pub fn scale(alt: &str) -> f32 {
     let Some((_, param)) = alt.split_once('|') else {
@@ -47,8 +51,12 @@ pub fn scale(alt: &str) -> f32 {
     .clamp(0.1, 7.)
 }
 pub fn fit(image: &RgbaImage, width: u32, height: u32, scale: f32) -> RgbaImage {
-    let tw = image.width() as f32 * scale;
-    let th = image.height() as f32 * scale;
+    // 2026-10-16：先自然适配版心，再以此为 100%，大图也能按百分比缩小。
+    let base_ratio = (width as f32 / image.width() as f32)
+        .min(height as f32 / image.height() as f32)
+        .min(1.);
+    let tw = image.width() as f32 * base_ratio * scale;
+    let th = image.height() as f32 * base_ratio * scale;
     let ratio = (width as f32 / tw).min(height as f32 / th).min(1.);
     image::imageops::resize(
         image,
@@ -59,7 +67,16 @@ pub fn fit(image: &RgbaImage, width: u32, height: u32, scale: f32) -> RgbaImage 
 }
 // 2026-10-12：高斯局部阈值、低频位移场、线条附近墨滴和透明墨色。
 pub fn handdrawn(image: &DynamicImage, seed: u64, cancel: &Cancellation) -> Result<RgbaImage> {
-    let gray = image.to_luma8();
+    // 2026-10-16：透明像素须先合成白底，否则黑色透明底会吞掉黑线。
+    let mut opaque = image.to_rgba8();
+    for pixel in opaque.pixels_mut() {
+        let alpha = u16::from(pixel[3]);
+        for channel in &mut pixel.0[..3] {
+            *channel = ((u16::from(*channel) * alpha + 255 * (255 - alpha) + 127) / 255) as u8;
+        }
+        pixel[3] = 255;
+    }
+    let gray = DynamicImage::ImageRgba8(opaque).to_luma8();
     let (w, h) = gray.dimensions();
     let blurred = imageproc::filter::gaussian_blur_f32(&gray, 0.85);
     let mean = imageproc::filter::gaussian_blur_f32(&blurred, 2.6);
