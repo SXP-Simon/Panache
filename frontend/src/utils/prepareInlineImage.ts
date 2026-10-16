@@ -1,7 +1,11 @@
 /** Decode before insertion; bound camera photos and normalize browser-only formats for the renderer. */
 export async function prepareInlineImage(file: File): Promise<string> {
   if (!file.size || file.size > 20 * 1024 * 1024) throw new Error('imageSize');
-  if (file.type && !/^image\/(?:png|jpeg|webp|gif|bmp|x-ms-bmp|avif)$/i.test(file.type)) {
+  if (
+    file.type &&
+    file.type !== 'application/octet-stream' &&
+    !/^image\/(?:png|x-png|jpe?g|webp|gif|bmp|x-ms-bmp|avif)$/i.test(file.type)
+  ) {
     throw new Error('imageInvalid');
   }
   const url = URL.createObjectURL(file);

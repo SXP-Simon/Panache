@@ -50,6 +50,23 @@ test('invalid inline image leaves document intact and allows a valid retry', asy
   await expect(page.getByTestId('inline-image-preview-1')).toBeVisible();
 });
 
+test('file-manager generic image MIME is validated by decoding and normalized', async ({ page }) => {
+  await openHome(page);
+  const fs = require('fs');
+  const buffer = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'inline-mark.png'));
+  await page.getByTestId('inline-image-input').setInputFiles({
+    name: 'file-manager-image.bin', mimeType: 'application/octet-stream', buffer,
+  });
+  const preview = page.getByTestId('inline-image-preview-1');
+  await expect(preview).toBeVisible();
+  expect(await preview.evaluate((button) => button.querySelector('img').src)).toMatch(/^data:image\/png;base64,/);
+  await page.getByTestId('inline-image-input').setInputFiles({
+    name: 'invalid.bin', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid'),
+  });
+  await expect(page.getByTestId('message-info')).toContainText('无法读取图片');
+  await expect(page.getByTestId('inline-image-preview-2')).toHaveCount(0);
+});
+
 test('batch insertion is atomic and repeated selection can be resized after reload', async ({ page }) => {
   await openHome(page);
   await fillText(page, '正文');
