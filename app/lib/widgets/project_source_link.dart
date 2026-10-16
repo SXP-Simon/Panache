@@ -7,7 +7,7 @@ import '../l10n/app_localizations.dart';
 class ProjectSourceLink extends StatelessWidget {
   const ProjectSourceLink({super.key});
 
-  static final uri = Uri.parse('https://github.com/SXP-Simon/handwriting-web');
+  static final uri = Uri.parse('https://github.com/SXP-Simon/Panache');
 
   @override
   Widget build(BuildContext context) => Tooltip(
@@ -25,10 +25,7 @@ class ProjectSourceLink extends StatelessWidget {
           painter: _GitHubMark(Theme.of(context).colorScheme.primary),
         ),
       ),
-      label: const Text(
-        'SXP-Simon/handwriting-web',
-        style: TextStyle(fontSize: 13),
-      ),
+      label: const Text('SXP-Simon/Panache', style: TextStyle(fontSize: 13)),
     ),
   );
 }

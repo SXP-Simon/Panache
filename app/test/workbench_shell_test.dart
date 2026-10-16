@@ -52,11 +52,12 @@ void main() {
       await tester.pumpWidget(shell());
       final link = find.byKey(const ValueKey('project-source-link'));
       expect(link, findsOneWidget);
-      expect(find.text('SXP-Simon/handwriting-web'), findsOneWidget);
+      expect(find.byKey(const ValueKey('panache-brand-mark')), findsOneWidget);
+      expect(find.text('SXP-Simon/Panache'), findsOneWidget);
       expect(tester.getRect(link).top, lessThan(120));
       await tester.tap(link);
       await tester.pumpAndSettle();
-      expect(openedUrl, 'https://github.com/SXP-Simon/handwriting-web');
+      expect(openedUrl, 'https://github.com/SXP-Simon/Panache');
       expect(tester.takeException(), isNull);
     });
   }

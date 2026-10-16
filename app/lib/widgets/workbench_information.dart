@@ -15,11 +15,19 @@ class WorkbenchInformation extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Icon(
-              guide ? Icons.menu_book_outlined : Icons.draw_outlined,
-              size: 56,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            if (guide)
+              Icon(
+                Icons.menu_book_outlined,
+                size: 56,
+                color: Theme.of(context).colorScheme.primary,
+              )
+            else
+              Image.asset(
+                'assets/branding/panache.png',
+                width: 64,
+                height: 64,
+                excludeFromSemantics: true,
+              ),
             const SizedBox(height: 24),
             Text(
               guide ? l.guide : l.about,
@@ -47,9 +55,7 @@ class WorkbenchInformation extends StatelessWidget {
                   ),
                   OutlinedButton.icon(
                     onPressed: () => launchUrl(
-                      Uri.parse(
-                        'https://github.com/SXP-Simon/handwriting-web/issues',
-                      ),
+                      Uri.parse('https://github.com/SXP-Simon/Panache/issues'),
                     ),
                     icon: const Icon(Icons.bug_report_outlined),
                     label: Text(l.feedback),
