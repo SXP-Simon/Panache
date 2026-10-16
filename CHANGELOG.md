@@ -1,3 +1,19 @@
+# [1.4.0](https://github.com/SXP-Simon/Panache/compare/v1.3.2...v1.4.0) (2026-10-16)
+
+
+### Bug Fixes
+
+* **be/handdrawn_filter.py:** 稳定透明插图缩放与照片方向处理 ([576069a](https://github.com/SXP-Simon/Panache/commit/576069afba46aa52b5ed0cd6afc92f93e3e8a2fb))
+* **fe/src/utils:** 兼容文件管理器提供的通用图片类型 ([7341591](https://github.com/SXP-Simon/Panache/commit/7341591bec9abc61cef8bd2dad67c5aa1ff84f1b))
+* **fe/src:** 稳定插图解码插入与缩放引用 ([c1847f1](https://github.com/SXP-Simon/Panache/commit/c1847f1ab6a44f17e58c9813a6138498bce01f69))
+* **scripts:** 固定Panache发布命名并兼容仓库更名 ([27bd6f3](https://github.com/SXP-Simon/Panache/commit/27bd6f3f51269fde05a0597c3389ffd56ce0f0c9))
+
+
+### Features
+
+* **desktop:** 更名Panache并保持原应用数据身份 ([2bb39dc](https://github.com/SXP-Simon/Panache/commit/2bb39dce1f5370037d4847765136b05e35c7eae9))
+* **fe/src:** 统一Panache名称与羽毛笔品牌图标 ([6c2bd19](https://github.com/SXP-Simon/Panache/commit/6c2bd1956062e205dff34e7ad1b5ae0c4683df68))
+
 ## [1.3.2](https://github.com/SXP-Simon/handwriting-web/compare/v1.3.1...v1.3.2) (2026-10-16)
 
 
