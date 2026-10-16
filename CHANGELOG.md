@@ -1,3 +1,16 @@
+## [1.3.2](https://github.com/SXP-Simon/handwriting-web/compare/v1.3.1...v1.3.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **ci:** build Flutter Android release APKs per ABI ([#3](https://github.com/SXP-Simon/handwriting-web/issues/3)) ([52770e3](https://github.com/SXP-Simon/handwriting-web/commit/52770e3a380e87e81f4d0a59d2dbb5110a0faec6))
+* **ci:** enforce per-ABI Flutter APK outputs in release workflow ([#5](https://github.com/SXP-Simon/handwriting-web/issues/5)) ([859e135](https://github.com/SXP-Simon/handwriting-web/commit/859e135f8c98846f7f8ad3cc4b7c953c787d6078))
+* **fe/src/utils:** 保持混排公式分组并清理列表缩进 ([2dbb973](https://github.com/SXP-Simon/handwriting-web/commit/2dbb973557c83c8819c8b294d3b9d2be5ae17c35))
+* **fe/src/utils:** 检测闭括号之后的公式脚本 ([c69bd31](https://github.com/SXP-Simon/handwriting-web/commit/c69bd310673e7912428cf4db6b1a0ff09ac36220))
+* **fe/src/utils:** 清洗时保护裸公式中的分组下标 ([1d4f661](https://github.com/SXP-Simon/handwriting-web/commit/1d4f661daefac6f3618c1ca47bafda2d7d6be7d6))
+* **scripts:** 兼容固定旧源码的 Android ABI 拆包 ([e53ec13](https://github.com/SXP-Simon/handwriting-web/commit/e53ec13a58f788744f7f94a091f326b74e070cbf))
+* **scripts:** 按 Android ABI 分别发布正式 APK ([ccd24d8](https://github.com/SXP-Simon/handwriting-web/commit/ccd24d82ac51bfa32447f90571e4cd10fb88f379))
+
 ## [1.3.1](https://github.com/SXP-Simon/handwriting-web/compare/v1.3.0...v1.3.1) (2026-10-15)
 
 
