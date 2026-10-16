@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
@@ -9,6 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'dialogs/connection_dialog.dart';
+import 'dialogs/illustration_dialog.dart';
+import '../utils/image_data.dart';
+import '../utils/image_markers.dart';
 import 'dialogs/text_tools_dialogs.dart';
 import 'dialogs/text_preview_dialog.dart';
 import '../services/api.dart';
@@ -176,41 +178,52 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     await documents.importText(file);
   });
   Future<void> insertImage() => action(() async {
-    final file = await pick(['png', 'jpg', 'jpeg', 'webp']);
+    // Capture before the native picker/dialog changes focus. No text edit is
+    // committed until decoding and confirmation both succeed.
+    final selection = editor.selection;
+    final originalText = editor.text;
+    final file = await pick(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
     if (file == null || !mounted) return;
-    final scale = TextEditingController(text: '50');
-    final value = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.insertImage),
-        content: TextField(
-          controller: scale,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(labelText: l.imageScale),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final n = int.tryParse(scale.text);
-              if (n != null && n >= 1 && n <= 100) Navigator.pop(context, n);
-            },
-            child: Text(l.apply),
-          ),
-        ],
-      ),
-    );
-    scale.dispose();
-    if (value == null) return;
-    final id =
-        '${w.images.keys.map(int.parse).fold(0, (a, b) => a > b ? a : b) + 1}';
-    final ext = file.name.split('.').last.toLowerCase();
-    w.images[id] =
-        'data:image/${ext == 'jpg' ? 'jpeg' : ext};base64,${base64Encode(file.bytes)}';
+    String source;
+    try {
+      source = await prepareIllustration(file.bytes);
+    } catch (_) {
+      if (mounted) notify(l.invalidIllustration);
+      return;
+    }
+    if (!mounted) return;
+    final value = await showIllustrationDialog(context, source: source);
+    if (value == null || !mounted) return;
+    if (editor.text != originalText) return;
+    final existing = w.images.entries
+        .where((entry) => entry.value == source)
+        .firstOrNull;
+    final id = existing?.key ?? nextIllustrationId(w.images, editor.text);
+    w.images[id] = source;
+    editor.selection = selection;
     insert('\n![插图 $id|$value%]\n');
+  });
+
+  Future<void> editImage(IllustrationMarker marker) => action(() async {
+    final before = editor.text;
+    final value = await showIllustrationDialog(
+      context,
+      source: w.images[marker.id],
+      initialScale: marker.scale,
+      removable: true,
+    );
+    if (value == null || !mounted || editor.text != before) return;
+    editor.value = TextEditingValue(
+      text: before.replaceRange(
+        marker.start,
+        marker.end,
+        value == 0 ? '' : marker.resized(value),
+      ),
+      selection: TextSelection.collapsed(offset: marker.start),
+    );
+    w.text = editor.text;
+    // Keep detached bytes for undo/redo; explicit draft reset clears assets.
+    w.edit();
   });
 
   Future<void> generate({bool preview = true, bool pdf = false}) async {
@@ -291,6 +304,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     undo: undo,
     locked: locked,
     images: w.images,
+    onEditImage: editImage,
     onChanged: (value) {
       w.text = collapseImages(value, w.images);
       w.edit();
