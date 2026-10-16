@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useDocumentStore } from '@/features/document/store';
@@ -14,7 +14,12 @@ import {
   formatChineseLetter,
   restoreLetterEnding,
 } from '@/utils/chineseLetterFormatter';
-import { getReferencedImages, collapseInlineImages } from '@/utils/inlineImageManager';
+import {
+  getReferencedImages,
+  collapseInlineImages,
+  updateInlineImage,
+} from '@/utils/inlineImageManager';
+import { prepareInlineImage } from '@/utils/prepareInlineImage';
 import type { TableMode } from '@/utils/cleanMarkdown';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
@@ -51,6 +56,15 @@ export default function EditorPanel() {
     detectedEnding: boolean;
   } | null>(null);
   const [backup, setBackup] = useState<{ original: string; formatted: string } | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const imagePending = useRef(false);
+  const [imageBusy, setImageBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
   const images = getReferencedImages(text, imageStore);
   const letterPreview = letter ? formatChineseLetter(letter) : '';
@@ -70,51 +84,63 @@ export default function EditorPanel() {
       input.current?.setSelectionRange(start + offset, start + offset);
     });
   }
-  async function addImage(file: File) {
+  async function addImages(files: File[]) {
+    if (files.length === 0) return;
+    if (imagePending.current) {
+      useNotificationStore.getState().inform('preparingImages');
+      return;
+    }
+    imagePending.current = true;
+    setImageBusy(true);
+    useNotificationStore.getState().clear();
+    const original = useDocumentStore.getState().text;
+    const start = input.current?.selectionStart ?? original.length;
+    const end = input.current?.selectionEnd ?? start;
     try {
-      const data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') resolve(reader.result);
-          else reject(new Error(t('invalidResponse')));
-        };
-        reader.onerror = () => reject(new Error(t('networkError')));
-        reader.readAsDataURL(file);
-      });
+      const values: string[] = [];
+      for (const file of files) values.push(`\n![image](${await prepareInlineImage(file)})\n`);
+      const value = values.join('');
       let cursor = 0;
-      await updateResources((document) => {
-        const start = input.current?.selectionStart ?? document.text.length;
-        const end = input.current?.selectionEnd ?? start;
-        const value = `\n![image](${data})\n`;
-        const draft = collapseInlineImages(
-          document.text.slice(0, start) + value + document.text.slice(end),
-          document.imageStore,
-        );
-        cursor = start + collapseInlineImages(value, document.imageStore).collapsedText.length;
-        return {
-          document: {
-            text: draft.collapsedText,
-            imageStore: draft.imageStore,
-            textFileName: document.textFileName,
-          },
-        };
-      });
+      await updateResources(
+        (document) => {
+          if (document.text !== original) throw new Error('imageDocumentChanged');
+          const draft = collapseInlineImages(
+            document.text.slice(0, start) + value + document.text.slice(end),
+            document.imageStore,
+          );
+          cursor = start + collapseInlineImages(value, draft.imageStore).collapsedText.length;
+          return {
+            document: {
+              text: draft.collapsedText,
+              imageStore: draft.imageStore,
+              textFileName: document.textFileName,
+            },
+          };
+        },
+        () => mounted.current,
+      );
+      if (!mounted.current) return;
       setBackup(null);
       requestAnimationFrame(() => {
         input.current?.focus();
         input.current?.setSelectionRange(cursor, cursor);
       });
     } catch (cause) {
-      reportFailure(cause);
+      if (!mounted.current) return;
+      const key = cause instanceof Error ? cause.message : '';
+      useNotificationStore
+        .getState()
+        .fail(key === 'imageSize' || key === 'imageDocumentChanged' ? key : 'imageInvalid');
+    } finally {
+      imagePending.current = false;
+      if (mounted.current) setImageBusy(false);
     }
   }
   function changeScale(index: number, scale: string) {
-    const pattern = new RegExp(`!\\[(插图[ \\t]*[#:_-]?[ \\t]*${index})(?:\\|[^\\n\\]]+)?\\]`, 'g');
-    editText(text.replace(pattern, `![插图 ${index}|${scale}%]`));
+    editText(updateInlineImage(useDocumentStore.getState().text, index, scale));
   }
   function removeImage(index: number) {
-    const pattern = new RegExp(`!\\[插图[ \\t]*[#:_-]?[ \\t]*${index}(?:\\|[^\\n\\]]+)?\\]`, 'g');
-    editText(text.replace(pattern, ''));
+    editText(updateInlineImage(useDocumentStore.getState().text, index, null));
     if (activeImageIndex === index) setActiveImageIndex(null);
   }
   function openLetter() {
@@ -209,10 +235,12 @@ export default function EditorPanel() {
           <input
             data-testid="inline-image-input"
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+            multiple
+            disabled={imageBusy}
             onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
-              if (file) void addImage(file);
+              const files = Array.from(event.currentTarget.files ?? []);
+              void addImages(files);
               event.currentTarget.value = '';
             }}
           />
@@ -265,18 +293,21 @@ export default function EditorPanel() {
         aria-label={t('document')}
         spellCheck={false}
         onPaste={(event) => {
-          for (const item of event.clipboardData.items) {
-            if (item.type.startsWith('image/')) {
-              const file = item.getAsFile();
-              if (file) {
-                event.preventDefault();
-                void addImage(file);
-                break;
-              }
-            }
+          const files = Array.from(event.clipboardData.items)
+            .filter((item) => item.type.startsWith('image/'))
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => file !== null);
+          if (files.length) {
+            event.preventDefault();
+            void addImages(files);
           }
         }}
       />
+      {imageBusy && (
+        <p className="field-caption" role="status">
+          {t('preparingImages')}
+        </p>
+      )}
       {images.length > 0 && (
         <div className="inline-images">
           <p className="field-caption">{t('insertedImages')}</p>
@@ -296,7 +327,7 @@ export default function EditorPanel() {
                 <input
                   type="range"
                   data-testid={`inline-image-scale-${image.index}`}
-                  min="20"
+                  min="10"
                   max="700"
                   step="10"
                   value={Number.parseInt(image.scale, 10)}
@@ -355,7 +386,7 @@ export default function EditorPanel() {
               {t('imageScale')} · <span data-testid="active-scale-badge">{activeImage.scale}</span>
             </p>
             <div className="image-scale-presets">
-              {[50, 100, 200, 300, 500, 700].map((scale) => (
+              {[10, 50, 100, 200, 300, 500, 700].map((scale) => (
                 <Button
                   key={scale}
                   data-testid={`image-scale-${scale}`}
@@ -368,7 +399,7 @@ export default function EditorPanel() {
             </div>
             <input
               type="range"
-              min="20"
+              min="10"
               max="700"
               step="10"
               value={Number.parseInt(activeImage.scale, 10)}

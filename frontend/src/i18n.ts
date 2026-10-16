@@ -40,6 +40,19 @@ const words = {
     'The paper exceeds the pixel limit. Reduce its width or height.',
   ],
   import: ['导入文档', 'Import document'],
+  preparingImages: ['正在准备插图…', 'Preparing images…'],
+  imageSize: [
+    '图片须小于 20 MB 且不超过 4000 万像素，请先缩小后重试。',
+    'Use an image under 20 MB and 40 megapixels. Resize it and try again.',
+  ],
+  imageInvalid: [
+    '无法读取图片，请选择有效的 PNG、JPEG、WebP、GIF、BMP 或 AVIF 图片。',
+    'Cannot read this image. Choose a valid PNG, JPEG, WebP, GIF, BMP or AVIF file.',
+  ],
+  imageDocumentChanged: [
+    '插图准备期间正文已更改，请在所需位置重新插入。',
+    'The text changed while preparing the images. Insert them again at the desired position.',
+  ],
   insertImage: ['插入图片', 'Insert image'],
   latex: ['转换 LaTeX', 'Convert LaTeX'],
   markdown: ['清理 Markdown', 'Clean Markdown'],

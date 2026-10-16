@@ -26,7 +26,13 @@ export function collapseInlineImages(text: string, existingStore: ImageStore = {
   }
 
   const imageStore = { ...existingStore };
-  let counter = Object.keys(imageStore).length;
+  let counter = Math.max(
+    0,
+    ...Object.keys(imageStore).map((key) => {
+      const match = /^(?:img_)?(\d+)$/.exec(key);
+      return match ? Number(match[1]) : 0;
+    }),
+  );
 
   // 正则匹配 ![alt](data:image/...;base64,...) 或 ![alt|scale](data:...)
   const base64ImgRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
@@ -90,7 +96,7 @@ export function expandInlineImages(text: string, imageStore: ImageStore = {}) {
 
   // 1. 替换形如 ![插图 1]、![插图: 1]、![插图 1|50%] 等
   let result = text.replace(
-    /!\[(插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|[^\]]+)?)\]/g,
+    /!\[(插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|[^\]]+)?)\](?!\()/g,
     (match: string, fullAlt: string, numStr: string) => {
       const id = `img_${numStr}`;
       const base64Data = imageStore[id] || imageStore[numStr];
@@ -126,24 +132,40 @@ export function expandInlineImages(text: string, imageStore: ImageStore = {}) {
 export function getReferencedImages(text: string, imageStore: ImageStore = {}): InlineImage[] {
   if (!text || !imageStore) return [];
   const list: InlineImage[] = [];
-  // 匹配 ![插图 1]、![插图 1|50%]、![插图: 1|75%]
-  const regex = /!\[(?:插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|([^\]]+))?|([^\]]*)\(img:?_?(\d+)\))\]/g;
+  const regex =
+    /!\[(?:插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|([^\]\n]+))?)\](?!\()|!\[([^\]\n]*)\]\(img:?_?(\d+)\)/g;
   let m;
   while ((m = regex.exec(text)) !== null) {
     const num = m[1] || m[4];
-    const scaleStr = (m[2] ? m[2].trim() : '') || '100%';
-    if (num) {
-      const id = `img_${num}`;
-      if (imageStore[id] && !list.some((item) => item.id === id)) {
-        list.push({
-          id,
-          index: parseInt(num, 10),
-          alt: `插图 ${num}`,
-          scale: scaleStr,
-          data: imageStore[id] ?? '',
-        });
-      }
+    if (!num) continue;
+    const id = `img_${num}`;
+    const data = imageStore[id] || imageStore[num];
+    const scale = m[2] ?? m[3]?.split('|')[1] ?? '100%';
+    const parsedScale = Number.parseFloat(scale);
+    if (data && !list.some((item) => item.id === id)) {
+      list.push({
+        id,
+        index: Number(num),
+        alt: `插图 ${num}`,
+        scale: `${Number.isFinite(parsedScale) ? Math.min(700, Math.max(10, parsedScale)) : 100}%`,
+        data,
+      });
     }
   }
   return list;
+}
+
+/** Update both current and imported legacy markers without touching literal image Markdown. */
+export function updateInlineImage(text: string, index: number, scale: string | null): string {
+  const pattern =
+    /!\[插图[ \t]*[#:_-]?[ \t]*(\d+)(?:\|[^\]\n]+)?\](?!\()|!\[[^\]\n]*\]\(img:?_?(\d+)\)/g;
+  return text.replace(
+    pattern,
+    (match: string, current: string | undefined, legacy: string | undefined) =>
+      Number(current ?? legacy) === index
+        ? scale === null
+          ? ''
+          : `![插图 ${index}|${scale}%]`
+        : match,
+  );
 }
