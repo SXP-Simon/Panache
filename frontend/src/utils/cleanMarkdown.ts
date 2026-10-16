@@ -116,12 +116,16 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   let mathPrefix = '\ue100MATH';
   while (text.includes(mathPrefix)) mathPrefix += '\ue100';
   const mathSources: string[] = [];
-  let s = mapMathSegments(text, (source, segment) => {
-    if (segment.kind !== 'math' && !segment.safeMathLiteral) return source;
-    const token = `${mathPrefix}${mathSources.length}\ue101`;
-    mathSources.push(source);
-    return token;
-  });
+  let s = mapMathSegments(
+    text,
+    (source, segment) => {
+      if (segment.kind !== 'math' && !segment.safeMathLiteral) return source;
+      const token = `${mathPrefix}${mathSources.length}\ue101`;
+      mathSources.push(source);
+      return token;
+    },
+    { includeBareSizedGroups: true },
+  );
   s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // 1. 移除文档顶部的 YAML / TOML Front Matter

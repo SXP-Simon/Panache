@@ -7,6 +7,22 @@ function test(name, run) {
 
 const cleanModule = import("../src/utils/cleanMarkdown.ts");
 
+test("protects bare sized groups from emphasis in either cleanup order", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const { convertLatexToUnicode } = await import('../src/utils/latexToUnicode.ts');
+  const inputs = [
+    [String.raw`结果：\left[ a_b+c_d \right]，_保留强调内容_。`, '结果：[a_(b)+c_(d)]，保留强调内容。'],
+    [String.raw`结果：\left[ {a}_{b}+{c}_{d} \right]，**重要**。`, '结果：[a_(b)+c_(d)]，重要。'],
+    [String.raw`结果：\left( \left[ {a}_{b}+{c}_{d} \right]+x^2 \right)，*结论*。`, '结果：([a_(b)+c_(d)]+x²)，结论。'],
+  ];
+  for (const [source, expected] of inputs) {
+    assert.equal(convertLatexToUnicode(cleanMarkdown(source)), expected, source);
+    assert.equal(cleanMarkdown(convertLatexToUnicode(source)), expected, source);
+  }
+  const source = String.raw`\left[ {a}_{b}+{c}_{d} \right]`;
+  assert.equal(cleanMarkdown(source), source);
+});
+
 test("removes unordered item and continuation indentation without trimming ordinary paragraphs", async () => {
   const { cleanMarkdown } = await cleanModule;
   assert.equal(cleanMarkdown(' * 第一项\n   展开计算\n   再乘系数\n\n    保留普通缩进\n\t- [x] 完成\n\t  下一行\n  + 嵌套项'), '第一项\n展开计算\n再乘系数\n\n    保留普通缩进\n完成\n下一行\n嵌套项');

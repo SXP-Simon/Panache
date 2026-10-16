@@ -1,5 +1,5 @@
 import katex from 'katex';
-import { scanMathSegments } from './mathSegments.ts';
+import { scanMathSegments, sizedGroupEnd } from './mathSegments.ts';
 
 // KaTeX exposes an internal parser. Its output crosses an unknown boundary and
 // is narrowed before access; unsupported shapes preserve the original formula.
@@ -611,19 +611,6 @@ function argumentEnd(text: string, start: number) {
   }
   const token = /^(?:\\[a-zA-Z]+|\\.|[^\s])/u.exec(text.slice(cursor));
   return token ? cursor + token[0].length : start;
-}
-
-// Keep paired sizing commands together: neither side is valid math on its own.
-function sizedGroupEnd(text: string, start: number): number | null {
-  const commands = /\\(left|right)(?![a-zA-Z])\s*(\\[a-zA-Z]+|\\.|[()[\]{}.|])/g;
-  commands.lastIndex = start;
-  let depth = 0;
-  for (let token = commands.exec(text); token; token = commands.exec(text)) {
-    if (depth === 0 && token.index !== start) return null;
-    depth += token[1] === 'left' ? 1 : -1;
-    if (depth === 0) return commands.lastIndex;
-  }
-  return null;
 }
 
 // 正文中孤立的裸宏只消费自己的参数，不改周围空格、路径或标识符。

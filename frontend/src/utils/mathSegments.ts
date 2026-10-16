@@ -10,6 +10,23 @@ export interface MathSegment {
 const MAX_MATH_LENGTH = 32768;
 const MAX_ENV_DEPTH = 64;
 
+interface ScanOptions {
+  // Markdown 清洗需要保护裸分组；转写仍由裸公式转换器消费分组后的上下标。
+  includeBareSizedGroups?: boolean;
+}
+
+export function sizedGroupEnd(text: string, start: number): number | null {
+  const commands = /\\(left|right)(?![a-zA-Z])\s*(\\[a-zA-Z]+|\\.|[()[\]{}.|])/g;
+  commands.lastIndex = start;
+  let depth = 0;
+  for (let token = commands.exec(text); token; token = commands.exec(text)) {
+    if (depth === 0 && token.index !== start) return null;
+    depth += token[1] === 'left' ? 1 : -1;
+    if (depth === 0) return commands.lastIndex;
+  }
+  return null;
+}
+
 function escapedAt(text: string, index: number) {
   let count = 0;
   while (index > 0 && text[--index] === '\\') count++;
@@ -112,7 +129,7 @@ function scanDelimited(text: string, start: number, opener: string, closer: stri
  * 代码、URL、路径、图片以及未闭合/超限公式的 kind 为 literal。
  * 未闭合/超限公式另有 safeMathLiteral: true，Markdown 清洗也应保留其源码。
  */
-export function scanMathSegments(text: string): MathSegment[] {
+export function scanMathSegments(text: string, options: ScanOptions = {}): MathSegment[] {
   if (typeof text !== 'string' || !text) return [];
   const segments: MathSegment[] = [];
   const add = (
@@ -207,6 +224,13 @@ export function scanMathSegments(text: string): MathSegment[] {
     }
     if ((char === '\\' || char === '$') && !escapedAt(text, cursor)) {
       if (char === '\\') {
+        if (options.includeBareSizedGroups && /^\\left(?![a-zA-Z])/.test(text.slice(cursor))) {
+          const end = sizedGroupEnd(text, cursor);
+          if (end !== null) {
+            cursor = add(start, end, 'math');
+            continue;
+          }
+        }
         const env = environmentAt(text, cursor);
         if (env && env.command === 'begin') {
           const found = scanEnvironment(text, cursor);
@@ -265,11 +289,12 @@ export function scanMathSegments(text: string): MathSegment[] {
 export function mapMathSegments(
   text: string,
   callback: (source: string, segment: MathSegment) => string | undefined = (source) => source,
+  options: ScanOptions = {},
 ) {
   if (typeof text !== 'string') return '';
   let cursor = 0;
   let result = '';
-  for (const segment of scanMathSegments(text)) {
+  for (const segment of scanMathSegments(text, options)) {
     const source = text.slice(segment.start, segment.end);
     const replacement = callback(source, segment);
     result +=
