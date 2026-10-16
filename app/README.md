@@ -1,6 +1,6 @@
-# Flutter 客户端
+# Panache · Flutter 客户端
 
-使用 Material Design 3 重建的手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 随包内置 Rust FFI 引擎，生成、导入和导出可离线完成。
+Panache 的 Flutter 客户端使用 Material Design 3 手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 随包内置 Rust FFI 引擎，生成、导入和导出可离线完成。
 
 UI 使用绿色 Material Design 3 主题，中英文统一使用霞鹜文楷。该主题字体只用于界面，纸张渲染继续使用选定的手写字体；数学预览使用数学排版组件。
 
@@ -37,7 +37,7 @@ python3 scripts/build-flutter-desktop.py --flutter /path/to/flutter
 macOS 使用 ad-hoc 签名，并未进行 Developer ID 签名和公证。下载后若被 Gatekeeper 拦截，将 `.app` 放到 `/Applications` 后执行：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
+xattr -dr com.apple.quarantine /Applications/Panache.app
 ```
 
 Rust sidecar 的架构取决于构建机。打包时必须匹配目标 CPU，arm64 包不能直接用于 Intel Mac。Windows/Linux 构建与进程测试由 `.github/workflows/flutter_desktop.yml` 的 pull request 或手动入口执行。macOS 已在 Xcode 构建阶段自动构建、复制和签名 sidecar，`cd app && flutter run -d macos`、`flutter build macos` 均可直接使用内置引擎。首次启动需安装 Rust 工具链，之后 Cargo 增量构建。Windows/Linux 当前仍使用上面的完整打包脚本嵌入后端。

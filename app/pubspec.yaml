@@ -1,5 +1,5 @@
 name: handwriting_app
-description: 手写体生成器的跨平台 Flutter 客户端。
+description: Panache 手写体生成工具的跨平台 Flutter 客户端。
 publish_to: none
 
 # 开发脚手架版本；产品版本由根目录 VERSION 提供。

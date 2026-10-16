@@ -139,7 +139,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   Future<void> saveBytes(
     Uint8List bytes,
     String extension, {
-    String name = 'handwriting',
+    String name = 'Panache',
   }) async {
     await FileSaver.instance.saveAs(
       name: name,
@@ -410,11 +410,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       if (!w.loadPreset()) notify(l.emptyPreset);
     },
     onExportPreset: () => action(
-      () => saveBytes(
-        documents.exportPreset(),
-        'json',
-        name: 'handwriting-preset',
-      ),
+      () => saveBytes(documents.exportPreset(), 'json', name: 'Panache-preset'),
     ),
     onImportPreset: () => action(() async {
       final file = await pick(['json']);
@@ -450,8 +446,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       w.emit();
     },
     onSaveImage: () => action(
-      () =>
-          saveBytes(w.pages[w.page], 'png', name: 'handwriting-${w.page + 1}'),
+      () => saveBytes(w.pages[w.page], 'png', name: 'Panache-${w.page + 1}'),
     ),
     onSaveExport: w.exportBytes == null
         ? null
