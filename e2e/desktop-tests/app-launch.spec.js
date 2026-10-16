@@ -14,8 +14,8 @@ test.describe("桌面版启动与打包完整性", () => {
       explicit: app.commandLine.getSwitchValue("user-data-dir"), userData: app.getPath("userData"), sessionData: app.getPath("sessionData"),
     }));
     expect(identity.explicit).toBeTruthy();
-    expect(identity.userData).toBe(identity.explicit);
-    expect(identity.sessionData).toBe(identity.userData);
+    expect(fs.realpathSync(identity.userData)).toBe(fs.realpathSync(identity.explicit));
+    expect(fs.realpathSync(identity.sessionData)).toBe(fs.realpathSync(identity.userData));
   });
 
   test("发行包保留完整的项目许可", async ({ desktop }) => {

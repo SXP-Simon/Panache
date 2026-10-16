@@ -313,6 +313,9 @@ jobs:
         working-directory: e2e
         shell: bash
         run: |
+          # 2026-10-16：macOS 的 /var 是 /private/var 的软链接；规范临时目录，
+          # 让旧 tag 的测试也能与 Electron 返回的真实配置路径一致。
+          export TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
           if [ -f ../frontend/vite.config.ts ] && [ -f ../uv.lock ]; then
             pnpm run test:desktop
           else
