@@ -1,3 +1,13 @@
+## [1.4.1](https://github.com/SXP-Simon/Panache/compare/v1.4.0...v1.4.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **docs:** 恢复文档原有配色与链接对比度 ([f06cc88](https://github.com/SXP-Simon/Panache/commit/f06cc88f9aaecdd8327509db91ec4f479cf89cd8))
+* **docs:** 更新数学公式预览图像 ([8a69f24](https://github.com/SXP-Simon/Panache/commit/8a69f245d3415e1251de02800641d839ff94d8d5))
+* **e2e/desktop-tests:** 规范macOS配置目录的软链接路径 ([f2efe63](https://github.com/SXP-Simon/Panache/commit/f2efe631f0496373088bc0bf9e9aa84d127a9c16))
+* **fe/src:** 清理Markdown时移除分隔线与空白行 ([fe457d1](https://github.com/SXP-Simon/Panache/commit/fe457d18cba45d7f162cf584cdb8deaac3c635d2))
+
 # [1.4.0](https://github.com/SXP-Simon/Panache/compare/v1.3.2...v1.4.0) (2026-10-16)
 
 
