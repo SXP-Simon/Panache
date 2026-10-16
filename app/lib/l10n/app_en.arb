@@ -76,7 +76,7 @@
   "alignedMode": "Aligned",
   "pipeMode": "Pipe separated",
   "cleanMode": "Plain text",
-  "imageScale": "Illustration width (% of usable page width)",
+  "imageScale": "Illustration scale (10%–700%, limited by the page)",
   "guideText": "1. Type or import TXT, DOCX, PDF or RTF.\n2. Choose a built-in font or upload a TTF font.\n3. Adjust paper, margins, spacing and variation. Upload a background and detect its margins if needed.\n4. Preview one or all pages, then export a PDF or image ZIP.\n\nThe backend applies a hand-drawn filter to illustrations. Markdown cleanup supports four table layouts. LaTeX conversion supports common symbols, fractions, roots, matrices and scripts. Inspect formulas before converting; undo afterward if needed.\n\nDrafts, illustrations and settings are stored on this device. Font and background files must be selected again. Backend tasks and results expire after about 30 minutes.",
   "aboutText": "A free, open-source handwriting tool with a Material Design 3 Flutter interface and a Rust engine. Desktop and mobile support offline generation; Web connects to a Rust service.",
   "accountUnavailable": "Accounts are unavailable: login and registration are disabled in the existing backend.",
@@ -114,5 +114,8 @@
   "mobileEditor": "Edit",
   "mobilePaper": "Paper",
   "mobilePreview": "View",
-  "imageUnavailable": "Image unavailable"
+  "imageUnavailable": "Image unavailable",
+  "removeIllustration": "Remove illustration",
+  "editIllustrationHelp": "Tap an illustration below to resize or remove this occurrence.",
+  "invalidIllustration": "Cannot read this image, or it is too large. Choose a PNG, JPEG, WebP, GIF or BMP up to 12 MB and 16 megapixels."
 }

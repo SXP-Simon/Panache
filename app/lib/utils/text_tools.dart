@@ -1,4 +1,5 @@
 import 'math_segments.dart';
+import 'image_markers.dart';
 
 String expandImages(String text, Map<String, String> images) {
   var result = text.replaceAllMapped(
@@ -12,22 +13,20 @@ String expandImages(String text, Map<String, String> images) {
   return result;
 }
 
-String collapseImages(
-  String text,
-  Map<String, String> images,
-) => text.replaceAllMapped(
-  RegExp(r'!\[([^\]]*)\]\((data:image/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)'),
-  (m) {
-    final data = m[2]!.replaceAll(RegExp(r'\s'), '');
-    final existing = images.entries.where((e) => e.value == data).firstOrNull;
-    final id =
-        existing?.key ??
-        '${images.keys.map(int.parse).fold(0, (a, b) => a > b ? a : b) + 1}';
-    images[id] = data;
-    final scale = m[1]!.contains('|') ? '|${m[1]!.split('|').last}' : '';
-    return '![插图 $id$scale]';
-  },
-);
+String collapseImages(String text, Map<String, String> images) =>
+    text.replaceAllMapped(
+      RegExp(r'!\[([^\]]*)\]\((data:image/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)'),
+      (m) {
+        final data = m[2]!.replaceAll(RegExp(r'\s'), '');
+        final existing = images.entries
+            .where((e) => e.value == data)
+            .firstOrNull;
+        final id = existing?.key ?? nextIllustrationId(images, text);
+        images[id] = data;
+        final scale = m[1]!.contains('|') ? '|${m[1]!.split('|').last}' : '';
+        return '![插图 $id$scale]';
+      },
+    );
 
 String cleanMarkdown(
   String text, {
