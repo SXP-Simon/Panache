@@ -6,7 +6,7 @@
 
 📖 **[使用与部署文档](https://heliannuits.me/handwriting-web/)** · [下载](https://github.com/SXP-Simon/handwriting-web/releases)
 
-感谢 @HakimYu 提供的 flutter rust 分支支持，现已在 release 发布，全平台可用
+感谢 [@HakimYu](https://github.com/HakimYu) 提供的 flutter rust 分支支持，现已在 release 发布，全平台可用
 
 ![手写数学公式、竖式分式与封顶根式排版预览](./docs/assets/images/math_formula_preview.png)
 
