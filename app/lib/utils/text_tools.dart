@@ -60,6 +60,18 @@ String cleanMarkdown(
   }
   math.write(s.substring(cursor));
   s = math.toString();
+  final bareMath = StringBuffer();
+  cursor = 0;
+  for (final match in RegExp(r'\\left\b').allMatches(s)) {
+    if (match.start < cursor) continue;
+    final end = bareDelimiterEnd(s, match.start);
+    if (end <= match.start) continue;
+    bareMath.write(s.substring(cursor, match.start));
+    bareMath.write(protect(s.substring(match.start, end)));
+    cursor = end;
+  }
+  bareMath.write(s.substring(cursor));
+  s = bareMath.toString();
   s = s.replaceAllMapped(
     RegExp(
       r'!\[[^\]]*\]\((?:data:image/[^)]+|img:?_?\d+)\)|!\[插图(?:[ \t]*[#:_-]?[ \t]*\d+)?(?:\|[^\]]+)?\](?!\()',
@@ -137,14 +149,23 @@ String cleanMarkdown(
     table.clear();
   }
 
+  var listContinuation = false;
   for (var line in s.split('\n')) {
     if (RegExp(r'^\s*\|.*\|\s*$').hasMatch(line)) {
       table.add(line);
       continue;
     }
     flush();
+    if (line.trim().isEmpty) listContinuation = false;
+    final listItem = RegExp(r'^[ \t]*(?:>[ \t]*)*[-*+][ \t]+').hasMatch(line);
+    if (listItem) listContinuation = true;
+    if (listContinuation && RegExp(r'^[ \t]+').hasMatch(line)) {
+      line = line.trimLeft();
+    } else if (!listItem && !RegExp(r'^[ \t]*>').hasMatch(line)) {
+      listContinuation = false;
+    }
     if (!line.trimLeft().startsWith('>>>')) {
-      line = line.replaceFirst(RegExp(r'^\s*>+\s?'), '');
+      line = line.replaceFirst(RegExp(r'^[ \t]*(?:>[ \t]*)+'), '');
     }
     line = line
         .replaceFirst(RegExp(r'^\s*#{1,6}\s+'), '')
