@@ -12,7 +12,7 @@ are optional.
 
 ```shell
 git clone --branch custom-base https://github.com/SXP-Simon/Panache.git
-cd handwriting-web
+cd Panache
 docker compose up -d --build frontend backend
 ```
 

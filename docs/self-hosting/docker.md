@@ -11,7 +11,7 @@ Docker Compose 默认从本 fork 的源码构建前后端两个容器；自动�
 
 ```shell
 git clone --branch custom-base https://github.com/SXP-Simon/Panache.git
-cd handwriting-web
+cd Panache
 docker compose up -d --build frontend backend
 ```
 
