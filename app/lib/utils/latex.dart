@@ -277,8 +277,13 @@ bool _isBare(String text) {
 int _argumentEnd(String text, int start) {
   if (start >= text.length) return start;
   var cursor = start;
-  if (text[cursor] == '{' || text[cursor] == '[') {
-    final open = text[cursor], close = open == '{' ? '}' : ']';
+  if (text[cursor] == '{' || text[cursor] == '[' || text[cursor] == '(') {
+    final open = text[cursor],
+        close = open == '{'
+            ? '}'
+            : open == '('
+            ? ')'
+            : ']';
     var depth = 1;
     while (++cursor < text.length && depth > 0) {
       if (text[cursor] == r'\') {
@@ -318,7 +323,7 @@ String _bareText(String text) {
           return '${RegExp(r'^\s*').firstMatch(line)![0]}$converted${RegExp(r'\s*$').firstMatch(line)![0]}';
         }
         final command = RegExp(
-          r'\\([a-zA-Z]+|[^a-zA-Z\n])|(?<![\w])([a-zA-Z0-9])((?:[_^](?:\{[^{}]*\}|[a-zA-Z0-9]))+)',
+          r'\\([a-zA-Z]+|[^a-zA-Z\n])|(?<![\w])(\d*[a-zA-Z]|[0-9])((?:[_^](?:\{[^{}]*\}|[a-zA-Z0-9]))+)|(\()',
         );
         var cursor = 0, search = 0;
         final out = StringBuffer();
@@ -328,6 +333,24 @@ String _bareText(String text) {
           final start = search + match.start;
           var end = search + match.end;
           final name = match[1];
+          if (match[4] != null) {
+            final after = _argumentEnd(line, start);
+            if (after > start &&
+                after < line.length &&
+                (line[after] == '^' || line[after] == '_')) {
+              end = after;
+              while (end < line.length &&
+                  (line[end] == '^' || line[end] == '_')) {
+                final next = _argumentEnd(line, end + 1);
+                if (next == end + 1) break;
+                end = next;
+              }
+            }
+          }
+          if (name == 'left') {
+            final pairedEnd = bareDelimiterEnd(line, start);
+            if (pairedEnd > start) end = pairedEnd;
+          }
           if (name != null) {
             if (name == r'\') {
               out.write('${line.substring(cursor, start)}\n');
@@ -369,6 +392,11 @@ String _bareText(String text) {
                 end = line.length;
                 break;
               }
+              end = after;
+            }
+            while (end < line.length && line[end] == '{') {
+              final after = _argumentEnd(line, end);
+              if (after == end) break;
               end = after;
             }
             while (end < line.length &&

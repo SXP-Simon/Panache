@@ -34,6 +34,19 @@ bool withinMathBudget(String s) {
   return true;
 }
 
+// Bare paired delimiters are one formula region, not paths or Markdown links.
+int bareDelimiterEnd(String text, int start) {
+  var depth = 0;
+  for (final token in RegExp(r'\\(left|right)\b').allMatches(text, start)) {
+    depth += token[1] == 'left' ? 1 : -1;
+    if (depth != 0) continue;
+    final delimiter = RegExp(r'^[ \t]*(?:\\[a-zA-Z]+|\\.|[^\s])')
+        .firstMatch(text.substring(token.end));
+    return delimiter == null ? start : token.end + delimiter[0]!.length;
+  }
+  return start;
+}
+
 final _env = RegExp(r'^\\(begin|end)\{([a-zA-Z][a-zA-Z0-9*]*)\}');
 
 // Explicit math and literal ranges share one scanner so conversion and Markdown
@@ -84,6 +97,13 @@ List<MathSegment> scanMathSegments(String text) {
             : end + count,
       );
       continue;
+    }
+    if (text.startsWith(r'\left', cursor)) {
+      final end = bareDelimiterEnd(text, cursor);
+      if (end > cursor) {
+        cursor = end;
+        continue;
+      }
     }
     final boundary =
         cursor == 0 || RegExp(r'''[\s"'([{:：，；]''').hasMatch(text[cursor - 1]);
