@@ -61,26 +61,28 @@ class WorkbenchSettings extends StatelessWidget {
         children: [
           Semantics(
             identifier: 'font-select',
-            child: DropdownButtonFormField<String>(
-              key: ValueKey('font-${settings.font}-${fontFile?.name}'),
-              initialValue: fonts.contains(settings.font)
-                  ? settings.font
-                  : null,
-              isExpanded: true,
-              decoration: InputDecoration(labelText: l.font),
-              items: fonts
-                  .map(
-                    (f) => DropdownMenuItem(
-                      value: f,
-                      child: Text(f, overflow: TextOverflow.ellipsis),
-                    ),
-                  )
-                  .toList(),
-              onChanged: locked
-                  ? null
-                  : (value) {
-                      onSelectFont(value);
-                    },
+            child: SettingsFieldLabel(
+              label: l.font,
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('font-${settings.font}-${fontFile?.name}'),
+                initialValue: fonts.contains(settings.font)
+                    ? settings.font
+                    : null,
+                isExpanded: true,
+                items: fonts
+                    .map(
+                      (f) => DropdownMenuItem(
+                        value: f,
+                        child: Text(f, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: locked
+                    ? null
+                    : (value) {
+                        onSelectFont(value);
+                      },
+              ),
             ),
           ),
           TextButton.icon(
@@ -213,24 +215,26 @@ class WorkbenchSettings extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            key: ValueKey('fill-$settingsRevision'),
-            initialValue: settings.fill,
-            enabled: !locked,
-            decoration: InputDecoration(labelText: l.customColor),
-            validator: (s) =>
-                RegExp(r'^\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$')
-                        .hasMatch(s ?? '') &&
-                    (s!
-                        .replaceAll(RegExp(r'[()\s]'), '')
-                        .split(',')
-                        .every((c) => int.parse(c) <= 255))
-                ? null
-                : l.validation,
-            onChanged: (s) {
-              settings.fill = s;
-              onEdited();
-            },
+          SettingsFieldLabel(
+            label: l.customColor,
+            child: TextFormField(
+              key: ValueKey('fill-$settingsRevision'),
+              initialValue: settings.fill,
+              enabled: !locked,
+              validator: (s) =>
+                  RegExp(r'^\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$')
+                          .hasMatch(s ?? '') &&
+                      (s!
+                          .replaceAll(RegExp(r'[()\s]'), '')
+                          .split(',')
+                          .every((c) => int.parse(c) <= 255))
+                  ? null
+                  : l.validation,
+              onChanged: (s) {
+                settings.fill = s;
+                onEdited();
+              },
+            ),
           ),
         ],
       ),
@@ -239,39 +243,71 @@ class WorkbenchSettings extends StatelessWidget {
 
   Widget parameterGrid(BuildContext context, List<Parameter> fields) =>
       LayoutBuilder(
-        builder: (context, constraints) => Wrap(
-          spacing: 8,
-          runSpacing: 12,
-          children: [
-            for (final p in fields)
-              SizedBox(
-                width: (constraints.maxWidth - 8) / 2,
-                child: Semantics(
-                  identifier: p.key,
-                  child: TextFormField(
-                    key: ValueKey('${p.key}-$settingsRevision'),
-                    initialValue: settings.values[p.key],
-                    enabled: !locked,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      labelText:
+        builder: (context, constraints) {
+          final minWidth = 140 * MediaQuery.textScalerOf(context).scale(1);
+          final columns = constraints.maxWidth >= minWidth * 2 + 8 ? 2 : 1;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 12,
+            children: [
+              for (final p in fields)
+                SizedBox(
+                  width: (constraints.maxWidth - 8 * (columns - 1)) / columns,
+                  child: Semantics(
+                    identifier: p.key,
+                    child: SettingsFieldLabel(
+                      label:
                           Localizations.localeOf(context).languageCode == 'en'
                           ? p.en
                           : p.zh,
+                      child: TextFormField(
+                        key: ValueKey('${p.key}-$settingsRevision'),
+                        initialValue: settings.values[p.key],
+                        enabled: !locked,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (s) => p.accepts(s)
+                            ? null
+                            : AppLocalizations.of(context)!.validation,
+                        onChanged: (s) {
+                          settings.values[p.key] = s;
+                          onEdited();
+                        },
+                      ),
                     ),
-                    validator: (s) => p.accepts(s)
-                        ? null
-                        : AppLocalizations.of(context)!.validation,
-                    onChanged: (s) {
-                      settings.values[p.key] = s;
-                      onEdited();
-                    },
                   ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          );
+        },
       );
+}
+
+/// Labels participate in layout rather than painting above an outlined field.
+/// This keeps them inside scrolling and animated expansion clip boundaries.
+class SettingsFieldLabel extends StatelessWidget {
+  const SettingsFieldLabel({
+    super.key,
+    required this.label,
+    required this.child,
+  });
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: label,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ExcludeSemantics(
+          child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    ),
+  );
 }
