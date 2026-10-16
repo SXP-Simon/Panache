@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from handright import Template
 from numpy.typing import NDArray
-from PIL import Image
+from PIL import Image, ImageOps
 
 if __package__:
     from .logging_setup import get_logger
@@ -29,6 +29,15 @@ logger = get_logger(__name__)
 INK_DIFFERENCE_THRESHOLD = 15
 MAX_IMAGE_SCALE = 7.0
 MAX_IMAGE_PERCENT = 700.0
+MAX_IMAGE_BYTES = 32 * 1024 * 1024
+MAX_IMAGE_PIXELS = 16_000_000
+
+
+def _white_background(image: Image.Image) -> Image.Image:
+    """2026-10-16：将透明度合成到白底，避免透明 PNG 的黑色隐藏像素吞掉线稿."""
+    rgba = image.convert("RGBA")
+    background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+    return Image.alpha_composite(background, rgba).convert("RGB")
 
 
 def decode_base64_image(image_str: str) -> Image.Image | None:
@@ -36,9 +45,17 @@ def decode_base64_image(image_str: str) -> Image.Image | None:
     try:
         if "," in image_str:
             image_str = image_str.split(",", 1)[1]
-        raw_bytes = base64.b64decode(image_str)
-        return Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-    except (ValueError, OSError):
+        if len(image_str) > MAX_IMAGE_BYTES * 4 // 3 + 4:
+            return None
+        raw_bytes = base64.b64decode("".join(image_str.split()), validate=True)
+        if len(raw_bytes) > MAX_IMAGE_BYTES:
+            return None
+        with Image.open(io.BytesIO(raw_bytes)) as image:
+            if image.width * image.height > MAX_IMAGE_PIXELS:
+                return None
+            # 2026-10-16：手机 JPEG 的显示方向来自 EXIF，而非存储像素方向。
+            return ImageOps.exif_transpose(image)
+    except (ValueError, OSError, Image.DecompressionBombError):
         logger.exception("Unable to decode embedded image")
         return None
 
@@ -61,9 +78,10 @@ def fit_image_to_layout(
     if w <= 0 or h <= 0:
         return image
 
-    # 首先根据用户指定的 scale 缩放原始图
-    target_w = float(w) * scale
-    target_h = float(h) * scale
+    # 2026-10-16：以自然适配尺寸为 100%，大图调为 50% 时也能真实缩小。
+    base_ratio = min(max_width / w, max_height / h, 1.0)
+    target_w = float(w) * base_ratio * scale
+    target_h = float(h) * base_ratio * scale
 
     # 接着以版心可用宽高为硬性上限进行限制，确保绝不撑爆版面
     ratio = min(max_width / target_w, max_height / target_h, 1.0)
@@ -93,17 +111,14 @@ def process_image_to_handdrawn(
     rng = np.random.default_rng()
     # 1. 统一转换为 OpenCV BGR 格式
     if isinstance(image_input, bytes):
-        nparr = np.frombuffer(image_input, np.uint8)
-        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        with Image.open(io.BytesIO(image_input)) as decoded:
+            img_rgb = _white_background(ImageOps.exif_transpose(decoded))
+            img_bgr = cv2.cvtColor(np.array(img_rgb), cv2.COLOR_RGB2BGR)
     elif isinstance(image_input, Image.Image):
-        img_rgb = image_input.convert("RGB")
+        img_rgb = _white_background(image_input)
         img_bgr = cv2.cvtColor(np.array(img_rgb), cv2.COLOR_RGB2BGR)
     else:
         img_bgr = image_input
-
-    if img_bgr is None:
-        msg = "无法解码输入图片"
-        raise ValueError(msg)
 
     h, w = img_bgr.shape[:2]
 
@@ -249,17 +264,20 @@ class _InlineRenderer:
         """Fit an image inside the page margins, starting a new page as needed."""
         raw = decode_base64_image(data)
         if raw is None:
-            return
+            msg = "插图无法解码或超过图片大小限制，请重新插入有效图片"
+            raise ValueError(msg)
         template = self.template
         width, height = self.background.size
         top, bottom = template.get_top_margin(), template.get_bottom_margin()
         left, right = template.get_left_margin(), template.get_right_margin()
-        image = fit_image_to_layout(
-            process_image_to_handdrawn(raw),
+        # 2026-10-16：先按版心缩放，再分配滤镜位移场，避免手机大图放大内存占用。
+        fitted = fit_image_to_layout(
+            raw,
             width - left - right,
-            int((height - top - bottom) * 0.45),
+            height - top - bottom,
             scale,
         )
+        image = process_image_to_handdrawn(fitted)
         image_width, image_height = image.size
         if self.top + image_height > height - bottom:
             if self.dirty:

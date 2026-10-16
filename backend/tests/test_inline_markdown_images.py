@@ -4,12 +4,15 @@
 import base64
 import io
 import unittest
+from unittest.mock import patch
 
+import numpy as np
 from handdrawn_filter import (
     MARKDOWN_IMAGE_RE,
     _parse_image_scale,
     decode_base64_image,
     fit_image_to_layout,
+    process_image_to_handdrawn,
     render_inline_markdown_images,
 )
 from PIL import Image, ImageDraw
@@ -77,6 +80,64 @@ class InlineMarkdownImageTest(unittest.TestCase):
         fitted = fit_image_to_layout(large_img, max_width=500, max_height=300)
         self.assertLessEqual(fitted.size[0], 500)
         self.assertLessEqual(fitted.size[1], 300)
+
+    def test_large_image_percentage_uses_fitted_size(self):
+        fitted = fit_image_to_layout(self.img.resize((1000, 800)), 500, 300, 0.5)
+        self.assertEqual(fitted.size, (187, 150))
+
+    def test_transparent_black_line_survives_white_compositing(self):
+        transparent = Image.new("RGBA", (80, 60), (0, 0, 0, 0))
+        ImageDraw.Draw(transparent).line((10, 30, 70, 30), fill=(0, 0, 0, 255), width=3)
+        white = Image.new("RGBA", transparent.size, (255, 255, 255, 255))
+        opaque = Image.alpha_composite(white, transparent)
+        masks = []
+        for image in (transparent, opaque):
+            result = process_image_to_handdrawn(image, jitter_intensity=0, noise_ratio=0)
+            masks.append(np.asarray(result.getchannel("A")) > 0)
+        self.assertTrue(np.array_equal(*masks))
+        self.assertTrue(masks[0].any())
+        self.assertFalse(masks[0][0, 0])
+        buf = io.BytesIO()
+        transparent.save(buf, format="PNG")
+        decoded = decode_base64_image(base64.b64encode(buf.getvalue()).decode("ascii"))
+        self.assertEqual(decoded.getpixel((0, 0)), (0, 0, 0, 0))
+        self.assertEqual(decoded.getpixel((30, 30)), (0, 0, 0, 255))
+
+    def test_phone_photo_exif_direction_and_decode_limits(self):
+        photo = Image.new("RGB", (20, 10), "white")
+        exif = Image.Exif()
+        exif[274] = 6
+        buf = io.BytesIO()
+        photo.save(buf, format="JPEG", exif=exif)
+        encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+        self.assertEqual(decode_base64_image(encoded).size, (10, 20))
+        with patch("handdrawn_filter.MAX_IMAGE_PIXELS", 100):
+            self.assertIsNone(decode_base64_image(encoded))
+        with patch("handdrawn_filter.MAX_IMAGE_BYTES", 10):
+            self.assertIsNone(decode_base64_image(encoded))
+        self.assertIsNone(decode_base64_image(encoded + "!"))
+
+    def test_invalid_embedded_image_reports_failure(self):
+        bad = base64.b64encode(b"not an image").decode("ascii")
+        with self.assertRaisesRegex(ValueError, "插图无法解码"):
+            render_inline_markdown_images(
+                f"![broken](data:image/png;base64,{bad})",
+                MockTemplate(Image.new("RGB", (600, 800), "white")),
+                lambda _text, _template: [],
+            )
+
+    def test_filter_receives_fitted_image_instead_of_full_resolution(self):
+        buf = io.BytesIO()
+        self.img.resize((1000, 800)).save(buf, format="PNG")
+        data = base64.b64encode(buf.getvalue()).decode("ascii")
+        with patch("handdrawn_filter.process_image_to_handdrawn") as process:
+            process.return_value = Image.new("RGBA", (260, 208), (0, 0, 0, 0))
+            render_inline_markdown_images(
+                f"![图|50%](data:image/png;base64,{data})",
+                MockTemplate(Image.new("RGB", (600, 800), "white")),
+                lambda _text, _template: [],
+            )
+            self.assertEqual(process.call_args.args[0].size, (260, 208))
 
     def test_fit_image_to_layout_enlarges_small_image(self):
         small_img = Image.new("RGB", (100, 60), (255, 255, 255))
