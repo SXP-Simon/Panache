@@ -34,6 +34,41 @@ class _IllustrationDialog extends StatefulWidget {
 class _IllustrationDialogState extends State<_IllustrationDialog> {
   late int scale = widget.initialScale;
   late final _bytes = decodeImageData(widget.source ?? '');
+  late final ImageProvider? _provider = _bytes == null
+      ? null
+      : ResizeImage(
+          MemoryImage(_bytes),
+          width: 640,
+          height: 420,
+          policy: ResizeImagePolicy.fit,
+        );
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  bool _decoded = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = _provider;
+    if (provider == null || _stream != null) return;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener(
+      (info, synchronousCall) {
+        if (mounted) setState(() => _decoded = true);
+      },
+      onError: (Object error, StackTrace? stack) {
+        if (mounted) setState(() => _decoded = false);
+      },
+    );
+    _stream!.addListener(_listener!);
+  }
+
+  @override
+  void dispose() {
+    final listener = _listener;
+    if (listener != null) _stream?.removeListener(listener);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -45,9 +80,9 @@ class _IllustrationDialogState extends State<_IllustrationDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_bytes != null)
-              Image.memory(
-                _bytes,
+            if (_provider != null)
+              Image(
+                image: _provider,
                 height: 140,
                 fit: BoxFit.contain,
                 errorBuilder: (_, error, stack) => Text(l.imageUnavailable),
@@ -83,9 +118,7 @@ class _IllustrationDialogState extends State<_IllustrationDialog> {
         ),
         FilledButton(
           key: const ValueKey('illustration-apply'),
-          onPressed: _bytes == null
-              ? null
-              : () => Navigator.pop(context, scale),
+          onPressed: !_decoded ? null : () => Navigator.pop(context, scale),
           child: Text(l.apply),
         ),
       ],

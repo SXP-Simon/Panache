@@ -14,6 +14,7 @@ import '../utils/image_markers.dart';
 import 'dialogs/text_tools_dialogs.dart';
 import 'dialogs/text_preview_dialog.dart';
 import '../services/api.dart';
+import '../services/illustration_import.dart';
 import '../services/workspace.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
@@ -182,10 +183,10 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     // committed until decoding and confirmation both succeed.
     final selection = editor.selection;
     final originalText = editor.text;
-    final file = await pick(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
-    if (file == null || !mounted) return;
     String source;
     try {
+      final file = await pickIllustration();
+      if (file == null || !mounted) return;
       source = await prepareIllustration(file.bytes);
     } catch (_) {
       if (mounted) notify(l.invalidIllustration);

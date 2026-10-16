@@ -5,7 +5,13 @@ import 'dart:math' as math;
 
 /// Decodes supported raster data URLs without letting corrupt drafts throw
 /// during widget construction. Image codec failures are handled by the view.
+const maxRestoredIllustrationBytes = 32 * 1024 * 1024;
+
 Uint8List? decodeImageData(String source) {
+  // Reject oversized drafts before regex matching, whitespace copying or decode.
+  if (source.length > ((maxRestoredIllustrationBytes + 2) ~/ 3) * 4 + 128) {
+    return null;
+  }
   final match = RegExp(
     r'^data:image/(?:png|jpe?g|webp|gif|bmp);base64,([A-Za-z0-9+/=\s]+)$',
     caseSensitive: false,
@@ -13,7 +19,9 @@ Uint8List? decodeImageData(String source) {
   if (match == null) return null;
   try {
     final bytes = base64Decode(match[1]!.replaceAll(RegExp(r'\s'), ''));
-    return bytes.isEmpty ? null : bytes;
+    return bytes.isEmpty || bytes.length > maxRestoredIllustrationBytes
+        ? null
+        : bytes;
   } on FormatException {
     return null;
   }
@@ -34,7 +42,7 @@ Future<String> prepareIllustration(Uint8List bytes) async {
       }
       final ratio = math.min(
         1.0,
-        2048 / math.max(descriptor.width, descriptor.height),
+        2000 / math.max(descriptor.width, descriptor.height),
       );
       final codec = await descriptor.instantiateCodec(
         targetWidth: math.max(1, (descriptor.width * ratio).round()),
@@ -47,6 +55,9 @@ Future<String> prepareIllustration(Uint8List bytes) async {
             format: ui.ImageByteFormat.png,
           );
           if (png == null) throw const FormatException('image-decode');
+          if (png.lengthInBytes > 16 * 1024 * 1024) {
+            throw const FormatException('image-size');
+          }
           return 'data:image/png;base64,${base64Encode(png.buffer.asUint8List())}';
         } finally {
           frame.image.dispose();

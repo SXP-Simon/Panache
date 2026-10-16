@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -69,7 +68,7 @@ void main() {
         decodeImageData(normalized)!,
       );
       final frame = await codec.getNextFrame();
-      expect(frame.image.width, 2048);
+      expect(frame.image.width, 2000);
       expect(frame.image.height, 10);
       frame.image.dispose();
       codec.dispose();
@@ -84,11 +83,23 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        // Readable data URL but corrupt image codec: the editor must stay usable.
         final workspace = Workspace()
           ..text = '![插图 1|50%]\n![插图 1|75%]\n![插图 9]'
           ..images = {
-            '1': 'data:image/png;base64,${base64Encode([1, 2, 3])}',
+            '1':
+                await tester.runAsync(() async {
+                  final recorder = ui.PictureRecorder();
+                  Canvas(recorder).drawColor(Colors.black, BlendMode.src);
+                  final picture = recorder.endRecording();
+                  final image = await picture.toImage(8, 8);
+                  final bytes = await image.toByteData(
+                    format: ui.ImageByteFormat.png,
+                  );
+                  image.dispose();
+                  picture.dispose();
+                  return prepareIllustration(bytes!.buffer.asUint8List());
+                }) ??
+                '',
           };
         addTearDown(workspace.dispose);
         await tester.pumpWidget(
@@ -107,6 +118,18 @@ void main() {
         );
         slider.onChanged!(120);
         await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 150)),
+        );
+        await tester.pump();
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('illustration-apply')),
+              )
+              .onPressed,
+          isNotNull,
+        );
         await tester.tap(find.byKey(const ValueKey('illustration-apply')));
         await tester.pumpAndSettle();
         expect(workspace.text, '![插图 1|50%]\n![插图 1|120%]\n![插图 9]');
