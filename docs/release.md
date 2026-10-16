@@ -1,8 +1,8 @@
 # Flutter 发布
 
-开源仓库：[SXP-Simon/handwriting-web](https://github.com/SXP-Simon/handwriting-web)。
+开源仓库：[SXP-Simon/Panache](https://github.com/SXP-Simon/Panache)。
 Flutter 与 React/Python 保持独立源码分支；共同的 GitHub Release 由 `custom-base`
-的 [Flutter Release Assets](https://github.com/SXP-Simon/handwriting-web/blob/custom-base/.github/workflows/flutter_release.yml) 编排。
+的 [Flutter Release Assets](https://github.com/SXP-Simon/Panache/blob/custom-base/.github/workflows/flutter_release.yml) 编排。
 
 发布使用通过 Flutter、Rust 和移动端检查的完整提交 SHA，并在 Release 的
 `Flutter-source.json` 中固定来源。补跑复用该来源，不自动换成分支最新代码。

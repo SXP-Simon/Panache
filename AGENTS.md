@@ -6,13 +6,13 @@
 
 ## 项目概述
 
-Flutter + Rust 跨平台手写体生成器。Android/iOS 使用 C ABI + Dart FFI；桌面使用自动启动的 Rust HTTP sidecar；Web 使用 Rust HTTP 服务。
+Panache 的 Flutter + Rust 跨平台手写体生成器。Android/iOS 使用 C ABI + Dart FFI；桌面使用自动启动的 Rust HTTP sidecar；Web 使用 Rust HTTP 服务。
 
 ## 分支与同步
 
 - `flutter` 独立维护 Flutter/Rust 客户端与引擎；选择性通过 `cherry-pick -x` 接收 `hakimyu/refactor/flutter-rust`。
 - `custom-base` 是 React/Python/Electron 自用主线；`main` 只同步 `upstream/main`。两种实现不整分支互相合入，功能分别移植和验证。
-- 自用远端是 `origin`（`SXP-Simon/handwriting-web`），原项目是 `upstream`，Flutter 迁移来源是 `hakimyu`。
+- 自用远端是 `origin`（`SXP-Simon/Panache`），原项目是 `upstream`，Flutter 迁移来源是 `hakimyu`。
 
 ## 目录与资源
 
