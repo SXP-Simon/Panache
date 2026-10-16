@@ -3,6 +3,8 @@ pub mod document;
 pub mod export;
 pub mod fonts;
 pub mod imaging;
+mod inline_document;
+pub use inline_document::validate as validate_document;
 mod parameters;
 pub mod render;
 pub mod text;

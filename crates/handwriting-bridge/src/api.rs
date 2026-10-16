@@ -281,9 +281,7 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
         .get("text")
         .cloned()
         .ok_or_else(|| Error::new("invalid_parameter", "缺少 text"))?;
-    if text.chars().count() > limits().max_text_chars {
-        return Err(Error::new("text_limit", "文本超过移动端限制"));
-    }
+    handwriting_core::validate_document(&text, &limits())?;
     let names = fonts(&request.font_dir)?;
     let primary = if let Some(upload) = request.files.get("font_file") {
         FontBook::load(&read(&upload.path)?)?

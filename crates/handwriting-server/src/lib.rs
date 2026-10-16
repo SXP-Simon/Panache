@@ -480,9 +480,7 @@ async fn submit(
     let text = fields
         .get("text")
         .ok_or_else(|| Error::new("invalid_parameter", "缺少 text"))?;
-    if text.chars().count() > s.0.config.limits.max_text_chars {
-        return Err(Error::new("text_limit", "文本过长").into());
-    }
+    handwriting_core::validate_document(text, &s.0.config.limits)?;
     let id = uuid::Uuid::new_v4().simple().to_string();
     let token =
         s.0.store
@@ -914,7 +912,13 @@ mod tests {
             ("bottom_margin", "10"),
             ("strikethrough_probability", "0"),
         ];
-        fields.extend_from_slice(extra);
+        for &(key, value) in extra {
+            if let Some(field) = fields.iter_mut().find(|(name, _)| *name == key) {
+                field.1 = value;
+            } else {
+                fields.push((key, value));
+            }
+        }
         let (status, json) = send(s, "/api/generate_handwriting", &fields, None).await;
         assert_eq!(status, StatusCode::OK, "{json}");
         let id = json["task_id"].as_str().unwrap().to_string();
@@ -928,6 +932,31 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         panic!("任务超时")
+    }
+    mod image_support {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../handwriting-core/tests/support/images.rs"
+        ));
+    }
+    #[tokio::test]
+    async fn photo_payload_is_accepted_but_body_limit_is_preserved() {
+        let (_dir, s) = setup();
+        let document = image_support::image_document();
+        let id = generate(&s, &[("text", &document)]).await;
+        let (status, bytes) =
+            call(&s, &format!("/api/generate_handwriting/task/{id}/result")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(!bytes.is_empty());
+        let (status, error) = send(
+            &s,
+            "/api/generate_handwriting",
+            &[("text", &"字".repeat(100_001))],
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(error["error_code"], "text_limit");
     }
     #[tokio::test]
     async fn cors_preflight_and_urlencoded_legacy_forms() {

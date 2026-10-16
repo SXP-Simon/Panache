@@ -1,4 +1,4 @@
-//! 2026-10-12：移动端 C ABI。JSON 仅传参数、状态和路径，图片不经过 FFI 字符串。
+//! 2026-10-12：移动端 C ABI。JSON 传参数、有界内联图片文档和状态；渲染输出通过文件路径返回。
 pub mod api;
 use std::ffi::{CStr, CString, c_char};
 

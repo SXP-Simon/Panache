@@ -571,8 +571,10 @@ dependencies = [
 name = "handwriting-bridge"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "fontdue",
  "handwriting-core",
+ "image",
  "serde",
  "serde_json",
  "tempfile",
