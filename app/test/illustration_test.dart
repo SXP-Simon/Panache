@@ -110,9 +110,17 @@ void main() {
         final second = find.byKey(ValueKey('illustration-${markers[1].start}'));
         await tester.ensureVisible(second);
         await tester.pumpAndSettle();
+        final editorBounds = tester.getRect(
+          find.byKey(const ValueKey('text-editor')),
+        );
         await tester.tap(second);
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('75%'), findsOneWidget);
+        expect(find.byType(LinearProgressIndicator), findsNothing);
+        expect(
+          tester.getRect(find.byKey(const ValueKey('text-editor'))),
+          editorBounds,
+        );
         final slider = tester.widget<Slider>(
           find.byKey(const ValueKey('illustration-scale')),
         );

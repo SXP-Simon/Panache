@@ -94,6 +94,7 @@ void main() {
     await tester.tap(secondButton);
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('75%'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     final sliderFinder = find.byKey(const ValueKey('illustration-scale'));
     await tester.drag(sliderFinder, const Offset(-25, 0));
     await tester.pump(const Duration(milliseconds: 300));
@@ -147,7 +148,10 @@ void main() {
           widget.key is ValueKey<String> &&
           (widget.key! as ValueKey<String>).value.startsWith('font_size-'),
     );
-    await tester.ensureVisible(field);
+    final labeledField = find
+        .ancestor(of: field, matching: find.byType(SettingsFieldLabel))
+        .first;
+    await tester.ensureVisible(labeledField);
     await tester.pumpAndSettle();
     final label = find
         .descendant(
