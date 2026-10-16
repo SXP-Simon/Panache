@@ -167,6 +167,7 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   const lines = s.split('\n');
   const cleanedLines: string[] = [];
   let currentTableLines: string[] = [];
+  let listContentIndent = 0;
 
   const flushTable = () => {
     if (currentTableLines.length > 0) {
@@ -202,7 +203,17 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
 
     // 6.4 剥离无序列表前缀符（如 `- 项`、`* 项`、`+ 项`），转换为自然手写文本（人类手写通常不保留印刷体短横线）
     // 注意：保留行首用于数学负号或减号的情形（例如 -0.5 或 -x-x̄），仅当短横线后跟随空格时作为列表符剥离
-    line = line.replace(/^([ \t]*)[-*+][ \t]+/, '$1');
+    const listPrefix = /^[ \t]*[-*+][ \t]+/.exec(line);
+    if (listPrefix) {
+      listContentIndent = listPrefix[0].length;
+      line = line.slice(listContentIndent);
+    } else if (listContentIndent && /^[ \t]+\S/.test(line)) {
+      const indent = /^[ \t]*/.exec(line)?.[0].length ?? 0;
+      if (indent >= listContentIndent) line = line.slice(listContentIndent);
+      else listContentIndent = 0;
+    } else {
+      listContentIndent = 0;
+    }
 
     // 6.5 保留独立分页标记 ---，其余形式的分隔线规范化为 ---
     if (/^[ \t]*([*_-][ \t]*){3,}[ \t]*$/.test(line)) {

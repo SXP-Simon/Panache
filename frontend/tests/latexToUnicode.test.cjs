@@ -3,6 +3,12 @@ const assert = require('assert').strict;
 async function run() {
   const { convertLatexToUnicode: convert, hasLatexMarkup } = await import('../src/utils/latexToUnicode.ts');
   const cases = [
+    ['mixed prose coefficient powers', String.raw`导数：3x^2 + 12y_1，标识符 abc3x^2 不变。`, String.raw`导数：3x² + 12y₁，标识符 abc3x^2 不变。`],
+    ['mixed prose evaluation limits', String.raw`左边：\int_{-1}^{1} x^2 dx = \left. \frac{1}{3}x^3 \right\vert{}_{-1}^{1} = \frac{2}{3}`, '左边：∫₋₁¹ x² dx = ⅓x³|₋₁¹ = ⅔'],
+    ['mixed prose paired bracket and powers', String.raw`右边：\frac{1}{2}\left[ (\frac{1}{2}-\frac{1}{2\sqrt{3}})^3 + (\frac{1}{2}+\frac{1}{2\sqrt{3}})^3 \right]`, '右边：½[(½-(1)/(2√(3)))³+(½+(1)/(2√(3)))³]'],
+    ['mixed prose nested delimiters', String.raw`展开：2 \times \left( \left[ x^2 \right]+y \right)^3。`, '展开：2 × ([x²]+y)³。'],
+    ['mixed prose ordinary closing powers', String.raw`验证：(-1)^2 + 3(1)^2 + [x]^3。`, '验证：(-1)² + 3(1)² + [x]³。'],
+    ['invalid paired group preserves source', String.raw`结果：\left[ \unknown{x} \right]`, String.raw`结果：\left[ \unknown{x} \right]`],
     ['aligned rows', String.raw`\begin{aligned}x &= 1 \\ y &= 2\end{aligned}`, 'x=1\ny=2'],
     ['display wrapper', String.raw`\[\begin{aligned}x&=1\\y&=2\end{aligned}\]`, 'x=1\ny=2'],
     ['starred align and spacing', String.raw`\begin{align*}x&=1\\[2pt]y&=2\end{align*}`, 'x=1\ny=2'],

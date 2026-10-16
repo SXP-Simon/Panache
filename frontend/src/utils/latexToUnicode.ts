@@ -613,6 +613,19 @@ function argumentEnd(text: string, start: number) {
   return token ? cursor + token[0].length : start;
 }
 
+// Keep paired sizing commands together: neither side is valid math on its own.
+function sizedGroupEnd(text: string, start: number): number | null {
+  const commands = /\\(left|right)(?![a-zA-Z])\s*(\\[a-zA-Z]+|\\.|[()[\]{}.|])/g;
+  commands.lastIndex = start;
+  let depth = 0;
+  for (let token = commands.exec(text); token; token = commands.exec(text)) {
+    if (depth === 0 && token.index !== start) return null;
+    depth += token[1] === 'left' ? 1 : -1;
+    if (depth === 0) return commands.lastIndex;
+  }
+  return null;
+}
+
 // 正文中孤立的裸宏只消费自己的参数，不改周围空格、路径或标识符。
 function convertBareText(text: string) {
   const lines = text.split('\n');
@@ -631,7 +644,7 @@ function convertBareText(text: string) {
         return line;
       }
       const command =
-        /\\([a-zA-Z]+|[^a-zA-Z\n])|(?<![\w])([a-zA-Z0-9])((?:[_^](?:\{[^{}]*\}|[a-zA-Z0-9]))+)/g;
+        /\\([a-zA-Z]+|[^a-zA-Z\n])|(?<![\w])([0-9]*[a-zA-Z]|[0-9])((?:[_^](?:\{[^{}]*\}|[a-zA-Z0-9]))+)|([)\]])((?:[_^](?:\{[^{}]*\}|[a-zA-Z0-9]))+)/g;
       let result = '',
         cursor = 0,
         match;
@@ -639,6 +652,13 @@ function convertBareText(text: string) {
         let end = command.lastIndex;
         if (match[1]) {
           const name = match[1];
+          if (name === 'left') {
+            const groupEnd = sizedGroupEnd(line, match.index);
+            if (groupEnd !== null) {
+              end = groupEnd;
+              if (/^\{\}[_^]/.test(line.slice(end))) end += 2;
+            }
+          }
           if (name === '\\') {
             result += line.slice(cursor, match.index) + '\n';
             cursor = end;
@@ -678,8 +698,12 @@ function convertBareText(text: string) {
           }
         }
         const raw = line.slice(match.index, end);
-        const converted = tryConvertFormulaViaKatex(raw);
-        result += line.slice(cursor, match.index) + (converted ?? raw);
+        const converted = match[4]
+          ? tryConvertFormulaViaKatex(`{}${match[5]}`)
+          : tryConvertFormulaViaKatex(raw);
+        result +=
+          line.slice(cursor, match.index) +
+          (converted === null ? raw : (match[4] ?? '') + converted);
         cursor = end;
         command.lastIndex = end;
       }
@@ -712,5 +736,7 @@ export function hasLatexMarkup(text: string) {
 }
 
 function hasBareMarkup(text: string) {
-  return /\\(?:[a-zA-Z]+)(?![a-zA-Z])|\\\\|(?<![\w])[a-zA-Z0-9][_^](?:\{|[a-zA-Z0-9])/.test(text);
+  return /\\(?:[a-zA-Z]+)(?![a-zA-Z])|\\\\|(?<![\w])(?:[0-9]*[a-zA-Z]|[0-9]|[)\]])[_^](?:\{|[a-zA-Z0-9])/.test(
+    text,
+  );
 }

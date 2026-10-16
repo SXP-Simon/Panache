@@ -7,6 +7,41 @@ function test(name, run) {
 
 const cleanModule = import("../src/utils/cleanMarkdown.ts");
 
+test("removes unordered item and continuation indentation without trimming ordinary paragraphs", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  assert.equal(cleanMarkdown(' * 第一项\n   展开计算\n   再乘系数\n\n    保留普通缩进\n\t- [x] 完成\n\t  下一行\n  + 嵌套项'), '第一项\n展开计算\n再乘系数\n\n    保留普通缩进\n完成\n下一行\n嵌套项');
+  assert.equal(cleanMarkdown('负号\n-0.5\n-x\n  正文'), '负号\n-0.5\n-x\n  正文');
+});
+
+test("cleanup then conversion preserves numerical integration expressions", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const { convertLatexToUnicode } = await import('../src/utils/latexToUnicode.ts');
+  const input = String.raw` * 左边：\int_{-1}^{1} x^2 dx = \left. \frac{1}{3}x^3 \right\vert{}_{-1}^{1}
+   展开：2 \times \left( (\frac{1}{2})^3 + \frac{3}{2} \times \frac{1}{12} \right)`;
+  const output = convertLatexToUnicode(cleanMarkdown(input));
+  assert.equal(output, '左边：∫₋₁¹ x² dx = ⅓x³|₋₁¹\n展开：2 × ((½)³+(3)/(2)×(1)/(12))');
+  assert.equal(convertLatexToUnicode(cleanMarkdown(output)), output);
+});
+
+test("both cleanup orders preserve mixed numerical integration notes and derivative prose", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const { convertLatexToUnicode } = await import('../src/utils/latexToUnicode.ts');
+  const input = String.raw`导数 f'(x) = 3x^2，代入 f(x)。
+> * 左边：\int_{-1}^{1} x^2 dx = \left. \frac{1}{3}x^3 \right\vert{}_{-1}^{1}
+>   结论：左边 \neq 右边。
+ * 右边：\frac{1}{2}\left[ (\frac{1}{2}-\frac{1}{2\sqrt{3}})^3 + (\frac{1}{2}+\frac{1}{2\sqrt{3}})^3 \right]
+   展开：2 \times \left( (\frac{1}{2})^3 + \frac{3}{2} \times \frac{1}{12} \right)
+   再乘以系数 \frac{1}{2}，得到 \frac{1}{4}。`;
+  const expected = `导数 f'(x) = 3x²，代入 f(x)。
+左边：∫₋₁¹ x² dx = ⅓x³|₋₁¹
+结论：左边 ≠ 右边。
+右边：½[(½-(1)/(2√(3)))³+(½+(1)/(2√(3)))³]
+展开：2 × ((½)³+(3)/(2)×(1)/(12))
+再乘以系数 ½，得到 ¼。`;
+  assert.equal(convertLatexToUnicode(cleanMarkdown(input)), expected);
+  assert.equal(cleanMarkdown(convertLatexToUnicode(input)), expected);
+});
+
 test("strips markdown headings (#, ##, ###)", async () => {
   const { cleanMarkdown } = await cleanModule;
   const input = "# 一级标题\n## 二级标题\n### P36 第6题 (对应通话时间 02:04:02 图)\n正文内容";
