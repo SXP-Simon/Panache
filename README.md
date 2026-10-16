@@ -1,4 +1,4 @@
-# 手写体生成器
+# Panache · Flutter / Rust
 
 使用 Flutter + Rust 实现的跨平台手写体生成工具，支持文字与文档导入、字体和背景选择、排版扰动、图片预览及 PNG / PDF / ZIP 导出。
 
@@ -70,7 +70,7 @@ bash scripts/build-rust-service.sh
 
 `flutter` 分支推送与相关 pull request 按路径触发 Flutter 检查、Rust 跨平台检查，以及 Android/iOS 模拟器上的随包引擎集成测试。独立桌面打包保留 pull request 与手动入口；这些工作流不发布版本。
 
-问题与建议通过[当前 fork 的 GitHub Issues](https://github.com/SXP-Simon/handwriting-web/issues)提交，客户端反馈入口会打开该页面。
+问题与建议通过[当前 fork 的 GitHub Issues](https://github.com/SXP-Simon/Panache/issues)提交，客户端反馈入口会打开该页面。
 
 ## 许可
 
