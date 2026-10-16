@@ -57,6 +57,52 @@ pub fn normalize(text: &str, english_spacing: bool) -> String {
 }
 
 pub fn parse(text: &str) -> Vec<Node> {
+    let spans = crate::inline_document::image_payloads(text);
+    if spans.is_empty() {
+        return parse_document(text);
+    }
+    // 2026-10-16：先用短标记替换图片，避免 base64 进入公式字符和括号索引数组。
+    let mut compact = String::new();
+    let mut prefix = "data:image/handwriting-inline".to_owned();
+    while text.contains(&prefix) {
+        prefix.push('x');
+    }
+    let mut images = std::collections::HashMap::new();
+    let mut previous = 0;
+    for (index, span) in spans.into_iter().enumerate() {
+        compact.push_str(&text[previous..span.start]);
+        let key = format!("{prefix};base64,{index}");
+        compact.push_str(&key);
+        images.insert(key, &text[span.clone()]);
+        previous = span.end;
+    }
+    compact.push_str(&text[previous..]);
+    fn restore(nodes: &mut [Node], images: &std::collections::HashMap<String, &str>) {
+        for node in nodes {
+            match node {
+                Node::Image { data, .. } => {
+                    if let Some(original) = images.get(data) {
+                        *data = (*original).to_owned();
+                    }
+                }
+                Node::Fraction(a, b) | Node::Radical(a, b) => {
+                    restore(a, images);
+                    restore(b, images);
+                }
+                Node::Scripts { upper, lower } => {
+                    restore(upper, images);
+                    restore(lower, images);
+                }
+                Node::Accent(a, _) => restore(a, images),
+                _ => (),
+            }
+        }
+    }
+    let mut nodes = parse_document(&compact);
+    restore(&mut nodes, &images);
+    nodes
+}
+fn parse_document(text: &str) -> Vec<Node> {
     let mut out = Vec::new();
     let mut fenced: Option<(char, usize)> = None;
     for (i, line) in text.split('\n').enumerate() {

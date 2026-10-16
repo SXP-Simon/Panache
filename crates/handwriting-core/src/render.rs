@@ -189,9 +189,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     emit: F,
 ) -> Result<usize> {
     cancel.check()?;
-    if r.text.chars().count() > r.limits.max_text_chars {
-        return Err(Error::new("text_limit", "文本过长"));
-    }
+    crate::validate_document(&r.text, &r.limits)?;
     let p = &r.params;
     let background = match (p.width, p.height) {
         (Some(w), Some(h)) => {

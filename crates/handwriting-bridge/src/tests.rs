@@ -1,3 +1,5 @@
+#[path = "../../handwriting-core/tests/support/images.rs"]
+mod image_support;
 use crate::{
     api::{Request, Upload, execute},
     handwriting_bridge_call, handwriting_bridge_free,
@@ -75,7 +77,16 @@ fn local_engine_lifecycle_and_abi() {
         }
         panic!("worker timed out")
     };
-    for mode in ["preview", "math", "pdf", "zip", "cancel", "invalid"] {
+    for mode in [
+        "preview",
+        "math",
+        "image",
+        "text_limit",
+        "pdf",
+        "zip",
+        "cancel",
+        "invalid",
+    ] {
         let mut fields = fields.clone();
         if mode == "pdf" || mode == "zip" {
             fields.insert("preview".into(), "false".into());
@@ -87,12 +98,20 @@ fn local_engine_lifecycle_and_abi() {
         if mode == "invalid" {
             fields.insert("width".into(), "1000000".into());
         }
+        if mode == "image" {
+            fields.insert("text".into(), image_support::image_document());
+        }
+        if mode == "text_limit" {
+            fields.insert("text".into(), "字".repeat(20_001));
+        }
         // 2026-10-15：公式经移动端同一 C ABI 进入真实 worker，不只测试直接 Rust 函数。
-        let submitted = if mode == "math" {
-            fields.insert(
-                "text".into(),
-                "√((a)/(b)) + xₙ²\n---\n((a)/(b))/((c)/(d)) + (AB)⃗".into(),
-            );
+        let submitted = if mode == "math" || mode == "image" {
+            if mode == "math" {
+                fields.insert(
+                    "text".into(),
+                    "√((a)/(b)) + xₙ²\n---\n((a)/(b))/((c)/(d)) + (AB)⃗".into(),
+                );
+            }
             let input = CString::new(
                 json!({
                     "command":"submit", "data_dir":root.path(), "font_dir":font_dir,
@@ -122,8 +141,17 @@ fn local_engine_lifecycle_and_abi() {
                 assert_eq!(state["task_status"], "cancelled");
                 assert!(simple("result", id).is_err());
             }
+            "text_limit" => {
+                assert_eq!(state["task_status"], "failed");
+                assert!(
+                    state["error_message"]
+                        .as_str()
+                        .unwrap()
+                        .contains("文本过长")
+                );
+            }
             "invalid" => assert_eq!(state["task_status"], "failed"),
-            "preview" | "math" => {
+            "preview" | "math" | "image" => {
                 assert_eq!(state["task_status"], "completed", "{state}");
                 assert_eq!(state["pages"].as_array().unwrap().len(), 2);
                 let bytes = std::fs::read(state["pages"][0].as_str().unwrap()).unwrap();

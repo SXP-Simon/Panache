@@ -366,3 +366,53 @@ fn pdf_text_import_reads_real_content_and_obeys_text_limit() {
         "text_limit"
     );
 }
+
+#[path = "support/images.rs"]
+mod image_support;
+#[test]
+fn photo_payload_is_not_counted_as_body_text_or_formula_indices() {
+    let doc = image_support::image_document();
+    let mut r = request(&doc);
+    r.limits.max_text_chars = 100;
+    r.params.full_preview = true;
+    assert_eq!(pages(&r).len(), 2);
+    let nodes = text::parse(&doc);
+    assert!(nodes.len() < 20);
+    assert!(
+        nodes
+            .iter()
+            .any(|n| matches!(n, Node::Image { data, .. } if data.len() > 100_000))
+    );
+}
+
+#[test]
+fn image_compaction_preserves_literal_protection_order_and_original_marker_data() {
+    let image = "![图](data:image/png;base64,AAAA)";
+    let literal = format!("`{image}` https://example.com/{image}\n```\n{image}\n```\n");
+    let fake = "![占位](data:image/handwriting-inline;base64,0)";
+    let document = format!("{literal}{fake} {image} ½ {image}");
+    let nodes = text::parse(&document);
+    let images: Vec<_> = nodes
+        .iter()
+        .filter_map(|n| match n {
+            Node::Image { data, .. } => Some(data.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        images,
+        vec![
+            "data:image/handwriting-inline;base64,0",
+            "data:image/png;base64,AAAA",
+            "data:image/png;base64,AAAA"
+        ]
+    );
+    assert!(nodes.iter().any(|n| matches!(n, Node::Fraction(_, _))));
+    assert!(
+        nodes
+            .iter()
+            .filter(|n| matches!(n, Node::Char('!')))
+            .count()
+            >= 3
+    );
+}
