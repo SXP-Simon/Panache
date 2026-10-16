@@ -1,0 +1,11 @@
+// Pinned older Flutter sources may configure ndk.abiFilters unconditionally.
+// ABI splits own this selection; clear the conflicting filter only for split builds.
+gradle.beforeProject { project ->
+    project.pluginManager.withPlugin('com.android.application') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            if (project.findProperty('split-per-abi')?.toString() == 'true') {
+                android.defaultConfig.ndk.abiFilters.clear()
+            }
+        }
+    }
+}

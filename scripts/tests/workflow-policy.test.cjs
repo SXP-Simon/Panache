@@ -258,6 +258,11 @@ test("Flutter assets pin source and keep write permission out of build jobs", ()
   assert.match(android, /for ABI in arm64-v8a x86_64/u);
   assert.match(android, /native != \{sys.argv\[2\]\}/u);
   assert.match(android, /libhandwriting_bridge.so/u);
+  assert.match(android, /cp scripts\/android-release-compat.gradle/u);
+  const compatibility = fs.readFileSync(path.join(__dirname, "../android-release-compat.gradle"), "utf8");
+  assert.match(compatibility, /finalizeDsl/u);
+  assert.match(compatibility, /findProperty\('split-per-abi'\).*== 'true'/u);
+  assert.match(compatibility, /defaultConfig.ndk.abiFilters.clear\(\)/u);
   assert.match(android, /CN=Android Debug/u);
   assert.doesNotMatch(workflow, /flutter build ipa|--clobber/u);
   const plan = planChanges([".github/workflows/flutter_release.yml"]);

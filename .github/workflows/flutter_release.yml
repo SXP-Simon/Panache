@@ -233,6 +233,13 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           chmod 600 "$KEYSTORE"
           echo "HANDWRITING_ANDROID_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+      - name: Configure ABI splits for pinned older sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          INIT_DIR="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$INIT_DIR"
+          cp scripts/android-release-compat.gradle "$INIT_DIR/handwriting-release.gradle"
       - name: Build only a formally signed release APK
         working-directory: flutter-source/app
         shell: bash
