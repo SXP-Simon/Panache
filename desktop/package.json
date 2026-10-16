@@ -2,7 +2,7 @@
   "name": "handwriting-desktop",
   "version": "1.3.2",
   "private": true,
-  "description": "手写体生成器桌面版（Electron 外壳 + 内置后端）",
+  "description": "Panache 桌面版（Electron 外壳 + 内置后端）",
   "author": "SXP-Simon",
   "main": "main.js",
   "scripts": {
@@ -20,12 +20,13 @@
     "electronVersion": "33.4.11",
     "npmRebuild": false,
     "appId": "io.github.sxp-simon.handwriting",
-    "productName": "HandwritingWeb",
+    "productName": "Panache",
     "directories": {
       "output": "build/installer"
     },
     "files": [
       "main.js",
+      "app-identity.js",
       "studio-storage.js",
       "preload.js",
       "splash.html",
@@ -75,11 +76,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "手写体生成器",
-      "artifactName": "HandwritingWeb-Setup-${version}.exe"
+      "shortcutName": "Panache",
+      "artifactName": "Panache-Setup-${version}.exe"
     },
     "portable": {
-      "artifactName": "HandwritingWeb-portable-${version}.exe"
+      "artifactName": "Panache-portable-${version}.exe"
     },
     "mac": {
       "icon": "build/icon.icns",
@@ -98,7 +99,7 @@
           ]
         }
       ],
-      "artifactName": "HandwritingWeb-${version}-${arch}.${ext}",
+      "artifactName": "Panache-${version}-${arch}.${ext}",
       "identity": null
     }
   }

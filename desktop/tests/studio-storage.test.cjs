@@ -74,3 +74,17 @@ test('drain waits for accepted IO, is idempotent while pending and permits a can
   await storage.drain();
   assert.equal(await fs.readFile(record(key), 'utf8'), 'cancelled quit: editing continues');
 });
+
+
+test('Panache preserves packaged Chromium storage and lock identity, development remains unchanged', async (t) => {
+  const { configureAppIdentity } = require('../app-identity');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'panache-identity-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const calls = [];
+  configureAppIdentity({ isPackaged: true, commandLine: { hasSwitch: () => false }, getPath: (name) => { assert.equal(name, 'appData'); return directory; }, setPath: (...args) => calls.push(args) });
+  const expected = path.join(directory, 'HandwritingWeb');
+  assert.deepEqual(calls, [['userData', expected], ['sessionData', expected]]);
+  assert.equal((await fs.stat(expected)).isDirectory(), true);
+  configureAppIdentity({ isPackaged: true, commandLine: { hasSwitch: (name) => { assert.equal(name, 'user-data-dir'); return true; } }, getPath: () => { throw new Error('must preserve explicit profile'); } });
+  configureAppIdentity({ isPackaged: false, getPath: () => { throw new Error('must preserve development identity'); } });
+});

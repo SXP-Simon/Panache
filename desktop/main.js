@@ -6,6 +6,8 @@ const http = require("http");
 const path = require("path");
 const { randomUUID } = require("crypto");
 const { setupPersistence } = require("./studio-storage");
+const { configureAppIdentity } = require("./app-identity");
+configureAppIdentity(app);
 
 // PyInstaller 只在 Windows 上给可执行文件加 .exe 后缀，macOS 上没有
 const BACKEND_EXE =
@@ -316,7 +318,7 @@ function createWindow() {
     backgroundColor: "#ffffff",
     autoHideMenuBar: true,
     show: false,
-    title: "手写体生成器",
+    title: "Panache",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -417,7 +419,7 @@ function buildMenu() {
             dialog.showMessageBox({
               type: "info",
               title: "关于",
-              message: "手写体生成器 桌面版",
+              message: "Panache 桌面版",
               detail: `版本 ${app.getVersion()}\n数据目录：${dataDir()}`,
             }),
         },

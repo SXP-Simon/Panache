@@ -9,6 +9,15 @@ const PACKAGED_VERSION = require(path.resolve(__dirname, "..", "..", "desktop", 
   .version;
 
 test.describe("桌面版启动与打包完整性", () => {
+  test("产品更名保留显式 Chromium 配置与独立实例锁", async ({ desktop }) => {
+    const identity = await desktop.app.evaluate(({ app }) => ({
+      explicit: app.commandLine.getSwitchValue("user-data-dir"), userData: app.getPath("userData"), sessionData: app.getPath("sessionData"),
+    }));
+    expect(identity.explicit).toBeTruthy();
+    expect(identity.userData).toBe(identity.explicit);
+    expect(identity.sessionData).toBe(identity.userData);
+  });
+
   test("发行包保留完整的项目许可", async ({ desktop }) => {
     const license = await desktop.app.evaluate(async ({ app, BrowserWindow }) => {
       const viewer = new BrowserWindow({
