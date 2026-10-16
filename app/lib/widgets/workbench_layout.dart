@@ -62,7 +62,7 @@ class WorkbenchLayout extends StatelessWidget {
               ),
             ),
           ),
-        if (busy)
+        if (generating)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
