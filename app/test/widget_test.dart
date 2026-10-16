@@ -35,6 +35,8 @@ void main() {
         await tester.pumpWidget(HandwritingApp(locale: locale, workspace: w));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('text-editor')), findsOneWidget);
+        expect(find.text('Panache'), findsOneWidget);
+        expect(tester.widget<Title>(find.byType(Title).first).title, 'Panache');
         expect(tester.takeException(), isNull);
       }
     });

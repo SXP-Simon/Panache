@@ -137,6 +137,7 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
     if (workspace != null && !failed) return widget.builder(workspace!);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
       locale: const Locale('zh'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "SXP-Simon" "\0"
-            VALUE "FileDescription", "HandwritingWeb" "\0"
+            VALUE "FileDescription", "Panache" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "handwriting_app" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 SXP-Simon. Licensed under MIT." "\0"
             VALUE "OriginalFilename", "handwriting_app.exe" "\0"
-            VALUE "ProductName", "HandwritingWeb" "\0"
+            VALUE "ProductName", "Panache" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

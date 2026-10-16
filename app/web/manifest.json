@@ -1,11 +1,11 @@
 {
-  "name": "HandwritingWeb",
-  "short_name": "HandwritingWeb",
+  "name": "Panache",
+  "short_name": "Panache",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#F5F5F5",
-  "theme_color": "#007BFF",
-  "description": "手写体生成器",
+  "theme_color": "#62833A",
+  "description": "Panache · 手写体生成工具 / Handwriting generator",
   "orientation": "any",
   "prefer_related_applications": false,
   "icons": [
