@@ -220,6 +220,7 @@ export default function EditorPanel() {
           size="small"
           variant="ghost"
           data-testid="clean-markdown-btn"
+          title={t('markdownHint')}
           onClick={() => editText(cleanMarkdown(text, { tableMode }))}
         >
           <AlignLeft size={15} />

@@ -7,7 +7,7 @@ import { mapMathSegments } from './mathSegments.ts';
 /**
  * Markdown 标记清洗与纯文本提取工具模块
  * 用于将用户复制/导入的 Markdown 内容（标题、加粗、斜体、引用、链接、代码块、表格等）
- * 清洗转换为适合手写排版的纯文本内容，同时保留分页标记（---）与段落结构。
+ * 按钮触发时提取纯文本，移除分隔线和空白行；不参与编辑或渲染时的自动处理。
  */
 
 /**
@@ -129,7 +129,7 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // 1. 移除文档顶部的 YAML / TOML Front Matter
-  s = s.replace(/^---[ \t]*\n[\s\S]*?\n---[ \t]*\n?/, '');
+  s = s.replace(/^---[ \t]*\n(?=[ \t]*[\w-]+[ \t]*:)[\s\S]*?\n---[ \t]*\n?/, '');
 
   // 2. 移除 HTML 注释与转换常见 HTML 换行
   s = s.replace(/<!--[\s\S]*?-->/g, '');
@@ -219,7 +219,7 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
       listContentIndent = 0;
     }
 
-    // 6.5 保留独立分页标记 ---，其余形式的分隔线规范化为 ---
+    // 6.5 统一分隔线，清洗末尾集中移除。
     if (/^[ \t]*([*_-][ \t]*){3,}[ \t]*$/.test(line)) {
       line = '---';
     }
@@ -260,10 +260,15 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     .join('\n');
 
   s = s.trim();
-  return s.replace(
+  s = s.replace(
     new RegExp(`${mathPrefix}(\\d+)\ue101`, 'g'),
     (raw: string, index: string) => mathSources[Number(index)] ?? raw,
   );
+  // 2026-10-16：仅显式清洗删除分隔线与空行，保留有内容行的缩进及单个换行。
+  return s
+    .split('\n')
+    .filter((line) => line.trim() !== '' && line.trim() !== '---')
+    .join('\n');
 }
 
 /**

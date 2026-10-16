@@ -25,7 +25,7 @@ test("protects bare sized groups from emphasis in either cleanup order", async (
 
 test("removes unordered item and continuation indentation without trimming ordinary paragraphs", async () => {
   const { cleanMarkdown } = await cleanModule;
-  assert.equal(cleanMarkdown(' * 第一项\n   展开计算\n   再乘系数\n\n    保留普通缩进\n\t- [x] 完成\n\t  下一行\n  + 嵌套项'), '第一项\n展开计算\n再乘系数\n\n    保留普通缩进\n完成\n下一行\n嵌套项');
+  assert.equal(cleanMarkdown(' * 第一项\n   展开计算\n   再乘系数\n\n    保留普通缩进\n\t- [x] 完成\n\t  下一行\n  + 嵌套项'), '第一项\n展开计算\n再乘系数\n    保留普通缩进\n完成\n下一行\n嵌套项');
   assert.equal(cleanMarkdown('负号\n-0.5\n-x\n  正文'), '负号\n-0.5\n-x\n  正文');
 });
 
@@ -116,11 +116,11 @@ test("formats table in raw_pipe mode", async () => {
   assert.equal(output, "序号 | 名称 | 状态\n1 | 产生式 | 正常\n2 | 文法 | 结束");
 });
 
-test("preserves manual page break marker (---)", async () => {
+test("explicit cleanup removes standalone separators and empty lines", async () => {
   const { cleanMarkdown } = await cleanModule;
   const input = "第一页内容\n\n---\n\n第二页内容";
   const output = cleanMarkdown(input);
-  assert.equal(output, "第一页内容\n\n---\n\n第二页内容");
+  assert.equal(output, "第一页内容\n第二页内容");
 });
 
 test("detects markdown markup correctly", async () => {
@@ -165,7 +165,7 @@ test("handles discrete math markdown content with tables, lists, and formulas cl
   assert.ok(!output.includes("|"));
 });
 
-test("preserves math operators, delimiters, blank lines and environments", async () => {
+test("preserves math structure while compacting blank lines", async () => {
   const { cleanMarkdown } = await cleanModule;
   const formula = String.raw`$$
 - x + y
@@ -178,7 +178,7 @@ $$`;
 x &= 1 \\
 + y &= 2
 \end{aligned}`;
-  assert.equal(cleanMarkdown(`# 标题\n${formula}\n\n${environment}`), `标题\n${formula}\n\n${environment}`);
+  assert.equal(cleanMarkdown(`# 标题\n${formula}\n\n${environment}`), `标题\n${formula.replace(/\n{2,}/g, "\n")}\n${environment}`);
   assert.equal(cleanMarkdown(String.raw`**结论** $a<b>c$，\(x_1 * x_2\) 与 \[x<y\]`), String.raw`结论 $a<b>c$，\(x_1 * x_2\) 与 \[x<y\]`);
 });
 
@@ -256,6 +256,17 @@ test("shared scanner isolates nested formulas, escaped delimiters and literal co
   assert.equal(scanMathSegments(String.raw`\begin{a}x\end{b}`)[0].kind, 'literal');
   const segments = scanMathSegments(input);
   for (let index = 1; index < segments.length; index++) assert.ok(segments[index - 1].end <= segments[index].start);
+});
+
+
+test("cleanup removes only complete separator lines without losing leading content", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const input = "---\r\n第一段\r\n  ---\t\r\n\t\r\n\u3000\r\n  第二段\r\n前---后\r\n-1\r\n![插图 1|50%]\r\n---";
+  const expected = "第一段\n  第二段\n前---后\n-1\n![插图 1|50%]";
+  assert.equal(cleanMarkdown(input), expected);
+  assert.equal(cleanMarkdown(expected), expected);
+  assert.equal(cleanMarkdown("---\n\t\n---"), "");
+  assert.equal(cleanMarkdown("---\ntitle: Example\n---\n正文"), "正文");
 });
 
 async function runAll() {

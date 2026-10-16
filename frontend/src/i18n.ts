@@ -56,6 +56,10 @@ const words = {
   insertImage: ['插入图片', 'Insert image'],
   latex: ['转换 LaTeX', 'Convert LaTeX'],
   markdown: ['清理 Markdown', 'Clean Markdown'],
+  markdownHint: [
+    '清理格式，同时移除独立分隔线和空白行',
+    'Clean formatting, standalone separators and blank lines',
+  ],
   letter: ['书信排版', 'Format letter'],
   undo: ['撤销排版', 'Undo formatting'],
   clear: ['清空正文', 'Clear text'],
