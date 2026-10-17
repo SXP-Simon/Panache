@@ -4,6 +4,20 @@ import 'package:handwriting_app/utils/latex.dart';
 import 'package:handwriting_app/models/settings.dart';
 
 void main() {
+  test('清洗代码围栏保留字面正文但移除语言标记', () {
+    for (final fence in ['```', '~~~~']) {
+      final source =
+          '标题\n${fence}text\n**字面文本**\n'
+          r'\frac{a}{b}'
+          '\n$fence\n结尾';
+      expect(
+        cleanMarkdown(source),
+        '标题\n**字面文本**\n'
+        r'\frac{a}{b}'
+        '\n结尾',
+      );
+    }
+  });
   test('Markdown 清洗保护插图、右对齐和数学运算并移除分页空行', () {
     expect(
       cleanMarkdown('# 标题\n**正文**\n\n---\n>>>署名\n![插图 1|50%]\n3 * 5'),
