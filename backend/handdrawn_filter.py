@@ -251,12 +251,22 @@ class _InlineRenderer:
         if not content.strip():
             return
         template = copy.copy(self.template)
-        template.set_background(self.canvas)
         top = self.top
         if isinstance(template, RuledTemplate):
             # 2026-10-17：插图可以任意高，后续文本仍从原纸张的整行网格继续。
             origin, spacing = template.ruled_origin, template.get_line_spacing()
             top = origin + max(0, math.ceil((top - origin) / spacing)) * spacing
+        if (
+            top + template.get_line_spacing() + template.get_bottom_margin()
+            > self.background.height
+        ):
+            # 2026-10-17：插图后不足完整一行时先换页，不能把越界上边距交给文字引擎。
+            if self.dirty:
+                self.pages.append(self.canvas)
+            self.canvas = self.background.copy()
+            self.top = top = template.get_top_margin()
+            self.dirty = False
+        template.set_background(self.canvas)
         template.set_top_margin(top)
         pages = list(self.handwrite(content, template))
         if not pages:

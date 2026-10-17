@@ -16,6 +16,7 @@ from handdrawn_filter import (
     process_image_to_handdrawn,
     render_inline_markdown_images,
 )
+from handright import Template, handwrite
 from math_page_layout import RuledTemplate
 from PIL import Image, ImageDraw, ImageFont
 
@@ -181,6 +182,47 @@ class InlineMarkdownImageTest(unittest.TestCase):
             process.return_value = Image.new("RGBA", (100, 61), (0, 0, 0, 255))
             render_inline_markdown_images(self.img_markdown + "\n文字", tpl, handwrite)
         self.assertEqual(starts, [("\n文字", 160, 40)])
+
+    def test_image_leaving_no_complete_text_row_starts_a_clean_page(self):
+        for template_type, image_height in (
+            (RuledTemplate, 661),
+            (RuledTemplate, 725),
+            (Template, 725),
+        ):
+            with self.subTest(template_type=template_type.__name__, image_height=image_height):
+                tpl = template_type(
+                    background=Image.new("RGB", (600, 805), "white"),
+                    font=ImageFont.truetype(
+                        str(Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"), 24
+                    ),
+                    line_spacing=30,
+                    top_margin=40,
+                    bottom_margin=40,
+                    left_margin=40,
+                    right_margin=40,
+                    line_spacing_sigma=0,
+                    font_size_sigma=0,
+                    word_spacing_sigma=0,
+                    perturb_x_sigma=0,
+                    perturb_y_sigma=0,
+                    perturb_theta_sigma=0,
+                )
+                if isinstance(tpl, RuledTemplate):
+                    tpl.ruled_origin = 40
+                with patch("handdrawn_filter.process_image_to_handdrawn") as process:
+                    process.return_value = Image.new("RGBA", (100, image_height), (0, 0, 0, 255))
+                    pages = list(
+                        render_inline_markdown_images(self.img_markdown + "文字", tpl, handwrite)
+                    )
+                self.assertEqual(len(pages), 2)
+                self.assertEqual(pages[0].getpixel((300, 50)), (0, 0, 0))
+                ink = np.any(np.asarray(pages[1]) < 255, axis=2)
+                ys, xs = np.nonzero(ink)
+                self.assertGreater(len(xs), 0)
+                self.assertGreaterEqual(int(ys.min()), 40)
+                self.assertLess(int(ys.max()), 100)
+                self.assertGreaterEqual(int(xs.min()), 40)
+                self.assertLess(int(xs.max()), 200)
 
     def test_render_inline_markdown_images_with_handwrite(self):
         bg = Image.new("RGB", (600, 800), (255, 255, 255))
