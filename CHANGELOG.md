@@ -1,3 +1,13 @@
+## [1.4.2](https://github.com/SXP-Simon/Panache/compare/v1.4.1...v1.4.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* **be:** 保持横线纸数学排版的固定行网格 ([83acac5](https://github.com/SXP-Simon/Panache/commit/83acac5f85fd62dac27c66341bb6beb0b9074d6a))
+* **be:** 在插图后不足完整行时换页 ([963922c](https://github.com/SXP-Simon/Panache/commit/963922c968dea2e4aad2ade62b0722c475620e48))
+* **be:** 让插图后的文字回到纸张横线 ([969970d](https://github.com/SXP-Simon/Panache/commit/969970d1c25ab68f1a97a941bd79da1731edae12))
+* **fe/src/utils:** 修复单字强调跨段落错误配对 ([6914687](https://github.com/SXP-Simon/Panache/commit/6914687aa6570bf1ad7ccd5a5bad446406642065))
+
 ## [1.4.1](https://github.com/SXP-Simon/Panache/compare/v1.4.0...v1.4.1) (2026-10-16)
 
 
