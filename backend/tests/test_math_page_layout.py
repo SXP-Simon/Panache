@@ -11,7 +11,7 @@ import pytest
 import symbol_fallback as symbols
 from app import apply_right_align
 from handright import Feature, Template
-from math_page_layout import install_math_page_layout
+from math_page_layout import RuledTemplate, install_math_page_layout
 from PIL import Image, ImageFont
 
 
@@ -65,6 +65,7 @@ def synthetic_core(original=None):
 
 
 def template(size=(230, 260), features=frozenset(), **kwargs):
+    ruled_origin = kwargs.pop("ruled_origin", None)
     params = {
         "background": Image.new("RGB", size, "white"),
         "font": Font(),
@@ -85,7 +86,10 @@ def template(size=(230, 260), features=frozenset(), **kwargs):
         "strikethrough_probability": 0,
     }
     params.update(kwargs)
-    return Template(**params)
+    tpl = (RuledTemplate if ruled_origin is not None else Template)(**params)
+    if isinstance(tpl, RuledTemplate):
+        tpl.ruled_origin = ruled_origin
+    return tpl
 
 
 def draft(core, text, tpl, seed=17):
@@ -154,6 +158,43 @@ def test_tall_adjacent_lines_have_separate_ink_and_keep_margins():
     assert all(len(run) == 48 for run in runs)
     assert sum(pixel != 0 for pixel in pages[0].getdata()) == 4 * 75 * 48
     assert all(runs[index + 1][0] - runs[index][-1] >= 3 for index in range(3))
+    assert_inside(pages, tpl)
+
+
+@pytest.mark.parametrize("features", [frozenset(), {Feature.GRID_LAYOUT}])
+def test_ruled_multi_page_math_returns_to_paper_rows(features):
+    tpl = template(size=(230, 240), features=features, ruled_origin=10)
+    text = "§\nA\n\n§\nA\n" * 8 + "§"
+    pages, consumed = draft(synthetic_core(), text, tpl)
+    assert len(pages) >= 3
+    assert consumed[-1][1] == len(text)
+    origin = tpl.get_top_margin() + tpl.get_line_spacing() - tpl.get_font().size
+    for page in pages:
+        for run in occupied_runs(page, "y"):
+            # 2026-10-17：普通字高24、公式上下各24；两者共享同一固定行基准。
+            baseline = run[0] + (24 if len(run) == 48 else 0)
+            assert (baseline - origin) % tpl.get_line_spacing() == 0
+    assert_inside(pages, tpl)
+
+
+def test_ruled_math_keeps_original_grid_after_temporary_top_margin():
+    tpl = template(size=(230, 300), ruled_origin=10, top_margin=45)
+    pages, _ = draft(synthetic_core(), "§\nA", tpl)
+    origin = 10 + tpl.get_line_spacing() - tpl.get_font().size
+    runs = occupied_runs(pages[0], "y")
+    assert (runs[0][0] + 24 - origin) % tpl.get_line_spacing() == 0
+    assert (runs[1][0] - origin) % tpl.get_line_spacing() == 0
+    assert_inside(pages, tpl)
+
+
+def test_ruled_oversized_first_formula_fits_whole_row_without_bottom_clamp():
+    tpl = template(size=(230, 66), ruled_origin=10)
+    pages, consumed = draft(synthetic_core(), "§\n§", tpl)
+    assert consumed[-1][1] == 3
+    assert len(pages) == 2
+    origin = tpl.get_top_margin() + tpl.get_line_spacing() - tpl.get_font().size
+    for page in pages:
+        assert (page.getbbox()[1] - origin) % tpl.get_line_spacing() == 0
     assert_inside(pages, tpl)
 
 

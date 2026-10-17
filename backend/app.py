@@ -49,6 +49,7 @@ from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
 from library_boundary import member
 from logging_setup import get_logger
+from math_page_layout import RuledTemplate
 from PIL import Image, ImageDraw, ImageFont
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -810,7 +811,12 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
     probability = _nonnegative_float(data, "strikethrough_probability")
     if probability > 1:
         raise HTTPException(status_code=400, detail="Strikethrough probability must be in 0..1")
-    return Template(
+    template_type = (
+        RuledTemplate
+        if data.get("isUnderlined") == "true" and "width" in data and "height" in data
+        else Template
+    )
+    template = template_type(
         background=background,
         font=font,
         fill=_ink_color(data["fill"]),
@@ -833,6 +839,9 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
         strikethrough_width=_nonnegative_float(data, "strikethrough_width"),
         ink_depth_sigma=_nonnegative_float(data, "ink_depth_sigma"),
     )
+    if isinstance(template, RuledTemplate):
+        template.ruled_origin = int(data["top_margin"])
+    return template
 
 
 def _english_spacing(text: str) -> str:

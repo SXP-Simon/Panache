@@ -29,6 +29,14 @@ type Unit = tuple[Image.Image, BBox, int, int]
 type DrawPage = Callable[[Page, str, int, Template, Random], int]
 
 
+class RuledTemplate(Template):
+    """2026-10-17：保留纸张横线原点，插图临时调整上边距时也不改变行网格。."""
+
+    __slots__ = ("ruled_origin",)
+
+    ruled_origin: int
+
+
 class StrokeDrawer(Protocol):
     """2026-10-15：只暴露引擎删除线需要的绘图接口."""
 
@@ -126,6 +134,7 @@ class _Metrics:
     grid: bool
     cell_width: int
     gap: int
+    ruled_origin: int | None
 
     @classmethod
     def create(cls, page: Page, tpl: Template, api: _CoreAdapter) -> "_Metrics":
@@ -149,6 +158,7 @@ class _Metrics:
             api.grid in tpl.get_features(),
             max(1, tpl.get_word_spacing() + font_size),
             max(2, round(font_size * 0.12)),
+            tpl.ruled_origin if isinstance(tpl, RuledTemplate) else None,
         )
 
 
@@ -422,13 +432,16 @@ class _PageRenderer:
             start += 1
         return units, start
 
-    def _fit_line(self, units: list[Unit]) -> tuple[list[Unit], int, int]:
+    def _fit_line(
+        self, units: list[Unit], max_height: int | None = None
+    ) -> tuple[list[Unit], int, int]:
         min_y = min(bbox[1] + dy for _, bbox, _, dy in units)
         max_y = max(bbox[3] + dy for _, bbox, _, dy in units)
         # 2026-10-15：极端纵向抖动时整体缩放行字形，不裁掉墨迹。
-        if max_y - min_y <= self.metrics.area.height:
+        height = self.metrics.area.height if max_height is None else max_height
+        if max_height is None and max_y - min_y <= height:
             return units, min_y, max_y
-        factor = self.metrics.area.height / (max_y - min_y)
+        factor = min(1, height / (max_y - min_y))
         adjusted: list[Unit] = []
         for image, bbox, x, dy in units:
             scaled = _resize(image, factor)
@@ -450,8 +463,16 @@ class _PageRenderer:
     def _baseline(self, min_y: int) -> int:
         metrics = self.metrics
         if self.previous_y is None:
-            return max(metrics.top - min_y, metrics.top + metrics.spacing - metrics.font_size)
-        return max(self.previous_y + metrics.spacing, self.previous_bottom + metrics.gap - min_y)
+            required = max(metrics.top - min_y, metrics.top + metrics.spacing - metrics.font_size)
+        else:
+            required = max(
+                self.previous_y + metrics.spacing, self.previous_bottom + metrics.gap - min_y
+            )
+        if metrics.ruled_origin is None:
+            return required
+        # 2026-10-17：高公式可以占多行，但后续书写必须回到原纸张的整行距网格。
+        origin = metrics.ruled_origin + metrics.spacing - metrics.font_size
+        return origin + max(0, math.ceil((required - origin) / metrics.spacing)) * metrics.spacing
 
     def render(self, start: int) -> int:
         while start < len(self.text):
@@ -464,7 +485,13 @@ class _PageRenderer:
             baseline = self._baseline(min_y)
             if baseline + max_y > self.metrics.bottom:
                 if line_start == 0 or self.previous_y is None:
-                    baseline = self.metrics.bottom - max_y
+                    anchor = self._baseline(0)
+                    if self.metrics.ruled_origin is not None and anchor < self.metrics.bottom:
+                        # 2026-10-17：整页巨公式按可用完整行格缩小，不能贴页底破坏横线相位。
+                        units, min_y, max_y = self._fit_line(units, self.metrics.bottom - anchor)
+                        baseline = anchor
+                    else:
+                        baseline = self.metrics.bottom - max_y
                 else:
                     self.rand.setstate(line_state)
                     return line_start
