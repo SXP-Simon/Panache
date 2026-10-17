@@ -29,7 +29,7 @@
 
 `WorkspaceDocuments` 承担文档导入、预设序列化和背景检测，页面只接入系统文件选择与保存。缺失的预设字体保留当前字体，替换背景后的迟到检测结果不回写参数。
 
-`WorkspaceStorage` 是可注入持久化接口；默认 `PreferencesWorkspaceStorage` 使用 SharedPreferences。`flutter.workspace` 保存文字、参数及插图映射，`flutter.preset` 保存参数预设，`flutter.api` 保存自定义 HTTP 服务地址。上传字体、背景文件与生成图片是会话资源，不作为偏好设置持久化；重启后需要重新选择上传资源。
+`WorkspaceStorage` 是可注入持久化接口；默认 `PreferencesWorkspaceStorage` 使用 SharedPreferences。`flutter.workspace` 保存文字、参数及插图映射，`flutter.preset` 保存参数预设，`flutter.api` 保存自定义 HTTP 服务地址。内置字体选择随参数保存，重连时按字体名称恢复，字体不存在时回退到可用字体。上传字体通过独立的 `UploadedFontStorage` 保存：原生端写入应用支持目录，Web 写入 IndexedDB；草稿只记录是否使用上传字体，字体二进制不写入 SharedPreferences。移除上传字体或改选内置字体会同步清除保存的上传文件。背景文件与生成图片仍是会话资源。
 
 `Workspace.edit()` 延迟 400 ms 保存；`persist()` 立即捕获当前快照并加入串行写入队列，后写快照不能被较慢的旧写覆盖。移动应用进入 inactive、paused 或 detached 时由页面调用 `persist()`；`dispose()` 也提交最后快照并关闭 API。操作系统强制结束进程无法保证执行 Dart 清理回调，主动生命周期保存用于减小丢失窗口。
 
