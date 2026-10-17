@@ -130,19 +130,69 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
             }
             (min_y, max_y) = bounds(&units);
         }
+        // 2026-10-17：公式可占多格，后续基线仍须落在原纸张横线上。
+        let ruled = self.p.underlined && self.p.width.is_some();
+        let align = |anchor: f32| {
+            if ruled {
+                top + (((anchor - top) / self.p.line_spacing) - 0.00001)
+                    .ceil()
+                    .max(1.)
+                    * self.p.line_spacing
+            } else {
+                anchor
+            }
+        };
         let mut anchor = self.y.max(top - min_y as f32);
         if self.dirty {
             anchor = anchor.max(self.previous_bottom + gap - min_y as f32);
         }
+        anchor = align(anchor);
         if anchor + max_y as f32 > bottom && self.dirty {
             self.emit_page(false)?;
             if self.stopped {
                 return Ok(());
             }
-            anchor = self.y.max(top - min_y as f32);
+            anchor = align(self.y.max(top - min_y as f32));
         }
         if anchor + max_y as f32 > bottom {
-            anchor = bottom - max_y as f32;
+            if ruled {
+                // 2026-10-17：仅空页也装不下的极高公式缩至实际横线，不把基线移到页底。
+                let mut best = (0f32, top + self.p.line_spacing);
+                let mut row = 1usize;
+                loop {
+                    let baseline = top + row as f32 * self.p.line_spacing;
+                    if baseline >= bottom {
+                        break;
+                    }
+                    let above = if min_y < 0 {
+                        ((baseline - top - 1.) / -(min_y as f32)).max(0.)
+                    } else {
+                        1.
+                    };
+                    let below = if max_y > 0 {
+                        ((bottom - baseline - 1.) / max_y as f32).max(0.)
+                    } else {
+                        1.
+                    };
+                    let factor = above.min(below).min(1.);
+                    if factor > best.0 {
+                        best = (factor, baseline);
+                    }
+                    row += 1;
+                }
+                anchor = best.1;
+                for u in &mut units {
+                    let offset = u.glyph.top + u.dy;
+                    u.glyph = u.glyph.clone().fit(
+                        u.glyph.mask.width() as f32 * best.0,
+                        (u.glyph.mask.height() as f32 * best.0).max(1.),
+                    );
+                    u.dy = (offset as f32 * best.0).round() as i32 - u.glyph.top;
+                }
+                (_, max_y) = bounds(&units);
+            } else {
+                anchor = bottom - max_y as f32;
+            }
         }
         for u in units {
             let origin = (
@@ -411,4 +461,102 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
         pages.flush(pages.count == 0)?;
     }
     Ok(pages.count)
+}
+
+#[cfg(test)]
+mod ruled_tests {
+    use super::*;
+    use image::Luma;
+
+    fn sample_line() -> Vec<LineUnit> {
+        vec![LineUnit {
+            glyph: Glyph {
+                mask: GrayImage::from_pixel(8, 40, Luma([255])),
+                advance: 8.,
+                left: 0,
+                top: -30,
+                ink: true,
+            },
+            rigid: false,
+            x: 10,
+            dy: 0,
+        }]
+    }
+
+    #[test]
+    fn tall_lines_keep_the_ruled_phase_across_pages_and_image_offsets() {
+        for spacing in [32., 32.3, 42.] {
+            let p = Parameters {
+                font_size: 24.,
+                line_spacing: spacing,
+                top_margin: 10.,
+                bottom_margin: 13.,
+                left_margin: 10.,
+                right_margin: 10.,
+                width: Some(180),
+                height: Some(193),
+                underlined: true,
+                preview: false,
+                perturb_x_sigma: 0.,
+                perturb_y_sigma: 0.,
+                perturb_theta_sigma: 0.,
+                ink_depth_sigma: 0.,
+                ..Parameters::default()
+            };
+            let cancel = Cancellation::default();
+            let bg = blank_paper(180, 193, &p);
+            let mut pages = Pages {
+                background: bg.clone(),
+                canvas: bg,
+                mask: GrayImage::new(180, 193),
+                p: &p,
+                rng: ChaCha8Rng::seed_from_u64(42),
+                cancel: &cancel,
+                x: 10.,
+                y: 10. + spacing,
+                previous_bottom: 10.,
+                line: vec![],
+                dirty: false,
+                count: 0,
+                max_pages: 100,
+                emit: |_, _| Ok(()),
+                stopped: false,
+            };
+            for n in 0..20 {
+                if n == 7 {
+                    // 模拟插图占用了非整数行格的高度。
+                    pages.previous_bottom += 17.;
+                    pages.y = pages.previous_bottom + spacing;
+                }
+                pages.line = sample_line();
+                pages.finish_line().unwrap();
+                let baseline = pages.previous_bottom - 10.;
+                let grid = (baseline - p.top_margin) / spacing;
+                assert!(
+                    (grid - grid.round()).abs() < 0.0001,
+                    "baseline {baseline}, spacing {spacing}"
+                );
+                assert!(pages.previous_bottom <= 180.);
+                assert!(baseline - 30. >= p.top_margin);
+            }
+            assert!(pages.count >= 4);
+            pages.flush(false).unwrap();
+            let mut giant = sample_line();
+            giant[0].glyph.mask = GrayImage::from_pixel(8, 400, Luma([255]));
+            giant[0].glyph.top = -220;
+            pages.line = giant;
+            pages.finish_line().unwrap();
+            let grid = (pages.y - spacing - p.top_margin) / spacing;
+            assert!((grid - grid.round()).abs() < 0.0001);
+            assert!(pages.previous_bottom <= 180.);
+            let painted_top = pages
+                .mask
+                .enumerate_pixels()
+                .filter(|(_, _, pixel)| pixel[0] > 128)
+                .map(|(_, y, _)| y)
+                .min()
+                .unwrap();
+            assert!(painted_top >= p.top_margin as u32);
+        }
+    }
 }

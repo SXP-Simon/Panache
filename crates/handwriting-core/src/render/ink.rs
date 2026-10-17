@@ -101,15 +101,19 @@ pub(super) fn perturb(
 pub(super) fn blank_paper(w: u32, h: u32, p: &Parameters) -> RgbaImage {
     let mut bg = RgbaImage::from_pixel(w, h, Rgba([255, 255, 255, 255]));
     if p.underlined {
-        let mut y = p.top_margin + p.line_spacing;
-        while y < h as f32 - p.bottom_margin {
+        let mut row = 1usize;
+        loop {
+            let y = p.top_margin + row as f32 * p.line_spacing;
+            if y >= h as f32 - p.bottom_margin {
+                break;
+            }
             imageproc::drawing::draw_line_segment_mut(
                 &mut bg,
                 (p.left_margin, y),
                 (w as f32 - p.right_margin, y),
                 Rgba([0, 0, 0, 255]),
             );
-            y += p.line_spacing;
+            row += 1;
         }
     }
     bg
