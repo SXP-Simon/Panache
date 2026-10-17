@@ -96,6 +96,8 @@ flutter test test/mobile_api_test.dart --dart-define=MOBILE_ENGINE_LIBRARY=<仓�
 cd app
 flutter analyze
 flutter test
+# 真实 Chrome 的字体持久化、IndexedDB 和工作区恢复测试
+python ../scripts/test-flutter-web.py
 # 需要已启动的真实后端；Rust 使用端口 5006
 flutter test test/live_api_test.dart --dart-define=LIVE_API_BASE=http://127.0.0.1:5006
 flutter build web --release
@@ -103,6 +105,10 @@ flutter build web --release
 ```
 
 测试涵盖 LaTeX 兼容与数学片段、文本工具、API multipart 和返回格式、异步工作区持久化与取消，以及中英文移动/桌面布局、键盘、横屏和文字缩放交互。桌面进程测试见 `test/desktop_backend_test.dart`。
+
+浏览器持久化测试入口为 `scripts/test-flutter-web.py`，需要 Chrome/Chromium，非标准安装位置可通过 `CHROME_EXECUTABLE` 指定。默认运行上传字体的真实 IndexedDB、字体恢复及工作区测试；使用 `--test test/文件名.dart`（可重复）选择文件，其余参数传给 `flutter test`。CI 在 Linux 与 Windows 运行同一入口。
+
+固定 Flutter SDK 的 Windows 测试宿主存在 CanvasKit URL 路径分隔符问题。测试入口只修正 `_localCanvasKitHandler` 中已识别的旧实现，使其使用 URI 路径，并移除派生工具快照以便 Flutter 自动重建；已修正的实现不会重复修改，未知实现会报错并保持原样。资源仍从 SDK 本地加载，不使用 CDN，也不修改应用的构建与运行逻辑。
 
 任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；Rust 提供取消 API 和 cancelled 状态，客户端已将其作为终态处理；移动端 UI 提供取消按钮，生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
 
