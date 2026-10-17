@@ -3,9 +3,9 @@ name: Flutter UI
 on:
   push:
     branches: ["flutter"]
-    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   pull_request:
-    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   workflow_dispatch:
 
 jobs:
@@ -25,3 +25,24 @@ jobs:
         working-directory: app
       - run: flutter build web --release
         working-directory: app
+
+  browser-persistence:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - run: flutter pub get
+        working-directory: app
+      - run: python -m unittest discover -s scripts/tests -p test_flutter_web_runner.py
+      - run: python scripts/test-flutter-web.py --reporter expanded
