@@ -40,7 +40,18 @@ class Workspace extends ChangeNotifier {
   List<String> fonts = [];
   List<Uint8List> pages = [];
   Map<String, String> images = {};
-  Upload? fontFile, background;
+  Upload? background;
+  Upload? _fontFile;
+  // Draft edits must not cancel an in-flight font restore; font choices must.
+  int _fontRevision = 0;
+  bool _fontRestorePending = false;
+  Upload? get fontFile => _fontFile;
+  set fontFile(Upload? value) {
+    _fontFile = value;
+    ++_fontRevision;
+    _fontRestorePending = false;
+  }
+
   final UploadedFontStorage fontStorage;
   Upload? _savedFont;
   Uint8List? exportBytes;
@@ -94,12 +105,18 @@ class Workspace extends ChangeNotifier {
       }
     }
     if (restoreUploadedFont) {
+      final fontRevision = _fontRevision;
+      _fontRestorePending = true;
       try {
         final restoredFont = await fontStorage.read();
         _savedFont = restoredFont;
-        if (revision == _editRevision && !disposed) fontFile = restoredFont;
+        if (fontRevision == _fontRevision && !disposed) {
+          _fontFile = restoredFont;
+        }
       } catch (_) {
         // Missing or damaged uploaded fonts fall back to the selected bundled font.
+      } finally {
+        _fontRestorePending = false;
       }
     }
     if (disposed) return;
@@ -183,13 +200,13 @@ class Workspace extends ChangeNotifier {
       'text': text,
       'settings': settings.toJson(),
       'images': images,
-      'uploadedFont': font != null,
+      'uploadedFont': font != null || _fontRestorePending,
     });
     return _write(
       'flutter.workspace',
       snapshot,
       font: font,
-      saveFont: true,
+      saveFont: !_fontRestorePending,
     ).then((_) {});
   }
 

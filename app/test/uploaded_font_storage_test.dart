@@ -34,6 +34,81 @@ class MultipleFontsApi extends ControlledApi {
 }
 
 void main() {
+  test(
+    'exit during font restore preserves font pointer and edited draft',
+    () async {
+      final storage = MemoryStorage();
+      storage.values['flutter.workspace'] = jsonEncode({
+        'text': 'old draft',
+        'uploadedFont': true,
+      });
+      final original = Upload('saved.ttf', Uint8List.fromList([1]));
+      final fonts = MemoryFonts()..pendingRead = Completer<Upload?>();
+      final w = Workspace(
+        api: ControlledApi(),
+        storage: storage,
+        fontStorage: fonts,
+      );
+      final initializing = w.initialize();
+      await Future<void>.delayed(Duration.zero);
+      w.text = 'edited draft';
+      w.edit();
+      w.dispose();
+      await w.persist();
+      final saved = jsonDecode(storage.values['flutter.workspace']!);
+      expect(saved['text'], 'edited draft');
+      expect(saved['uploadedFont'], true);
+      expect(fonts.writes, 0);
+      fonts.pendingRead!.complete(original);
+      await initializing;
+      fonts.pendingRead = null;
+      fonts.value = original;
+      final restarted = Workspace(
+        api: ControlledApi(),
+        storage: storage,
+        fontStorage: fonts,
+      );
+      await restarted.initialize();
+      expect(restarted.fontFile?.name, original.name);
+      expect(restarted.text, 'edited draft');
+      restarted.dispose();
+      await restarted.persist();
+    },
+  );
+
+  test(
+    'draft edits do not cancel font restore and explicit removal wins',
+    () async {
+      for (final remove in [false, true]) {
+        final storage = MemoryStorage();
+        storage.values['flutter.workspace'] = jsonEncode({
+          'uploadedFont': true,
+        });
+        final fonts = MemoryFonts()..pendingRead = Completer<Upload?>();
+        final w = Workspace(
+          api: ControlledApi(),
+          storage: storage,
+          fontStorage: fonts,
+        );
+        final initializing = w.initialize();
+        await Future<void>.delayed(Duration.zero);
+        w.text = 'new draft';
+        if (remove) w.fontFile = null;
+        w.edit();
+        await w.persist();
+        fonts.pendingRead!.complete(Upload('old.ttf', Uint8List.fromList([1])));
+        await initializing;
+        expect(w.fontFile?.name, remove ? null : 'old.ttf');
+        expect(
+          jsonDecode(storage.values['flutter.workspace']!)['uploadedFont'],
+          !remove,
+        );
+        w.dispose();
+        await w.persist();
+      }
+    },
+  );
+
   test('bundled font selection survives restart and catalog reorder', () async {
     final storage = MemoryStorage();
     final first = Workspace(
