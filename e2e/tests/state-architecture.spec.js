@@ -82,6 +82,29 @@ test('连续输入和插图刷新后完整恢复，生成仍提交原始图片�
   expect(transport.forms[0].get('text')).not.toMatch(/!\[插图 1\](?!\()/);
 });
 
+test('内置字体按名称持久化，刷新与字体列表重排后保持选择', async ({ page }) => {
+  let fonts = ['first.ttf', 'chosen.ttf'];
+  await page.route('**/api/fonts_info', (route) => route.fulfill({ json: fonts }));
+  const transport = await generationTransport(page);
+  await openHome(page);
+  await page.getByTestId('font-select').selectOption('chosen.ttf');
+  await saved(page);
+  fonts = ['new-first.ttf', 'first.ttf', 'chosen.ttf'];
+  await page.reload();
+  await expect(page.getByTestId('font-select')).toHaveValue('chosen.ttf');
+  await page.getByTestId('text-input').fill('使用上次选择的字体');
+  await page.getByTestId('preview-btn').click();
+  await expectPreviewImageLoaded(page);
+  expect(transport.forms[0].get('font_option')).toBe('chosen.ttf');
+
+  fonts = ['replacement.ttf'];
+  await page.reload();
+  await expect(page.getByTestId('font-select')).toHaveValue('replacement.ttf');
+  await saved(page);
+  await page.reload();
+  await expect(page.getByTestId('font-select')).toHaveValue('replacement.ttf');
+});
+
 test('上传字体和纸张背景刷新后恢复二进制资源而非仅文件名', async ({ page }) => {
   const transport = await generationTransport(page);
   const fontBytes = fs.readFileSync(path.join(__dirname, '../../backend/font_assets/云烟体.ttf'));
