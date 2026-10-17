@@ -9,6 +9,7 @@ import '../utils/text_tools.dart';
 import '../utils/image_data.dart';
 import 'api.dart';
 import 'workspace_storage.dart';
+import 'uploaded_font_storage.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
 
 class Workspace extends ChangeNotifier {
@@ -16,8 +17,10 @@ class Workspace extends ChangeNotifier {
     HandwritingApi? api,
     this.managedBackend = false,
     this.storage,
+    UploadedFontStorage? fontStorage,
     Settings Function()? settingsFactory,
-  }) : api = api ?? HandwritingApi(defaultBase),
+  }) : fontStorage = fontStorage ?? createUploadedFontStorage(),
+       api = api ?? HandwritingApi(defaultBase),
        _settingsFactory = settingsFactory ?? Settings.new,
        settings = (settingsFactory ?? Settings.new)();
   final Settings Function() _settingsFactory;
@@ -38,6 +41,8 @@ class Workspace extends ChangeNotifier {
   List<Uint8List> pages = [];
   Map<String, String> images = {};
   Upload? fontFile, background;
+  final UploadedFontStorage fontStorage;
+  Upload? _savedFont;
   Uint8List? exportBytes;
   String exportExtension = '';
   int progress = 0, page = 0;
@@ -63,6 +68,7 @@ class Workspace extends ChangeNotifier {
     }
     if (disposed) return;
     final saved = storage!.read('flutter.workspace');
+    var restoreUploadedFont = false;
     if (saved != null && revision == _editRevision) {
       try {
         final data = jsonDecode(saved) as Map<String, dynamic>;
@@ -72,6 +78,7 @@ class Workspace extends ChangeNotifier {
         if (data['settings'] is Map<String, dynamic>) {
           settings.restore(data['settings'] as Map<String, dynamic>);
         }
+        restoreUploadedFont = data['uploadedFont'] == true;
         if (data['images'] is Map) {
           images = {
             for (final entry in (data['images'] as Map).entries)
@@ -86,6 +93,16 @@ class Workspace extends ChangeNotifier {
         /* Leave invalid drafts untouched until the next edit. */
       }
     }
+    if (restoreUploadedFont) {
+      try {
+        final restoredFont = await fontStorage.read();
+        _savedFont = restoredFont;
+        if (revision == _editRevision && !disposed) fontFile = restoredFont;
+      } catch (_) {
+        // Missing or damaged uploaded fonts fall back to the selected bundled font.
+      }
+    }
+    if (disposed) return;
     if (saved == null && revision == _editRevision) {
       final legacy = readLegacyDraft();
       if (legacy.isNotEmpty) {
@@ -159,22 +176,41 @@ class Workspace extends ChangeNotifier {
 
   /// Flush immediately when the app becomes inactive or goes to background.
   Future<void> persist() {
+    if (disposed) return _writes;
     saveTimer?.cancel();
+    final font = fontFile;
     final snapshot = jsonEncode({
       'text': text,
       'settings': settings.toJson(),
       'images': images,
+      'uploadedFont': font != null,
     });
-    return _write('flutter.workspace', snapshot).then((_) {});
+    return _write(
+      'flutter.workspace',
+      snapshot,
+      font: font,
+      saveFont: true,
+    ).then((_) {});
   }
 
-  Future<bool> _write(String key, String value) {
+  Future<bool> _write(
+    String key,
+    String value, {
+    Upload? font,
+    bool saveFont = false,
+  }) {
     final storage = this.storage;
     if (storage == null) return Future<bool>.value(false);
     // Serialize snapshots and recover the queue after a failed write, while
     // preserving an explicit success outcome for user-initiated saves.
     final operation = _writes
-        .then((_) => storage.write(key, value))
+        .then((_) async {
+          if (saveFont && !identical(font, _savedFont)) {
+            await fontStorage.write(font);
+            _savedFont = font;
+          }
+          await storage.write(key, value);
+        })
         .then(
           (_) => true,
           onError: (Object e, StackTrace stackTrace) {
@@ -326,9 +362,9 @@ class Workspace extends ChangeNotifier {
   void dispose() {
     ++_generation;
     ++_connection;
-    disposed = true;
     saveTimer?.cancel();
     unawaited(persist());
+    disposed = true;
     api.close();
     pages = [];
     images = {};

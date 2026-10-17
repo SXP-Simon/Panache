@@ -382,12 +382,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       final file = await pick(['ttf', 'otf']);
       if (file != null) {
         w.fontFile = file;
-        w.emit();
+        w.edit();
       }
     }),
     onRemoveFont: () {
       w.fontFile = null;
-      w.emit();
+      w.edit();
     },
     onDefaultPreset: () {
       final font = w.settings.font;
