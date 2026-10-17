@@ -49,11 +49,13 @@ String cleanMarkdown(
   for (final segment in scanMathSegments(s)) {
     math.write(s.substring(cursor, segment.start));
     final source = s.substring(segment.start, segment.end);
+    final fenced = RegExp(r'^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\1$')
+        .firstMatch(source);
     // Links and images retain the existing Markdown extraction rules.
     math.write(
       source.startsWith('![') || source.startsWith('[')
           ? source
-          : protect(source),
+          : protect(fenced?[2] ?? source),
     );
     cursor = segment.end;
   }
