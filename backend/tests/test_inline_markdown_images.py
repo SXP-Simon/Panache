@@ -4,6 +4,7 @@
 import base64
 import io
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -15,7 +16,8 @@ from handdrawn_filter import (
     process_image_to_handdrawn,
     render_inline_markdown_images,
 )
-from PIL import Image, ImageDraw
+from math_page_layout import RuledTemplate
+from PIL import Image, ImageDraw, ImageFont
 
 
 class MockTemplate:
@@ -156,9 +158,32 @@ class InlineMarkdownImageTest(unittest.TestCase):
         self.assertEqual(fitted_clamped.size[0], 120)
         self.assertEqual(fitted_clamped.size[1], 72)
 
+    def test_text_after_image_returns_to_original_ruled_paper_grid(self):
+        tpl = RuledTemplate(
+            background=Image.new("RGB", (600, 800), "white"),
+            font=ImageFont.truetype(
+                str(Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"), 24
+            ),
+            line_spacing=30,
+            top_margin=40,
+            bottom_margin=40,
+            left_margin=40,
+            right_margin=40,
+        )
+        tpl.ruled_origin = 40
+        starts = []
+
+        def handwrite(text, template):
+            starts.append((text, template.get_top_margin(), template.ruled_origin))
+            return [template.get_background().copy()]
+
+        with patch("handdrawn_filter.process_image_to_handdrawn") as process:
+            process.return_value = Image.new("RGBA", (100, 61), (0, 0, 0, 255))
+            render_inline_markdown_images(self.img_markdown + "\n文字", tpl, handwrite)
+        self.assertEqual(starts, [("\n文字", 160, 40)])
+
     def test_render_inline_markdown_images_with_handwrite(self):
         bg = Image.new("RGB", (600, 800), (255, 255, 255))
-
         tpl = MockTemplate(bg)
 
         # 模拟 handwrite 行为：在背景上打上墨迹

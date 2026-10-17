@@ -11,6 +11,7 @@
 import base64
 import copy
 import io
+import math
 import re
 from collections.abc import Callable, Iterable
 
@@ -22,8 +23,10 @@ from PIL import Image, ImageOps
 
 if __package__:
     from .logging_setup import get_logger
+    from .math_page_layout import RuledTemplate
 else:
     from logging_setup import get_logger
+    from math_page_layout import RuledTemplate
 
 logger = get_logger(__name__)
 INK_DIFFERENCE_THRESHOLD = 15
@@ -249,7 +252,12 @@ class _InlineRenderer:
             return
         template = copy.copy(self.template)
         template.set_background(self.canvas)
-        template.set_top_margin(self.top)
+        top = self.top
+        if isinstance(template, RuledTemplate):
+            # 2026-10-17：插图可以任意高，后续文本仍从原纸张的整行网格继续。
+            origin, spacing = template.ruled_origin, template.get_line_spacing()
+            top = origin + max(0, math.ceil((top - origin) / spacing)) * spacing
+        template.set_top_margin(top)
         pages = list(self.handwrite(content, template))
         if not pages:
             return
