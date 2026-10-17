@@ -7,6 +7,15 @@ function test(name, run) {
 
 const cleanModule = import("../src/utils/cleanMarkdown.ts");
 
+test("single-character emphasis closes before following paragraphs", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  for (const marker of ["**", "__", "***", "___", "~~", "=="]) {
+    const source = `选择属性 ${marker}A${marker}。\n公式结论\n选择属性 ${marker}B${marker}。`;
+    assert.equal(cleanMarkdown(source), "选择属性 A。\n公式结论\n选择属性 B。");
+  }
+  assert.equal(cleanMarkdown("**单字**。\n**多字内容**。"), "单字。\n多字内容。");
+});
+
 test("protects bare sized groups from emphasis in either cleanup order", async () => {
   const { cleanMarkdown } = await cleanModule;
   const { convertLatexToUnicode } = await import('../src/utils/latexToUnicode.ts');
