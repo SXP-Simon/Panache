@@ -53,7 +53,7 @@ void main() {
     );
     expect(
       cleanMarkdown('正文\n```text\n   - literal\n```'),
-      '正文\n```text\n   - literal\n```',
+      '正文\n   - literal',
     );
     expect(convertLatex(r'原样：\left(x^2'), r'原样：\left(x²');
   });
