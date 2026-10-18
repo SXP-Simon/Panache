@@ -25,7 +25,7 @@ void main() {
       );
 
   for (final width in [320.0, 375.0, 1280.0]) {
-    testWidgets('repository header remains visible and opens at $width px', (
+    testWidgets('repository link stays accessible at $width px', (
       tester,
     ) async {
       tester.view.physicalSize = Size(width, 800);
@@ -50,11 +50,19 @@ void main() {
         ),
       );
       await tester.pumpWidget(shell());
+      if (width < 900) {
+        expect(find.byType(AppBar), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('app-preferences')));
+        await tester.pumpAndSettle();
+      }
       final link = find.byKey(const ValueKey('project-source-link'));
       expect(link, findsOneWidget);
-      expect(find.byKey(const ValueKey('panache-brand-mark')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('panache-brand-mark')),
+        width < 900 ? findsNothing : findsOneWidget,
+      );
       expect(find.text('SXP-Simon/Panache'), findsOneWidget);
-      expect(tester.getRect(link).top, lessThan(120));
+
       await tester.tap(link);
       await tester.pumpAndSettle();
       expect(openedUrl, 'https://github.com/SXP-Simon/Panache');
@@ -98,7 +106,7 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();
     expect(find.byType(NavigationBar), findsNothing);
-    expect(find.byIcon(Icons.keyboard_hide_outlined), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

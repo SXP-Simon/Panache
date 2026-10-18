@@ -36,130 +36,156 @@ class WorkbenchShell extends StatelessWidget {
       Icons.info_outline_rounded,
     ];
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/branding/panache.png',
-              key: const ValueKey('panache-brand-mark'),
-              width: 32,
-              height: 32,
-              excludeFromSemantics: true,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                l.appTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(
-            MediaQuery.sizeOf(context).width < 1100 &&
-                    MediaQuery.viewInsetsOf(context).bottom > 0
-                ? 80
-                : 40,
-          ),
-          child: Column(
-            children: [
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: ProjectSourceLink(),
-                ),
-              ),
-              if (MediaQuery.sizeOf(context).width < 1100 &&
-                  MediaQuery.viewInsetsOf(context).bottom > 0)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => FocusScope.of(context).unfocus(),
-                    icon: const Icon(Icons.keyboard_hide_outlined),
-                    label: Text(l.dismissKeyboard),
+      appBar: MediaQuery.sizeOf(context).width < 900
+          ? null
+          : AppBar(
+              title: Row(
+                children: [
+                  Image.asset(
+                    'assets/branding/panache.png',
+                    key: const ValueKey('panache-brand-mark'),
+                    width: 32,
+                    height: 32,
+                    excludeFromSemantics: true,
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l.appTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              bottom: PreferredSize(
+                preferredSize: Size.fromHeight(
+                  MediaQuery.sizeOf(context).width < 1100 &&
+                          MediaQuery.viewInsetsOf(context).bottom > 0
+                      ? 80
+                      : 40,
                 ),
-            ],
-          ),
-        ),
-        actions: [
-          if (MediaQuery.sizeOf(context).width < 1100) ...[
-            TextButton.icon(
-              key: const ValueKey('app-preferences'),
-              onPressed: () => preferencesSheet(context),
-              icon: const Icon(Icons.settings_outlined),
-              label: Text(l.appPreferences),
-            ),
-          ] else ...[
-            Tooltip(
-              message: l.connection,
-              child: TextButton.icon(
-                onPressed: locked || managedBackend ? null : onConnection,
-                icon: Icon(
-                  connected
-                      ? Icons.cloud_done_outlined
-                      : Icons.cloud_off_outlined,
-                ),
-                label: Text(managedBackend ? l.localEngine : l.connection),
-              ),
-            ),
-            Tooltip(
-              message: l.language,
-              child: TextButton.icon(
-                onPressed: onToggleLocale,
-                icon: const Icon(Icons.translate),
-                label: Text(l.language),
-              ),
-            ),
-            Tooltip(
-              message: l.theme,
-              child: TextButton.icon(
-                onPressed: onToggleTheme,
-                icon: const Icon(Icons.contrast),
-                label: Text(l.theme),
-              ),
-            ),
-          ],
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 900;
-          final content = destination == 0
-              ? workspaceBuilder(wide, constraints.maxWidth)
-              : informationBuilder();
-          return Row(
-            children: [
-              if (wide)
-                NavigationRail(
-                  selectedIndex: destination,
-                  onDestinationSelected: onDestinationSelected,
-                  labelType: NavigationRailLabelType.all,
-                  destinations: [
-                    for (var i = 0; i < labels.length; i++)
-                      NavigationRailDestination(
-                        icon: Icon(icons[i]),
-                        label: Text(labels[i]),
+                child: Column(
+                  children: [
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: ProjectSourceLink(),
+                      ),
+                    ),
+                    if (MediaQuery.sizeOf(context).width < 1100 &&
+                        MediaQuery.viewInsetsOf(context).bottom > 0)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => FocusScope.of(context).unfocus(),
+                          icon: const Icon(Icons.keyboard_hide_outlined),
+                          label: Text(l.dismissKeyboard),
+                        ),
                       ),
                   ],
                 ),
-              Expanded(child: content),
-            ],
-          );
-        },
+              ),
+              actions: [
+                if (MediaQuery.sizeOf(context).width < 1100) ...[
+                  TextButton.icon(
+                    key: const ValueKey('app-preferences'),
+                    onPressed: () => preferencesSheet(context),
+                    icon: const Icon(Icons.settings_outlined),
+                    label: Text(l.appPreferences),
+                  ),
+                ] else ...[
+                  Tooltip(
+                    message: l.connection,
+                    child: TextButton.icon(
+                      onPressed: locked || managedBackend ? null : onConnection,
+                      icon: Icon(
+                        connected
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_outlined,
+                      ),
+                      label: Text(
+                        managedBackend ? l.localEngine : l.connection,
+                      ),
+                    ),
+                  ),
+                  Tooltip(
+                    message: l.language,
+                    child: TextButton.icon(
+                      onPressed: onToggleLocale,
+                      icon: const Icon(Icons.translate),
+                      label: Text(l.language),
+                    ),
+                  ),
+                  Tooltip(
+                    message: l.theme,
+                    child: TextButton.icon(
+                      onPressed: onToggleTheme,
+                      icon: const Icon(Icons.contrast),
+                      label: Text(l.theme),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 900;
+            final content = destination == 0
+                ? workspaceBuilder(wide, constraints.maxWidth)
+                : informationBuilder();
+            return Row(
+              children: [
+                if (wide)
+                  NavigationRail(
+                    selectedIndex: destination,
+                    onDestinationSelected: onDestinationSelected,
+                    labelType: NavigationRailLabelType.all,
+                    destinations: [
+                      for (var i = 0; i < labels.length; i++)
+                        NavigationRailDestination(
+                          icon: Icon(icons[i]),
+                          label: Text(labels[i]),
+                        ),
+                    ],
+                  ),
+                Expanded(child: content),
+              ],
+            );
+          },
+        ),
       ),
+      floatingActionButton:
+          MediaQuery.sizeOf(context).width < 900 &&
+              MediaQuery.viewInsetsOf(context).bottom > 0
+          ? FloatingActionButton.small(
+              tooltip: l.dismissKeyboard,
+              onPressed: () => FocusScope.of(context).unfocus(),
+              child: const Icon(Icons.keyboard_hide_outlined),
+            )
+          : null,
       bottomNavigationBar:
           MediaQuery.sizeOf(context).width < 900 &&
               MediaQuery.viewInsetsOf(context).bottom == 0
           ? NavigationBar(
               selectedIndex: destination,
-              onDestinationSelected: onDestinationSelected,
+              onDestinationSelected: (index) {
+                if (index == 3) {
+                  preferencesSheet(context);
+                } else {
+                  onDestinationSelected(index);
+                }
+              },
               destinations: [
                 for (var i = 0; i < labels.length; i++)
                   NavigationDestination(icon: Icon(icons[i]), label: labels[i]),
+                NavigationDestination(
+                  key: const ValueKey('app-preferences'),
+                  icon: const Icon(Icons.settings_outlined),
+                  label: l.appPreferences,
+                ),
               ],
             )
           : null,
@@ -214,6 +240,7 @@ class WorkbenchShell extends StatelessWidget {
                 onToggleTheme();
               },
             ),
+            const ProjectSourceLink(),
             const SizedBox(height: 16),
           ],
         ),
