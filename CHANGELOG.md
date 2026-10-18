@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/SXP-Simon/Panache/compare/v1.4.2...v1.4.3) (2026-10-18)
+
+
+### Bug Fixes
+
+* **be:** 保留纸张横线在文档缩图后的可见性 ([8b1c515](https://github.com/SXP-Simon/Panache/commit/8b1c515500f919a73868c8c1b982e14ee842ce58))
+
 ## [1.4.2](https://github.com/SXP-Simon/Panache/compare/v1.4.1...v1.4.2) (2026-10-17)
 
 
