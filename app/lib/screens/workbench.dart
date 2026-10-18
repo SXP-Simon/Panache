@@ -26,16 +26,21 @@ import '../widgets/workbench_layout.dart';
 import '../widgets/workbench_information.dart';
 import '../widgets/workbench_settings.dart';
 import '../widgets/workbench_shell.dart';
+import '../theme/handwriting_theme.dart';
 
 class Workbench extends StatefulWidget {
   const Workbench({
     super.key,
     this.workspace,
+    this.themeColor = defaultThemeColor,
+    this.onThemeColorChanged,
     this.initialDestination = 0,
     required this.toggleLocale,
     required this.toggleTheme,
   });
   final Workspace? workspace;
+  final Color themeColor;
+  final Future<bool> Function(Color)? onThemeColorChanged;
   final int initialDestination;
   final VoidCallback toggleLocale, toggleTheme;
   @override
@@ -266,6 +271,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         onConnection: connectionDialog,
         onToggleLocale: widget.toggleLocale,
         onToggleTheme: widget.toggleTheme,
+        themeColor: widget.themeColor,
+        onThemeColorChanged: widget.onThemeColorChanged,
         workspaceBuilder: workspace,
         informationBuilder: information,
       ),

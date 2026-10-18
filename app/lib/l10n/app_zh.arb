@@ -117,5 +117,12 @@
   "imageUnavailable": "图片无法显示",
   "removeIllustration": "移除此插图",
   "editIllustrationHelp": "点击下方插图，调整宽度或移除此处的插图。",
-  "invalidIllustration": "图片无法读取或过大。请选择不超过 12 MB、1600 万像素的 PNG、JPEG、WebP、GIF 或 BMP 图片。"
+  "invalidIllustration": "图片无法读取或过大。请选择不超过 12 MB、1600 万像素的 PNG、JPEG、WebP、GIF 或 BMP 图片。",
+  "themeColor": "主题色",
+  "themeColorHint": "仅调整界面，不影响纸张和墨色。",
+  "themeColorHex": "自定义颜色（HEX）",
+  "themeColorInvalid": "请输入六位十六进制颜色，例如 #62833A",
+  "resetThemeColor": "恢复绿色",
+  "applyThemeColor": "应用颜色",
+  "themeColorSaveFailed": "颜色已应用，但此设备暂时无法保存，下次启动可能需要重新选择。"
 }

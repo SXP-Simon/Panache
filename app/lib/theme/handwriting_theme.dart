@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 /// Shared UI theme for startup, recovery screens and the workbench.
-ThemeData handwritingTheme(Brightness brightness) {
+const defaultThemeColor = Color(0xFF62833A);
+
+ThemeData handwritingTheme(
+  Brightness brightness, {
+  Color seedColor = defaultThemeColor,
+}) {
   final scheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF62833A),
+    seedColor: seedColor,
     brightness: brightness,
   );
   return ThemeData(

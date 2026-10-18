@@ -117,5 +117,12 @@
   "imageUnavailable": "Image unavailable",
   "removeIllustration": "Remove illustration",
   "editIllustrationHelp": "Tap an illustration below to resize or remove this occurrence.",
-  "invalidIllustration": "Cannot read this image, or it is too large. Choose a PNG, JPEG, WebP, GIF or BMP up to 12 MB and 16 megapixels."
+  "invalidIllustration": "Cannot read this image, or it is too large. Choose a PNG, JPEG, WebP, GIF or BMP up to 12 MB and 16 megapixels.",
+  "themeColor": "Theme color",
+  "themeColorHint": "Interface only; paper and ink stay unchanged.",
+  "themeColorHex": "Custom color (HEX)",
+  "themeColorInvalid": "Enter six hexadecimal digits, e.g. #62833A",
+  "resetThemeColor": "Restore green",
+  "applyThemeColor": "Apply color",
+  "themeColorSaveFailed": "Color applied for this session. Unable to save it on this device."
 }

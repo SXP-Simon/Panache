@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/foundation.dart';
 
+import 'services/appearance_preferences.dart';
+
 import 'l10n/app_localizations.dart';
 import 'theme/handwriting_theme.dart';
 import 'screens/workbench.dart';
@@ -33,16 +35,26 @@ class HandwritingApp extends StatefulWidget {
 class _HandwritingAppState extends State<HandwritingApp> {
   SemanticsHandle? semantics;
   Locale? locale;
+  final appearance = AppearancePreferences();
+  Color get themeColor => appearance.color;
   ThemeMode mode = ThemeMode.system;
   @override
   void initState() {
     super.initState();
     if (kIsWeb) semantics = WidgetsBinding.instance.ensureSemantics();
     locale = widget.locale ?? const Locale('zh');
+    appearance.addListener(refreshAppearance);
+    appearance.restore();
+  }
+
+  void refreshAppearance() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    appearance.removeListener(refreshAppearance);
+    appearance.dispose();
     semantics?.dispose();
     super.dispose();
   }
@@ -53,6 +65,8 @@ class _HandwritingAppState extends State<HandwritingApp> {
     toggleLocale: () => setState(
       () => locale = Locale(locale?.languageCode == 'zh' ? 'en' : 'zh'),
     ),
+    themeColor: themeColor,
+    onThemeColorChanged: appearance.setColor,
     toggleTheme: () => setState(
       () => mode = mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
     ),
@@ -65,8 +79,8 @@ class _HandwritingAppState extends State<HandwritingApp> {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-    theme: handwritingTheme(Brightness.light),
-    darkTheme: handwritingTheme(Brightness.dark),
+    theme: handwritingTheme(Brightness.light, seedColor: themeColor),
+    darkTheme: handwritingTheme(Brightness.dark, seedColor: themeColor),
     themeMode: mode,
     home: workbench(),
     routes: {
