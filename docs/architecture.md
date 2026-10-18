@@ -58,7 +58,7 @@ API 层处理传输与数据契约，存储适配层处理持久化。store 保�
 |---|---|---|
 | 正文、插图映射、导入文件名 | document store | 工作区快照与二进制资源 |
 | 手写参数、字体、背景、生成选项 | settings store | 工作区快照；上传文件保存为资源 |
-| 语言、主题、表格转换模式 | preferences store | 工作区快照 |
+| 语言、明暗模式、界面主题色、表格转换模式 | preferences store | 工作区快照 |
 | 预览图片 URL、当前页、下载展示信息 | preview store | 内存展示状态；不保存为草稿 |
 | 字体目录、版本、任务状态、原始生成结果 | TanStack Query | 内存缓存；不把整份 Query 缓存写入本地 |
 | 生成任务 ID 与导出模式 | 生成流程 / `studio.generation` | 用于刷新后续接服务端任务 |

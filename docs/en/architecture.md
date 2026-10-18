@@ -59,7 +59,7 @@ state and synchronous updates rather than requests, file writes, or object-URL c
 |---|---|---|
 | Text, image map, imported filename | Document store | Workspace snapshot and binary assets |
 | Handwriting parameters, fonts, backgrounds, generation options | Settings store | Workspace snapshot; uploaded files become assets |
-| Language, theme, table conversion mode | Preferences store | Workspace snapshot |
+| Language, light/dark mode, interface theme color, table conversion mode | Preferences store | Workspace snapshot |
 | Preview URLs, current page, download display information | Preview store | Memory only |
 | Font catalog, version, task state, raw generation results | TanStack Query | Memory cache; the whole Query cache is not persisted |
 | Generation task ID and export mode | Generation flow / `studio.generation` | Resume observation after refresh |

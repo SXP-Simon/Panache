@@ -21,7 +21,13 @@ The wide-screen workspace has three areas, which rearrange on narrower screens:
 - **Preview** — rendered pages, navigation, zoom, and export.
 - **Handwriting & paper** — fonts, dimensions, margins, natural variation, cross-out effects, and presets.
 
-Detailed settings are grouped into collapsible sections. The header switches language and theme.
+Detailed settings are grouped into collapsible sections.
+
+## Interface appearance
+
+Open "Appearance & settings" to select a theme preset, use the color picker, or enter a six-digit HEX color. You can also restore the default green. The choice is saved on this device and survives reloads. It changes only the interface, leaving paper fonts, ink colors, and exported images unchanged.
+
+Phones omit the top brand header. The compact workspace action row provides the settings entry, where language, light/dark mode, help, and the source link remain available. Desktop keeps its top navigation.
 
 ## Entering text
 
