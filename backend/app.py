@@ -393,12 +393,18 @@ def create_notebook_image(width: int, height: int, layout: NotebookOptions) -> I
     image = Image.new("RGB", (width, height), "white")
     if layout.underlined:
         draw = ImageDraw.Draw(image)
+        # 2026-10-18：横线随纸张宽度缩放，避免 Word 缩图时滤掉单像素细线。
+        line_width = max(1, (width + 599) // 600)
         for y in range(
             layout.top_margin + layout.line_spacing,
             height - layout.bottom_margin,
             layout.line_spacing,
         ):
-            draw.line((layout.left_margin, y, width - layout.right_margin, y), fill="black")
+            draw.line(
+                (layout.left_margin, y, width - layout.right_margin, y),
+                fill="black",
+                width=line_width,
+            )
     return image
 
 
