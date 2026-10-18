@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'project_source_link.dart';
+import 'theme_color_editor.dart';
+import '../theme/handwriting_theme.dart';
 
 /// Adaptive app navigation and visible preference actions. Selection belongs to
 /// the caller; this shell only presents callbacks and responsive navigation.
 class WorkbenchShell extends StatelessWidget {
   const WorkbenchShell({
     super.key,
+    this.themeColor = defaultThemeColor,
+    this.onThemeColorChanged,
     required this.destination,
     required this.onDestinationSelected,
     required this.connected,
@@ -19,6 +23,8 @@ class WorkbenchShell extends StatelessWidget {
     required this.workspaceBuilder,
     required this.informationBuilder,
   });
+  final Color themeColor;
+  final Future<bool> Function(Color)? onThemeColorChanged;
   final int destination;
   final ValueChanged<int> onDestinationSelected;
   final bool connected, managedBackend, locked;
@@ -96,6 +102,12 @@ class WorkbenchShell extends StatelessWidget {
                     label: Text(l.appPreferences),
                   ),
                 ] else ...[
+                  IconButton(
+                    key: const ValueKey('app-preferences'),
+                    tooltip: l.appPreferences,
+                    onPressed: () => preferencesSheet(context),
+                    icon: const Icon(Icons.palette_outlined),
+                  ),
                   Tooltip(
                     message: l.connection,
                     child: TextButton.icon(
@@ -198,51 +210,72 @@ class WorkbenchShell extends StatelessWidget {
       context: context,
       showDragHandle: true,
       useSafeArea: true,
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(
-                l.appPreferences,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  (MediaQuery.sizeOf(sheetContext).height -
+                          MediaQuery.viewInsetsOf(sheetContext).bottom -
+                          80)
+                      .clamp(100, double.infinity),
             ),
-            ListTile(
-              leading: Icon(
-                connected
-                    ? Icons.cloud_done_outlined
-                    : Icons.cloud_off_outlined,
-              ),
-              title: Text(managedBackend ? l.localEngine : l.connection),
-              subtitle: Text(connected ? l.connected : l.disconnected),
-              onTap: locked || managedBackend
-                  ? null
-                  : () {
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    title: Text(
+                      l.appPreferences,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      connected
+                          ? Icons.cloud_done_outlined
+                          : Icons.cloud_off_outlined,
+                    ),
+                    title: Text(managedBackend ? l.localEngine : l.connection),
+                    subtitle: Text(connected ? l.connected : l.disconnected),
+                    onTap: locked || managedBackend
+                        ? null
+                        : () {
+                            Navigator.pop(sheetContext);
+                            onConnection();
+                          },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.translate),
+                    title: Text(l.language),
+                    onTap: () {
                       Navigator.pop(sheetContext);
-                      onConnection();
+                      onToggleLocale();
                     },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.contrast),
+                    title: Text(l.theme),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      onToggleTheme();
+                    },
+                  ),
+                  ThemeColorEditor(
+                    color: themeColor,
+                    onChanged: onThemeColorChanged ?? (_) async => true,
+                  ),
+                  const ProjectSourceLink(),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.translate),
-              title: Text(l.language),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onToggleLocale();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.contrast),
-              title: Text(l.theme),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onToggleTheme();
-              },
-            ),
-            const ProjectSourceLink(),
-            const SizedBox(height: 16),
-          ],
+          ),
         ),
       ),
     );
