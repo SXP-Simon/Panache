@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/SXP-Simon/Panache/compare/v1.4.3...v1.5.0) (2026-10-18)
+
+
+### Features
+
+* **fe/src:** 支持自定义主题色并精简移动端操作区 ([73439ad](https://github.com/SXP-Simon/Panache/commit/73439ad50716f43048131b6975bb356773d140a3))
+
 ## [1.4.3](https://github.com/SXP-Simon/Panache/compare/v1.4.2...v1.4.3) (2026-10-18)
 
 
