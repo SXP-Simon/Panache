@@ -101,16 +101,21 @@ pub(super) fn perturb(
 pub(super) fn blank_paper(w: u32, h: u32, p: &Parameters) -> RgbaImage {
     let mut bg = RgbaImage::from_pixel(w, h, Rgba([255, 255, 255, 255]));
     if p.underlined {
+        // 2026-10-18：纸张缩入 Word 后仍保留横线覆盖率，不使用固定单像素线。
+        let thickness = w.div_ceil(600).max(1);
         let mut row = 1usize;
         loop {
             let y = p.top_margin + row as f32 * p.line_spacing;
             if y >= h as f32 - p.bottom_margin {
                 break;
             }
-            imageproc::drawing::draw_line_segment_mut(
+            imageproc::drawing::draw_filled_rect_mut(
                 &mut bg,
-                (p.left_margin, y),
-                (w as f32 - p.right_margin, y),
+                imageproc::rect::Rect::at(p.left_margin as i32, y as i32 - (thickness / 2) as i32)
+                    .of_size(
+                        ((w as f32 - p.right_margin - p.left_margin).max(0.) as u32 + 1).max(1),
+                        thickness,
+                    ),
                 Rgba([0, 0, 0, 255]),
             );
             row += 1;
@@ -121,3 +126,56 @@ pub(super) fn blank_paper(w: u32, h: u32, p: &Parameters) -> RgbaImage {
 
 mod rigid;
 pub(super) use rigid::paint_math_unit;
+
+#[cfg(test)]
+mod paper_tests {
+    use super::*;
+    use image::imageops::{FilterType, resize};
+
+    #[test]
+    fn every_rule_survives_document_downscaling() {
+        for (w, h, spacing, top) in [(1600, 600, 120., 100.), (3481, 600, 150.3, 50.)] {
+            let p = Parameters {
+                underlined: true,
+                line_spacing: spacing,
+                top_margin: top,
+                bottom_margin: 100.,
+                left_margin: 80.,
+                right_margin: 80.,
+                ..Parameters::default()
+            };
+            let paper = blank_paper(w, h, &p);
+            for width in [640, 1270] {
+                let height = (h as f64 * width as f64 / w as f64).round() as u32;
+                for filter in [
+                    FilterType::Nearest,
+                    FilterType::Triangle,
+                    FilterType::Lanczos3,
+                ] {
+                    let small = resize(&paper, width, height, filter);
+                    let mut row = 1;
+                    while top + row as f32 * spacing < h as f32 - 100. {
+                        let y = ((top + row as f32 * spacing) * height as f32 / h as f32).round()
+                            as u32;
+                        assert!(
+                            (y.saturating_sub(2)..=(y + 2).min(height - 1))
+                                .any(|yy| small[(width / 2, yy)][0] < 200),
+                            "missing row {row}, source {w}, target {width}, filter {filter:?}"
+                        );
+                        row += 1;
+                    }
+                    assert!(small.pixels().all(|pixel| pixel[3] == 255));
+                }
+            }
+            let plain = blank_paper(
+                w,
+                h,
+                &Parameters {
+                    underlined: false,
+                    ..p
+                },
+            );
+            assert!(plain.pixels().all(|pixel| *pixel == Rgba([255; 4])));
+        }
+    }
+}
