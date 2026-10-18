@@ -12,7 +12,9 @@
 
 | 模块 | 职责 |
 |---|---|
-| `widgets/workbench_shell.dart` | 自适应 AppBar、桌面导航栏、移动底部导航与应用设置菜单 |
+| `widgets/workbench_shell.dart` | 桌面 AppBar、桌面导航栏、移动底部导航与应用设置菜单；手机不显示顶部 AppBar |
+| `widgets/theme_color_editor.dart` | 界面主题预设色、HEX 输入与恢复默认，不修改纸张参数 |
+| `services/appearance_preferences.dart` | 界面主题色的恢复、串行保存与失败状态，独立于工作区渲染设置 |
 | `widgets/workbench_layout.dart` | 编辑/参数/预览的响应式布局、错误和任务进度、全局生成与取消入口 |
 | `widgets/workbench_editor.dart` | 编辑器、焦点与撤销控制器接入、字符数及插图缩略图 |
 | `widgets/workbench_controls.dart` | 通用面板和有图标、名称及用途说明的编辑工具菜单 |
@@ -22,6 +24,8 @@
 | `screens/dialogs/` | 连接设置、Markdown/书信输入及数学预览对话框，返回用户选择而不直接操作工作区 |
 
 界面局部导航、面板选择和文本光标由页面持有；渲染参数与任务状态由业务层持有。移动端工具菜单同时显示图标、动作名和用途说明；长任务的取消入口位于全局任务区域，不要求先切换到预览页。键盘弹出时隐藏底部导航及导出操作，保留显式收起键盘入口。
+
+手机通过底部「应用设置」打开语言、明暗模式、主题色与项目来源入口；桌面从顶部打开应用设置。主题色可选预设或输入六位 HEX 色值，支持恢复默认绿色；由 Material ColorScheme 派生深浅色界面配色，不改变纸张字体、墨色或导出内容。`AppearancePreferences` 使用独立的 `panache.themeColor` 键保存在本机，恢复期间的新选择优先，后续写入按顺序执行。
 
 ## 草稿与生命周期
 
