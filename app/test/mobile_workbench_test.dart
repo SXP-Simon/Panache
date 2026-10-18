@@ -197,7 +197,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(focus.hasFocus, isTrue);
       expect(find.byType(NavigationBar), findsNothing);
-      expect(find.text(labels(tester).dismissKeyboard), findsOneWidget);
+      expect(find.byTooltip(labels(tester).dismissKeyboard), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
