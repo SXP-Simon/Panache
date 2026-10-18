@@ -16,6 +16,20 @@ const words = {
   projectSource: ['开源代码', 'Source code'],
   language: ['切换语言', 'Switch language'],
   theme: ['切换主题', 'Switch theme'],
+  appearance: ['外观与设置', 'Appearance & settings'],
+  themeColor: ['主题色', 'Theme color'],
+  themeColorHint: [
+    '仅改变界面配色，不影响纸张与墨水颜色。',
+    'Changes the interface only, leaving paper and ink unchanged.',
+  ],
+  themeColorInvalid: [
+    '请输入完整的六位色值，例如 #8B5CF6',
+    'Enter a six-digit color, for example #8B5CF6',
+  ],
+  themeColorReset: ['恢复默认配色', 'Reset theme color'],
+  themeColorApply: ['应用', 'Apply'],
+  themePresets: ['预设颜色', 'Preset colors'],
+
   document: ['文字与公式', 'Text & formulas'],
   documentHint: ['从一段文字开始', 'Start with your words'],
   editorPlaceholder: [

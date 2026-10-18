@@ -55,7 +55,11 @@ for (const viewport of [
       expect(layout.panels[2].top).toBeGreaterThan(layout.panels[0].top);
       expect(layout.panels[1].top).toBeGreaterThan(layout.panels[2].top);
     }
-    await page.getByTestId('language-toggle').click();
+    if (viewport.width <= 720) {
+      await page.getByTestId('mobile-settings-btn').click();
+      await page.getByTestId('settings-language-toggle').click();
+      await page.getByTestId('appearance-modal-close').click();
+    } else await page.getByTestId('language-toggle').click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect((await metrics(page)).overflow).toBe(false);
   });

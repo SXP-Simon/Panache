@@ -48,7 +48,11 @@ for (const width of [1440, 390]) {
         await page.getByTestId('variation-settings-toggle').click();
         await page.getByTestId('strike-settings-toggle').click();
         await expectUnifiedFont(page);
-        await page.getByTestId('guide-btn').click();
+        if (width <= 720) {
+          await page.getByTestId('mobile-settings-btn').click();
+          await expectUnifiedFont(page);
+          await page.getByTestId('settings-guide-btn').click();
+        } else await page.getByTestId('guide-btn').click();
         await expectUnifiedFont(page);
         await page.keyboard.press('Escape');
         await expect(page.getByTestId('modal')).toHaveCount(0);
@@ -60,9 +64,7 @@ for (const width of [1440, 390]) {
         const documentNode = await session.send('DOM.getDocument');
         const renderedFonts = [];
         for (const selector of [
-          'h1',
-          '[data-testid="brand-title"]',
-          '[data-testid="project-source-link"]',
+          ...(width > 720 ? ['h1', '[data-testid="brand-title"]', '[data-testid="project-source-link"]'] : ['[data-testid="mobile-settings-btn"]']),
           '[data-testid="quick-symbol-α"]',
           '[data-testid="text-input"]',
         ]) {
@@ -75,7 +77,7 @@ for (const width of [1440, 390]) {
           });
           renderedFonts.push(...rendered.fonts.filter((font) => font.glyphCount > 0));
         }
-        expect(renderedFonts.length).toBeGreaterThanOrEqual(3);
+        expect(renderedFonts.length).toBeGreaterThanOrEqual(width <= 720 ? 2 : 3);
         expect(
           renderedFonts.filter((font) => font.familyName !== 'LXGW WenKai' || !font.isCustomFont),
         ).toEqual([]);

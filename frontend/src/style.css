@@ -387,7 +387,7 @@ input[type='range'] {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: oklch(0.66 0.12 138);
+  background: var(--green-ink);
   display: inline-block;
 }
 h1 {
@@ -1339,4 +1339,90 @@ input[type='color'] {
 }
 .letter-detected p {
   margin-bottom: 8px;
+}
+/* Appearance controls share workspace preferences, independently of paper ink. */
+.workspace-actions,
+.appearance-tools,
+.theme-color-fields,
+.theme-swatches {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mobile-settings-button {
+  display: none;
+}
+.theme-editor h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+.theme-swatches {
+  margin: 18px 0;
+}
+.theme-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  box-shadow: 0 0 0 2px var(--card);
+}
+.theme-swatch[aria-pressed='true'] {
+  outline: 2px solid var(--foreground);
+  outline-offset: 3px;
+}
+.theme-color-fields {
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
+}
+.theme-color-fields input[type='color'] {
+  width: 48px;
+  height: 40px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.theme-color-fields input[type='text'] {
+  width: 120px;
+  min-width: 0;
+  padding: 8px 10px;
+  flex: 1;
+}
+.appearance-tools {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  margin: 16px 0;
+}
+@media (max-width: 720px) {
+  .app-header {
+    display: none;
+  }
+  .workspace-intro > div:first-child {
+    display: none;
+  }
+  .workspace-intro {
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
+  .workspace-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .mobile-settings-button {
+    display: inline-flex;
+  }
+  .workspace-actions > .button {
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1100px) {
+  [data-testid='appearance-btn'] {
+    font-size: 0;
+    width: 32px;
+    padding: 0;
+    gap: 0;
+  }
 }

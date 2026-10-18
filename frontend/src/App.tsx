@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import ThemeColorEditor from './features/preferences/ThemeColorEditor';
+import { applyThemeColor } from './features/preferences/themeColors';
 import brandIcon from './assets/brand.svg';
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { I18nContext, translate, useI18n } from './i18n';
@@ -15,7 +17,15 @@ import PreviewPanel from './components/PreviewPanel';
 import Button from './shared/ui/Button';
 import Modal from './shared/ui/Modal';
 import GitHubIcon from './shared/ui/GitHubIcon';
-import { Languages, Moon, Sun, CircleHelp, MonitorDown, ArrowUpRight } from './shared/icons';
+import {
+  Languages,
+  Moon,
+  Sun,
+  CircleHelp,
+  MonitorDown,
+  ArrowUpRight,
+  SlidersHorizontal,
+} from './shared/icons';
 export default function App() {
   const locale = usePreferencesStore((state) => state.locale);
   const toggleLocale = usePreferencesStore((state) => state.toggleLocale);
@@ -39,6 +49,8 @@ function Studio() {
   const { locale, t, toggle } = useI18n();
   const reduced = useReducedMotion();
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
+  const [appearance, setAppearance] = useState(false);
+  const themeColor = usePreferencesStore((state) => state.themeColor);
   const [guide, setGuide] = useState(false);
   const [desktop, setDesktop] = useState(false);
   const theme = usePreferencesStore((state) => state.theme);
@@ -46,10 +58,11 @@ function Studio() {
   const dark = theme === 'dark';
   useEffect(() => {
     document.documentElement.dataset['theme'] = dark ? 'dark' : 'light';
-  }, [dark]);
+    applyThemeColor(themeColor, dark);
+  }, [dark, themeColor]);
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header" data-testid="app-header">
         <div className="brand">
           <span className="brand-mark">
             <img src={brandIcon} width={38} height={38} alt="" aria-hidden="true" />
@@ -93,6 +106,15 @@ function Studio() {
           </Button>
         </nav>
         <div className="header-actions">
+          <Button
+            variant="ghost"
+            size="small"
+            data-testid="appearance-btn"
+            onClick={() => setAppearance(true)}
+          >
+            <SlidersHorizontal size={18} />
+            {t('appearance')}
+          </Button>
           {pwa.installable && (
             <Button
               variant="ghost"
@@ -141,7 +163,17 @@ function Studio() {
             </p>
             <h1>{t('tagline')}</h1>
           </div>
-          <GenerateButton testId="preview-btn" />
+          <div className="workspace-actions">
+            <Button
+              className="mobile-settings-button"
+              variant="ghost"
+              data-testid="mobile-settings-btn"
+              onClick={() => setAppearance(true)}
+            >
+              {t('appearance')}
+            </Button>
+            <GenerateButton testId="preview-btn" />
+          </div>
         </div>
         <WorkspaceStatus />
         <div className="workspace-grid" data-testid="workspace">
@@ -152,6 +184,70 @@ function Studio() {
         <WorkspaceFooter />
       </motion.main>
       <AnimatePresence>
+        {appearance && (
+          <Modal
+            key="appearance"
+            title={t('appearance')}
+            closeLabel={t('close')}
+            testId="appearance-modal"
+            onClose={() => setAppearance(false)}
+          >
+            <ThemeColorEditor />
+            <div className="appearance-tools">
+              <Button variant="secondary" data-testid="settings-language-toggle" onClick={toggle}>
+                <Languages size={16} />
+                {locale === 'cn' ? 'English' : '简体中文'}
+              </Button>
+              <Button variant="secondary" data-testid="settings-theme-toggle" onClick={toggleTheme}>
+                {dark ? <Sun size={16} /> : <Moon size={16} />}
+                {t('theme')}
+              </Button>
+              <Button
+                variant="ghost"
+                data-testid="settings-guide-btn"
+                onClick={() => {
+                  setAppearance(false);
+                  setGuide(true);
+                }}
+              >
+                <CircleHelp size={16} />
+                {t('help')}
+              </Button>
+              <Button
+                variant="ghost"
+                data-testid="settings-desktop-download-btn"
+                onClick={() => {
+                  setAppearance(false);
+                  setDesktop(true);
+                }}
+              >
+                <MonitorDown size={16} />
+                {t('desktop')}
+              </Button>
+              {pwa.installable && (
+                <Button
+                  variant="ghost"
+                  data-testid="settings-pwa-install-btn"
+                  onClick={() => {
+                    void installPwa().catch(reportFailure);
+                  }}
+                >
+                  {t('installApp')}
+                </Button>
+              )}
+            </div>
+            <a
+              className="project-source-link"
+              href="https://github.com/SXP-Simon/Panache"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="settings-project-source-link"
+            >
+              <GitHubIcon />
+              <span>SXP-Simon/Panache</span>
+            </a>
+          </Modal>
+        )}
         {guide && (
           <Modal
             key="guide"
