@@ -4,7 +4,8 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 if [[ "${1:-}" != "--skip-web" ]]; then
-  (cd app && flutter pub get && flutter build web --release)
+  (cd app && flutter pub get)
+  python3 scripts/build-flutter-web.py
 fi
 [[ -f app/build/web/index.html ]] || { echo "缺少 Flutter Web 产物，请先构建。" >&2; exit 1; }
 cargo build --locked --release -p handwriting-server

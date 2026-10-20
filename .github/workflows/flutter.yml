@@ -3,9 +3,9 @@ name: Flutter UI
 on:
   push:
     branches: ["flutter"]
-    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   pull_request:
-    paths: ["VERSION", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   workflow_dispatch:
 
 jobs:
@@ -23,8 +23,11 @@ jobs:
         working-directory: app
       - run: flutter test
         working-directory: app
-      - run: flutter build web --release
-        working-directory: app
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s scripts/tests -p test_web_build_version.py
+      - run: python scripts/build-flutter-web.py
 
   browser-persistence:
     timeout-minutes: 15
