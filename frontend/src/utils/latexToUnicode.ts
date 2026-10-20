@@ -57,6 +57,9 @@ const LATEX_SYMBOL_MAP: Record<string, string> = {
   '\\}': '}',
   '\\setminus': '\\',
   '\\backslash': '\\',
+  '\\textbackslash': '\\',
+  '\\textasciicircum': '^',
+  '\\textasciitilde': '~',
 
   // 箭头与推导
   '\\Rightarrow': '⇒',
@@ -469,8 +472,11 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
         horizontalRules.some((lines) => nodeArray(lines).length > 0)
       ) {
         // 2026-10-20：保留增广列与表格分隔，不因辅助线放弃整个数组的转写。
-        if (rows.some((row) => row.some((cell) => !safeTableCell(cell))))
-          throw new Error('Ambiguous table cell separators');
+        const cells = rows.map((row) =>
+          row.map((cell) =>
+            safeTableCell(cell) && !/["\\]/.test(cell) ? cell : JSON.stringify(cell),
+          ),
+        );
         const separators = new Map<number, string>();
         let column = 0;
         for (const value of columns) {
@@ -482,14 +488,14 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
             separators.set(column, (separators.get(column) ?? '') + (rule === ':' ? '┆' : '|'));
           } else throw new Error('Unsupported array column');
         }
-        const width = Math.max(column, ...rows.map((row) => row.length));
+        const width = Math.max(column, ...cells.map((row) => row.length));
         const content: string[] = [];
-        for (let index = 0; index <= rows.length; index++) {
+        for (let index = 0; index <= cells.length; index++) {
           for (const dashed of nodeArray(horizontalRules[index])) {
             if (typeof dashed !== 'boolean') throw new Error('Unsupported row rule');
             content.push(dashed ? '╌╌' : '──');
           }
-          const row = rows[index];
+          const row = cells[index];
           if (!row) continue;
           let line = separators.has(0) ? `${separators.get(0)} ` : '';
           for (let cell = 0; cell < width; cell++) {
