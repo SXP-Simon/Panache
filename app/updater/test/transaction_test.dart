@@ -40,7 +40,8 @@ class Fixture {
       ? p.join(target, 'versions', '$version-$build')
       : target;
   static Future<Fixture> create({String mode = 'healthy'}) async {
-    final root = Directory.systemTemp.createTempSync('Panache 测试 space ');
+    final temporary = Directory.systemTemp.createTempSync('Panache 测试 space ');
+    final root = Directory(temporary.resolveSymbolicLinksSync());
     final target = p.join(
       root.path,
       Platform.isMacOS ? 'Panache.app' : 'Panache',
@@ -61,7 +62,11 @@ class Fixture {
           .createSync(recursive: true);
       await File(fakeApp).copy(p.join(runtime, info.executable));
       setMode(p.join(runtime, info.executable), 0x1ed);
-      File(p.join(runtime, 'mode')).writeAsStringSync(mode);
+      final resources = Platform.isMacOS
+          ? p.join(runtime, 'Contents', 'Resources')
+          : runtime;
+      Directory(resources).createSync(recursive: true);
+      File(p.join(resources, 'mode')).writeAsStringSync(mode);
       final backend = p.join(
         runtime,
         Platform.isMacOS
@@ -97,6 +102,13 @@ class Fixture {
           location,
         ]);
         expect(signed.exitCode, 0, reason: '${signed.stderr}');
+        final verified = await Process.run('/usr/bin/codesign', [
+          '--verify',
+          '--deep',
+          '--strict',
+          location,
+        ]);
+        expect(verified.exitCode, 0, reason: '${verified.stderr}');
       }
     }
 
@@ -227,7 +239,10 @@ class FailingJournalTransaction extends UpdateTransaction {
 
 void main() {
   setUpAll(() async {
-    binaries = Directory.systemTemp.createTempSync('panache updater binaries ');
+    final temporary = Directory.systemTemp.createTempSync(
+      'panache updater binaries ',
+    );
+    binaries = Directory(temporary.resolveSymbolicLinksSync());
     helper =
         Platform.environment['PANACHE_COMPILED_UPDATER'] ??
         p.join(binaries.path, 'helper$extension');
@@ -306,18 +321,24 @@ void main() {
     expect(currentInstall(fixture.plan).version, '1.6.0');
     for (
       var i = 0;
-      i < 50 &&
-          !File(p.join(fixture.runtime('1.6.0', 1006000), 'reopened'))
-              .existsSync();
+      i < 50 && !File(p.join(fixture.root.path, 'reopened')).existsSync();
       i++
     ) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     expect(
-      File(p.join(fixture.runtime('1.6.0', 1006000), 'reopened'))
-          .readAsStringSync(),
+      File(p.join(fixture.root.path, 'reopened')).readAsStringSync(),
       'restart_failed',
     );
+    if (Platform.isMacOS) {
+      final verified = await Process.run('/usr/bin/codesign', [
+        '--verify',
+        '--deep',
+        '--strict',
+        fixture.target,
+      ]);
+      expect(verified.exitCode, 0, reason: '${verified.stderr}');
+    }
     final token = secureToken();
     final directory = Directory(p.join(p.dirname(fixture.directory), token))
       ..createSync();
@@ -553,16 +574,13 @@ void main() {
         expect(currentInstall(fixture.plan).version, '1.6.0');
         for (
           var i = 0;
-          i < 100 &&
-              !File(p.join(fixture.runtime('1.6.0', 1006000), 'reopened'))
-                  .existsSync();
+          i < 100 && !File(p.join(fixture.root.path, 'reopened')).existsSync();
           i++
         ) {
           await Future<void>.delayed(const Duration(milliseconds: 30));
         }
         expect(
-          File(p.join(fixture.runtime('1.6.0', 1006000), 'reopened'))
-              .readAsStringSync(),
+          File(p.join(fixture.root.path, 'reopened')).readAsStringSync(),
           'atomic_write_failed',
         );
       } finally {
