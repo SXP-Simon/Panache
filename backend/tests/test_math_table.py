@@ -33,7 +33,7 @@ def test_distribution_table_has_shared_columns_and_centered_fraction_cells(sourc
         lower_center = lx + (lower.bbox[0] + lower.bbox[2]) / 2
         assert abs(upper_center - lower_center) <= 1
         assert uy + upper.bbox[3] < ly + lower.bbox[1]
-    assert len(box.paths) == 2
+    assert len(box.paths) == columns + 4
     image = Image.new("1", (2000, 800))
     symbols._paint_math_box(ImageDraw.Draw(image), box, (100, 100))
     ink = image.getbbox()
@@ -113,5 +113,44 @@ def test_dashed_rules_are_rendered_as_separate_pen_strokes():
     font = ImageFont.truetype(str(FONT), 56)
     box = symbols._layout_math_char(normalized, font, str(FONT), symbols._LayoutMemo())
     assert len(box.paths) > 4
-    assert all(len(path) == 2 for path, _ in box.paths)
+    assert any(len(path) == 2 for path, _ in box.paths)
+    assert any(len(path) == 3 for path, _ in box.paths)
     assert all(thickness >= 1 for _, thickness in box.paths)
+    strokes = symbols._compose_box(box.advance, paths=box.paths)
+    image = Image.new("1", (1000, 600))
+    symbols._paint_math_box(ImageDraw.Draw(image), strokes, (20, 20))
+    vertical_dashes = [path for path, _ in box.paths if len(path) == 2 and path[0][0] == path[1][0]]
+    first, second = vertical_dashes[:2]
+    gap_y = (first[1][1] + second[0][1]) // 2
+    assert not image.getpixel((20 + first[0][0], 20 + gap_y))
+
+
+def test_complete_grid_encloses_every_cell_with_clear_ink_padding():
+    converted = symbols.normalize_text_for_font(X)
+    font = ImageFont.truetype(str(FONT), 64)
+    box = symbols._layout_math_char(converted, font, str(FONT), symbols._LayoutMemo())
+    vertical = [
+        (points[0][0], width) for points, width in box.paths if points[0][0] == points[-1][0]
+    ]
+    horizontal = [
+        (points[0][1], width) for points, width in box.paths if points[0][1] == points[-1][1]
+    ]
+    assert len(vertical) == 6
+    assert len(horizontal) == 3
+    assert vertical[0][0] == horizontal[0][0] == 0
+    assert vertical[1][1] > vertical[2][1]
+    assert horizontal[1][1] > horizontal[0][1]
+    image = Image.new("1", (1000, 600))
+    symbols._paint_math_box(ImageDraw.Draw(image), box, (20, 20))
+    for x, _ in vertical:
+        for y in range(horizontal[-1][0] + 1):
+            assert image.crop((20 + x - 2, 20 + y, 20 + x + 3, 21 + y)).getbbox()
+    for y, _ in horizontal:
+        for x in range(vertical[-1][0] + 1):
+            assert image.crop((20 + x, 20 + y - 2, 21 + x, 20 + y + 3)).getbbox()
+    for index, (child, x, y) in enumerate(box.children):
+        row, column = divmod(index, 5)
+        assert x + child.bbox[0] > vertical[column][0] + 5
+        assert x + child.bbox[2] < vertical[column + 1][0] - 5
+        assert y + child.bbox[1] > horizontal[row][0] + 5
+        assert y + child.bbox[3] < horizontal[row + 1][0] - 5

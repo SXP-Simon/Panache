@@ -1000,7 +1000,10 @@ def _table_rule(
 ) -> list[BoxPath]:
     # 2026-10-20：细线中点轻微偏移模拟落笔，虚线按字号分段，不影响表格列对齐。
     if not dashed:
-        middle = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2 + 1)
+        middle = (
+            (start[0] + end[0]) // 2 + int(start[0] == end[0]),
+            (start[1] + end[1]) // 2 + int(start[1] == end[1]),
+        )
         return [((start, middle, end), thickness)]
     length = max(end[0] - start[0], end[1] - start[1])
     dash = max(3, round(size * 0.18))
@@ -1011,6 +1014,41 @@ def _table_rule(
         a = (start[0] + position, start[1]) if horizontal else (start[0], start[1] + position)
         b = (start[0] + stop, start[1]) if horizontal else (start[0], start[1] + stop)
         paths.append(((a, b), thickness))
+    return paths
+
+
+def _table_grid_paths(
+    table: Table, widths: list[int], heights: list[int], size: int
+) -> list[BoxPath]:
+    thin = max(1, round(size * 0.025))
+    emphasis = max(thin + 1, round(size * 0.040))
+    paths: list[BoxPath] = []
+    vertical = {rule.position: rule for rule in table.vertical}
+    horizontal = {rule.position: rule for rule in table.horizontal}
+    for index in range(len(widths) + 1):
+        rule = vertical.get(index)
+        x = sum(widths[:index])
+        paths.extend(
+            _table_rule(
+                (x, 0),
+                (x, sum(heights)),
+                emphasis if rule else thin,
+                size,
+                dashed=bool(rule and rule.dashed),
+            )
+        )
+    for index in range(len(heights) + 1):
+        rule = horizontal.get(index)
+        y = sum(heights[:index])
+        paths.extend(
+            _table_rule(
+                (0, y),
+                (sum(widths), y),
+                emphasis if rule else thin,
+                size,
+                dashed=bool(rule and rule.dashed),
+            )
+        )
     return paths
 
 
@@ -1042,16 +1080,8 @@ def _layout_table(table: Table, font: Font, font_path: str | None, memo: _Layout
             )
             x += width
         y += height
-    thickness = max(1, round(size * 0.025))
-    paths: list[BoxPath] = []
-    for rule in table.vertical:
-        x = sum(widths[: rule.position])
-        paths.extend(_table_rule((x, 0), (x, y), thickness, size, dashed=rule.dashed))
-    for rule in table.horizontal:
-        rule_y = sum(heights[: rule.position])
-        paths.extend(
-            _table_rule((0, rule_y), (sum(widths), rule_y), thickness, size, dashed=rule.dashed)
-        )
+    # 2026-10-20：补齐每个单元格的四边；原文明确规则加重或保留虚线，不能被默认网格覆盖。
+    paths = _table_grid_paths(table, widths, heights, size)
     return _compose_box(sum(widths) + pad, children, paths)
 
 
