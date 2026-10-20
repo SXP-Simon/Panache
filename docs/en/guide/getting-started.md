@@ -82,4 +82,4 @@ The backend only renders a limited number of jobs at a time. When it is busy you
 Progress is pushed over a WebSocket; if that connection cannot be established the client
 falls back to polling, and the interface looks the same either way.
 
-Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other text modes. Click LaTeX conversion, then generate the preview. Handwriting tables include an outer border and every row/column boundary, with explicit source separators emphasized.
+Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other text modes. Click LaTeX conversion, then generate the preview. Handwriting tables include an outer border and every row/column boundary, with uniform stroke widths and visually centered contents.
