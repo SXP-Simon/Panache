@@ -15,7 +15,7 @@
     "test:clean-markdown": "node tests/cleanMarkdown.test.cjs && node --test tests/markdownTableLatex.test.cjs",
     "test:latex-unicode": "node tests/latexToUnicode.test.cjs",
     "test:inline-image": "node tests/inlineImageManager.test.cjs",
-    "test:generation": "node --test tests/generation.test.cjs"
+    "test:generation": "node --test tests/generation.test.cjs tests/releaseSummary.test.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.3",

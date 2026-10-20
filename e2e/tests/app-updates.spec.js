@@ -15,7 +15,7 @@ test('desktop update settings support check, preference persistence and explicit
       storage: { readRecord: async (key) => localStorage.getItem(key), writeRecord: async (key, value) => localStorage.setItem(key, value), removeRecord: async (key) => localStorage.removeItem(key), readAsset: async () => null, writeAsset: async () => {}, removeAsset: async () => {} },
       updates: {
         state: async () => state, subscribe: (callback) => { listener = callback; return () => {}; },
-        check: async () => { state = { status: 'available', current: '1.6.0', version: '1.7.0', notes: '测试预览 / Test preview\n改进手写排版与更新体验。', releaseUrl: 'https://github.com/SXP-Simon/Panache/releases/tag/v1.7.0' }; listener(state); return state; },
+        check: async () => { state = { status: 'available', current: '1.6.0', version: '1.7.0', notes: '- 测试预览 / Test preview\n- 改进手写排版与更新体验。', releaseUrl: 'https://github.com/SXP-Simon/Panache/releases/tag/v1.7.0' }; listener(state); return state; },
         download: async () => { window.updateDownloadCalls++; state = { ...state, status: 'ready' }; listener(state); return state; },
         cancel: async () => state, open: async () => { window.updateOpenCalls++; return { ...state, status: 'launched' }; },
       },
@@ -32,7 +32,7 @@ test('desktop update settings support check, preference persistence and explicit
   await page.getByTestId('update-settings').locator('summary').click();
   await page.getByTestId('update-settings').screenshot({ path: path.join(output, 'web-update-settings.png') });
   await page.getByTestId('update-download').click();
-  await expect(page.getByTestId('update-status')).toContainText('通过校验');
+  await expect(page.getByTestId('update-status')).toContainText('已下载，可以安装');
   await page.getByTestId('appearance-modal-close').click();
   await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
   let blocked;
@@ -48,7 +48,7 @@ test('desktop update settings support check, preference persistence and explicit
   await expect(page.getByTestId('preview-btn')).toBeEnabled();
   await page.getByTestId('update-check').click(); await page.getByTestId('update-download').click();
   await page.getByTestId('update-open').click();
-  await expect(page.getByTestId('update-status')).toContainText('安装包已打开');
+  await expect(page.getByTestId('update-status')).toContainText('安装程序已打开');
   await page.reload();
   await page.getByTestId('appearance-btn').click();
   await expect(page.getByTestId('update-auto')).not.toBeChecked();
@@ -56,7 +56,7 @@ test('desktop update settings support check, preference persistence and explicit
 
 test('web environment explains deployment scope and never offers desktop installer controls', async ({ page }) => {
   await openHome(page); await page.getByTestId('appearance-btn').click();
-  await expect(page.getByTestId('update-settings')).toContainText('服务端升级由部署管理员处理');
+  await expect(page.getByTestId('update-settings')).toContainText('服务端由部署管理员升级');
   await page.getByTestId('update-check').click();
   await expect(page.getByTestId('update-status')).toContainText('此环境不支持');
   await expect(page.getByTestId('update-download')).toHaveCount(0);

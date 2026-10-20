@@ -4,6 +4,7 @@ import { usePreferencesStore } from '@/features/preferences/store';
 import Button from '@/shared/ui/Button';
 import { checkUpdates, updateAction, useUpdateState } from './runtime';
 import type { UpdateStatus } from './contracts';
+import { summarizeReleaseNotes } from './releaseSummary';
 const statuses: Record<UpdateStatus, MessageKey> = {
   development: 'updateDevelopment',
   launched: 'updateLaunched',
@@ -35,6 +36,7 @@ export default function UpdateSettings() {
   const auto = usePreferencesStore((value) => value.autoCheckUpdates);
   const patch = usePreferencesStore((value) => value.patch);
   const desktop = Boolean(window.handwritingDesktop);
+  const notes = summarizeReleaseNotes(state.notes ?? '');
   const busy = state.status === 'checking' || state.status === 'downloading';
   const message =
     state.status === 'error'
@@ -43,11 +45,12 @@ export default function UpdateSettings() {
   return (
     <section className="update-settings" data-testid="update-settings">
       <h3>{t('updates')}</h3>
-      <p className="help-text">{t(desktop ? 'updateDesktopHint' : 'updateWebHint')}</p>
+      {!desktop && <p className="help-text">{t('updateWebHint')}</p>}
       <label className="update-auto">
         <input
           data-testid="update-auto"
           type="checkbox"
+          title={t('updateAutoHint')}
           checked={auto}
           onChange={(event) => patch({ autoCheckUpdates: event.target.checked })}
         />
@@ -128,19 +131,29 @@ export default function UpdateSettings() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            {t('viewReleases')}
+            {t('updateFullNotes')}
           </a>
         )}
       </div>
       {state.status === 'ready' && desktop && (
         <p className="help-text">
-          {t(state.portable ? 'updatePortableHint' : 'updateInstallHint')}
+          {t(
+            state.portable
+              ? 'updatePortableHint'
+              : /Mac/.test(navigator.platform)
+                ? 'updateMacHint'
+                : 'updateInstallHint',
+          )}
         </p>
       )}
-      {state.notes && (
+      {notes.length > 0 && (
         <details className="update-notes">
           <summary>{t('updateNotes')}</summary>
-          <p>{state.notes}</p>
+          <ul>
+            {notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
         </details>
       )}
     </section>
