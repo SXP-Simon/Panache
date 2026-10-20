@@ -28,8 +28,7 @@ Protected or read-only installation locations, missing recovery packages or star
 
 ## macOS blocks it on first launch
 
-The desktop build is **neither code-signed nor notarised** — there is no Apple Developer certificate in
-the project. So macOS blocks it the first time you open it. On macOS 15 and later the warning may say the
+The desktop build has **no Apple Developer signature or notarisation**. Builds use a local ad-hoc integrity signature; the project has no Apple Developer certificate. macOS can therefore block the first launch. On macOS 15 and later the warning may say the
 file is **"damaged"** outright.
 
 **That warning has two possible meanings — work out which one you are looking at:**

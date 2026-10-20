@@ -21,6 +21,7 @@
     "npmRebuild": false,
     "appId": "io.github.sxp-simon.handwriting",
     "productName": "Panache",
+    "afterPack": "./mac-sign.cjs",
     "directories": {
       "output": "build/installer"
     },
