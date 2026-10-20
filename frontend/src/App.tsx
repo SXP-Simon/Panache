@@ -1,3 +1,5 @@
+import { useUpdatesStore } from './features/updates/store';
+import UpdatePrompt from './features/updates/UpdatePrompt';
 import UpdateSettings from './features/updates/UpdateSettings';
 import { useInitializeUpdates } from './features/updates/runtime';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -48,7 +50,7 @@ export default function App() {
   );
 }
 function Studio() {
-  useInitializeUpdates();
+  const updatePrompt = useUpdatesStore((state) => state.prompt);
   const { locale, t, toggle } = useI18n();
   const reduced = useReducedMotion();
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
@@ -56,6 +58,7 @@ function Studio() {
   const themeColor = usePreferencesStore((state) => state.themeColor);
   const [guide, setGuide] = useState(false);
   const [desktop, setDesktop] = useState(false);
+  useInitializeUpdates(appearance || guide || desktop);
   const theme = usePreferencesStore((state) => state.theme);
   const toggleTheme = usePreferencesStore((state) => state.toggleTheme);
   const dark = theme === 'dark';
@@ -187,6 +190,7 @@ function Studio() {
         <WorkspaceFooter />
       </motion.main>
       <AnimatePresence>
+        {updatePrompt && <UpdatePrompt key={updatePrompt.key} prompt={updatePrompt} />}
         {appearance && (
           <Modal
             key="appearance"

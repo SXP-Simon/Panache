@@ -1,35 +1,9 @@
 import { useI18n } from '@/i18n';
-import type { MessageKey } from '@/i18n';
 import { usePreferencesStore } from '@/features/preferences/store';
 import Button from '@/shared/ui/Button';
-import { checkUpdates, updateAction, useUpdateState } from './runtime';
-import type { UpdateStatus } from './contracts';
+import { checkUpdates, showUpdatePrompt, updateAction, useUpdateState } from './runtime';
+import { updateMessage } from './presentation';
 import { summarizeReleaseNotes } from './releaseSummary';
-const statuses: Record<UpdateStatus, MessageKey> = {
-  development: 'updateDevelopment',
-  launched: 'updateLaunched',
-  idle: 'updateIdle',
-  checking: 'updateChecking',
-  current: 'updateCurrent',
-  available: 'updateAvailable',
-  unsupported: 'updateUnsupported',
-  pending: 'updatePending',
-  downloading: 'updateDownloading',
-  cancelled: 'updateCancelled',
-  ready: 'updateReady',
-  error: 'updateNetwork',
-};
-const errors: Record<string, MessageKey> = {
-  cleanupFailed: 'updateCleanupFailed',
-  generationBusy: 'updateGenerationBusy',
-  rateLimited: 'updateRateLimited',
-  invalid: 'updateInvalid',
-  unsafe: 'updateInvalid',
-  integrity: 'updateIntegrity',
-  saveFailed: 'updateSaveFailed',
-  unsupported: 'updateWebUnsupported',
-  pending: 'updatePending',
-};
 export default function UpdateSettings() {
   const { t } = useI18n();
   const state = useUpdateState();
@@ -38,10 +12,7 @@ export default function UpdateSettings() {
   const desktop = Boolean(window.handwritingDesktop);
   const notes = summarizeReleaseNotes(state.notes ?? '');
   const busy = state.status === 'checking' || state.status === 'downloading';
-  const message =
-    state.status === 'error'
-      ? (errors[state.error ?? ''] ?? 'updateNetwork')
-      : statuses[state.status];
+  const message = updateMessage(state);
   return (
     <section className="update-settings" data-testid="update-settings">
       <h3>{t('updates')}</h3>
@@ -82,6 +53,15 @@ export default function UpdateSettings() {
         >
           {t('updateCheck')}
         </Button>
+        {['available', 'downloading', 'ready', 'launched', 'cancelled'].includes(state.status) && (
+          <Button
+            variant="ghost"
+            data-testid="update-show-prompt"
+            onClick={() => showUpdatePrompt()}
+          >
+            {t('updateShowPrompt')}
+          </Button>
+        )}
         {desktop && ['available', 'cancelled'].includes(state.status) && (
           <Button
             variant="primary"

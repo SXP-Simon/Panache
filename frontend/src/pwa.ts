@@ -10,11 +10,13 @@ export interface PwaState {
   installable: boolean;
   installed: boolean;
   updateAvailable: boolean;
+  updateId: string;
 }
 
 let prompt: InstallPrompt | null = null;
 let state: PwaState = {
   updateAvailable: false,
+  updateId: '',
   online: navigator.onLine,
   installable: false,
   installed: window.matchMedia('(display-mode: standalone)').matches,
@@ -53,12 +55,22 @@ export async function installPwa(): Promise<void> {
   if (choice.outcome === 'accepted') update({ installed: true });
 }
 
+const deploymentIds = new WeakMap<ServiceWorker, string>();
+let deploymentSequence = 0;
+function identifyDeployment(worker: ServiceWorker): string {
+  let id = deploymentIds.get(worker);
+  if (!id) {
+    id = `deployment-${++deploymentSequence}`;
+    deploymentIds.set(worker, id);
+  }
+  return id;
+}
 let studioRegistration: ServiceWorkerRegistration | null = null;
 function observeWorker(registration: ServiceWorkerRegistration): void {
   studioRegistration = registration;
   const waiting = () => {
     if (registration.waiting && navigator.serviceWorker.controller)
-      update({ updateAvailable: true });
+      update({ updateAvailable: true, updateId: identifyDeployment(registration.waiting) });
   };
   waiting();
   registration.addEventListener('updatefound', () => {
@@ -91,7 +103,8 @@ export async function checkDeploymentUpdate(): Promise<boolean> {
       installing.addEventListener('statechange', changed);
       changed();
     });
-  if (registration.waiting) update({ updateAvailable: true });
+  if (registration.waiting)
+    update({ updateAvailable: true, updateId: identifyDeployment(registration.waiting) });
   return state.updateAvailable;
 }
 export async function activateDeploymentUpdate(): Promise<void> {

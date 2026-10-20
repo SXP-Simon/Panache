@@ -15,6 +15,7 @@ export interface UpdateState {
   status: UpdateStatus;
   current?: string;
   version?: string;
+  deploymentId?: string;
   releaseUrl?: string;
   notes?: string;
   portable?: boolean;

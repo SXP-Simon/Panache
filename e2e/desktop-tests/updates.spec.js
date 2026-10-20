@@ -21,10 +21,10 @@ test('打包应用通过真实主进程桥校验固定来源更新，下载后�
     await page.getByTestId('appearance-btn').click();
     await page.getByTestId('update-auto').uncheck();
     await page.getByTestId('update-check').click();
-    await expect(page.getByTestId('update-status')).toContainText('v999.0.0');
-    await page.getByTestId('update-download').click();
-    await expect(page.getByTestId('update-status')).toContainText('已下载，可以安装');
-    await expect(page.getByTestId('update-open')).toBeVisible();
+    await expect(page.getByTestId('update-prompt-version')).toContainText('v999.0.0');
+    await page.getByTestId('update-prompt-now').click();
+    await expect(page.getByTestId('update-prompt-status')).toContainText('已下载，可以安装');
+    await expect(page.getByTestId('update-prompt-now')).toHaveText('安装更新');
     const state = await page.evaluate(() => window.handwritingDesktop.updates.state());
     expect(state.status).toBe('ready'); expect(state.current).toBe(require('../../desktop/package.json').version);
     expect(state).not.toHaveProperty('asset'); expect(state).not.toHaveProperty('file');

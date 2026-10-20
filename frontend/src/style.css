@@ -1458,3 +1458,30 @@ input[type='color'] {
   overflow-y: auto;
   font-size: 0.9rem;
 }
+
+.update-prompt-version {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.update-prompt-notes {
+  margin: 1rem 0;
+}
+.update-prompt-notes h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+.update-prompt-notes ul {
+  list-style: disc;
+  padding-inline-start: 1.4rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.update-prompt-notes li + li {
+  margin-top: 0.4rem;
+}
+.update-prompt-progress {
+  width: 100%;
+  accent-color: var(--primary);
+  margin-bottom: 1rem;
+}

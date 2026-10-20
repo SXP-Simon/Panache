@@ -1,6 +1,16 @@
 import { createContext, useContext } from 'react';
 const words = {
   updates: ['应用更新', 'App updates'],
+  updatePromptTitle: ['发现新版本', 'A new version is available'],
+  updateWebPromptTitle: ['网页已更新', 'Website updated'],
+  updateWebPromptHint: [
+    '刷新即可使用新版，当前内容会先保存。',
+    'Reload to use the new version. Your work will be saved first.',
+  ],
+  updatePromptNoNotes: ['前往发布页查看更新内容。', 'See the release page for details.'],
+  updateNow: ['立即更新', 'Update now'],
+  updateLater: ['稍后再说', 'Later'],
+  updateShowPrompt: ['查看更新', 'View update'],
   updateCleanupFailed: [
     '临时文件被占用，请稍后重试',
     'Temporary files are in use. Please try again later.',

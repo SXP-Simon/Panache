@@ -3,6 +3,12 @@ const path = require('node:path');
 const http = require('node:http');
 const { test, expect, openHome } = require('./fixtures');
 const output = path.resolve(__dirname, '../../preview_outputs/update-feature');
+async function dismissPrompt(page) {
+  await expect(page.getByTestId('update-prompt')).toBeVisible();
+  await page.getByTestId('update-prompt-later').click();
+  await expect(page.getByTestId('update-prompt')).toHaveCount(0);
+}
+
 
 test('desktop update settings support check, preference persistence and explicit download actions', async ({ page }) => {
   await page.addInitScript(() => {
@@ -24,7 +30,7 @@ test('desktop update settings support check, preference persistence and explicit
   await openHome(page);
   await page.getByTestId('appearance-btn').click();
   await page.getByTestId('update-auto').uncheck();
-  await page.getByTestId('update-check').click();
+  await page.getByTestId('update-check').click(); await dismissPrompt(page);
   await expect(page.getByTestId('update-status')).toContainText('有新版本可用');
   await expect(page.getByTestId('update-status')).toContainText('v1.7.0');
   expect(await page.evaluate(() => window.updateDownloadCalls)).toBe(0);
@@ -46,7 +52,7 @@ test('desktop update settings support check, preference persistence and explicit
   expect(await page.evaluate(() => window.updateOpenCalls)).toBe(0);
   await pendingRequest.abort();
   await expect(page.getByTestId('preview-btn')).toBeEnabled();
-  await page.getByTestId('update-check').click(); await page.getByTestId('update-download').click();
+  await page.getByTestId('update-check').click(); await dismissPrompt(page); await page.getByTestId('update-download').click();
   await page.getByTestId('update-open').click();
   await expect(page.getByTestId('update-status')).toContainText('安装程序已打开');
   await page.reload();
@@ -94,6 +100,12 @@ test('production deployment waits for approval and saves the draft before activa
     await expect(page.getByTestId('text-input')).toHaveValue('更新前必须保存的最后一笔。');
     deployment = 'two';
     await page.getByTestId('appearance-btn').click(); await page.getByTestId('update-check').click();
+    await expect(page.getByTestId('update-prompt')).toContainText('网页已更新');
+    await expect(page.getByTestId('update-prompt-notes')).toHaveCount(0);
+    await expect(page.getByTestId('update-prompt-now')).toHaveText('保存并刷新');
+    await fs.mkdir(output, { recursive: true });
+    await page.getByTestId('update-prompt').screenshot({ path: path.join(output, 'pwa-update-prompt.png') });
+    await dismissPrompt(page);
     await expect(page.getByTestId('update-status')).toContainText('有新版本可用');
     expect(await page.locator('meta[name="test-deployment"]').getAttribute('content')).toBe('one');
     expect(await page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration()).waiting))).toBe(true);
@@ -107,7 +119,7 @@ test('production deployment waits for approval and saves the draft before activa
     await expect(page.getByTestId('update-status')).toContainText('尚未保存成功');
     expect(await page.locator('meta[name="test-deployment"]').getAttribute('content')).toBe('one');
     await page.evaluate(() => { Storage.prototype.setItem = window.originalSetItem; });
-    await page.getByTestId('update-check').click();
+    await page.getByTestId('update-check').click(); await dismissPrompt(page);
     await page.getByTestId('update-open').click();
     await expect(page.locator('meta[name="test-deployment"]')).toHaveAttribute('content', 'two');
     await expect(page.getByTestId('text-input')).toHaveValue('更新前必须保存的最后一笔。');
