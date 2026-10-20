@@ -56,6 +56,52 @@ def wait_stopped(identity):
         time.sleep(0.02)
 
 
+@pytest.mark.parametrize("mode", ["win-install", "win-portable", "mac-bundle"])
+def test_other_window_of_same_target_is_rejected_without_termination(
+    native_plan, monkeypatch, mode
+):
+    plan = dataclasses.replace(native_plan, mode=mode)
+    expected = plan.target if mode == "win-portable" else plan.executable
+    parent = Mock(pid=101)
+    renderer = Mock(pid=102)
+    renderer.exe.return_value = str(expected)
+    other = Mock(pid=103)
+    other.exe.return_value = str(expected)
+    unrelated = Mock(pid=104)
+    unrelated.exe.return_value = str(native_plan.work / "OtherProduct")
+    monkeypatch.setattr(
+        native.psutil, "process_iter", Mock(return_value=[renderer, unrelated, other])
+    )
+    monkeypatch.setattr(native, "_descends_from", lambda process, _parent: process is renderer)
+    with pytest.raises(UpdateFailure, match="fileLocked"):
+        native.refuse_other_instances(plan, parent)
+    for process in (renderer, other, unrelated):
+        process.kill.assert_not_called()
+        process.terminate.assert_not_called()
+
+
+def test_prepare_allows_own_renderer_but_apply_rechecks_new_window(native_plan, monkeypatch):
+    plan = dataclasses.replace(native_plan, mode="win-install")
+    parent, renderer = Mock(pid=101), Mock(pid=102)
+    parent.exe.return_value = renderer.exe.return_value = str(plan.executable)
+    monkeypatch.setattr(native.psutil, "process_iter", Mock(return_value=[parent, renderer]))
+    monkeypatch.setattr(native, "_descends_from", lambda process, _parent: process is renderer)
+    native.refuse_other_instances(plan, parent)
+    with pytest.raises(UpdateFailure, match="fileLocked"):
+        native.refuse_other_instances(plan)
+
+
+def test_nsis_preflight_refuses_other_target_with_same_image_name(native_plan, monkeypatch):
+    plan = dataclasses.replace(native_plan, mode="win-install")
+    other = Mock(pid=103)
+    other.exe.return_value = str(native_plan.work / "another-install" / "Panache.exe")
+    other.username.return_value = psutil.Process().username()
+    monkeypatch.setattr(native.psutil, "process_iter", Mock(return_value=[other]))
+    with pytest.raises(UpdateFailure, match="fileLocked"):
+        native.refuse_other_instances(plan)
+    other.terminate.assert_not_called()
+
+
 def start_fixture(plan, monkeypatch, *, broken_record=False):
     root_file, child_file = plan.work / "root-pid", plan.work / "child-pid"
     child_code = "import time;time.sleep(60)"
@@ -229,6 +275,19 @@ def test_profile_uses_actual_parent_home(tmp_path):
         native._profile_from_parent(parent)
         == tmp_path / "Library/Application Support/HandwritingWeb"
     )
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="Darwin extended attribute ABI")
+def test_mac_quarantine_round_trip_uses_native_attribute_api(tmp_path):
+    source, destination = tmp_path / "download.zip", tmp_path / "Panache.app"
+    source.write_bytes(b"fixture")
+    destination.mkdir()
+    assert native._mac_quarantine(source) is None
+    quarantine = b"0081;0;PanacheTests;00000000-0000-0000-0000-000000000000"
+    native._set_mac_quarantine(source, quarantine)
+    assert native._mac_quarantine(source) == quarantine
+    native._set_mac_quarantine(destination, native._mac_quarantine(source))
+    assert native._mac_quarantine(destination) == quarantine
 
 
 def test_relaunch_preserves_workspace_without_overriding_chromium_profile(native_plan, monkeypatch):

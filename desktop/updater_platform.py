@@ -38,6 +38,7 @@ UNSUPPORTED_INSTALL = "unsupportedLocation"
 RUN_ONCE = r"Software\Microsoft\Windows\CurrentVersion\RunOnce"
 VERSION_SIGNATURE = 0xFEEF04BD
 RUN_ONCE_LIMIT = 260
+MAX_QUARANTINE_BYTES = 65536
 
 
 def _same_path(left: Path, right: Path) -> bool:
@@ -280,6 +281,33 @@ def _validate_mac_product(plan: Plan, executable: Path) -> Path:
     return plan.target / "Contents/Resources/backend/handwriting-backend"
 
 
+def refuse_other_instances(plan: Plan, parent: psutil.Process | None = None) -> None:
+    """2026-10-20：同目标的其他窗口可能有未保存内容，只拒绝更新，不按名称终止."""
+    expected = plan.target if plan.mode == "win-portable" else plan.executable
+    own_launcher = plan.launcher_pid if parent is not None else None
+    current_user = psutil.Process().username()
+    for process in psutil.process_iter():
+        try:
+            executable = Path(process.exe())
+            same_installer_image = (
+                plan.mode == "win-install"
+                and executable.name.casefold() == expected.name.casefold()
+                and process.username() == current_user
+            )
+            if not same_installer_image and not _same_path(executable, expected):
+                continue
+            if parent is not None and (
+                process.pid == parent.pid or _descends_from(process, parent)
+            ):
+                continue
+            if own_launcher is not None and process.pid == own_launcher:
+                continue
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+        message = "fileLocked"
+        raise UpdateFailure(message)
+
+
 def validate_installation(plan: Plan) -> None:
     """2026-10-20：退出前绑定产品、当前用户、父子关系、版本和安装位置."""
     _require_unprivileged()
@@ -296,6 +324,7 @@ def validate_installation(plan: Plan) -> None:
         expected_backend = _validate_product(plan, parent, parent_executable)
         if not _same_path(Path(backend.exe()), expected_backend):
             raise UpdateFailure(PROCESS_IDENTITY)
+        refuse_other_instances(plan, parent)
         _writable_directory(plan.target.parent)
         if plan.mode != "win-portable" and plan.data_root.is_relative_to(plan.target):
             raise UpdateFailure(UNSAFE_PATH)
@@ -463,13 +492,9 @@ def validate_stage_bundle(plan: Plan, stage: Path) -> None:
         raise UpdateFailure(INVALID_BUNDLE)
     quarantine: bytes | None = None
     for source in (plan.package.file, plan.target):
-        try:
-            quarantine = os.getxattr(source, "com.apple.quarantine")
-        except OSError as error:
-            if error.errno not in {errno.ENODATA, getattr(errno, "ENOATTR", errno.ENODATA)}:
-                raise UpdateFailure(PERMISSIONS) from error
+        quarantine = _mac_quarantine(source)
         if quarantine:
-            os.setxattr(stage, "com.apple.quarantine", quarantine)
+            _set_mac_quarantine(stage, quarantine)
             break
     if quarantine:
         assessment = _assess(
@@ -477,6 +502,54 @@ def validate_stage_bundle(plan: Plan, stage: Path) -> None:
         )
         if assessment.returncode != 0:
             raise UpdateFailure(SYSTEM_APPROVAL)
+
+
+def _mac_quarantine(source: Path) -> bytes | None:
+    """2026-10-20：使用 Darwin 原生 xattr ABI；Python os 的 xattr 入口仅支持 Linux."""
+    if sys.platform != "darwin":
+        raise UpdateFailure(UNSUPPORTED_INSTALL)
+    library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    read = library.getxattr
+    read.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_uint32,
+        ctypes.c_int,
+    ]
+    read.restype = ctypes.c_ssize_t
+    name = b"com.apple.quarantine"
+    size = int(read(os.fsencode(source), name, None, 0, 0, 0))
+    if size < 0 and ctypes.get_errno() == errno.ENOATTR:
+        return None
+    if not 0 <= size <= MAX_QUARANTINE_BYTES:
+        raise UpdateFailure(PERMISSIONS)
+    buffer = ctypes.create_string_buffer(size)
+    actual = int(read(os.fsencode(source), name, buffer, size, 0, 0))
+    if not 0 <= actual <= size:
+        raise UpdateFailure(PERMISSIONS)
+    return ctypes.string_at(buffer, actual)
+
+
+def _set_mac_quarantine(destination: Path, value: bytes) -> None:
+    """2026-10-20：保持下载或旧应用的隔离标记，不自动移除系统信任限制."""
+    if sys.platform != "darwin":
+        raise UpdateFailure(UNSUPPORTED_INSTALL)
+    library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    write = library.setxattr
+    write.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_uint32,
+        ctypes.c_int,
+    ]
+    write.restype = ctypes.c_int
+    buffer = ctypes.create_string_buffer(value)
+    if write(os.fsencode(destination), b"com.apple.quarantine", buffer, len(value), 0, 0) != 0:
+        raise UpdateFailure(PERMISSIONS)
 
 
 def _assess(arguments: list[str], failure: str) -> subprocess.CompletedProcess[bytes]:
@@ -549,7 +622,11 @@ class _JobAccounting(ctypes.Structure):
 class _WindowsJob:
     """2026-10-20：挂起启动并先加入 Job，消除派生 sidecar 的记录时间窗口."""
 
+    library: ctypes.CDLL
+
     def __init__(self) -> None:
+        if sys.platform != "win32":
+            raise UpdateFailure(UNSUPPORTED_INSTALL)
         self.library = ctypes.WinDLL("kernel32", use_last_error=True)
         create = self.library.CreateJobObjectW
         create.argtypes, create.restype = [ctypes.c_void_p, ctypes.c_wchar_p], ctypes.c_void_p
@@ -652,6 +729,9 @@ def _spawn_process(
     """2026-10-20：Windows 挂起加入 Job 后才恢复，其他系统使用独立 session."""
     job = _WindowsJob() if sys.platform == "win32" else None
     process: subprocess.Popen[bytes] | None = None
+    flags = 0
+    if sys.platform == "win32":
+        flags = subprocess.CREATE_NO_WINDOW | 0x4
     try:
         process = subprocess.Popen(  # noqa: S603
             arguments,
@@ -661,7 +741,7 @@ def _spawn_process(
             stdout=output,
             stderr=output,
             close_fds=True,
-            creationflags=(subprocess.CREATE_NO_WINDOW | 0x4) if job else 0,
+            creationflags=flags,
             start_new_session=sys.platform != "win32",
         )
         if job:

@@ -289,13 +289,14 @@ def finish(plan: Plan, timeout: float = HEALTH_TIMEOUT) -> None:
     """2026-10-20：仅新版健康确认后提交；异常自动回滚并健康重启旧版."""
     try:
         native.wait_for_parents(plan)
-    except (OSError, UpdateFailure):
+        native.refuse_other_instances(plan)
+    except (OSError, UpdateFailure) as error:
         best_effort_record(
             plan.work / "result.json",
             {
                 "nonce": plan.nonce,
                 "outcome": "rolled_back",
-                "reason": "exitTimeout",
+                "reason": error.code if isinstance(error, UpdateFailure) else "exitTimeout",
                 "version": plan.current,
             },
         )

@@ -55,6 +55,7 @@ def plan(tmp_path, monkeypatch):
     monkeypatch.setattr(updater.native, "register_recovery", Mock())
     monkeypatch.setattr(updater.native, "unregister_recovery", Mock())
     monkeypatch.setattr(updater.native, "wait_for_parents", Mock())
+    monkeypatch.setattr(updater.native, "refuse_other_instances", Mock())
     monkeypatch.setattr(updater.native, "stop_interrupted_launch", Mock())
     return result
 
@@ -346,6 +347,23 @@ def test_parent_exit_timeout_never_replaces_or_launches_second_instance(plan, mo
     updater.finish(plan, timeout=0.01)
     assert plan.target.read_bytes() == b"previous executable"
     launch.assert_not_called()
+
+
+def test_another_window_after_prepare_aborts_without_install_replace_or_restart(plan, monkeypatch):
+    updater.prepare(plan, Path(sys.executable))
+    blocked = Mock(side_effect=UpdateFailure("fileLocked"))
+    installer, launch, replace_target = Mock(), Mock(), Mock()
+    monkeypatch.setattr(updater.native, "refuse_other_instances", blocked)
+    monkeypatch.setattr(updater.native, "run_installer", installer)
+    monkeypatch.setattr(updater.native, "launch_application", launch)
+    monkeypatch.setattr(updater, "retry_replace", replace_target)
+    updater.finish(plan, timeout=0.01)
+    assert plan.target.read_bytes() == b"previous executable"
+    assert read_record(plan.work / "state.json")["phase"] == "aborted"
+    assert read_record(plan.work / "result.json")["reason"] == "fileLocked"
+    installer.assert_not_called()
+    launch.assert_not_called()
+    replace_target.assert_not_called()
 
 
 def test_duplicate_prepare_does_not_delete_preexisting_recovery_backup(plan, monkeypatch):
