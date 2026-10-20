@@ -150,6 +150,25 @@ export function scanMathSegments(text: string, options: ScanOptions = {}): MathS
     const start = cursor;
     const char = text[cursor];
 
+    // 2026-10-20：结构化手写表格已完成转写；JSON 单元格中的宏和边界是内容。
+    if (char === '⟦') {
+      let end = cursor + 1;
+      let quoted = false;
+      let depth = 1;
+      while (end < text.length && text[end] !== '\n' && depth > 0) {
+        const next = text[end];
+        if (quoted && next === '\\') end += Math.min(2, text.length - end);
+        else {
+          if (next === '"') quoted = !quoted;
+          else if (!quoted && next === '⟦') depth++;
+          else if (!quoted && next === '⟧') depth--;
+          end++;
+        }
+      }
+      cursor = add(start, end, 'literal', text.slice(start, end), false, true);
+      continue;
+    }
+
     // 代码围栏和行内代码优先；其中的美元、宏与环境均不转换。
     if (char === '`' || (char === '~' && text.startsWith('~~~', cursor))) {
       let count = 1;

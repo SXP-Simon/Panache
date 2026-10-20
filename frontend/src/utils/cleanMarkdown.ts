@@ -124,13 +124,8 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   let mathPrefix = '\ue100MATH';
   while (text.includes(mathPrefix)) mathPrefix += '\ue100';
   const mathSources: string[] = [];
-  const protectedText = text.replace(/^⟦[^\n]*⟧$/gm, (source) => {
-    const token = `${mathPrefix}${mathSources.length}\ue101`;
-    mathSources.push(source);
-    return token;
-  });
   let s = mapMathSegments(
-    protectedText,
+    text,
     (source, segment) => {
       if (segment.kind !== 'math' && !segment.safeMathLiteral) return source;
       const token = `${mathPrefix}${mathSources.length}\ue101`;

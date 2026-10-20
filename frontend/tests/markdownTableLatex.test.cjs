@@ -32,3 +32,13 @@ test('code blocks and non-tables are not promoted to arrays',async()=>{
  assert.ok(!clean('```\n'+table('|1|2|')+'\n```').includes('\\begin{array}'));
  for(const input of ['a | b\nc | d','| a | b |\n|--|--|\n|1|2|',table('')]) assert.ok(!clean(input).includes('\\begin{array}'));
 });
+
+test('serialized table cells remain unchanged across repeated cleanup and conversion',async()=>{
+ const [{cleanMarkdown:clean},{convertLatexToUnicode:convert}] = await modules;
+ for(const cell of ['a\\b','a\\\\b','a*bold*','text ⟧ text','"quoted"']) {
+  const source='⟦ ── ; | A | B | ; ── ; | '+JSON.stringify(cell)+' | 1 | ; ── ⟧';
+  assert.equal(convert(source),source);
+  assert.equal(clean(source),source);
+  assert.equal(convert(clean(convert(source))),source);
+ }
+});
