@@ -190,13 +190,32 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
     return '$left$body${cases ? ' }' : right}';
   }
   if (n is MatrixNode) {
-    if (n.vLines.any((v) => v != MatrixSeparatorStyle.none) ||
-        n.hLines.any((v) => v != MatrixSeparatorStyle.none)) {
-      throw const FormatException('Augmented matrix rules');
+    String rule(MatrixSeparatorStyle style, bool horizontal) => switch (style) {
+      MatrixSeparatorStyle.none => '',
+      MatrixSeparatorStyle.solid => horizontal ? '──' : '|',
+      MatrixSeparatorStyle.dashed => horizontal ? '╌╌' : '┆',
+    };
+    final lines = <String>[];
+    for (var row = 0; row <= n.body.length; row++) {
+      final horizontal = rule(n.hLines[row], true);
+      if (horizontal.isNotEmpty) lines.add(horizontal);
+      if (row == n.body.length) break;
+      final cells = StringBuffer();
+      for (var col = 0; col <= n.body[row].length; col++) {
+        final vertical = rule(n.vLines[col], false);
+        if (vertical.isNotEmpty) {
+          if (cells.isNotEmpty) cells.write(' ');
+          cells.write(vertical);
+        }
+        if (col == n.body[row].length) break;
+        if (col > 0 || vertical.isNotEmpty) {
+          cells.write(vertical.isEmpty ? '  ' : ' ');
+        }
+        cells.write(child(n.body[row][col]));
+      }
+      lines.add(cells.toString());
     }
-    final rows = n.body
-        .map((row) => row.map(child).join('  '))
-        .join(mode == 'cases' ? '\n' : ' ; ');
+    final rows = lines.join(mode == 'cases' ? '\n' : ' ; ');
     return mode == 'cases'
         ? '\n$rows'
         : mode == 'standalone'
@@ -240,6 +259,14 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
 
 String? _formula(String source) {
   if (!withinMathBudget(source)) return null;
+  // The upstream AST retains only one separator per edge. Keep formulas with
+  // repeated rules verbatim rather than silently losing an augmented group.
+  if (RegExp(
+        r'\\begin\{(?:d?array|subarray)\}\s*\{[^{}]*[|:][ \t]*[|:][^{}]*\}',
+      ).hasMatch(source) ||
+      RegExp(r'\\h(?:dash)?line\s*\\h(?:dash)?line').hasMatch(source)) {
+    return null;
+  }
   try {
     var normalized = source.replaceAllMapped(
       RegExp(r'\\(?:text|textrm|textbf|textit)\s*\{[^{}]*\}'),
