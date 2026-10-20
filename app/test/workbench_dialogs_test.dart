@@ -65,6 +65,19 @@ void main() {
     expect(result, 'aligned');
     expect(tester.takeException(), isNull);
   });
+  testWidgets('markdown dialog offers the handwritten grid mode', (
+    tester,
+  ) async {
+    String? result;
+    await host(tester, (context) async {
+      result = await showMarkdownDialog(context, initialMode: 'latex');
+    });
+    expect(find.text('Handwritten table (LaTeX)'), findsOneWidget);
+    await tester.tap(find.byType(FilledButton));
+    await tester.pumpAndSettle();
+    expect(result, 'latex');
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('letter dialog returns inputs on a narrow screen', (
     tester,
   ) async {

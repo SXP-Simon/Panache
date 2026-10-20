@@ -21,6 +21,7 @@ Future<String?> showMarkdownDialog(
           decoration: InputDecoration(labelText: l.tableMode),
           items: [
             for (final option in [
+              ('latex', l.latexTableMode),
               ('list', l.listMode),
               ('aligned', l.alignedMode),
               ('raw_pipe', l.pipeMode),

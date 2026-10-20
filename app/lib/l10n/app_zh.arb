@@ -72,6 +72,7 @@
   "date": "日期",
   "body": "正文",
   "tableMode": "Markdown 表格格式",
+  "latexTableMode": "手写表格（LaTeX）",
   "listMode": "清单",
   "alignedMode": "空格对齐",
   "pipeMode": "竖线分隔",
