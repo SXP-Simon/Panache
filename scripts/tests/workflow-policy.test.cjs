@@ -128,6 +128,12 @@ test("桌面单测要求 macOS 原生回归，其他检查跳过不能替代它"
   assert.match(job, /if: needs\.changes\.outputs\.unit_desktop == 'true'/u);
   assert.match(job, /runs-on: macos-14/u);
   assert.match(job, /pnpm run test:desktop-storage/u);
+  assert.match(job, /pnpm run test:desktop-updater/u);
+  const nativeTests = job.indexOf('run: pnpm run test:desktop-updater');
+  const buildDependencies = job.indexOf('uv sync --locked --extra dev --extra build');
+  const packageBuild = job.indexOf('bash desktop/build.sh --app-only --skip-deps');
+  assert.ok(buildDependencies > nativeTests && packageBuild > buildDependencies);
+  assert.doesNotMatch(job.slice(packageBuild), /\buv (?:run|sync)\b/u);
   const checks = gateChecks("false");
   checks.changes.outputs.unit_desktop = "true";
   checks.desktop_macos.result = "success";

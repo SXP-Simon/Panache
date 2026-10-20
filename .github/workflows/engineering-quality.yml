@@ -282,7 +282,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.unit_desktop == 'true'
     runs-on: macos-14
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -296,9 +296,35 @@ jobs:
         with:
           python-version: "3.12"
       - run: pnpm install --frozen-lockfile
-      - run: uv sync --locked --extra dev --extra build
+      - run: uv sync --locked --extra dev
       - run: pnpm run test:desktop-storage
       - run: pnpm run test:desktop-updater
+      - name: Strict native updater types on macOS
+        run: uv run --no-sync pyright desktop/updater.py desktop/updater_core.py desktop/updater_platform.py
+      - name: Build and validate the signed macOS application bundle
+        if: needs.changes.outputs.desktop_e2e == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --locked --extra dev --extra build
+          bash desktop/build.sh --app-only --skip-deps
+          APP="$(find desktop/build/installer -maxdepth 2 -type d -name Panache.app -print -quit)"
+          test -n "$APP"
+          codesign --verify --deep --strict "$APP"
+          "$APP/Contents/Resources/updater/panache-updater" --self-check
+      - name: Verify the macOS application opens with its packaged backend
+        if: needs.changes.outputs.desktop_e2e == 'true'
+        run: pnpm --filter handwriting-web-e2e exec playwright test --config playwright.desktop.config.js app-launch.spec.js
+      - name: Upload macOS desktop diagnostics
+        if: always() && needs.changes.outputs.desktop_e2e == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-desktop-report-macos
+          path: |
+            e2e/desktop-tests/.report
+            e2e/desktop-tests/.results
+          include-hidden-files: true
+          retention-days: 7
 
   gate:
     name: Engineering quality gate
