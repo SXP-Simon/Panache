@@ -5,15 +5,15 @@ const output = path.resolve(__dirname, '../../preview_outputs/update-feature');
 async function bridge(page) {
   await page.addInitScript(() => {
     let state = { status: 'idle', current: '1.6.0' }, notify = () => {};
-    window.updateChecks = 0; window.updateDownloads = 0; window.nextUpdateStatus = 'available';
+    window.updateChecks = 0; window.updateDownloads = 0; window.updateOpens = 0; window.nextUpdateStatus = 'available';
     window.handwritingDesktop = {
       onDownloadFinished: () => () => {}, revealLastDownload() {}, onBeforeClose: () => () => {},
       storage: { readRecord: async (key) => localStorage.getItem(key), writeRecord: async (key, value) => localStorage.setItem(key, value), removeRecord: async (key) => localStorage.removeItem(key), readAsset: async () => null, writeAsset: async () => {}, removeAsset: async () => {} },
       updates: {
         state: async () => state, subscribe: (callback) => { notify = callback; return () => {}; },
         check: async () => { window.updateChecks++; state = { status: window.nextUpdateStatus, current: '1.6.0', version: '1.7.0', notes: '### Features\n- **fe/path:** 支持检查和安装更新 ([abcdef1](https://github.com/SXP-Simon/Panache/commit/abcdef1))\n- 改进手写表格排版\n<!-- download-guide -->\n- 不应出现的下载指南', releaseUrl: 'https://github.com/SXP-Simon/Panache/releases/tag/v1.7.0' }; notify(state); return state; },
-        download: async () => { window.updateDownloads++; state = { ...state, status: 'ready' }; notify(state); return state; },
-        cancel: async () => state, open: async () => ({ ...state, status: 'launched' }),
+        download: async () => { window.updateDownloads++; state = { ...state, status: 'downloading' }; notify(state); if(window.holdDownload) await new Promise((resolve) => { window.finishDownload = resolve; }); state = { ...state, status: 'ready' }; notify(state); return state; },
+        cancel: async () => { state = { ...state, status: 'cancelled' }; notify(state); window.finishDownload?.(); return state; }, open: async () => { window.updateOpens++; state = { ...state, status: 'installing' }; notify(state); return state; },
       },
     };
   });
@@ -37,7 +37,7 @@ test('automatic update dialog opens changelog, dismisses once, and manual checks
   await page.keyboard.press('Escape'); await expect(page.getByTestId('update-prompt')).toHaveCount(0);
   await expect(page.getByTestId('update-check')).toBeFocused();
   await page.getByTestId('update-show-prompt').click(); await page.getByTestId('update-prompt-now').click();
-  await expect(page.getByTestId('update-prompt-status')).toContainText('已下载');
+  await expect(page.getByTestId('update-prompt-status')).toContainText('正在退出并安装');
   expect(await page.evaluate(() => window.updateDownloads)).toBe(1);
   await later(page); await expect(page.getByTestId('update-prompt')).toHaveCount(0);
 });
@@ -92,3 +92,54 @@ test('automatic notice waits for editor letter dialogs outside the application s
   await expect(page.getByTestId('letter-dialog')).toHaveCount(0);
   await expect(page.getByTestId('update-prompt')).toBeVisible();
 });
+
+
+test('one click updates automatically; later during download retains bytes without restarting', async ({ page }) => {
+  await bridge(page); await openHome(page);
+  await expect(page.getByTestId('update-prompt')).toBeVisible();
+  await page.evaluate(() => { window.holdDownload = true; });
+  await page.getByTestId('update-prompt-now').click();
+  await expect(page.getByTestId('update-prompt-status')).toContainText('下载中');
+  await later(page);
+  await page.evaluate(() => window.finishDownload());
+  await expect.poll(() => page.evaluate(() => window.handwritingDesktop.updates.state().then((state) => state.status))).toBe('ready');
+  expect(await page.evaluate(() => window.updateOpens)).toBe(0);
+  await page.getByTestId('appearance-btn').click();
+  await page.getByTestId('update-open').click();
+  await expect(page.getByTestId('update-status')).toContainText('正在退出并安装');
+  expect(await page.evaluate(() => window.updateOpens)).toBe(1);
+});
+
+test('generation started during download delays restart until the task finishes', async ({ page }) => {
+  await bridge(page); await openHome(page);
+  await expect(page.getByTestId('update-prompt')).toBeVisible(); await later(page);
+  await page.evaluate(() => { window.holdDownload = true; });
+  let routeReady, route;
+  const started = new Promise((resolve) => { routeReady = resolve; });
+  await page.route('**/api/generate_handwriting', (pending) => { route = pending; routeReady(); });
+  await page.getByTestId('text-input').fill('生成结束之前，不应退出更新。');
+  await page.getByTestId('preview-btn').click(); await started;
+  await page.evaluate(async () => { const updates = await import('/src/features/updates/runtime.ts'); void updates.updateAction('download'); });
+  await expect.poll(() => page.evaluate(() => window.updateDownloads)).toBe(1);
+  await page.evaluate(() => window.finishDownload());
+  await page.waitForTimeout(200); expect(await page.evaluate(() => window.updateOpens)).toBe(0);
+  await route.abort(); await expect(page.getByTestId('preview-btn')).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => window.updateOpens)).toBe(1);
+});
+
+
+for (const failedKey of [null, 'studio.workspace', 'studio.preset', 'studio.generation', 'write']) {
+  test(`startup health requires successful restore and persisted first frame (${failedKey || 'healthy'})`, async ({ page }) => {
+    await bridge(page);
+    await page.addInitScript((key) => {
+      window.healthCalls = 0;
+      window.handwritingDesktop.updates.healthy = async () => { window.healthCalls++; return true; };
+      if (key === 'write') window.handwritingDesktop.storage.writeRecord = async () => { throw new Error('Isolated save failure'); };
+      const read = window.handwritingDesktop.storage.readRecord;
+      window.handwritingDesktop.storage.readRecord = async (name) => { if(name === key) throw new Error('Isolated restore failure'); return read(name); };
+    }, failedKey);
+    await openHome(page);
+    if (!failedKey) await expect.poll(() => page.evaluate(() => window.healthCalls)).toBe(1);
+    else { await page.waitForTimeout(400); expect(await page.evaluate(() => window.healthCalls)).toBe(0); }
+  });
+}

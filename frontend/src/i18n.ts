@@ -8,7 +8,34 @@ const words = {
     'Reload to use the new version. Your work will be saved first.',
   ],
   updatePromptNoNotes: ['前往发布页查看更新内容。', 'See the release page for details.'],
-  updateNow: ['立即更新', 'Update now'],
+  updateNow: ['更新并重启', 'Update and restart'],
+  updatePreparing: ['正在准备更新，请稍候…', 'Preparing the update…'],
+  updateInstalling: ['正在退出并安装，完成后将重新打开', 'Restarting to install the update…'],
+  updateRecovered: [
+    '更新未完成，已恢复旧版。你的内容已保留。',
+    'The update failed. Your previous version and saved work were restored.',
+  ],
+  updateManual: ['手动安装', 'Install manually'],
+  updateManualRequired: [
+    '此安装位置需要手动更新，当前应用未退出。',
+    'This installation needs a manual update. The app is still open.',
+  ],
+  updateTrustRequired: [
+    '请先通过系统安全确认，再重试或手动安装。',
+    'Approve the app in system security settings, then retry or install manually.',
+  ],
+  updateDiskSpace: [
+    '磁盘空间不足，请清理后重试。',
+    'Not enough disk space. Free some space and retry.',
+  ],
+  updateFileLocked: [
+    '应用文件正在使用，请关闭其他实例后重试。',
+    'App files are in use. Close other instances and retry.',
+  ],
+  updateApplyFailed: [
+    '更新准备失败，当前应用未退出。可重试或手动安装。',
+    'The update could not be prepared. The app remains open. Retry or install manually.',
+  ],
   updateLater: ['稍后再说', 'Later'],
   updateShowPrompt: ['查看更新', 'View update'],
   updateCleanupFailed: [
@@ -66,7 +93,7 @@ const words = {
   ],
   updateInstalledVersion: ['当前版本', 'Installed version'],
   updateCheck: ['检查更新', 'Check for updates'],
-  updateDownload: ['下载更新', 'Download update'],
+  updateDownload: ['更新并重启', 'Update and restart'],
   updateReload: ['保存并刷新', 'Save and reload'],
   updateReveal: ['打开文件位置', 'Show downloaded file'],
   updateOpen: ['安装更新', 'Install update'],

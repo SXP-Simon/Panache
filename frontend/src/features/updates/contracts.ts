@@ -8,6 +8,8 @@ export type UpdateStatus =
   | 'unsupported'
   | 'pending'
   | 'downloading'
+  | 'preparing'
+  | 'installing'
   | 'cancelled'
   | 'ready'
   | 'error';
@@ -22,4 +24,6 @@ export interface UpdateState {
   bytes?: number;
   total?: number;
   error?: string | undefined;
+  manualAvailable?: boolean;
+  recovery?: string | null;
 }

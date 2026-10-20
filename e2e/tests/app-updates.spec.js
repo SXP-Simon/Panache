@@ -10,7 +10,7 @@ async function dismissPrompt(page) {
 }
 
 
-test('desktop update settings support check, preference persistence and explicit download actions', async ({ page }) => {
+test('desktop update settings support check, preference persistence and one-click download and restart', async ({ page }) => {
   await page.addInitScript(() => {
     let state = { status: 'idle', current: '1.6.0', portable: false };
     let listener = () => {};
@@ -38,23 +38,8 @@ test('desktop update settings support check, preference persistence and explicit
   await page.getByTestId('update-settings').locator('summary').click();
   await page.getByTestId('update-settings').screenshot({ path: path.join(output, 'web-update-settings.png') });
   await page.getByTestId('update-download').click();
-  await expect(page.getByTestId('update-status')).toContainText('已下载，可以安装');
-  await page.getByTestId('appearance-modal-close').click();
-  await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
-  let blocked;
-  const started = new Promise((resolve) => { blocked = resolve; });
-  let pendingRequest;
-  await page.route('**/api/generate_handwriting', (route) => { pendingRequest = route; blocked(); });
-  await page.getByTestId('text-input').fill('生成期间不应开始安装。');
-  await page.getByTestId('preview-btn').click(); await started;
-  await page.getByTestId('appearance-btn').click(); await page.getByTestId('update-open').click();
-  await expect(page.getByTestId('update-status')).toContainText('正在生成内容');
-  expect(await page.evaluate(() => window.updateOpenCalls)).toBe(0);
-  await pendingRequest.abort();
-  await expect(page.getByTestId('preview-btn')).toBeEnabled();
-  await page.getByTestId('update-check').click(); await dismissPrompt(page); await page.getByTestId('update-download').click();
-  await page.getByTestId('update-open').click();
   await expect(page.getByTestId('update-status')).toContainText('安装程序已打开');
+  expect(await page.evaluate(() => window.updateOpenCalls)).toBe(1);
   await page.reload();
   await page.getByTestId('appearance-btn').click();
   await expect(page.getByTestId('update-auto')).not.toBeChecked();

@@ -11,11 +11,16 @@ export default function UpdateSettings() {
   const patch = usePreferencesStore((value) => value.patch);
   const desktop = Boolean(window.handwritingDesktop);
   const notes = summarizeReleaseNotes(state.notes ?? '');
-  const busy = state.status === 'checking' || state.status === 'downloading';
+  const busy = ['checking', 'downloading', 'preparing', 'installing'].includes(state.status);
   const message = updateMessage(state);
   return (
     <section className="update-settings" data-testid="update-settings">
       <h3>{t('updates')}</h3>
+      {state.recovery && (
+        <p role="alert" data-testid="update-recovered">
+          {t('updateRecovered')}
+        </p>
+      )}
       {!desktop && <p className="help-text">{t('updateWebHint')}</p>}
       <label className="update-auto">
         <input
@@ -73,7 +78,7 @@ export default function UpdateSettings() {
             {t('updateDownload')}
           </Button>
         )}
-        {state.status === 'downloading' && (
+        {['downloading', 'preparing'].includes(state.status) && (
           <Button
             variant="ghost"
             data-testid="update-cancel"
@@ -93,15 +98,18 @@ export default function UpdateSettings() {
               void updateAction('open');
             }}
           >
-            {t(
-              !desktop
-                ? 'updateReload'
-                : state.portable
-                  ? 'updateReveal'
-                  : state.status === 'launched'
-                    ? 'updateOpenAgain'
-                    : 'updateOpen',
-            )}
+            {t(!desktop ? 'updateReload' : 'updateNow')}
+          </Button>
+        )}
+        {desktop && state.manualAvailable && (
+          <Button
+            variant="secondary"
+            data-testid="update-manual"
+            onClick={() => {
+              void updateAction('manual');
+            }}
+          >
+            {t('updateManual')}
           </Button>
         )}
         {state.releaseUrl && (
@@ -115,17 +123,6 @@ export default function UpdateSettings() {
           </a>
         )}
       </div>
-      {state.status === 'ready' && desktop && (
-        <p className="help-text">
-          {t(
-            state.portable
-              ? 'updatePortableHint'
-              : /Mac/.test(navigator.platform)
-                ? 'updateMacHint'
-                : 'updateInstallHint',
-          )}
-        </p>
-      )}
       {notes.length > 0 && (
         <details className="update-notes">
           <summary>{t('updateNotes')}</summary>

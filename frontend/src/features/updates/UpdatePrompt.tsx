@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '@/i18n';
 import Button from '@/shared/ui/Button';
 import Modal from '@/shared/ui/Modal';
-import { updateAction, useUpdateState } from './runtime';
+import { deferUpdate, updateAction, useUpdateState } from './runtime';
 import { useUpdatesStore } from './store';
 import type { UpdatePrompt as UpdatePromptData } from './store';
 import { summarizeReleaseNotes } from './releaseSummary';
@@ -14,15 +14,24 @@ export default function UpdatePrompt({ prompt }: { prompt: UpdatePromptData }) {
   const desktop = Boolean(window.handwritingDesktop);
   const shown = state.version === prompt.update.version ? state : prompt.update;
   const notes = desktop ? summarizeReleaseNotes(prompt.update.notes ?? '') : [];
-  const busy = acting || shown.status === 'downloading' || shown.status === 'checking';
+  const busy =
+    acting || ['downloading', 'checking', 'preparing', 'installing'].includes(shown.status);
   const ready = ['ready', 'launched'].includes(shown.status);
-  const canUpdate = ['available', 'cancelled', 'ready', 'launched'].includes(shown.status);
-  const dismiss = () => useUpdatesStore.getState().dismissPrompt();
+  const canUpdate =
+    shown.manualAvailable || ['available', 'cancelled', 'ready', 'launched'].includes(shown.status);
+  const dismiss = () => {
+    deferUpdate();
+    useUpdatesStore.getState().dismissPrompt();
+  };
   const act = async () => {
     setActing(true);
-    const action = !desktop || ready ? 'open' : 'download';
+    const action = shown.manualAvailable ? 'manual' : !desktop || ready ? 'open' : 'download';
     await updateAction(action);
-    if (action === 'open' && useUpdatesStore.getState().update.status !== 'error') dismiss();
+    if (
+      action === 'open' &&
+      (!desktop || ['installing', 'launched'].includes(useUpdatesStore.getState().update.status))
+    )
+      dismiss();
     setActing(false);
   };
   return (
@@ -82,7 +91,7 @@ export default function UpdatePrompt({ prompt }: { prompt: UpdatePromptData }) {
         <Button variant="ghost" data-testid="update-prompt-later" onClick={dismiss}>
           {t('updateLater')}
         </Button>
-        {shown.status === 'downloading' ? (
+        {['downloading', 'preparing'].includes(shown.status) ? (
           <Button
             variant="secondary"
             data-testid="update-prompt-cancel"
@@ -101,15 +110,7 @@ export default function UpdatePrompt({ prompt }: { prompt: UpdatePromptData }) {
               void act();
             }}
           >
-            {t(
-              !desktop
-                ? 'updateReload'
-                : ready
-                  ? shown.portable
-                    ? 'updateReveal'
-                    : 'updateOpen'
-                  : 'updateNow',
-            )}
+            {t(!desktop ? 'updateReload' : shown.manualAvailable ? 'updateManual' : 'updateNow')}
           </Button>
         )}
       </footer>

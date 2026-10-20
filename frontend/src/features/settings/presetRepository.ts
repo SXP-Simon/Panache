@@ -26,12 +26,12 @@ export interface RestoredPreset {
   replaceBackground: boolean;
 }
 let saves: Promise<void> = Promise.resolve();
-export async function registerPresetResources(): Promise<void> {
+export async function registerPresetResources(): Promise<boolean> {
   try {
     const raw = await readRecord('studio.preset');
     if (!raw) {
       setResourceRecord('preset', null);
-      return;
+      return true;
     }
     const decoded: unknown = JSON.parse(raw);
     const modern = v.safeParse(presetSchema, decoded);
@@ -43,7 +43,9 @@ export async function registerPresetResources(): Promise<void> {
     }
   } catch {
     disableResourceCollection();
+    return false;
   }
+  return true;
 }
 export function savePreset(document: DocumentData, settings: SettingsData): Promise<void> {
   const save = saves

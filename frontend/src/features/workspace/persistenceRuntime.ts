@@ -163,7 +163,7 @@ async function hydrateLegacy(): Promise<void> {
         : 'latex',
   });
 }
-export async function hydrateWorkspace(): Promise<void> {
+export async function hydrateWorkspace(): Promise<boolean> {
   try {
     const checkpoint = await readRecord('studio.workspace');
     if (checkpoint) await hydrateCheckpoint(checkpoint);
@@ -174,7 +174,7 @@ export async function hydrateWorkspace(): Promise<void> {
     useSaveStatus.setState({ status: 'error' });
     useNotificationStore.getState().fail('restoreFailed');
   }
-  await registerPresetResources();
+  const presetsRestored = await registerPresetResources();
   const preferences = usePreferencesStore.getState();
   document.documentElement.dataset['theme'] = preferences.theme;
   document.documentElement.lang = preferences.locale === 'cn' ? 'zh-CN' : 'en';
@@ -186,7 +186,9 @@ export async function hydrateWorkspace(): Promise<void> {
     }
   } catch {
     useNotificationStore.getState().fail('restoreFailed');
+    return false;
   }
+  return !hydrationBlocked && presetsRestored;
 }
 
 export function startWorkspacePersistence(): () => void {

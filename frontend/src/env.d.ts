@@ -5,13 +5,15 @@ declare global {
     handwritingDesktop?: {
       onDownloadFinished(callback: (payload: { file: string; state: string }) => void): () => void;
       revealLastDownload(): void;
-      onBeforeClose(callback: () => Promise<void>): () => void;
+      onBeforeClose(callback: (reason: 'close' | 'update') => Promise<void>): () => void;
       updates: {
         state(): Promise<import('./features/updates/contracts').UpdateState>;
         check(): Promise<import('./features/updates/contracts').UpdateState>;
         download(): Promise<import('./features/updates/contracts').UpdateState>;
         cancel(): Promise<import('./features/updates/contracts').UpdateState>;
         open(): Promise<import('./features/updates/contracts').UpdateState>;
+        manual(): Promise<import('./features/updates/contracts').UpdateState>;
+        healthy(): Promise<boolean>;
         subscribe(
           callback: (state: import('./features/updates/contracts').UpdateState) => void,
         ): () => void;
