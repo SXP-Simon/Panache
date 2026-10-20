@@ -15,14 +15,12 @@ impl Glyphs<'_> {
         }
         let pad = (size * 0.26).round().max(3.) as i32;
         let grid_thickness = (size * 0.025).round().max(1.) as i32;
-        let thickness = ((size * 0.04).round() as i32).max(grid_thickness + 1);
+
         let mut widths = vec![(size * 0.35).round() as i32; columns];
-        let mut heights = Vec::new();
+        let mut row_height = (size * 0.77).round() as i32;
         let mut rendered = Vec::new();
         let mut bytes = 0usize;
         for row in &table.rows {
-            let mut ascent = (size * 0.65).round() as i32;
-            let mut descent = (size * 0.12).round() as i32;
             let mut cells = Vec::new();
             for (column, cell) in row.iter().enumerate() {
                 let g = self.sequence_at(cell, size, depth + 1)?;
@@ -31,11 +29,10 @@ impl Glyphs<'_> {
                     return Err(Error::new("invalid_layout", "表格子结构超过内存预算"));
                 }
                 widths[column] = widths[column].max(g.mask.width() as i32);
-                ascent = ascent.max(-g.top);
-                descent = descent.max(g.bottom());
+                row_height = row_height.max(g.mask.height() as i32);
                 cells.push(g);
             }
-            heights.push((ascent, descent));
+
             rendered.push(cells);
         }
         let mut xs = vec![0];
@@ -43,8 +40,8 @@ impl Glyphs<'_> {
             xs.push(xs.last().unwrap() + width + pad * 2);
         }
         let mut ys = vec![0];
-        for (ascent, descent) in &heights {
-            ys.push(ys.last().unwrap() + ascent + descent + pad * 2);
+        for _ in &table.rows {
+            ys.push(ys.last().unwrap() + row_height + pad * 2);
         }
         let width = *xs.last().unwrap();
         let height = *ys.last().unwrap();
@@ -54,22 +51,18 @@ impl Glyphs<'_> {
         for (row, cells) in rendered.into_iter().enumerate() {
             for (column, g) in cells.into_iter().enumerate() {
                 let x = (xs[column] + xs[column + 1] - g.mask.width() as i32) / 2 - g.left;
-                let y = offset + ys[row] + pad + heights[row].0;
+                // 2026-10-20：以实际墨迹居中，避免字体基线差异让数字和分数上下漂移。
+                let y = offset + (ys[row] + ys[row + 1] - g.mask.height() as i32) / 2 - g.top;
                 children.push((g, x, y));
             }
         }
         let mut paths = Vec::new();
         let mut draw = |rule, start: (i32, i32), end: (i32, i32)| {
-            let thickness = if rule == TableRule::None {
-                grid_thickness
-            } else {
-                thickness
-            };
+            let thickness = grid_thickness;
             let length = (end.0 - start.0).abs().max((end.1 - start.1).abs());
             if rule != TableRule::Dashed {
-                // 轻微的中段偏移模拟手写直尺线，不引入逐格随机错位。
-                let mid = ((start.0 + end.0) / 2, (start.1 + end.1) / 2);
-                paths.push((vec![start, (mid.0, mid.1 + 1), end], thickness));
+                // 2026-10-20：各边共用精确端点和笔宽，不对格线添加人为抖动。
+                paths.push((vec![start, end], thickness));
             } else {
                 let dash = (size * 0.12).round().max(3.) as i32;
                 for at in (0..length).step_by((dash * 2) as usize) {
