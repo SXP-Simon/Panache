@@ -13,13 +13,45 @@ const markerName = 'panache-install.json';
 const supportedPlatforms = {'windows-x64', 'macos-arm64', 'linux-x64'};
 
 class UpdaterFailure implements Exception {
-  const UpdaterFailure(this.code);
+  const UpdaterFailure(this.code, {this.osError});
+  final int? osError;
   final String code;
   @override
-  String toString() => 'UpdaterFailure($code)';
+  String toString() =>
+      'UpdaterFailure($code${osError == null ? '' : ', osError: $osError'})';
 }
 
-Never reject(String code) => throw UpdaterFailure(code);
+Never reject(String code, {int? osError}) =>
+    throw UpdaterFailure(code, osError: osError);
+
+/// Prefix only an ordinary local absolute path at the Win32 FFI boundary.
+/// Protocol paths stay canonical and never contain a device/UNC namespace.
+String windowsExtendedPath(String path) {
+  final windows = p.Context(style: p.Style.windows);
+  if (!RegExp(r'^[A-Za-z]:[\\/]').hasMatch(path) ||
+      path.length > 32000 ||
+      path.contains('\x00') ||
+      path
+          .split(RegExp(r'[\\/]'))
+          .skip(1)
+          .any((part) => part == '.' || part == '..')) {
+    reject('invalid_native_path');
+  }
+  final normalized = windows.normalize(path);
+  for (final part in windows.split(normalized).skip(1)) {
+    if (part.isEmpty ||
+        part.endsWith('.') ||
+        part.endsWith(' ') ||
+        RegExp(r'[\x00-\x1f<>:"|?*]').hasMatch(part) ||
+        RegExp(
+          r'^(CON|PRN|AUX|NUL|CLOCK\$|COM[1-9]|LPT[1-9])(?:\.|$)',
+          caseSensitive: false,
+        ).hasMatch(part)) {
+      reject('invalid_native_path');
+    }
+  }
+  return '\\\\?\\$normalized';
+}
 
 String secureToken() {
   final random = Random.secure();
@@ -171,6 +203,10 @@ class UpdatePlan {
         !p.isAbsolute(archive)) {
       reject('invalid_plan');
     }
+    if (Platform.isWindows) {
+      windowsExtendedPath(target);
+      windowsExtendedPath(archive);
+    }
     final updates = p.dirname(p.dirname(transaction));
     if (p.equals(updates, target) ||
         p.isWithin(updates, target) ||
@@ -197,6 +233,7 @@ class UpdatePlan {
 }
 
 void validateTransactionDirectory(String directory, String token) {
+  if (Platform.isWindows) windowsExtendedPath(directory);
   if (!validToken(token) ||
       p.basename(directory) != token ||
       p.basename(p.dirname(directory)) != 'transactions' ||
