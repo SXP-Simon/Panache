@@ -851,6 +851,8 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
 
 
 def _english_spacing(text: str) -> str:
+    # 2026-10-20：先绑定表格，英文加宽不能改变列分隔空格。
+    text = normalize_text_for_font(text)
     english = re.compile(r"""^[a-zA-Z0-9.,!?;:\'\"()\-_]+$""")
     lines: list[str] = []
     for line in text.split("\n"):

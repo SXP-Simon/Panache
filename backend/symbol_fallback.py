@@ -27,10 +27,12 @@ if __package__:
     from .library_boundary import install_member, member
     from .logging_setup import get_logger
     from .math_page_layout import install_math_page_layout
+    from .math_table import Table, parse_table
 else:
     from library_boundary import install_member, member
     from logging_setup import get_logger
     from math_page_layout import install_math_page_layout
+    from math_table import Table, parse_table
 
 
 type Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
@@ -307,10 +309,48 @@ _ACCENT_KEYS: dict[tuple[str, str], str] = {}
 _ACCENT_MARKS = frozenset("\u0304\u0302\u20d7\u0332\u0307\u0308\u0303\u0306\u0301\u0300\u030c")
 
 
+_TABLE_MAP: dict[str, Table] = {}
+_TABLE_KEYS: dict[Table, str] = {}
+
+
+def convert_tables_to_drawn(text: str) -> str:
+    """2026-10-20：只将带明确规则的完整表格注册为不可拆分的复合字形."""
+
+    def replace(source: str) -> str:
+        table = parse_table(source)
+        if table is None:
+            return source
+        with _REGISTRY_LOCK:
+            if table in _TABLE_KEYS:
+                return _TABLE_KEYS[table]
+            if len(_TABLE_KEYS) >= _MAX_DYNAMIC_EXPRESSIONS:
+                return source
+            char = chr(0x104000 + len(_TABLE_KEYS))
+            _TABLE_KEYS[table] = char
+            _TABLE_MAP[char] = table
+            return char
+
+    output: list[str] = []
+    start, depth, copied = 0, 0, 0
+    for index, char in enumerate(text):
+        if char == "⟦":
+            if not depth:
+                start = index
+            depth += 1
+        elif char == "⟧" and depth:
+            depth -= 1
+            if not depth:
+                output.extend((text[copied:start], replace(text[start : index + 1])))
+                copied = index + 1
+    output.append(text[copied:])
+    return "".join(output)
+
+
 def is_math_glyph(char: str) -> bool:
     """Check whether a registered glyph requires mathematical layout."""
     return (
-        char in _VULGAR_FRACTION_MAP
+        char in _TABLE_MAP
+        or char in _VULGAR_FRACTION_MAP
         or char in _RADICAL_MAP
         or char in _SCRIPT_MAP
         or char in _ACCENT_MAP
@@ -955,8 +995,70 @@ def _layout_accent(
     )
 
 
+def _table_rule(
+    start: tuple[int, int], end: tuple[int, int], thickness: int, size: int, *, dashed: bool
+) -> list[BoxPath]:
+    # 2026-10-20：细线中点轻微偏移模拟落笔，虚线按字号分段，不影响表格列对齐。
+    if not dashed:
+        middle = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2 + 1)
+        return [((start, middle, end), thickness)]
+    length = max(end[0] - start[0], end[1] - start[1])
+    dash = max(3, round(size * 0.18))
+    horizontal = end[0] != start[0]
+    paths: list[BoxPath] = []
+    for position in range(0, length, dash * 2):
+        stop = min(length, position + dash)
+        a = (start[0] + position, start[1]) if horizontal else (start[0], start[1] + position)
+        b = (start[0] + stop, start[1]) if horizontal else (start[0], start[1] + stop)
+        paths.append(((a, b), thickness))
+    return paths
+
+
+def _layout_table(table: Table, font: Font, font_path: str | None, memo: _LayoutMemo) -> _MathBox:
+    # 2026-10-20：以各列最大墨迹宽度和各行高度定位，分数与普通文字共用手写字形。
+    size = font_size_of(font)
+    pad = max(3, round(size * 0.22))
+    gap = max(4, round(size * 0.20))
+    boxes = [[_layout_math_text(cell, font, font_path, memo) for cell in row] for row in table.rows]
+    widths = [
+        max(box.bbox[2] - box.bbox[0] for box in column) + pad * 2
+        for column in zip(*boxes, strict=True)
+    ]
+    heights = [
+        max(max(box.bbox[3] - box.bbox[1], round(size * 0.65)) for box in row) + gap * 2
+        for row in boxes
+    ]
+    children: list[BoxChild] = []
+    y = 0
+    for row, height in zip(boxes, heights, strict=True):
+        x = 0
+        for box, width in zip(row, widths, strict=True):
+            children.append(
+                (
+                    box,
+                    x + (width - box.bbox[2] + box.bbox[0]) // 2 - box.bbox[0],
+                    y + (height - box.bbox[3] + box.bbox[1]) // 2 - box.bbox[1],
+                )
+            )
+            x += width
+        y += height
+    thickness = max(1, round(size * 0.025))
+    paths: list[BoxPath] = []
+    for rule in table.vertical:
+        x = sum(widths[: rule.position])
+        paths.extend(_table_rule((x, 0), (x, y), thickness, size, dashed=rule.dashed))
+    for rule in table.horizontal:
+        rule_y = sum(heights[: rule.position])
+        paths.extend(
+            _table_rule((0, rule_y), (sum(widths), rule_y), thickness, size, dashed=rule.dashed)
+        )
+    return _compose_box(sum(widths) + pad, children, paths)
+
+
 def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _LayoutMemo) -> _MathBox:
     size = font_size_of(font)
+    if char in _TABLE_MAP:
+        return _layout_table(_TABLE_MAP[char], font, font_path, memo)
     if char in _ACCENT_MAP:
         return _layout_accent(_ACCENT_MAP[char], font, font_path, memo)
     if char in _SCRIPT_MAP:
@@ -1221,9 +1323,11 @@ def normalize_text_for_font(text: str, font_path: str | None = None) -> str:
     cleaned = clean_invisible_and_special_characters(text)
     return _transform_math_segments(
         cleaned,
-        lambda segment: convert_accents_to_drawn(
-            convert_scripts_to_drawn(
-                convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment))
+        lambda segment: convert_tables_to_drawn(
+            convert_accents_to_drawn(
+                convert_scripts_to_drawn(
+                    convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment))
+                )
             )
         ),
     )
