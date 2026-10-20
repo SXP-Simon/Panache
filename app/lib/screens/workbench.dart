@@ -28,6 +28,8 @@ import '../widgets/workbench_settings.dart';
 import '../widgets/workbench_shell.dart';
 import '../theme/handwriting_theme.dart';
 import '../services/updates/update_controller.dart';
+import '../services/updates/update_prompt_coordinator.dart';
+import 'dialogs/app_update_dialog.dart';
 
 class Workbench extends StatefulWidget {
   const Workbench({
@@ -60,6 +62,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   bool operation = false;
   int settingsRevision = 0;
   bool restored = false;
+  bool firstFrameReady = false;
+  UpdatePromptCoordinator? updatePrompts;
   String tableMode = 'latex';
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
@@ -77,6 +81,38 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     editor.text = w.text;
     w.addListener(refresh);
     widget.updates?.addListener(refreshUpdates);
+    if (widget.updates case final updates?) {
+      updatePrompts = UpdatePromptCoordinator(
+        controller: updates,
+        ready: () {
+          final state = WidgetsBinding.instance.lifecycleState;
+          return mounted &&
+              firstFrameReady &&
+              (state == null || state == AppLifecycleState.resumed) &&
+              ModalRoute.of(context)?.isCurrent == true &&
+              !locked &&
+              !updates.busy &&
+              !updates.opening;
+        },
+        present: (_) async {
+          final accepted = await showAppUpdateDialog(context, updates);
+          if (!mounted || accepted != true) return;
+          if (updates.web) {
+            await reloadUpdatedWeb();
+          } else {
+            await showAppUpdateProgress(
+              context,
+              updates,
+              onReload: reloadUpdatedWeb,
+            );
+          }
+        },
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      firstFrameReady = true;
+      updatePrompts?.evaluate();
+    });
     if (widget.workspace == null) unawaited(w.initialize());
   }
 
@@ -97,11 +133,13 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       );
     }
     setState(() {});
+    updatePrompts?.evaluate();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) unawaited(w.persist());
+    updatePrompts?.evaluate();
   }
 
   @override
@@ -109,6 +147,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     w.removeListener(refresh);
     widget.updates?.removeListener(refreshUpdates);
+    updatePrompts?.dispose();
     if (widget.workspace == null) w.dispose();
     editor.dispose();
     editorFocus.dispose();

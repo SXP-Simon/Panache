@@ -11,9 +11,11 @@ class AppUpdateCard extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onReload,
+    this.compact = false,
   });
   final UpdateController controller;
   final Future<void> Function() onReload;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -122,12 +124,13 @@ class AppUpdateCard extends StatelessWidget {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  OutlinedButton.icon(
-                    key: const ValueKey('check-updates'),
-                    onPressed: c.busy || c.opening ? null : c.check,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(l.checkUpdates),
-                  ),
+                  if (!compact)
+                    OutlinedButton.icon(
+                      key: const ValueKey('check-updates'),
+                      onPressed: c.busy || c.opening ? null : c.check,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(l.checkUpdates),
+                    ),
                   if (c.phase == UpdatePhase.downloading)
                     TextButton.icon(
                       onPressed: c.cancel,
@@ -181,15 +184,17 @@ class AppUpdateCard extends StatelessWidget {
                   ),
                 ],
               ),
-              SwitchListTile.adaptive(
-                key: const ValueKey('auto-check-updates'),
-                contentPadding: EdgeInsets.zero,
-                value: c.autoCheck,
-                onChanged: c.setAutoCheck,
-                title: Text(l.updateAutoCheck),
-                subtitle: Text(l.updateAutoCheckHelp),
-              ),
-              if (c.preferenceFailed) Text(l.updatePreferenceFailed),
+              if (!compact)
+                SwitchListTile.adaptive(
+                  key: const ValueKey('auto-check-updates'),
+                  contentPadding: EdgeInsets.zero,
+                  value: c.autoCheck,
+                  onChanged: c.setAutoCheck,
+                  title: Text(l.updateAutoCheck),
+                  subtitle: Text(l.updateAutoCheckHelp),
+                ),
+              if (!compact && c.preferenceFailed)
+                Text(l.updatePreferenceFailed),
               if (!c.web && c.installed?.target.os != 'ios')
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,
@@ -202,7 +207,7 @@ class AppUpdateCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              if (changes.isNotEmpty)
+              if (!compact && changes.isNotEmpty)
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   title: Text(l.updateNotes),

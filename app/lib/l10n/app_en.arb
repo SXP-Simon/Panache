@@ -167,5 +167,12 @@
   "updateSavedLocation": "Saved location",
   "updateInstructions": "Installation instructions",
   "updateAndroidSummary": "Download, then confirm installation with Android.",
-  "updateDesktopSummary": "Download and extract, then quit Panache before replacing it."
+  "updateDesktopSummary": "Download and extract, then quit Panache before replacing it.",
+  "updateWebPrompt": "This site has been updated. Save your work and reload to use the new version.",
+  "updateNoChanges": "A new version is ready. See the release page for details.",
+  "updateFullNotes": "Full release notes",
+  "updateLater": "Later",
+  "updateNow": "Update now",
+  "updateReloadNow": "Reload now",
+  "updateClose": "Close"
 }

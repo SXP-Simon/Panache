@@ -14,6 +14,13 @@ enum UpdatePhase {
   failed,
 }
 
+class UpdateNotice {
+  const UpdateNotice(this.sequence, this.identity, this.automatic);
+  final int sequence;
+  final String identity;
+  final bool automatic;
+}
+
 class UpdateController extends ChangeNotifier {
   UpdateController({
     required this.host,
@@ -37,6 +44,23 @@ class UpdateController extends ChangeNotifier {
   String? downloadedPath;
   VerifiedPackage? _package;
   DownloadCancellation? _cancellation;
+  UpdateNotice? notice;
+  int _noticeSequence = 0, _claimedSequence = 0;
+  final Set<String> _seenIdentities = {};
+  bool claimNotice(UpdateNotice candidate) {
+    if (phase != UpdatePhase.available ||
+        notice?.sequence != candidate.sequence ||
+        candidate.sequence <= _claimedSequence) {
+      return false;
+    }
+    _claimedSequence = candidate.sequence;
+    if (candidate.automatic && _seenIdentities.contains(candidate.identity)) {
+      return false;
+    }
+    _seenIdentities.add(candidate.identity);
+    return true;
+  }
+
   bool get busy =>
       phase == UpdatePhase.checking || phase == UpdatePhase.downloading;
   bool get web => installed?.target.web ?? kIsWeb;
@@ -59,7 +83,7 @@ class UpdateController extends ChangeNotifier {
     }
     if (_disposed) return;
     _emit();
-    if (autoCheck) await check();
+    if (autoCheck) await check(automatic: true);
   }
 
   Future<void> setAutoCheck(bool value) async {
@@ -77,9 +101,10 @@ class UpdateController extends ChangeNotifier {
     _emit();
   }
 
-  Future<void> check() async {
+  Future<void> check({bool automatic = false}) async {
     if (busy || opening || _disposed) return;
     phase = UpdatePhase.checking;
+    notice = null;
     problem = null;
     _emit();
     try {
@@ -124,6 +149,13 @@ class UpdateController extends ChangeNotifier {
       problem = UpdateProblem.network;
       phase = UpdatePhase.failed;
     }
+    if (_disposed) return;
+    if (phase == UpdatePhase.available) {
+      final identity = web
+          ? 'web:${deployed!.version}:${deployed!.buildId}'
+          : 'release:${release!.version}';
+      notice = UpdateNotice(++_noticeSequence, identity, automatic);
+    }
     _emit();
   }
 
@@ -132,6 +164,7 @@ class UpdateController extends ChangeNotifier {
       return;
     }
     phase = UpdatePhase.downloading;
+    notice = null;
     problem = null;
     received = total = 0;
     downloadedPath = null;
@@ -192,6 +225,7 @@ class UpdateController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    notice = null;
     cancel();
     repository.close();
     super.dispose();
