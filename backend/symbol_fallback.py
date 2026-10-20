@@ -27,12 +27,12 @@ if __package__:
     from .library_boundary import install_member, member
     from .logging_setup import get_logger
     from .math_page_layout import install_math_page_layout
-    from .math_table import Table, parse_table
+    from .math_table import Table, parse_table, table_spans
 else:
     from library_boundary import install_member, member
     from logging_setup import get_logger
     from math_page_layout import install_math_page_layout
-    from math_table import Table, parse_table
+    from math_table import Table, parse_table, table_spans
 
 
 type Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
@@ -320,6 +320,14 @@ def convert_tables_to_drawn(text: str) -> str:
         table = parse_table(source)
         if table is None:
             return source
+        table = Table(
+            tuple(
+                tuple(_transform_math_segments(cell, _normalize_math_content) for cell in row)
+                for row in table.rows
+            ),
+            table.vertical,
+            table.horizontal,
+        )
         with _REGISTRY_LOCK:
             if table in _TABLE_KEYS:
                 return _TABLE_KEYS[table]
@@ -331,17 +339,15 @@ def convert_tables_to_drawn(text: str) -> str:
             return char
 
     output: list[str] = []
-    start, depth, copied = 0, 0, 0
-    for index, char in enumerate(text):
-        if char == "⟦":
-            if not depth:
-                start = index
-            depth += 1
-        elif char == "⟧" and depth:
-            depth -= 1
-            if not depth:
-                output.extend((text[copied:start], replace(text[start : index + 1])))
-                copied = index + 1
+    copied = 0
+    protected = tuple(
+        match.span()
+        for match in _NON_MATH_SLASH_RE.finditer(text)
+        if match.group().startswith(("`", "~~~"))
+    )
+    for start, end in table_spans(text, protected):
+        output.extend((text[copied:start], replace(text[start:end])))
+        copied = end
     output.append(text[copied:])
     return "".join(output)
 
@@ -1351,15 +1357,15 @@ def normalize_text_for_font(text: str, font_path: str | None = None) -> str:
         init_glyph_fallback_engine()
 
     cleaned = clean_invisible_and_special_characters(text)
-    return _transform_math_segments(
-        cleaned,
-        lambda segment: convert_tables_to_drawn(
-            convert_accents_to_drawn(
-                convert_scripts_to_drawn(
-                    convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment))
-                )
-            )
-        ),
+    # 2026-10-20：先解码表格 JSON 单元格，避免数学转换破坏引号中的反斜杠转义。
+    return _transform_math_segments(convert_tables_to_drawn(cleaned), _normalize_math_content)
+
+
+def _normalize_math_content(segment: str) -> str:
+    return convert_accents_to_drawn(
+        convert_scripts_to_drawn(
+            convert_radicals_to_drawn(convert_slashed_fractions_to_vertical(segment))
+        )
     )
 
 

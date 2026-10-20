@@ -1,5 +1,6 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 
+import json
 from pathlib import Path
 
 import pytest
@@ -154,3 +155,56 @@ def test_complete_grid_encloses_every_cell_with_clear_ink_padding():
         assert x + child.bbox[2] < vertical[column + 1][0] - 5
         assert y + child.bbox[1] > horizontal[row][0] + 5
         assert y + child.bbox[3] < horizontal[row + 1][0] - 5
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "a|b",
+        "a ; b",
+        "a  b",
+        'say "hello"',
+        r"C:\Users\Simon\file.txt",
+        "⟦ literal ⟧",
+        "(unbalanced",
+        "a||b",
+        "a┆b",
+    ],
+)
+def test_quoted_cell_keeps_literal_delimiters_whitespace_and_backslashes(cell):
+    quoted = json.dumps(cell, ensure_ascii=False)
+    source = f"⟦ X | {quoted} ; ── ; P | 1 ⟧"
+    table = parse_table(source)
+    assert table is not None
+    assert table.rows == (("X", cell), ("P", "1"))
+    normalized = symbols.normalize_text_for_font(source)
+    assert len(normalized) == 1
+    assert symbols._TABLE_MAP[normalized].rows == table.rows
+    font = ImageFont.truetype(str(FONT), 40)
+    box = symbols._layout_math_char(normalized, font, str(FONT), symbols._LayoutMemo())
+    assert len(box.children) == 4
+
+
+@pytest.mark.parametrize(
+    "cell", ['"unclosed', '"a"garbage', 'prefix"a"', r'"invalid\q"', r'"line\nfeed"']
+)
+def test_malformed_quoted_cell_falls_back_without_partial_table(cell):
+    source = f"⟦ X | {cell} ; ── ; P | 1 ⟧"
+    assert parse_table(source) is None
+    assert symbols.convert_tables_to_drawn(source) == source
+
+
+def test_table_parsing_preserves_code_literals_and_handles_neighboring_tables():
+    literal = '`⟦ "unclosed`'
+    source = literal + " " + X + " " + Y
+    normalized = symbols.normalize_text_for_font(source)
+    assert normalized.startswith(literal + " ")
+    assert sum(char in symbols._TABLE_MAP for char in normalized) == 2
+
+
+def test_quoted_empty_cells_and_double_spaces_do_not_create_extra_columns():
+    source = '⟦ X | "a  b"  ""  "c|d" ; ── ; P | "a ; b"  "──"  "⟦⟧" ⟧'
+    table = parse_table(source)
+    assert table is not None
+    assert table.rows == (("X", "a  b", "", "c|d"), ("P", "a ; b", "──", "⟦⟧"))
+    assert len(symbols.normalize_text_for_font(source)) == 1

@@ -2,6 +2,7 @@
 """2026-10-20：识别带明确分隔线的可读二维表格，普通矩阵保持原样."""
 
 import itertools
+import json
 from dataclasses import dataclass
 
 _MAX_SOURCE = 16384
@@ -27,30 +28,86 @@ class Table:
     horizontal: tuple[Rule, ...]
 
 
-def _split(text: str, separators: str) -> tuple[list[str], list[str]] | None:
+def _unquoted_tokens(text: str) -> list[tuple[int, str]] | None:
+    # 2026-10-20：JSON 解码器负责转义合法性，引号内的括号和规则不参与表格语法。
+    decoder = json.JSONDecoder()
+    tokens: list[tuple[int, str]] = []
+    index = 0
+    while index < len(text):
+        if text[index] == '"':
+            try:
+                _, index = decoder.raw_decode(text, index)
+            except ValueError:
+                return None
+        else:
+            tokens.append((index, text[index]))
+            index += 1
+    return tokens
+
+
+def _separator_positions(text: str, separators: tuple[str, ...]) -> list[tuple[int, str]] | None:
+    tokens = _unquoted_tokens(text)
+    if tokens is None:
+        return None
     stack: list[str] = []
     pairs = {"(": ")", "[": "]", "{": "}", "⟦": "⟧"}
-    result: list[str] = []
-    markers: list[str] = []
-    start = 0
-    for index, char in enumerate(text):
+    positions: list[tuple[int, str]] = []
+    consumed = 0
+    for index, char in tokens:
+        if index < consumed:
+            continue
         if char in pairs:
             stack.append(pairs[char])
         elif char in ")]}⟧":
             if not stack or stack.pop() != char:
                 return None
-        elif char in separators and not stack:
-            result.append(text[start:index])
-            markers.append(char)
-            start = index + 1
-    if stack:
+        elif not stack:
+            separator = next((item for item in separators if text.startswith(item, index)), None)
+            if separator is not None:
+                positions.append((index, separator))
+                consumed = index + len(separator)
+    return None if stack else positions
+
+
+def _split(text: str, separators: tuple[str, ...]) -> tuple[list[str], list[str]] | None:
+    positions = _separator_positions(text, separators)
+    if positions is None:
         return None
+    result: list[str] = []
+    markers: list[str] = []
+    start = 0
+    for index, marker in positions:
+        result.append(text[start:index])
+        markers.append(marker)
+        start = index + len(marker)
     result.append(text[start:])
     return result, markers
 
 
+def _decode_cell(cell: str) -> str | None:
+    if '"' not in cell:
+        return cell
+    try:
+        decoded: object = json.loads(cell)
+    except ValueError:
+        return None
+    if not isinstance(decoded, str) or any(char in decoded for char in "\n\r\t"):
+        return None
+    return decoded
+
+
+def _decode_group(group: str) -> tuple[str, ...] | None:
+    split = _split(group, ("  ",))
+    if split is None:
+        return None
+    cells = tuple(_decode_cell(cell) for cell in split[0])
+    if any(cell is None for cell in cells):
+        return None
+    return tuple(cell for cell in cells if cell is not None)
+
+
 def _cells(line: str) -> tuple[tuple[str, ...], tuple[Rule, ...]] | None:
-    split = _split(line, "|┆")
+    split = _split(line, ("|", "┆"))
     if split is None:
         return None
     groups, markers = split
@@ -73,7 +130,10 @@ def _cells(line: str) -> tuple[tuple[str, ...], tuple[Rule, ...]] | None:
         if index:
             rules.append(Rule(len(cells), markers[index - 1] == "┆"))
         if not edge:
-            cells.extend(group.split("  "))
+            decoded = _decode_group(group)
+            if decoded is None:
+                return None
+            cells.extend(decoded)
     if not cells or len(cells) > _MAX_COLUMNS:
         return None
     return tuple(cells), tuple(rules)
@@ -109,10 +169,51 @@ def parse_table(text: str) -> Table | None:
     """2026-10-20：限定完整括号、规则及一致列宽；保留双空格表示的空单元格."""
     if not text.startswith("⟦ ") or not text.endswith(" ⟧") or len(text) > _MAX_SOURCE:
         return None
-    # 2026-10-20：双线尚无明确间距协议，不把它误读为新的空列。
-    if "||" in text or any(char in text for char in "\n\r\t"):
+    # 2026-10-20：协议限定单行；控制字符不能悄悄改变单元格内的排版。
+    if any(char in text for char in "\n\r\t"):
         return None
-    split = _split(text[2:-2], ";")
+    split = _split(text[2:-2], (";",))
     if split is None or len(split[0]) > _MAX_PARTS:
         return None
     return _parse_parts(split[0])
+
+
+def table_spans(text: str, protected: tuple[tuple[int, int], ...] = ()) -> list[tuple[int, int]]:
+    """2026-10-20：定位完整表格，JSON 字符串内的表格边界不结束当前表格."""
+    spans: list[tuple[int, int]] = []
+    index = 0
+    while index < len(text):
+        if text[index] != "⟦":
+            index += 1
+            continue
+        protected_end = next((right for left, right in protected if left <= index < right), None)
+        if protected_end is not None:
+            index = protected_end
+            continue
+        end = _table_end(text, index)
+        if end is None:
+            break
+        spans.append((index, end))
+        index = end
+    return spans
+
+
+def _table_end(text: str, start: int) -> int | None:
+    decoder = json.JSONDecoder()
+    depth, index = 0, start
+    while index < len(text):
+        char = text[index]
+        if char == '"':
+            try:
+                _, index = decoder.raw_decode(text, index)
+            except ValueError:
+                return None
+            continue
+        if char == "⟦":
+            depth += 1
+        elif char == "⟧":
+            depth -= 1
+            if not depth:
+                return index + 1
+        index += 1
+    return None
