@@ -51,3 +51,5 @@ Actions → Flutter Release Assets → Run workflow：
 补跑会重新核验该 SHA 的必要工作流并保持相同构建号。配置签名后，可用同一 manifest/SHA 补充正式 APK；不会移动来源，也不会选用 `flutter` 最新版本。
 
 发布清单的 `product_name` 固定下载包的产品名称。历史清单缺少该字段时继续使用原 `HandwritingWeb` 前缀，补跑不会重命名旧版本资产。
+
+Android 分架构 APK 的实际 `versionCode` 包含 Flutter 的 ABI 偏移：arm64-v8a 在基础 `build_number` 上加 2000，x86_64 加 4000。发布时用 `aapt2` 核对实际包名、版本名与版本码，再将 `android_version_code` 写入各 APK 旁的 JSON；客户端据此检查升级。旧元数据没有该字段时按同一偏移兼容，不能改为忽略 ABI 的版本码以免造成降级。

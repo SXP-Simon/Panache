@@ -31,3 +31,5 @@ If the first run failed before creating its manifest, use Run workflow with the 
 Retries recheck the same source and use the same build number. Adding signing secrets later allows the formally signed APK to be added from that source, without selecting a newer branch commit.
 
 The manifest `product_name` fixes the download package brand. Historical manifests without this field keep the original `HandwritingWeb` prefix, so retries do not rename existing release assets.
+
+Split Android APKs retain Flutter ABI version-code offsets: +2000 for arm64-v8a and +4000 for x86_64, in addition to the base `build_number`. Publishing verifies the actual package ID, version name, and version code with `aapt2`, then records `android_version_code` in each APK JSON. Clients support older metadata by applying the same offsets; dropping them could turn a new release into a system-level downgrade.

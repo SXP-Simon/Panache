@@ -148,3 +148,12 @@ record keys, asset IDs, sizes, and in-flight calls. It exposes no arbitrary file
   end-to-end coverage.
 - Consult source and tests for exact fields, limits, timeouts, and cache parameters. This page does
   not duplicate release versions or a work log.
+
+
+## Application updates
+
+Client updates and server deployments have separate lifecycles. Electron checks the official GitHub Release for its exact platform, CPU architecture, and Windows installation type. Downloads must match their declared size and SHA-256 before the user can open an installer or DMG. Portable packages are replaced manually after closing the running application.
+
+Web/PWA checks the currently deployed Service Worker and saves the workspace before a user-confirmed refresh. A newer GitHub desktop release does not imply that the website has been deployed. Startup checking can be disabled; no update is silently downloaded or installed. Missing platform assets, uploads still in progress, network failures, and rate limits have distinct feedback.
+
+The renderer submits only fixed update operations. The main process owns the official repository, asset selection, private download location, verification, and system handoff; update IPC accepts no arbitrary URL, command, or path. Partial files are cleaned on failure or cancellation, and completed downloads are checked again before opening.

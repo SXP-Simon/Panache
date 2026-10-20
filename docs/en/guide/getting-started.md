@@ -83,3 +83,10 @@ Progress is pushed over a WebSocket; if that connection cannot be established th
 falls back to polling, and the interface looks the same either way.
 
 Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other text modes. Click LaTeX conversion, then generate the preview. Handwriting tables include an outer border and every row/column boundary, with uniform stroke widths and visually centered contents.
+
+
+## Checking for updates
+
+Open **Appearance and settings → App updates** to check manually or enable startup checks. Desktop clients select the official package for their system, CPU architecture, and installation type. Downloads show progress, can be cancelled, and must pass verification before opening. Windows installers and macOS DMGs use the system installation flow; portable applications are replaced manually after closing the old version.
+
+Web/PWA checks the current site's deployment and saves the draft before refreshing. Finish or cancel any generation task first. A newer desktop release on GitHub does not mean that a self-hosted website has already been upgraded. Missing packages, unsupported architectures, and network failures have separate feedback and retry or release-page actions.
