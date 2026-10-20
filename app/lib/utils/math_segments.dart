@@ -158,6 +158,29 @@ List<MathSegment> scanMathSegments(String text) {
       continue;
     }
     if ((c == r'\' || c == r'$') && !_escaped(text, cursor)) {
+      // Keep a bare enclosure together: an environment inside it must not be
+      // split from its enclosing command before the formula parser sees it.
+      final enclosure = RegExp(r'^\\(?:boxed|fbox)\s*\{').firstMatch(tail);
+      if (enclosure != null) {
+        var end = cursor + enclosure[0]!.length, depth = 1;
+        while (end < text.length && depth > 0) {
+          if (text[end] == r'\') {
+            end += 2;
+            continue;
+          }
+          if (text[end] == '{') depth++;
+          if (text[end] == '}') depth--;
+          end++;
+        }
+        if (depth == 0) {
+          final body = text.substring(start, end);
+          final valid = withinMathBudget(body);
+          add(start, end, math: valid, safe: !valid);
+          continue;
+        }
+        add(start, text.length, safe: true);
+        continue;
+      }
       final env = _env.firstMatch(tail);
       if (env != null && env[1] == 'begin') {
         final stack = <String>[env[2]!];

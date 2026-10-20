@@ -54,9 +54,16 @@ void main() {
           r'$a_{n+1}^{2}+\overrightarrow{AB}+\underline{xy}$'
           '\n'
           r'$\sqrt[12]{\frac{x+1}{x-1}}$'
+          '\n'
+          r'\[\begin{array}{c|cccc}X&0&1&2&3\\\hline P&\frac8{15}&\frac4{15}&\frac2{15}&\frac1{15}\end{array}\]'
+          '\n'
+          r'\[\boxed{\begin{array}{c|ccc}Y&1&2&3\\\hline P&\frac13&\frac13&\frac13\end{array}}\]'
           '\n---\n'
           r'$\frac{a+b+c+d+e+f+g+h+i+j+k+l+m+n}{x+y}$',
         );
+        expect(w.text, isNot(contains(r'\begin')));
+        expect(w.text, contains('[ X | 0  1  2  3 ; ── ; P |'));
+        expect(w.text, contains('[ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ]'));
         for (final grid in [false, true]) {
           w.settings.values['grid_layout'] = '$grid';
           w.settings.underlined = grid;
