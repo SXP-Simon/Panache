@@ -38,7 +38,7 @@ Phones omit the top brand header. The compact workspace action row provides the 
 
 - Text, settings, and uploaded assets are saved on this device. Check the save status; clearing site data or storage failures can affect recovery.
 - Uploading a document only **fills the text box** — you can keep editing afterwards.
-- Markdown cleanup preserves formula source; use the LaTeX conversion button to transcribe it. Arrays, matrices, and probability tables become linear text in row/column order, retaining horizontal and vertical separator markers rather than reproducing TeX's two-dimensional table layout. Unsafe conversions preserve the source.
+- Markdown cleanup preserves formula source; use the LaTeX conversion button to transcribe it. Arrays, probability tables, and augmented matrices with explicit separator rules remain editable structured text and render as two-dimensional cells using the selected handwriting font and ink. Wide tables scale as a whole and cells stay together across page breaks. Unsupported syntax preserves the source.
 - This fork has no fixed 10-page truncation. Long documents remain subject to hardware and [server limits](../self-hosting/fonts-and-limits.md).
 
 ## Choosing a font
@@ -81,3 +81,5 @@ The backend only renders a limited number of jobs at a time. When it is busy you
 
 Progress is pushed over a WebSocket; if that connection cannot be established the client
 falls back to polling, and the interface looks the same either way.
+
+Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other text modes. Click LaTeX conversion, then generate the preview. Handwriting tables include an outer border and every row/column boundary, with explicit source separators emphasized.
