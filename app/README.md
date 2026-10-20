@@ -100,7 +100,7 @@ flutter test
 python ../scripts/test-flutter-web.py
 # 需要已启动的真实后端；Rust 使用端口 5006
 flutter test test/live_api_test.dart --dart-define=LIVE_API_BASE=http://127.0.0.1:5006
-flutter build web --release
+python3 ../scripts/build-flutter-web.py
 # 完整原生桌面包在仓库根目录构建：python3 scripts/build-flutter-desktop.py
 ```
 

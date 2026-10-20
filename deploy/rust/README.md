@@ -20,7 +20,7 @@ bash scripts/build-rust-service.sh --skip-web
 ## Docker
 
 ```bash
-cd app && flutter build web --release && cd ..
+python3 scripts/build-flutter-web.py
 export HANDWRITING_ACCESS_TOKEN="$(openssl rand -hex 32)"
 docker compose -f deploy/rust/compose.yml up --build -d
 ```
@@ -81,3 +81,5 @@ SQLite `rust-tasks.db` 仅存元数据，结果放 `results/`，与 Python 数�
 以 20 ms 间隔采样进程 RSS，本轮最高约 660 MiB，包含中文字体解析、页面缓冲与缓存；短请求未必覆盖采样点。这表明仍有较大的内存成本，应按机器容量配置执行配额，移动端原生接入前还需专门优化和测量。取消 API 确认耗时约 0.4 ms，100 ms 后未见任务临时文件；API 返回状态不代表所有 CPU 工作在同一瞬间停止，运行中取消测试另验证 3 s 内释放执行配额。
 
 Python/Rust 无扰动样张和包含删除线、公式、插图滤镜的 Rust 样张已人工检查。字体度量、随机数与编码器不同，输出体积或逐像素差异不作为缺陷判据。
+
+Web 更新检测依赖同一构建注入的版本与部署标识，请使用 `scripts/build-flutter-web.py` 构建；入口与平台更新方式见[应用更新](../../docs/app-updates.md)。

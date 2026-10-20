@@ -40,7 +40,8 @@ flutter pub get
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 flutter analyze
 flutter test
-flutter build web --release
+cd ..
+python3 scripts/build-flutter-web.py
 ```
 
 原生桌面包：`python3 scripts/build-flutter-desktop.py`。
