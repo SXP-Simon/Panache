@@ -36,6 +36,8 @@ jobs:
         with:
           flutter-version: "3.47.5"
           cache: true
+      - run: dart pub get
+        working-directory: app/updater
       - run: flutter pub get
         working-directory: app
       - run: flutter analyze
