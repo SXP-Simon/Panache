@@ -36,7 +36,7 @@ const preferencesSchema = v.object({
     v.fallback(v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/)), DEFAULT_THEME_COLOR),
     DEFAULT_THEME_COLOR,
   ),
-  tableMode: v.picklist(['list', 'aligned', 'raw_pipe', 'clean']),
+  tableMode: v.optional(v.picklist(['latex', 'list', 'aligned', 'raw_pipe', 'clean']), 'latex'),
 });
 const workspaceSchema = v.object({
   version: v.literal(2),
@@ -146,7 +146,7 @@ async function hydrateLegacy(): Promise<void> {
   }
   setResourceRecord('workspace', restoredAssets);
   const rawMode = records.get('markdownTableMode');
-  let mode: unknown = 'list';
+  let mode: unknown = 'latex';
   try {
     if (rawMode) mode = JSON.parse(rawMode);
   } catch {
@@ -156,7 +156,10 @@ async function hydrateLegacy(): Promise<void> {
   usePreferencesStore.getState().patch({
     locale: records.get('studio.locale') === 'en' ? 'en' : 'cn',
     theme: records.get('studio.theme') === 'dark' ? 'dark' : 'light',
-    tableMode: mode === 'aligned' || mode === 'raw_pipe' || mode === 'clean' ? mode : 'list',
+    tableMode:
+      mode === 'list' || mode === 'aligned' || mode === 'raw_pipe' || mode === 'clean'
+        ? mode
+        : 'latex',
   });
 }
 export async function hydrateWorkspace(): Promise<void> {

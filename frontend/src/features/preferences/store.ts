@@ -17,7 +17,7 @@ interface PreferencesState extends PreferencesData {
 export const usePreferencesStore = create<PreferencesState>()((set) => ({
   locale: 'cn',
   theme: 'light',
-  tableMode: 'list',
+  tableMode: 'latex',
   themeColor: DEFAULT_THEME_COLOR,
   patch: (values) => set(values),
   toggleLocale: () => set((state) => ({ locale: state.locale === 'cn' ? 'en' : 'cn' })),

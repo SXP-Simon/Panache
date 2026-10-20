@@ -255,6 +255,7 @@ export default function EditorPanel() {
           onChange={(event) => {
             const value = event.currentTarget.value;
             if (
+              value === 'latex' ||
               value === 'list' ||
               value === 'aligned' ||
               value === 'raw_pipe' ||
@@ -264,6 +265,7 @@ export default function EditorPanel() {
             }
           }}
         >
+          <option value="latex">{t('tableLatex')}</option>
           <option value="list">{t('tableList')}</option>
           <option value="aligned">{t('tableAligned')}</option>
           <option value="raw_pipe">{t('tablePipes')}</option>

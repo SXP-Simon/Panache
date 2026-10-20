@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 const words = {
+  tableLatex: ['表格：手写方格（LaTeX）', 'Tables: handwriting grid (LaTeX)'],
   tableList: ['表格：条目列表', 'Tables: item list'],
   tableAligned: ['表格：纯文本对齐', 'Tables: aligned text'],
   tablePipes: ['表格：保留分隔线', 'Tables: pipe separators'],

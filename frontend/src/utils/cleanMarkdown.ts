@@ -1,8 +1,9 @@
-export type TableMode = 'list' | 'aligned' | 'raw_pipe' | 'clean';
+export type TableMode = 'latex' | 'list' | 'aligned' | 'raw_pipe' | 'clean';
 export interface MarkdownOptions {
   tableMode?: TableMode;
 }
 import { mapMathSegments } from './mathSegments.ts';
+import { markdownTablesToLatex } from './markdownTableLatex.ts';
 
 /**
  * Markdown 标记清洗与纯文本提取工具模块
@@ -13,15 +14,20 @@ import { mapMathSegments } from './mathSegments.ts';
 /**
  * 表格清洗格式化处理函数
  * @param {string[]} tableLines 属于同一个表格的一组原始行
- * @param {'list'|'aligned'|'raw_pipe'|'clean'} mode 处理模式
+ * @param {'latex'|'list'|'aligned'|'raw_pipe'|'clean'} mode 处理模式
+ *  - 'latex': 保留为可编辑的 LaTeX 方格表（默认）
  *  - 'list': 结构化清单展开模式（推荐抄写/笔记：【表头】项1: 值1，项2: 值2）
  *  - 'aligned': 纯净对齐文本模式（剔除竖线，利用空格保持整齐排列）
  *  - 'raw_pipe': 传统竖线分隔模式（列1 | 列2）
  *  - 'clean': 彻底清除表格结构线，平铺内容
  * @returns {string[]}
  */
-export function formatMarkdownTable(tableLines: string[], mode: TableMode = 'list'): string[] {
+export function formatMarkdownTable(tableLines: string[], mode: TableMode = 'latex'): string[] {
   if (!tableLines || tableLines.length === 0) return [];
+  if (mode === 'latex')
+    return markdownTablesToLatex(tableLines.join('\n'), (text) =>
+      cleanMarkdown(text, { tableMode: 'clean' }),
+    ).split('\n');
 
   const parsedRows: string[][] = [];
   for (const line of tableLines) {
@@ -101,7 +107,7 @@ export function formatMarkdownTable(tableLines: string[], mode: TableMode = 'lis
  * 清洗字符串中的 Markdown 标记，返回适合手写渲染的纯文本
  * @param {string} text 输入的 Markdown 文本
  * @param {Object} [options] 清洗配置项
- * @param {'list'|'aligned'|'raw_pipe'|'clean'} [options.tableMode='list'] 表格处理模式
+ * @param {'latex'|'list'|'aligned'|'raw_pipe'|'clean'} [options.tableMode='latex'] 表格处理模式
  * @returns {string} 清洗后的纯文本
  */
 export function cleanMarkdown(text: string, options: MarkdownOptions = {}): string {
@@ -109,15 +115,22 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     return '';
   }
 
-  const tableMode = options.tableMode || 'list';
+  const tableMode = options.tableMode || 'latex';
+  if (tableMode === 'latex')
+    text = markdownTablesToLatex(text, (cell) => cleanMarkdown(cell, { tableMode: 'clean' }));
 
   // 2026-10-15：公式先占位，防止 HTML、列表、斜体和表格清洗改写数学语义。
   // 占位符无 Markdown 标记且不含竖线；检查前缀避免与用户原文冲突。
   let mathPrefix = '\ue100MATH';
   while (text.includes(mathPrefix)) mathPrefix += '\ue100';
   const mathSources: string[] = [];
+  const protectedText = text.replace(/^⟦[^\n]*⟧$/gm, (source) => {
+    const token = `${mathPrefix}${mathSources.length}\ue101`;
+    mathSources.push(source);
+    return token;
+  });
   let s = mapMathSegments(
-    text,
+    protectedText,
     (source, segment) => {
       if (segment.kind !== 'math' && !segment.safeMathLiteral) return source;
       const token = `${mathPrefix}${mathSources.length}\ue101`;
@@ -182,6 +195,7 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   };
 
   const isTableRow = (line: string) => {
+    if (tableMode === 'latex') return false;
     return (
       /^[ \t]*\|.*\|[ \t]*$/.test(line) ||
       /^[ \t]*\|?(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*:?-+:?[ \t]*\|?[ \t]*$/.test(line)

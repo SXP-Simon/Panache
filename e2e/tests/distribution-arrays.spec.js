@@ -47,3 +47,20 @@ for (const order of [
     );
   });
 }
+
+ test('Markdown probability table renders a handwriting grid', async ({ page }) => {
+    await openHome(page);
+    await useSmallCanvas(page, { fontSize: 70, lineSpacing: 120 });
+    await page.getByTestId('width-input').fill('1600');
+    await page.getByTestId('height-input').fill('1600');
+    const input = page.getByTestId('text-input');
+    await input.fill('分布律与计算记录\n| X | 0 | 1 | 2 | 3 |\n|---|---|---|---|---|\n| P | $\\frac8{15}$ | $\\frac4{15}$ | $\\frac2{15}$ | $\\frac1{15}$ |\n\n| 项目 | 结果 |\n|---|---|\n| 期望 | $\\frac{11}{15}$ |\n| 说明 | text $x$ unit |');
+    await page.getByTestId('clean-markdown-btn').click();
+    await expect(input).toHaveValue(/\\begin\{array\}/);
+    await page.getByTestId('convert-latex-btn').click();
+    await expect(input).toHaveValue(/⟦/);
+    await page.getByTestId('preview-btn').click();
+    await expectPreviewImageLoaded(page);
+    const png = await page.getByTestId('preview-image').evaluate(async (image) => Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())));
+    fs.writeFileSync(path.resolve(__dirname, '../../preview_outputs/distribution-arrays/web-markdown-grid-full.png'), Buffer.from(png));
+ });

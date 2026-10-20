@@ -129,10 +129,10 @@ test("strips blockquote markers and preserves text", async () => {
   assert.equal(output, "第一行引用\n第二行嵌套引用\n正常正文");
 });
 
-test("strips markdown table separators and neatly formats rows in default list mode", async () => {
+test("strips markdown table separators and neatly formats rows in explicit list mode", async () => {
   const { cleanMarkdown } = await cleanModule;
   const input = "| 序号 | 名称 | 状态 |\n|:---|:---:|---:|\n| 1 | 产生式 | 正常 |\n| 2 | 文法 | 结束 |";
-  const output = cleanMarkdown(input);
+  const output = cleanMarkdown(input, { tableMode: "list" });
   assert.equal(output, "1. 序号: 1 (名称: 产生式; 状态: 正常)\n2. 序号: 2 (名称: 文法; 状态: 结束)");
 });
 
@@ -221,7 +221,7 @@ x &= 1 \\
 test("keeps formula pipes inside one Markdown table cell", async () => {
   const { cleanMarkdown } = await cleanModule;
   const input = '| formula | value |\n|---|---|\n| $|x|$ | 1 |';
-  assert.equal(cleanMarkdown(input), '1. formula: $|x|$ (value: 1)');
+  assert.equal(cleanMarkdown(input, { tableMode: 'list' }), '1. formula: $|x|$ (value: 1)');
 });
 
 test("preserves incomplete and over-budget formulas during Markdown cleanup", async () => {
