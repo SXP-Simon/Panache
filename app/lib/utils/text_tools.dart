@@ -30,7 +30,7 @@ String collapseImages(String text, Map<String, String> images) =>
 
 String cleanMarkdown(
   String text, {
-  String tableMode = 'list',
+  String tableMode = 'latex',
   bool english = false,
 }) {
   var s = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -42,6 +42,23 @@ String cleanMarkdown(
   String protect(String source) {
     protected.add(source);
     return '$tokenPrefix${protected.length - 1}\uE101';
+  }
+
+  if (tableMode == 'latex') {
+    final original = s;
+    final buffer = StringBuffer();
+    var offset = 0;
+    for (final segment in scanMathSegments(original)) {
+      final value = original.substring(segment.start, segment.end);
+      if (!value.startsWith('```') && !value.startsWith('~~~')) continue;
+      buffer.write(original.substring(offset, segment.start));
+      final fenced = RegExp(r'^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\1$')
+          .firstMatch(value);
+      buffer.write(protect(fenced?[2] ?? value));
+      offset = segment.end;
+    }
+    buffer.write(original.substring(offset));
+    s = _convertMarkdownTables(buffer.toString(), protect);
   }
 
   final math = StringBuffer();
@@ -155,7 +172,7 @@ String cleanMarkdown(
 
   var listContinuation = false;
   for (var line in s.split('\n')) {
-    if (RegExp(r'^\s*\|.*\|\s*$').hasMatch(line)) {
+    if (tableMode != 'latex' && RegExp(r'^\s*\|.*\|\s*$').hasMatch(line)) {
       table.add(line);
       continue;
     }
@@ -203,6 +220,155 @@ String cleanMarkdown(
       .where((line) => line.trim().isNotEmpty && line.trim() != '---')
       .join('\n')
       .trim();
+}
+
+// Markdown 表格仅在完整分隔行后识别；不完整或超宽数据保持原文。
+String _convertMarkdownTables(String source, String Function(String) protect) {
+  final lines = source.split('\n');
+  final output = <String>[];
+  for (var i = 0; i < lines.length; i++) {
+    final first = _tableCells(lines[i]);
+    final separator = i + 1 < lines.length ? _tableCells(lines[i + 1]) : null;
+    if (first == null ||
+        separator == null ||
+        first.length != separator.length ||
+        !separator.every(
+          (cell) => RegExp(r'^:?-{3,}:?$').hasMatch(cell.trim()),
+        )) {
+      output.add(lines[i]);
+      continue;
+    }
+    final rows = <List<String>>[first];
+    var end = i + 2;
+    var valid = first.length <= 32;
+    while (end < lines.length) {
+      final row = _tableCells(lines[end]);
+      if (row == null) break;
+      if (row.length > first.length) valid = false;
+      rows.add([...row, for (var n = row.length; n < first.length; n++) '']);
+      end++;
+    }
+    if (rows.length > 32 ||
+        rows.length < 2 ||
+        lines.sublist(i, end).fold<int>(0, (sum, line) => sum + line.length) >
+            16000) {
+      valid = false;
+    }
+    if (!valid) {
+      output.add(protect(lines.sublist(i, end).join('\n')));
+    } else {
+      final body = rows
+          .map((row) => row.map(_tableLatexCell).join(' & '))
+          .join(
+            r' \\ \hline'
+            '\n',
+          );
+      final latex =
+          '\\[\n\\begin{array}{|${List.filled(first.length, 'c').join('|')}|}\n\\hline\n$body'
+          r' \\ \hline'
+          '\n\\end{array}\n\\]';
+      output.add(
+        protect(
+          latex.length <= 16000 ? latex : lines.sublist(i, end).join('\n'),
+        ),
+      );
+    }
+    i = end - 1;
+  }
+  return output.join('\n');
+}
+
+List<String>? _tableCells(String line) {
+  final value = line.trim();
+  if (value.isEmpty || value.startsWith('⟦')) return null;
+  final cells = <String>[];
+  final cell = StringBuffer();
+  var ticks = 0;
+  var dollar = false;
+  var paren = false;
+  var split = false;
+  for (var i = 0; i < value.length; i++) {
+    final char = value[i];
+    if (char == '\\' && i + 1 < value.length) {
+      final next = value[i + 1];
+      if (next == '(' && ticks == 0 && !dollar) paren = true;
+      if (next == ')' && ticks == 0 && !dollar) paren = false;
+      cell.write(char);
+      cell.write(next);
+      i++;
+      continue;
+    }
+    if (char == '`') {
+      var count = 1;
+      while (i + count < value.length && value[i + count] == '`') {
+        count++;
+      }
+      ticks = ticks == count
+          ? 0
+          : ticks == 0
+          ? count
+          : ticks;
+      cell.write('`' * count);
+      i += count - 1;
+      continue;
+    }
+    if (char == r'$' && ticks == 0 && !paren) dollar = !dollar;
+    if (char == '|' && ticks == 0 && !dollar && !paren) {
+      cells.add(cell.toString().trim());
+      cell.clear();
+      split = true;
+    } else {
+      cell.write(char);
+    }
+  }
+  cells.add(cell.toString().trim());
+  if (!split) return null;
+  if (value.startsWith('|')) cells.removeAt(0);
+  if (value.endsWith('|') && cells.last.isEmpty) cells.removeLast();
+  return cells.isEmpty ? null : cells;
+}
+
+String _tableLatexCell(String cell) {
+  final output = StringBuffer();
+  var cursor = 0;
+  for (final segment in scanMathSegments(cell)) {
+    output.write(_tableText(cell.substring(cursor, segment.start)));
+    final value = cell.substring(segment.start, segment.end);
+    if (value.startsWith(r'\(') && value.endsWith(r'\)')) {
+      output.write(value.substring(2, value.length - 2));
+    } else if (value.startsWith(r'$$') && value.endsWith(r'$$')) {
+      output.write(value.substring(2, value.length - 2));
+    } else if (value.startsWith(r'$') &&
+        value.endsWith(r'$') &&
+        value.length > 1) {
+      output.write(value.substring(1, value.length - 1));
+    } else {
+      output.write(_tableText(value));
+    }
+    cursor = segment.end;
+  }
+  output.write(_tableText(cell.substring(cursor)));
+  return output.toString();
+}
+
+String _tableText(String value) {
+  if (value.isEmpty) return '';
+  value = value
+      .replaceAllMapped(RegExp(r'^(`+)([\s\S]*?)\1$'), (m) => m[2]!)
+      .replaceAll(r'\|', '|');
+  const escapes = <String, String>{
+    '\\': r'\textbackslash{}',
+    '{': r'\{',
+    '}': r'\}',
+    '%': r'\%',
+    '&': r'\&',
+    '#': r'\#',
+    '_': r'\_',
+    r'$': r'\$',
+    '^': r'\textasciicircum{}',
+    '~': r'\textasciitilde{}',
+  };
+  return '\\text{${value.split('').map((c) => escapes[c] ?? c).join()}}';
 }
 
 String formatLetter(String body, String signature, String date) {

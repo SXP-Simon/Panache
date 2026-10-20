@@ -57,7 +57,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   bool operation = false;
   int settingsRevision = 0;
   bool restored = false;
-  String tableMode = 'list';
+  String tableMode = 'latex';
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';

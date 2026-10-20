@@ -24,7 +24,10 @@ void main() {
       '标题\n正文\n>>>署名\n![插图 1|50%]\n3 * 5',
     );
     expect(
-      cleanMarkdown('| 项目 | 数量 |\n| --- | --- |\n| 苹果 | 2 |'),
+      cleanMarkdown(
+        '| 项目 | 数量 |\n| --- | --- |\n| 苹果 | 2 |',
+        tableMode: 'list',
+      ),
       '1. 项目: 苹果 (数量: 2)',
     );
   });

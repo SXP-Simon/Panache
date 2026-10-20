@@ -90,7 +90,7 @@ void main() {
       ('\uE100HW0\uE101 **正文** \$x_1\$', '\uE100HW0\uE101 正文 \$x_1\$'),
     ];
     for (final (input, expected) in examples) {
-      expect(cleanMarkdown(input), expected, reason: input);
+      expect(cleanMarkdown(input, tableMode: 'list'), expected, reason: input);
     }
   });
   test('长正文扫描保持线性预算并保留公式位置', () {
