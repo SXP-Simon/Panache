@@ -303,3 +303,78 @@ fn scripts_follow_actual_base_height_and_natural_ink_width() {
         }
     }
 }
+
+#[test]
+fn table_grid_has_uniform_strokes_and_visually_centered_cells() {
+    for book in books() {
+        let mut gs = Glyphs::new(book);
+        let g = gs
+            .sequence(
+                &text::parse("⟦ X | 0  1 ; ── ; P | (8)/(15)  (1)/(3) ⟧"),
+                64.,
+            )
+            .unwrap();
+        let cluster = |values: Vec<u32>| {
+            let mut groups: Vec<Vec<u32>> = Vec::new();
+            for v in values {
+                if groups
+                    .last()
+                    .is_none_or(|group| v > group.last().unwrap() + 1)
+                {
+                    groups.push(vec![]);
+                }
+                groups.last_mut().unwrap().push(v);
+            }
+            groups
+        };
+        let horizontal = cluster(
+            (0..g.mask.height())
+                .filter(|&y| {
+                    (0..g.mask.width())
+                        .filter(|&x| g.mask[(x, y)][0] > 0)
+                        .count() as f32
+                        > g.mask.width() as f32 * 0.90
+                })
+                .collect(),
+        );
+        let vertical = cluster(
+            (0..g.mask.width())
+                .filter(|&x| {
+                    (0..g.mask.height())
+                        .filter(|&y| g.mask[(x, y)][0] > 0)
+                        .count() as f32
+                        > g.mask.height() as f32 * 0.90
+                })
+                .collect(),
+        );
+        assert_eq!(horizontal.len(), 3);
+        assert_eq!(vertical.len(), 4);
+        assert!(
+            horizontal
+                .iter()
+                .chain(&vertical)
+                .all(|line| line.len() == horizontal[0].len())
+        );
+        for row in horizontal.windows(2) {
+            for col in vertical.windows(2) {
+                let (x0, x1) = (*col[0].last().unwrap() + 3, col[1][0] - 2);
+                let (y0, y1) = (*row[0].last().unwrap() + 3, row[1][0] - 2);
+                let mut ink = Vec::new();
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        if g.mask[(x, y)][0] > 0 {
+                            ink.push((x, y));
+                        }
+                    }
+                }
+                assert!(!ink.is_empty());
+                let left = ink.iter().map(|p| p.0).min().unwrap();
+                let right = ink.iter().map(|p| p.0).max().unwrap();
+                let top = ink.iter().map(|p| p.1).min().unwrap();
+                let bottom = ink.iter().map(|p| p.1).max().unwrap();
+                assert!((left as i32 + right as i32 - (col[0][0] + col[1][0]) as i32).abs() <= 3);
+                assert!((top as i32 + bottom as i32 - (row[0][0] + row[1][0]) as i32).abs() <= 3);
+            }
+        }
+    }
+}
