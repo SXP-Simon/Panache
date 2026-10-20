@@ -2,7 +2,7 @@ const { test, expect } = require('./fixtures');
 const { createHash } = require('node:crypto');
 const { resetHome } = require('./launch');
 
-test('打包应用通过真实主进程桥校验固定来源更新，无法准备回滚时安全保留当前应用', async ({ desktop }) => {
+test('打包应用通过真实主进程桥校验固定来源更新，准备失败时安全保留当前应用', async ({ desktop }) => {
   const bytes = Buffer.from('Panache isolated update smoke test - not executable');
   await desktop.app.evaluate(({ session }, payload) => {
     const bytes = Uint8Array.from(payload.bytes);
@@ -24,13 +24,17 @@ test('打包应用通过真实主进程桥校验固定来源更新，无法准�
     await page.getByTestId('update-check').click();
     await expect(page.getByTestId('update-prompt-version')).toContainText('v999.0.0');
     await page.getByTestId('update-prompt-now').click();
-    await expect(page.getByTestId('update-prompt-status')).toContainText('检查次数较多');
+    // Windows 请求旧安装包时被隔离的 403 拦截；macOS 不需要旧安装包，直接拒绝假 ZIP。
+    const expectedError = process.platform === 'darwin' ? 'network' : 'rateLimited';
+    await expect.poll(() => page.evaluate(() => window.handwritingDesktop.updates.state())).toMatchObject({
+      status: 'error', error: expectedError, manualAvailable: true,
+    });
     const state = await page.evaluate(() => window.handwritingDesktop.updates.state());
     expect(state.status).toBe('error'); expect(state.manualAvailable).toBe(true); expect(state.current).toBe(require('../../desktop/package.json').version);
     expect(state).not.toHaveProperty('asset'); expect(state).not.toHaveProperty('file');
     expect(await desktop.app.evaluate(({ app }) => app.isPackaged)).toBe(true);
     expect(await page.evaluate(() => window.handwritingDesktop.updates.healthy())).toBe(false);
-    // Missing old installer metadata prevents preparation; fake bytes must never execute.
+    // Both platform paths must keep the original app running; fake bytes must never execute.
   } finally { await desktop.app.evaluate(({ session }) => session.defaultSession.protocol.unhandle('https')); }
 });
 
