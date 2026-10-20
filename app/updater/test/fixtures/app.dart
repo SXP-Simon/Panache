@@ -6,7 +6,10 @@ import 'package:panache_updater/client.dart';
 
 Future<void> main(List<String> arguments) async {
   final running = RunningInstallation.detect();
-  final mode = File(p.join(running.runtime, 'mode')).readAsStringSync();
+  final resources = Platform.isMacOS
+      ? p.join(running.runtime, 'Contents', 'Resources')
+      : running.runtime;
+  final mode = File(p.join(resources, 'mode')).readAsStringSync();
   final transaction = Platform.environment['PANACHE_UPDATE_TRANSACTION'] ?? '';
   if (transaction.isEmpty) {
     if (arguments.contains('--hold')) {
@@ -15,7 +18,7 @@ Future<void> main(List<String> arguments) async {
       return;
     }
     File(
-      p.join(running.runtime, 'reopened'),
+      p.join(p.dirname(running.root), 'reopened'),
     ).writeAsStringSync(Platform.environment['PANACHE_UPDATE_FAILURE'] ?? '');
     return;
   }
