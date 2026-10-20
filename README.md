@@ -54,7 +54,8 @@ cargo test --locked --workspace
 cd app
 flutter analyze
 flutter test
-flutter build web --release
+cd ..
+python3 scripts/build-flutter-web.py
 ```
 
 在仓库根目录构建独立桌面包或服务包：

@@ -1,0 +1,36 @@
+# 应用更新
+
+更新入口位于「关于与反馈」。支持手动检查，以及可关闭的启动检查；启动检查只提示可用版本，不自动下载或安装。
+
+## 各平台的更新方式
+
+| 平台 | 行为 |
+| --- | --- |
+| Android | 按设备支持的 ABI 选择 arm64-v8a 或 x86_64 APK；下载、校验后由系统安装器安装 |
+| Flutter Windows / macOS / Linux | 下载对应架构的完整 ZIP / tar.gz 包，校验后打开，由用户退出旧版并替换完整应用目录 |
+| iOS | 当前没有正式签名 IPA 更新包，前往官方发布页并使用原安装渠道更新 |
+| Web | 检查当前服务的部署标识；确认保存草稿后刷新页面。升级服务本身由部署管理员完成 |
+| 无对应架构安装包 | 显示不支持原因及官方发布页，不下载其他架构或其他客户端的安装包 |
+
+Android 首次安装更新可能需要允许本应用安装未知来源应用。返回后可再次点击安装；权限拒绝或取消安装不会被当作更新成功。覆盖升级要求沿用原包名和签名；此前使用调试签名的安装需要通过原安装方式迁移，应用不会自动卸载以清除冲突。
+
+下载显示进度，可取消并重试。只有版本、发布来源、平台、文件大小和 SHA-256 校验通过的包才能移交系统；Android 还核对 APK 包名及实际 versionCode。磁盘、网络、GitHub 限流或校验错误会显示反馈。Release 创建时安装包可能尚未构建完成，此时稍后重试即可。
+
+## Web 部署身份
+
+从仓库根目录构建 Web：
+
+```bash
+cd app
+flutter pub get
+cd ..
+python3 scripts/build-flutter-web.py
+# 指定自托管版本及子路径
+python3 scripts/build-flutter-web.py --version 1.6.0 --base-href /panache/
+```
+
+脚本将相同版本写入 Flutter 编译参数和 `version.json`，同时注入并发布独立 `build_id`。同一产品版本重新部署其他源码时，旧页面仍可识别变化。`--version` 或 `HANDWRITING_BUILD_VERSION` 可覆盖源码中的版本；不修改源文件。无 Git 信息的源码目录会生成独立构建标识，也可使用 `--build-id` 或 `HANDWRITING_WEB_BUILD_ID` 显式指定。
+
+直接使用没有版本注入的开发构建时，更新界面会说明当前构建版本未知。GitHub 的最新客户端版本与自托管网站的当前部署不同，不将两者混为一谈。网络离线时仍可使用原有离线生成能力。
+
+实现参考 [Kazumi 的更新策略](https://github.com/Predidit/Kazumi/tree/184f8db535f9b4098ada763fcefea8e602126dc7/lib/services/update)：平台包型选择、独立检查与下载、进度取消、校验后交给系统处理。Panache 使用自己的业务模块与发布资产契约。

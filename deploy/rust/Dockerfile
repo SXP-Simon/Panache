@@ -1,4 +1,4 @@
-# 从仓库根目录构建；预先执行 flutter build web --release。
+# 从仓库根目录构建；预先执行 python3 scripts/build-flutter-web.py。
 FROM rust:1.94.1-bookworm AS build
 WORKDIR /source
 COPY Cargo.toml Cargo.lock ./
