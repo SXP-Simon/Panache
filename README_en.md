@@ -40,6 +40,18 @@ See [Local Development](docs/en/development.md#selective-checks-and-ci) for the 
 
 ## Features
 
+### Handwritten table enhancements
+
+Building on the original application's Markdown text cleanup, this fork adds a path that preserves table structure and renders two-dimensional handwritten tables:
+
+- **Markdown to LaTeX:** choose **Tables: handwriting grid (LaTeX)** before cleanup. The existing item-list and aligned-text modes remain available.
+- **Probability and formula tables:** ruled LaTeX `array` tables, including those wrapped in `\boxed{...}`, support Chinese text, numbers, and stacked fractions in cells.
+- **Consistent layout:** complete outer borders and row/column lines use uniform stroke widths; rows have equal heights and cell contents are centered by their visible ink. The selected handwriting font and ink color still apply.
+- **Whole-table fitting:** wide tables scale together and remain intact across page breaks. Supported empty cells and literal pipes or semicolons retain their column positions.
+- **Conservative conversion:** unsupported tables remain editable text rather than losing content. Repeated cleanup and conversion preserve already converted table structures.
+
+Use **Paste table → Clean Markdown → Convert LaTeX → Generate preview**. Existing LaTeX tables can go directly through LaTeX conversion.
+
 ### Custom Fonts
 
 You can upload your own fonts to generate a unique handwriting style that suits your needs.
