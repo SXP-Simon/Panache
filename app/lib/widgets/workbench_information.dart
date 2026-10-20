@@ -2,10 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
+import '../services/updates/update_controller.dart';
+import 'app_update_card.dart';
 
 class WorkbenchInformation extends StatelessWidget {
-  const WorkbenchInformation({super.key, required this.guide});
+  const WorkbenchInformation({
+    super.key,
+    required this.guide,
+    this.updates,
+    this.onReload,
+  });
   final bool guide;
+  final UpdateController? updates;
+  final Future<void> Function()? onReload;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -64,6 +73,10 @@ class WorkbenchInformation extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(l.feedbackHelp),
+              if (updates != null && onReload != null) ...[
+                const SizedBox(height: 24),
+                AppUpdateCard(controller: updates!, onReload: onReload!),
+              ],
             ],
           ],
         ),

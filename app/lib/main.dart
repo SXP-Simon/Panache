@@ -3,6 +3,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/foundation.dart';
 
 import 'services/appearance_preferences.dart';
+import 'services/updates/update_controller.dart';
+import 'services/updates/update_host.dart';
 
 import 'l10n/app_localizations.dart';
 import 'theme/handwriting_theme.dart';
@@ -36,6 +38,7 @@ class _HandwritingAppState extends State<HandwritingApp> {
   SemanticsHandle? semantics;
   Locale? locale;
   final appearance = AppearancePreferences();
+  late final updates = UpdateController(host: createUpdateHost());
   Color get themeColor => appearance.color;
   ThemeMode mode = ThemeMode.system;
   @override
@@ -45,6 +48,7 @@ class _HandwritingAppState extends State<HandwritingApp> {
     locale = widget.locale ?? const Locale('zh');
     appearance.addListener(refreshAppearance);
     appearance.restore();
+    updates.initialize();
   }
 
   void refreshAppearance() {
@@ -55,12 +59,14 @@ class _HandwritingAppState extends State<HandwritingApp> {
   void dispose() {
     appearance.removeListener(refreshAppearance);
     appearance.dispose();
+    updates.dispose();
     semantics?.dispose();
     super.dispose();
   }
 
   Widget workbench({int destination = 0}) => Workbench(
     workspace: widget.workspace,
+    updates: updates,
     initialDestination: destination,
     toggleLocale: () => setState(
       () => locale = Locale(locale?.languageCode == 'zh' ? 'en' : 'zh'),

@@ -62,6 +62,12 @@ void main() {
     Navigator.of(tester.element(find.byType(Scaffold).first))
         .pushNamed('/About');
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('开源许可'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await tester.tap(find.text('开源许可'));
       await tester.pump();
