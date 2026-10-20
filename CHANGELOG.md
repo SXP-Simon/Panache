@@ -1,3 +1,22 @@
+# [1.6.0](https://github.com/SXP-Simon/Panache/compare/v1.5.0...v1.6.0) (2026-10-20)
+
+
+### Bug Fixes
+
+* **be:** 为手写表格补齐完整单元格网格 ([c7d3320](https://github.com/SXP-Simon/Panache/commit/c7d332037304860a08dec2d8bf5b32cd69973154))
+* **be:** 保留表格单元格内的分隔符与转义文本 ([1b3e7c5](https://github.com/SXP-Simon/Panache/commit/1b3e7c56a7972cf18ccadfd383e9323644d2c3e7))
+* **be:** 将分布律表格绘制为二维手写结构 ([12a7977](https://github.com/SXP-Simon/Panache/commit/12a7977eea05479f5587c62d903b718fc168fb3e))
+* **be:** 统一手写表格格线与单元格对齐 ([4cbab6c](https://github.com/SXP-Simon/Panache/commit/4cbab6c2943dd17230c97ff389007428a2ac80e8))
+* **fe/src/utils:** 保留供二维手写绘制的表格结构 ([131a0ea](https://github.com/SXP-Simon/Panache/commit/131a0ea23ef12e8c9a6c99c31beb48777a979855))
+* **fe/src/utils:** 安全转写含分隔字符的表格单元格 ([23562c7](https://github.com/SXP-Simon/Panache/commit/23562c7b86dbbba9f492bcd0f5a64fb814f09657))
+* **fe/src/utils:** 转写带分隔线的数组与框选公式 ([21bf709](https://github.com/SXP-Simon/Panache/commit/21bf709753870258e240920495c199a27e45221e))
+* **fe/src/utils:** 重复处理时保护已转写的手写表格 ([41c4579](https://github.com/SXP-Simon/Panache/commit/41c457936b2c3c38fb5a931fa16b2fe3f9eca8ef))
+
+
+### Features
+
+* **fe:** 将 Markdown 表格转换为手写方格表 ([76a2684](https://github.com/SXP-Simon/Panache/commit/76a2684e9e5390de4c9655b763a1bc9f7f7ebee3))
+
 # [1.5.0](https://github.com/SXP-Simon/Panache/compare/v1.4.3...v1.5.0) (2026-10-18)
 
 
