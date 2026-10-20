@@ -115,12 +115,16 @@ def test_dashed_rules_are_rendered_as_separate_pen_strokes():
     box = symbols._layout_math_char(normalized, font, str(FONT), symbols._LayoutMemo())
     assert len(box.paths) > 4
     assert any(len(path) == 2 for path, _ in box.paths)
-    assert any(len(path) == 3 for path, _ in box.paths)
+    assert all(len(path) == 2 for path, _ in box.paths)
     assert all(thickness >= 1 for _, thickness in box.paths)
     strokes = symbols._compose_box(box.advance, paths=box.paths)
     image = Image.new("1", (1000, 600))
     symbols._paint_math_box(ImageDraw.Draw(image), strokes, (20, 20))
-    vertical_dashes = [path for path, _ in box.paths if len(path) == 2 and path[0][0] == path[1][0]]
+    vertical_dashes = [
+        path
+        for path, _ in box.paths
+        if len(path) == 2 and path[0][0] == path[1][0] and path[1][1] - path[0][1] <= 12
+    ]
     first, second = vertical_dashes[:2]
     gap_y = (first[1][1] + second[0][1]) // 2
     assert not image.getpixel((20 + first[0][0], 20 + gap_y))
@@ -139,8 +143,9 @@ def test_complete_grid_encloses_every_cell_with_clear_ink_padding():
     assert len(vertical) == 6
     assert len(horizontal) == 3
     assert vertical[0][0] == horizontal[0][0] == 0
-    assert vertical[1][1] > vertical[2][1]
-    assert horizontal[1][1] > horizontal[0][1]
+    assert len({width for _, width in vertical + horizontal}) == 1
+    assert horizontal[1][0] * 2 == horizontal[2][0]
+    assert all(len(points) == 2 for points, _ in box.paths)
     image = Image.new("1", (1000, 600))
     symbols._paint_math_box(ImageDraw.Draw(image), box, (20, 20))
     for x, _ in vertical:
@@ -151,6 +156,20 @@ def test_complete_grid_encloses_every_cell_with_clear_ink_padding():
             assert image.crop((20 + x, 20 + y - 2, 21 + x, 20 + y + 3)).getbbox()
     for index, (child, x, y) in enumerate(box.children):
         row, column = divmod(index, 5)
+        assert (
+            abs(
+                (y + child.bbox[1] + y + child.bbox[3])
+                - (horizontal[row][0] + horizontal[row + 1][0])
+            )
+            <= 1
+        )
+        assert (
+            abs(
+                (x + child.bbox[0] + x + child.bbox[2])
+                - (vertical[column][0] + vertical[column + 1][0])
+            )
+            <= 1
+        )
         assert x + child.bbox[0] > vertical[column][0] + 5
         assert x + child.bbox[2] < vertical[column + 1][0] - 5
         assert y + child.bbox[1] > horizontal[row][0] + 5

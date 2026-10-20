@@ -1004,13 +1004,9 @@ def _layout_accent(
 def _table_rule(
     start: tuple[int, int], end: tuple[int, int], thickness: int, size: int, *, dashed: bool
 ) -> list[BoxPath]:
-    # 2026-10-20：细线中点轻微偏移模拟落笔，虚线按字号分段，不影响表格列对齐。
+    # 2026-10-20：格线共用直线端点与笔宽，避免人为偏移造成接缝和粗细错觉。
     if not dashed:
-        middle = (
-            (start[0] + end[0]) // 2 + int(start[0] == end[0]),
-            (start[1] + end[1]) // 2 + int(start[1] == end[1]),
-        )
-        return [((start, middle, end), thickness)]
+        return [((start, end), thickness)]
     length = max(end[0] - start[0], end[1] - start[1])
     dash = max(3, round(size * 0.18))
     horizontal = end[0] != start[0]
@@ -1027,7 +1023,6 @@ def _table_grid_paths(
     table: Table, widths: list[int], heights: list[int], size: int
 ) -> list[BoxPath]:
     thin = max(1, round(size * 0.025))
-    emphasis = max(thin + 1, round(size * 0.040))
     paths: list[BoxPath] = []
     vertical = {rule.position: rule for rule in table.vertical}
     horizontal = {rule.position: rule for rule in table.horizontal}
@@ -1038,7 +1033,7 @@ def _table_grid_paths(
             _table_rule(
                 (x, 0),
                 (x, sum(heights)),
-                emphasis if rule else thin,
+                thin,
                 size,
                 dashed=bool(rule and rule.dashed),
             )
@@ -1050,7 +1045,7 @@ def _table_grid_paths(
             _table_rule(
                 (0, y),
                 (sum(widths), y),
-                emphasis if rule else thin,
+                thin,
                 size,
                 dashed=bool(rule and rule.dashed),
             )
@@ -1068,10 +1063,12 @@ def _layout_table(table: Table, font: Font, font_path: str | None, memo: _Layout
         max(box.bbox[2] - box.bbox[0] for box in column) + pad * 2
         for column in zip(*boxes, strict=True)
     ]
-    heights = [
-        max(max(box.bbox[3] - box.bbox[1], round(size * 0.65)) for box in row) + gap * 2
-        for row in boxes
-    ]
+    # 2026-10-20：整表统一行高，单元格按实际墨迹居中，分数不挤压相邻行。
+    row_height = (
+        max(max(box.bbox[3] - box.bbox[1], round(size * 0.65)) for row in boxes for box in row)
+        + gap * 2
+    )
+    heights = [row_height] * len(boxes)
     children: list[BoxChild] = []
     y = 0
     for row, height in zip(boxes, heights, strict=True):
@@ -1086,7 +1083,7 @@ def _layout_table(table: Table, font: Font, font_path: str | None, memo: _Layout
             )
             x += width
         y += height
-    # 2026-10-20：补齐每个单元格的四边；原文明确规则加重或保留虚线，不能被默认网格覆盖。
+    # 2026-10-20：补齐每个单元格的四边；全部格线同宽，原文虚线保留虚线样式。
     paths = _table_grid_paths(table, widths, heights, size)
     return _compose_box(sum(widths) + pad, children, paths)
 
