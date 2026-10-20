@@ -12,6 +12,7 @@ class WorkbenchShell extends StatelessWidget {
     super.key,
     this.themeColor = defaultThemeColor,
     this.onThemeColorChanged,
+    this.updateAvailable = false,
     required this.destination,
     required this.onDestinationSelected,
     required this.connected,
@@ -25,6 +26,7 @@ class WorkbenchShell extends StatelessWidget {
   });
   final Color themeColor;
   final Future<bool> Function(Color)? onThemeColorChanged;
+  final bool updateAvailable;
   final int destination;
   final ValueChanged<int> onDestinationSelected;
   final bool connected, managedBackend, locked;
@@ -158,7 +160,10 @@ class WorkbenchShell extends StatelessWidget {
                     destinations: [
                       for (var i = 0; i < labels.length; i++)
                         NavigationRailDestination(
-                          icon: Icon(icons[i]),
+                          icon: Badge(
+                            isLabelVisible: i == 2 && updateAvailable,
+                            child: Icon(icons[i]),
+                          ),
                           label: Text(labels[i]),
                         ),
                     ],
@@ -192,7 +197,13 @@ class WorkbenchShell extends StatelessWidget {
               },
               destinations: [
                 for (var i = 0; i < labels.length; i++)
-                  NavigationDestination(icon: Icon(icons[i]), label: labels[i]),
+                  NavigationDestination(
+                    icon: Badge(
+                      isLabelVisible: i == 2 && updateAvailable,
+                      child: Icon(icons[i]),
+                    ),
+                    label: labels[i],
+                  ),
                 NavigationDestination(
                   key: const ValueKey('app-preferences'),
                   icon: const Icon(Icons.settings_outlined),

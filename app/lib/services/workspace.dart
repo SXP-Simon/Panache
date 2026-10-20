@@ -192,8 +192,11 @@ class Workspace extends ChangeNotifier {
   }
 
   /// Flush immediately when the app becomes inactive or goes to background.
-  Future<void> persist() {
-    if (disposed) return _writes;
+  Future<void> persist() => disposed ? _writes : persistDraft().then((_) {});
+
+  /// Reports persistence success before a user-confirmed page reload.
+  Future<bool> persistDraft() {
+    if (disposed) return Future.value(false);
     saveTimer?.cancel();
     final font = fontFile;
     final snapshot = jsonEncode({
@@ -207,7 +210,7 @@ class Workspace extends ChangeNotifier {
       snapshot,
       font: font,
       saveFont: !_fontRestorePending,
-    ).then((_) {});
+    );
   }
 
   Future<bool> _write(

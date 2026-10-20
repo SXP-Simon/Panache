@@ -27,11 +27,13 @@ import '../widgets/workbench_information.dart';
 import '../widgets/workbench_settings.dart';
 import '../widgets/workbench_shell.dart';
 import '../theme/handwriting_theme.dart';
+import '../services/updates/update_controller.dart';
 
 class Workbench extends StatefulWidget {
   const Workbench({
     super.key,
     this.workspace,
+    this.updates,
     this.themeColor = defaultThemeColor,
     this.onThemeColorChanged,
     this.initialDestination = 0,
@@ -39,6 +41,7 @@ class Workbench extends StatefulWidget {
     required this.toggleTheme,
   });
   final Workspace? workspace;
+  final UpdateController? updates;
   final Color themeColor;
   final Future<bool> Function(Color)? onThemeColorChanged;
   final int initialDestination;
@@ -73,7 +76,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     w = widget.workspace ?? Workspace();
     editor.text = w.text;
     w.addListener(refresh);
+    widget.updates?.addListener(refreshUpdates);
     if (widget.workspace == null) unawaited(w.initialize());
+  }
+
+  void refreshUpdates() {
+    if (mounted) setState(() {});
   }
 
   void refresh() {
@@ -100,6 +108,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     w.removeListener(refresh);
+    widget.updates?.removeListener(refreshUpdates);
     if (widget.workspace == null) w.dispose();
     editor.dispose();
     editorFocus.dispose();
@@ -263,6 +272,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         ),
       },
       child: WorkbenchShell(
+        updateAvailable: widget.updates?.phase == UpdatePhase.available,
         destination: destination,
         onDestinationSelected: (value) => setState(() => destination = value),
         connected: w.connected,
@@ -488,7 +498,42 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     onOpenLink: (uri) => unawaited(launchUrl(uri)),
   );
 
-  Widget information() => WorkbenchInformation(guide: destination == 1);
+  Future<void> reloadUpdatedWeb() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.updateReload),
+        content: Text(l.updateReloadConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.updateReload),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      if (!await w.persistDraft()) {
+        if (mounted) notify(l.updateSaveFailed);
+        return;
+      }
+    } catch (_) {
+      if (mounted) notify(l.updateSaveFailed);
+      return;
+    }
+    widget.updates?.host.reload();
+  }
+
+  Widget information() => WorkbenchInformation(
+    guide: destination == 1,
+    updates: widget.updates,
+    onReload: reloadUpdatedWeb,
+  );
 }
 
 class _PreviewIntent extends Intent {
