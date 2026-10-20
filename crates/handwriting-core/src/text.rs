@@ -6,11 +6,25 @@ pub enum Node {
     Radical(Vec<Node>, Vec<Node>),
     Scripts { upper: Vec<Node>, lower: Vec<Node> },
     Accent(Vec<Node>, char),
+    Table(Table),
     Image { alt: String, data: String },
     Break,
     Newline,
     RightAlign,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableRule {
+    None,
+    Solid,
+    Dashed,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Table {
+    pub rows: Vec<Vec<Vec<Node>>>,
+    pub vertical: Vec<TableRule>,
+    pub horizontal: Vec<TableRule>,
+}
+mod table;
 
 pub fn normalize(text: &str, english_spacing: bool) -> String {
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
@@ -38,6 +52,22 @@ pub fn normalize(text: &str, english_spacing: bool) -> String {
     }
     s.split('\n')
         .map(|line| {
+            // 2026-10-20：双空格是表格列边界，不能被英文词距选项再次翻倍。
+            let chars: Vec<_> = line.chars().collect();
+            let pairs = bracket_matches(&chars);
+            let mut index = 0;
+            while index < chars.len() {
+                if chars[index] == '⟦'
+                    && let Some(end) = pairs[index]
+                {
+                    if table::parse(&chars[index + 1..end], 0).is_some() {
+                        return line.to_owned();
+                    }
+                    index = end + 1;
+                } else {
+                    index += 1;
+                }
+            }
             let parts: Vec<_> = line.split(' ').collect();
             let mut out = String::new();
             for (i, part) in parts.iter().enumerate() {
@@ -94,6 +124,13 @@ pub fn parse(text: &str) -> Vec<Node> {
                     restore(lower, images);
                 }
                 Node::Accent(a, _) => restore(a, images),
+                Node::Table(table) => {
+                    for row in &mut table.rows {
+                        for cell in row {
+                            restore(cell, images);
+                        }
+                    }
+                }
                 _ => (),
             }
         }
@@ -162,9 +199,27 @@ fn parse_document(text: &str) -> Vec<Node> {
 // 2026-10-12：预计算各类括号配对，未闭合输入也只扫描一次。
 fn bracket_matches(cs: &[char]) -> Vec<Option<usize>> {
     let mut result = vec![None; cs.len()];
-    for (open, close) in [('(', ')'), ('[', ']'), ('{', '}')] {
+    for (open, close) in [('(', ')'), ('[', ']'), ('{', '}'), ('⟦', '⟧')] {
         let mut stack = Vec::new();
+        let mut quoted = false;
+        let mut escaped = false;
         for (i, c) in cs.iter().enumerate() {
+            if open == '⟦' && !stack.is_empty() {
+                if quoted {
+                    if escaped {
+                        escaped = false;
+                    } else if *c == '\\' {
+                        escaped = true;
+                    } else if *c == '"' {
+                        quoted = false;
+                    }
+                    continue;
+                }
+                if *c == '"' {
+                    quoted = true;
+                    continue;
+                }
+            }
             if *c == open {
                 stack.push(i);
             }
@@ -272,6 +327,17 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
         if let Some(end) = protected_end(&cs, i) {
             out.extend(cs[i..end].iter().copied().map(Node::Char));
             i = end;
+            continue;
+        }
+        if cs[i] == '⟦'
+            && let Some(end) = pairs[i]
+        {
+            if let Some(table) = table::parse(&cs[i + 1..end], depth) {
+                out.push(Node::Table(table));
+            } else {
+                out.extend(cs[i..=end].iter().copied().map(Node::Char));
+            }
+            i = end + 1;
             continue;
         }
         if cs[i] == '!'

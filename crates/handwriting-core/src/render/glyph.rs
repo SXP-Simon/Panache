@@ -253,6 +253,7 @@ impl<'a> Glyphs<'a> {
         let thickness = (size * 0.035).round().max(1.) as i32;
         match n {
             Node::Char(c) => self.glyph(*c, size),
+            Node::Table(table) => self.table(table, size, depth + 1),
             Node::Fraction(num, den) => {
                 let a = self.sequence_at(num, small, depth + 1)?;
                 let b = self.sequence_at(den, small, depth + 1)?;
@@ -395,5 +396,6 @@ impl<'a> Glyphs<'a> {
 }
 
 mod sequence;
+mod table;
 #[cfg(test)]
 mod tests;

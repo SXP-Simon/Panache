@@ -1,3 +1,4 @@
+import 'dart:convert' show jsonEncode;
 import 'dart:ui' show FontStyle;
 
 import 'package:flutter_math_fork/ast.dart';
@@ -190,6 +191,9 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
     return '$left$body${cases ? ' }' : right}';
   }
   if (n is MatrixNode) {
+    final ruled =
+        n.vLines.any((v) => v != MatrixSeparatorStyle.none) ||
+        n.hLines.any((v) => v != MatrixSeparatorStyle.none);
     String rule(MatrixSeparatorStyle style, bool horizontal) => switch (style) {
       MatrixSeparatorStyle.none => '',
       MatrixSeparatorStyle.solid => horizontal ? '──' : '|',
@@ -204,14 +208,24 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
       for (var col = 0; col <= n.body[row].length; col++) {
         final vertical = rule(n.vLines[col], false);
         if (vertical.isNotEmpty) {
-          if (cells.isNotEmpty) cells.write(' ');
+          if (col > 0) cells.write(' ');
           cells.write(vertical);
         }
         if (col == n.body[row].length) break;
         if (col > 0 || vertical.isNotEmpty) {
           cells.write(vertical.isEmpty ? '  ' : ' ');
         }
-        cells.write(child(n.body[row][col]));
+        final value = child(n.body[row][col]);
+        if (ruled &&
+            mode == 'standalone' &&
+            (RegExp(r'[;|┆⟦⟧"\\]').hasMatch(value) ||
+                value.contains('  ') ||
+                value.trim() == '──' ||
+                value.trim() == '╌╌')) {
+          cells.write(jsonEncode(value));
+        } else {
+          cells.write(value);
+        }
       }
       lines.add(cells.toString());
     }
@@ -219,7 +233,9 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
     return mode == 'cases'
         ? '\n$rows'
         : mode == 'standalone'
-        ? '[ $rows ]'
+        ? ruled
+              ? '⟦ $rows ⟧'
+              : '[ $rows ]'
         : ' $rows ';
   }
   if (n is EquationArrayNode) {

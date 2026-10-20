@@ -98,6 +98,32 @@ List<MathSegment> scanMathSegments(String text) {
       );
       continue;
     }
+    if (c == '⟦') {
+      var end = cursor + 1, depth = 1;
+      var quoted = false, escaped = false;
+      while (end < text.length && depth > 0) {
+        final value = text[end++];
+        if (quoted) {
+          if (escaped) {
+            escaped = false;
+          } else if (value == r'\') {
+            escaped = true;
+          } else if (value == '"') {
+            quoted = false;
+          }
+          continue;
+        }
+        if (value == '"') {
+          quoted = true;
+        } else if (value == '⟦') {
+          depth++;
+        } else if (value == '⟧') {
+          depth--;
+        }
+      }
+      add(start, end, safe: true);
+      continue;
+    }
     if (text.startsWith(r'\left', cursor)) {
       final end = bareDelimiterEnd(text, cursor);
       if (end > cursor) {

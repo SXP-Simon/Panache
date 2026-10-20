@@ -16,6 +16,78 @@ fn books() -> &'static [FontBook] {
     })
 }
 #[test]
+fn distribution_table_has_two_dimensional_handwritten_ink_and_continuous_rules() {
+    for book in books() {
+        for size in [24., 40., 64.] {
+            let mut gs = Glyphs::new(book);
+            for source in [
+                "⟦ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ⟧",
+                "⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧",
+            ] {
+                let parsed = text::parse(source);
+                assert!(matches!(parsed.as_slice(), [Node::Table(_)]));
+                let g = gs.sequence(&parsed, size).unwrap();
+                assert!(
+                    g.mask.height() as f32 > size * 2.,
+                    "table must have two actual rows"
+                );
+                let fullest_row = (0..g.mask.height().saturating_sub(2))
+                    .map(|y| {
+                        (0..g.mask.width())
+                            .filter(|&x| (y..y + 3).any(|yy| g.mask[(x, yy)][0] > 0))
+                            .count()
+                    })
+                    .max()
+                    .unwrap();
+                assert!(
+                    fullest_row as f32 > g.mask.width() as f32 * 0.90,
+                    "horizontal rule spans all columns"
+                );
+                let fullest_col = (0..g.mask.width())
+                    .map(|x| {
+                        (0..g.mask.height())
+                            .filter(|&y| g.mask[(x, y)][0] > 0)
+                            .count()
+                    })
+                    .max()
+                    .unwrap();
+                assert!(
+                    fullest_col as f32 > g.mask.height() as f32 * 0.85,
+                    "vertical rule spans both rows"
+                );
+                // 2026-10-20：外框四边必须存在，不能只画分布律原有的一横一竖。
+                for y in [0, g.mask.height() - 1] {
+                    let coverage = (0..g.mask.width())
+                        .filter(|&x| {
+                            (y.saturating_sub(2)..=(y + 2).min(g.mask.height() - 1))
+                                .any(|yy| g.mask[(x, yy)][0] > 0)
+                        })
+                        .count();
+                    assert!(
+                        coverage as f32 > g.mask.width() as f32 * 0.85,
+                        "outer horizontal grid rule"
+                    );
+                }
+                for x in [0, g.mask.width() - 1] {
+                    let coverage = (0..g.mask.height())
+                        .filter(|&y| {
+                            (x.saturating_sub(2)..=(x + 2).min(g.mask.width() - 1))
+                                .any(|xx| g.mask[(xx, y)][0] > 0)
+                        })
+                        .count();
+                    assert!(
+                        coverage as f32 > g.mask.height() as f32 * 0.85,
+                        "outer vertical grid rule"
+                    );
+                }
+                let fit = g.clone().fit(120., 100.);
+                assert!(fit.mask.width() <= 120 && fit.mask.height() <= 100);
+                assert!(fit.ink);
+            }
+        }
+    }
+}
+#[test]
 fn all_math_bounds_keep_actual_ink_and_native_baseline() {
     for book in books() {
         for size in [24., 40., 64.] {
