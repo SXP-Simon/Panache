@@ -87,6 +87,6 @@ Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other
 
 ## Checking for updates
 
-Open **Appearance and settings → App updates** to check manually or enable startup checks. Desktop clients select the official package for their system, CPU architecture, and installation type. Downloads show progress, can be cancelled, and must pass verification before opening. Windows installers and macOS DMGs use the system installation flow; portable applications are replaced manually after closing the old version.
+With automatic checks enabled, a newer version opens an update dialog with its version and key changes. Choose **Update now** or **Later**. Each version is automatically shown once per session, after any generation task finishes. Open **Appearance and settings → App updates** to check manually and show the dialog again. Desktop clients select the official package for their system, CPU architecture, and installation type. Downloads show progress, can be cancelled, and must pass verification before opening. Windows installers and macOS DMGs use the system installation flow; portable applications are replaced manually after closing the old version.
 
 Web/PWA checks the current site's deployment and saves the draft before refreshing. Finish or cancel any generation task first. A newer desktop release on GitHub does not mean that a self-hosted website has already been upgraded. Missing packages, unsupported architectures, and network failures have separate feedback and retry or release-page actions.
