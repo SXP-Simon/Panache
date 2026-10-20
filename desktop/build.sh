@@ -64,6 +64,17 @@ cd "$ROOT"
   --distpath "$DESKTOP/build/backend" \
   --workpath "$DESKTOP/build/pyinstaller-work"
 
+echo "==> 打包独立更新助手"
+"$PYTHON" -m PyInstaller "$DESKTOP/updater.spec" \
+  --noconfirm \
+  --distpath "$DESKTOP/build/updater" \
+  --workpath "$DESKTOP/build/updater-work"
+if [ -f "$DESKTOP/build/updater/panache-updater.exe" ]; then
+  "$DESKTOP/build/updater/panache-updater.exe" --self-check
+else
+  "$DESKTOP/build/updater/panache-updater" --self-check
+fi
+
 echo "==> 生成应用图标"
 # 图标源必须是站点自己的图标（frontend/public 里 PWA 用的那张 512x512）。
 # 2026-10-03 修：之前用的是仓库根的 logo.png —— 那是旧的 Vue 风格 V，和网站图标

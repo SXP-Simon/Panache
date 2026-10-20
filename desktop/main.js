@@ -8,6 +8,7 @@ const { randomUUID } = require("crypto");
 const { setupPersistence } = require("./studio-storage");
 const { configureAppIdentity } = require("./app-identity");
 const { setupUpdater, cleanupStaleUpdates } = require("./app-updates");
+const { prepareTransaction, acknowledgeHealth, recoveryNotice, cleanupTransactions } = require("./update-transaction");
 configureAppIdentity(app);
 
 // PyInstaller 只在 Windows 上给可执行文件加 .exe 后缀，macOS 上没有
@@ -55,7 +56,7 @@ function withDeadline(pending, milliseconds) {
   return Promise.race([pending, deadline]).finally(() => clearTimeout(timer));
 }
 
-async function flushRendererBeforeClose(window) {
+async function flushRendererBeforeClose(window, reason = "close") {
   if (!allowedStorageOrigin || window.isDestroyed()) return;
   let origin;
   try { origin = new URL(window.webContents.getURL()).origin; } catch { return; }
@@ -64,7 +65,7 @@ async function flushRendererBeforeClose(window) {
   try {
     await new Promise((resolve, reject) => {
       closeAcknowledgement = { id, resolve, reject };
-      window.webContents.send("storage:flush-request", id);
+      window.webContents.send("storage:flush-request", id, reason);
     });
   } finally {
     if (closeAcknowledgement?.id === id) closeAcknowledgement = null;
@@ -108,11 +109,11 @@ function requestApplicationClose() {
 }
 
 function setupCloseAcknowledgements() {
-  ipcMain.on("storage:flush-complete", (event, id, success) => {
+  ipcMain.on("storage:flush-complete", (event, id, success, reason) => {
     if (!studioStorage?.trustedRenderer(event) || !closeAcknowledgement ||
         id !== closeAcknowledgement.id || typeof success !== "boolean") return;
     if (success) closeAcknowledgement.resolve();
-    else closeAcknowledgement.reject(new Error("Renderer could not save the workspace"));
+    else closeAcknowledgement.reject(new Error(reason === "generationBusy" ? "generationBusy" : "saveFailed"));
   });
 }
 
@@ -462,21 +463,51 @@ if (!app.requestSingleInstanceLock()) {
       getAllowedOrigin: () => allowedStorageOrigin, dataDir,
     });
     setupCloseAcknowledgements();
+    ipcMain.handle("updates:healthy", async (event) => {
+      if (!studioStorage.trustedRenderer(event) || !backendProcess?.pid || !allowedStorageOrigin) return false;
+      const response = await net.fetch(`${allowedStorageOrigin}/api/version`);
+      if (!response.ok || (await response.json()).version !== app.getVersion()) return false;
+      return acknowledgeHealth({ directory: dataDir(), argv: process.argv, version: app.getVersion(), executable: process.execPath, portableExecutable: process.env.PORTABLE_EXECUTABLE_FILE, pid: process.pid, backendPid: backendProcess.pid });
+    });
     void cleanupStaleUpdates(path.join(dataDir(), "updates")).catch((error) => console.error("Update cache cleanup failed", error));
+    void cleanupTransactions(dataDir()).catch((error) => console.error("Update transaction cleanup failed", error));
     setupUpdater({
       fetcher: (url, options) => net.fetch(url, options),
       ipcMain, trustedRenderer: studioStorage.trustedRenderer, getWindow: () => mainWindow,
       development: !app.isPackaged, current: app.getVersion(), platform: process.platform, arch: process.arch,
       portable: Boolean(process.env.PORTABLE_EXECUTABLE_FILE),
       directory: path.join(dataDir(), "updates"),
+      recovery: await recoveryNotice(dataDir()).catch(() => null),
+      install: async (artifact, signal, rollback) => {
+        const target = process.platform === "darwin" ? path.resolve(process.execPath, "../../..") : process.env.PORTABLE_EXECUTABLE_FILE || path.dirname(process.execPath);
+        const transaction = await prepareTransaction({ directory: dataDir(), helper: path.join(process.resourcesPath, "updater", process.platform === "win32" ? "panache-updater.exe" : "panache-updater"), target, parentExecutable: process.execPath, parentPid: process.pid, backendPid: backendProcess?.pid, launcherPid: process.env.PORTABLE_EXECUTABLE_FILE ? process.ppid : null, platform: process.platform, artifact, rollback, signal });
+        try {
+          try {
+            await withDeadline((async () => {
+              if (!mainWindow || mainWindow.isDestroyed()) throw new Error("saveFailed");
+              await flushRendererBeforeClose(mainWindow, "update");
+              await studioStorage.drain();
+            })(), 5000);
+          } catch (error) { throw new Error(error.message === "generationBusy" ? "generationBusy" : "saveFailed"); }
+          if (signal.aborted) throw new Error("cancelled");
+          await transaction.arm();
+          finalWindowClose = true;
+          setImmediate(() => app.quit());
+        } catch (error) {
+          await transaction.abort();
+          closeAcknowledgement = null;
+          if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("storage:close-cancelled");
+          throw error;
+        }
+      },
       openPath: (file) => shell.openPath(file), reveal: (file) => shell.showItemInFolder(file),
       beforeOpen: async () => {
         try {
           await withDeadline((async () => {
-            if (mainWindow) await flushRendererBeforeClose(mainWindow);
+            if (mainWindow) await flushRendererBeforeClose(mainWindow, "update");
             await studioStorage.drain();
           })(), 5000);
-        } catch { closeAcknowledgement = null; throw new Error("saveFailed"); }
+        } catch (error) { closeAcknowledgement = null; throw new Error(error.message === "generationBusy" ? "generationBusy" : "saveFailed"); }
         finally {
           if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("storage:close-cancelled");
         }

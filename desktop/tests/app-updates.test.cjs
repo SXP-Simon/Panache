@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { createHash } = require('node:crypto');
-const { newerVersion, assetName, trustedUrl, releaseAsset, cleanupStaleUpdates, createUpdater, setupUpdater } = require('../app-updates');
+const { newerVersion, assetName, trustedUrl, releaseAsset, cleanupStaleUpdates, createUpdater, setupUpdater, downloadRollback } = require('../app-updates');
 const data = Buffer.from('verified installer bytes');
 const digest = createHash('sha256').update(data).digest('hex');
 function release(options = {}) {
@@ -23,7 +23,7 @@ test('stable versions compare numerically and reject malformed, prerelease and u
   assert.equal(newerVersion('1.5.99', '1.6.0'), false);
   for (const value of ['1.2', '01.2.3', '1.2.3-beta', '1.2.3/evil', '1.2.3+dev']) assert.equal(newerVersion(value, '1.0.0'), null);
   assert.equal(assetName('1.10.0', 'win32', 'x64', true), 'Panache-portable-1.10.0.exe');
-  assert.equal(assetName('1.10.0', 'darwin', 'arm64', false), 'Panache-1.10.0-arm64.dmg');
+  assert.equal(assetName('1.10.0', 'darwin', 'arm64', false), 'Panache-1.10.0-arm64.zip');
   for (const [platform, arch] of [['darwin', 'x64'], ['linux', 'x64'], ['win32', 'arm64']]) assert.equal(assetName('1.10.0', platform, arch, false), null);
 });
 test('release selection excludes Flutter and waits for uploaded hashed exact assets', () => {
@@ -54,6 +54,44 @@ test('portable update reveals the new binary without launching an installer', as
   const { updater, opened, revealed } = await fixture(t, async (url) => new Response(url.includes('api.github.com') ? JSON.stringify(info) : data), { portable: true });
   await updater.check(); await updater.download(); await updater.open();
   assert.equal(opened.length, 0); assert.equal(revealed.length, 1);
+});
+
+test('automatic installer receives only verified fixed artifact and cancellation remains available during preparation', async (t) => {
+  let preparing;
+  const entered = new Promise((resolve) => { preparing = resolve; });
+  const { updater, opened } = await fixture(t, undefined, { install: async (artifact, signal) => {
+    assert.equal(artifact.version, '1.10.0'); assert.equal(artifact.current, '1.6.0');
+    assert.equal(artifact.digest, digest); assert.equal(artifact.size, data.length);
+    preparing(); await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+    throw new Error('cancelled');
+  } });
+  await updater.check(); await updater.download();
+  const installing = updater.open(); await entered; assert.equal(updater.state().status, 'preparing');
+  updater.cancel(); await installing;
+  assert.equal(updater.state().status, 'ready'); assert.equal(opened.length, 0);
+});
+
+test('unsupported installation retains verified package for manual fallback and translates native errors', async (t) => {
+  const { updater, opened } = await fixture(t, undefined, { install: async () => { throw new Error('permissions'); } });
+  await updater.check(); await updater.download(); await updater.open();
+  assert.equal(updater.state().error, 'permissionDenied'); assert.equal(updater.state().manualAvailable, true);
+  await updater.manual(); assert.equal(opened.length, 1);
+});
+
+test('rollback installer requires exact current tag, asset, digest and size', async (t) => {
+  const { directory } = await fixture(t);
+  const current = '1.6.0';
+  const metadata = release({ tag_name: 'v1.6.0' });
+  metadata.assets[0].name = 'Panache-Setup-1.6.0.exe';
+  metadata.assets[0].browser_download_url = 'https://github.com/SXP-Simon/Panache/releases/download/v1.6.0/Panache-Setup-1.6.0.exe';
+  const calls = [];
+  const fetcher = async (url) => { calls.push(url); return new Response(url.includes('api.github.com') ? JSON.stringify(metadata) : data); };
+  const result = await downloadRollback({ fetcher, current, work: directory, signal: new AbortController().signal });
+  assert.equal(result.digest, digest); assert.equal(path.basename(result.file), 'rollback.exe');
+  assert.equal(calls[0], 'https://api.github.com/repos/SXP-Simon/Panache/releases/tags/v1.6.0');
+  await fs.rm(result.file);
+  metadata.tag_name = 'v1.7.0';
+  await assert.rejects(downloadRollback({ fetcher, current, work: directory, signal: new AbortController().signal }), /rollbackUnavailable/);
 });
 test('corrupt and oversized downloads are removed and cannot be opened', async (t) => {
   for (const corrupted of [Buffer.alloc(data.length), Buffer.alloc(data.length + 1)]) {
@@ -100,7 +138,7 @@ test('update IPC rejects untrusted renderers and accepts no URL/path arguments',
   const handlers = new Map();
   setupUpdater({ ipcMain: { handle: (channel, callback) => handlers.set(channel, callback) }, trustedRenderer: () => false, getWindow: () => null, current: '1.6.0', platform: 'win32', arch: 'x64', directory: '/unused' });
   for (const callback of handlers.values()) assert.throws(() => callback({}, 'https://evil.test/run.exe'), /Untrusted/);
-  assert.equal(handlers.size, 5);
+  assert.equal(handlers.size, 6);
 });
 test('cancelling after all bytes arrive while file sync is pending never publishes ready', async (t) => {
   let unblock, syncing;

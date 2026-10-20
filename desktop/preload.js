@@ -7,7 +7,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const closeHandlers = new Set();
 let closeUiState = null;
 
-ipcRenderer.on("storage:flush-request", async (event, id) => {
+ipcRenderer.on("storage:flush-request", async (event, id, reason) => {
   if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id)) return;
   if (!closeUiState && document.documentElement) {
     closeUiState = {
@@ -18,10 +18,10 @@ ipcRenderer.on("storage:flush-request", async (event, id) => {
     document.documentElement.inert = true;
   }
   try {
-    await Promise.all([...closeHandlers].map((callback) => callback()));
+    await Promise.all([...closeHandlers].map((callback) => callback(reason === "update" ? "update" : "close")));
     ipcRenderer.send("storage:flush-complete", id, true);
-  } catch {
-    ipcRenderer.send("storage:flush-complete", id, false);
+  } catch (error) {
+    ipcRenderer.send("storage:flush-complete", id, false, error?.message === "generationBusy" ? "generationBusy" : "saveFailed");
   }
 });
 ipcRenderer.on("storage:close-cancelled", () => {
@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld("handwritingDesktop", {
     download: () => ipcRenderer.invoke("updates:download"),
     cancel: () => ipcRenderer.invoke("updates:cancel"),
     open: () => ipcRenderer.invoke("updates:open"),
+    manual: () => ipcRenderer.invoke("updates:manual"),
+    healthy: () => ipcRenderer.invoke("updates:healthy"),
     subscribe: (callback) => {
       if (typeof callback !== "function") throw new TypeError("Invalid update listener");
       const listener = (_event, state) => callback(state);

@@ -19,7 +19,7 @@ function newerVersion(latest, current) {
 function assetName(version, platform, arch, portable) {
   if (!stableVersion(version)) return null;
   if (platform === 'win32' && arch === 'x64') return `Panache-${portable ? 'portable' : 'Setup'}-${version}.exe`;
-  if (platform === 'darwin' && arch === 'arm64') return `Panache-${version}-arm64.dmg`;
+  if (platform === 'darwin' && arch === 'arm64') return `Panache-${version}-arm64.zip`;
   return null;
 }
 function trustedUrl(value, download = false) {
@@ -89,8 +89,38 @@ async function cleanupStaleUpdates(directory, now = Date.now()) {
     if (!stat.isSymbolicLink() && stat.isDirectory() && now - stat.mtimeMs > 7 * 24 * 60 * 60 * 1000) await fs.rm(target, { recursive: true, force: true });
   }
 }
-function createUpdater({ current, platform, arch, portable, directory, notify = () => {}, fetcher = fetch, beforeOpen = async () => {}, openPath, reveal, files = fs, development = false }) {
-  let state = { status: 'idle', current, portable };
+async function downloadRollback({ fetcher, current, work, signal, files = fs }) {
+  let release;
+  try { release = await boundedJson(await fetchTrusted(fetcher, API.replace('/latest', `/tags/v${current}`), signal)); }
+  catch (error) { if (error.message === 'pending') throw new Error('rollbackUnavailable'); throw error; }
+  const selected = releaseAsset(release, '0.0.0', 'win32', 'x64', false);
+  if (selected.version !== current || selected.status !== 'available') throw new Error('rollbackUnavailable');
+  const asset = selected.asset;
+  const file = path.join(work, 'rollback.exe');
+  const output = await files.open(file, 'wx', 0o600);
+  const hash = createHash('sha256');
+  let size = 0;
+  let reader;
+  try {
+    const response = await fetchTrusted(fetcher, asset.url, signal, true);
+    reader = response.body?.getReader();
+    if (!reader) throw new Error('integrity');
+    while (true) {
+      const chunk = await reader.read();
+      if (signal.aborted) throw new Error('cancelled');
+      if (chunk.done) break;
+      size += chunk.value.length;
+      if (size > asset.size) throw new Error('integrity');
+      hash.update(chunk.value);
+      await output.writeFile(chunk.value);
+    }
+    if (size !== asset.size || hash.digest('hex') !== asset.digest) throw new Error('integrity');
+    await output.sync();
+    return { file, size, digest: asset.digest };
+  } finally { await reader?.cancel().catch(() => {}); await output.close(); }
+}
+function createUpdater({ current, platform, arch, portable, directory, notify = () => {}, fetcher = fetch, beforeOpen = async () => {}, openPath, reveal, files = fs, development = false, install, recovery = null }) {
+  let state = { status: 'idle', current, portable, recovery };
   let selected = null;
   let operation = null;
   let ready = null;
@@ -102,7 +132,10 @@ function createUpdater({ current, platform, arch, portable, directory, notify = 
     if (path.dirname(target) !== path.resolve(directory) || !path.basename(target).startsWith('update-')) throw new Error('unsafe');
     await files.rm(target, { recursive: true, force: true });
   };
-  const failure = (error) => ['rateLimited', 'pending', 'invalid', 'unsafe', 'integrity', 'saveFailed', 'cleanupFailed'].includes(error.message) ? error.message : 'network';
+  const failure = (error) => {
+    const code = ({ permissions: 'permissionDenied', recoveryUnavailable: 'rollbackUnavailable', systemApproval: 'trustRequired', unsupportedInstall: 'unsupportedLocation', processIdentity: 'invalidInstallation', replaceFailed: 'fileLocked', stopFailed: 'helperFailed', exitTimeout: 'helperFailed' })[error.message] || error.message;
+    return ['rateLimited', 'pending', 'invalid', 'unsafe', 'integrity', 'saveFailed', 'generationBusy', 'cleanupFailed', 'permissionDenied', 'helperUnavailable', 'helperFailed', 'helperTimeout', 'rollbackUnavailable', 'diskSpace', 'fileLocked', 'invalidBundle', 'invalidArchive', 'unsafePath', 'invalidInstallation', 'unsupportedLocation', 'trustRequired'].includes(code) ? code : 'network';
+  };
   async function check() {
     if (development) return emit({ status: 'development' });
     if (operation) return emit({});
@@ -114,7 +147,7 @@ function createUpdater({ current, platform, arch, portable, directory, notify = 
       const result = releaseAsset(release, current, platform, arch, portable);
       await cleanup();
       selected = result.asset ?? null;
-      return emit({ ...result, bytes: 0, error: undefined });
+      return emit({ ...result, bytes: 0, error: undefined, manualAvailable: false });
     } catch (error) { return emit({ status: 'error', error: failure(error) }); }
     finally { clearTimeout(timer); operation = null; }
   }
@@ -127,7 +160,7 @@ function createUpdater({ current, platform, arch, portable, directory, notify = 
     const timer = setTimeout(() => controller.abort(), 30 * 60 * 1000);
     let idleTimer;
     const resetIdle = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => controller.abort(), 30000); };
-    emit({ status: 'downloading', bytes: 0, total: selected.size, error: undefined });
+    emit({ status: 'downloading', bytes: 0, total: selected.size, error: undefined, manualAvailable: false });
     try {
       await cleanup();
       await files.mkdir(directory, { recursive: true });
@@ -160,7 +193,7 @@ function createUpdater({ current, platform, arch, portable, directory, notify = 
       await handle.sync();
       await handle.close(); handle = null;
       if (controller.signal.aborted) throw new Error('cancelled');
-      ready = { directory: temporary, file: target, digest: selected.digest };
+      ready = { directory: temporary, file: target, digest: selected.digest, size: selected.size };
       temporary = null;
       return emit({ status: 'ready' });
     } catch (error) {
@@ -174,36 +207,46 @@ function createUpdater({ current, platform, arch, portable, directory, notify = 
       finally { operation = null; }
     }
   }
-  async function open() {
-    if (operation || !ready || !['ready', 'launched'].includes(state.status)) return emit({});
+  async function open(manual = false) {
+    if (operation || !ready || !['ready', 'launched', 'error'].includes(state.status)) return emit({});
     operation = new AbortController();
+    const controller = operation;
+    const timer = setTimeout(() => controller.abort(), 10 * 60 * 1000);
     try {
       const hash = createHash('sha256');
       const handle = await files.open(ready.file, 'r');
       try { for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk); }
       finally { await handle.close(); }
       if (hash.digest('hex') !== ready.digest) throw new Error('integrity');
+      if (install && !manual) {
+        emit({ status: 'preparing', error: undefined, manualAvailable: false });
+        await install({ ...ready, current, version: state.version, portable }, controller.signal,
+          (work, signal) => downloadRollback({ fetcher, current, work, signal, files }));
+        return emit({ status: 'installing' });
+      }
       await beforeOpen();
-      if (portable) reveal(ready.file);
+      if (portable || platform === 'darwin') reveal(ready.file);
       else if (await openPath(ready.file)) throw new Error('network');
       return emit({ status: portable ? 'ready' : 'launched' });
     } catch (error) {
-      try { await cleanup(); } catch { return emit({ status: 'error', error: 'cleanupFailed' }); }
-      return emit({ status: 'error', error: failure(error) });
+      if (error.message === 'integrity') {
+        try { await cleanup(); } catch { return emit({ status: 'error', error: 'cleanupFailed' }); }
+      }
+      return emit({ status: controller.signal.aborted || error.message === 'generationBusy' ? 'ready' : 'error', error: controller.signal.aborted ? undefined : failure(error), manualAvailable: !controller.signal.aborted && Boolean(ready) && !['integrity', 'generationBusy'].includes(error.message) });
     }
-    finally { operation = null; }
+    finally { clearTimeout(timer); operation = null; }
   }
-  return { check, download, open, cancel: () => { if (['downloading', 'checking'].includes(state.status)) operation?.abort(); return emit({}); }, state: () => emit({}) };
+  return { check, download, open, manual: () => open(true), cancel: () => { if (['downloading', 'checking', 'preparing'].includes(state.status)) operation?.abort(); return emit({}); }, state: () => emit({}) };
 }
 function setupUpdater({ ipcMain, trustedRenderer, getWindow, ...options }) {
   const service = createUpdater({ ...options, notify: (state) => {
     const window = getWindow();
     if (window && !window.isDestroyed()) window.webContents.send('updates:state', state);
   } });
-  for (const action of ['state', 'check', 'download', 'cancel', 'open']) ipcMain.handle(`updates:${action}`, (event) => {
+  for (const action of ['state', 'check', 'download', 'cancel', 'open', 'manual']) ipcMain.handle(`updates:${action}`, (event) => {
     if (!trustedRenderer(event)) throw new Error('Untrusted update request');
     return service[action]();
   });
   return service;
 }
-module.exports = { newerVersion, assetName, trustedUrl, releaseAsset, cleanupStaleUpdates, createUpdater, setupUpdater };
+module.exports = { newerVersion, assetName, trustedUrl, releaseAsset, cleanupStaleUpdates, createUpdater, setupUpdater, downloadRollback };
