@@ -53,6 +53,7 @@ class AppUpdateCard extends StatelessWidget {
         UpdateProblem.saveFailed => l.updateSaveFailed,
         UpdateProblem.restartDeferred => l.updateRestartDeferred,
         UpdateProblem.restartCancelled => l.updateRestartCancelled,
+        UpdateProblem.anotherInstance => l.updateAnotherInstance,
       };
       return Card(
         key: const ValueKey('app-updates'),
@@ -197,6 +198,14 @@ class AppUpdateCard extends StatelessWidget {
                             ? l.updateRestart
                             : l.updateOpenArchive,
                       ),
+                    ),
+                  if (c.phase == UpdatePhase.ready &&
+                      c.problem == UpdateProblem.anotherInstance)
+                    OutlinedButton.icon(
+                      key: const ValueKey('manual-update'),
+                      onPressed: c.opening ? null : c.open,
+                      icon: const Icon(Icons.folder_open),
+                      label: Text(l.updateOpenArchive),
                     ),
                   if (c.web)
                     FilledButton.icon(

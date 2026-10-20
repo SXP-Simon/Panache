@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/theme/handwriting_theme.dart';
 import 'package:handwriting_app/screens/dialogs/app_update_dialog.dart';
+import 'package:handwriting_app/widgets/app_update_card.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/services/updates/update_controller.dart';
@@ -50,6 +51,7 @@ class Host implements UpdateHost, DesktopUpdateHost {
   final events = <String>[];
   Completer<void>? downloadHold, prepareHold;
   bool failPrepare = false;
+  UpdateProblem? prepareProblem;
   @override
   Future<InstalledApp> installed() async =>
       const InstalledApp('1.6.0', UpdateTarget('windows', 'x64'));
@@ -76,6 +78,7 @@ class Host implements UpdateHost, DesktopUpdateHost {
   }) async {
     events.add('prepare');
     await prepareHold?.future;
+    if (prepareProblem != null) throw UpdateException(prepareProblem!);
     if (failPrepare) {
       throw const UpdateException(UpdateProblem.desktopUnavailable);
     }
@@ -351,5 +354,58 @@ void main() {
     await c.download();
     await c.open();
     expect(host.events, ['download', 'manual']);
+  });
+  test('another open window explains how to retry and retains the verified download', () async {
+    final host = Host()..prepareProblem = UpdateProblem.anotherInstance;
+    final c = await controller(host);
+    addTearDown(c.dispose);
+    await c.updateAndRestart(
+      persist: () async {
+        fail('other GUI open');
+      },
+      canRestart: () => true,
+      requestExit: () async {
+        fail('other GUI open');
+      },
+    );
+    expect(c.problem, UpdateProblem.anotherInstance);
+    expect(c.phase, UpdatePhase.ready);
+    expect(host.events, ['download', 'prepare']);
+    expect(c.downloadedPath, isNotNull);
+  });
+  testWidgets('another-instance explanation retains manual archive access', (
+    tester,
+  ) async {
+    final host = Host()..prepareProblem = UpdateProblem.anotherInstance;
+    final c = await controller(host);
+    addTearDown(c.dispose);
+    await c.updateAndRestart(
+      persist: () async => true,
+      canRestart: () => true,
+      requestExit: () async => true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: AppUpdateCard(
+              controller: c,
+              onReload: () async {},
+              onRestart: () async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('请先关闭其他 Panache 窗口，然后重试更新。'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('manual-update')));
+    await tester.tap(find.byKey(const ValueKey('manual-update')));
+    await tester.pumpAndSettle();
+    expect(host.events.last, 'manual');
+    expect(tester.takeException(), isNull);
   });
 }
