@@ -62,6 +62,15 @@ Future<void> main(List<String> arguments) async {
       exit(0);
     } catch (error) {
       final reason = error is UpdaterFailure ? error.code : 'update_failed';
+      try {
+        File(p.join(directory, 'update.log')).writeAsStringSync(
+          '${DateTime.now().toUtc().toIso8601String()} failure $error\n',
+          mode: FileMode.append,
+          flush: true,
+        );
+      } catch (_) {
+        /* Recovery remains mandatory when diagnostics cannot be written. */
+      }
       if (recovering) {
         transaction.cancelRecovery();
       } else if (transaction.ownsInstallation &&
@@ -73,6 +82,9 @@ Future<void> main(List<String> arguments) async {
       rethrow;
     }
   } catch (error) {
+    if (error is UpdaterFailure && error.osError != null) {
+      stderr.writeln('PANACHE_UPDATE_OS_ERROR ${error.code} ${error.osError}');
+    }
     stderr.writeln(
       'PANACHE_UPDATE_ERROR ${error is UpdaterFailure ? error.code : 'update_failed'}',
     );

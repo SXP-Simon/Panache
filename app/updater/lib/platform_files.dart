@@ -9,6 +9,10 @@ import 'protocol.dart';
 
 void atomicFile(String path, Map<String, Object?> value) {
   final temporary = File('$path.${secureToken()}.tmp');
+  final sourcePath = Platform.isWindows
+      ? windowsExtendedPath(temporary.path)
+      : temporary.path;
+  final destinationPath = Platform.isWindows ? windowsExtendedPath(path) : path;
   temporary.writeAsStringSync(jsonEncode(value), flush: true);
   try {
     if (Platform.isWindows) {
@@ -17,16 +21,17 @@ void atomicFile(String path, Map<String, Object?> value) {
             Int32 Function(Pointer<Utf16>, Pointer<Utf16>, Uint32),
             int Function(Pointer<Utf16>, Pointer<Utf16>, int)
           >('MoveFileExW');
-      final source = temporary.path.toNativeUtf16(),
-          destination = path.toNativeUtf16();
+      final source = sourcePath.toNativeUtf16(),
+          destination = destinationPath.toNativeUtf16();
       try {
         final lastError = DynamicLibrary.open('kernel32.dll')
             .lookupFunction<Uint32 Function(), int Function()>('GetLastError');
         final clock = Stopwatch()..start();
         while (move(source, destination, 0x1 | 0x8) == 0) {
-          if (!{5, 32, 33}.contains(lastError()) ||
+          final error = lastError();
+          if (!{5, 32, 33}.contains(error) ||
               clock.elapsed >= const Duration(seconds: 2)) {
-            reject('atomic_write_failed');
+            reject('atomic_write_failed', osError: error);
           }
           sleep(const Duration(milliseconds: 25));
         }
