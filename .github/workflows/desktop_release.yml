@@ -19,6 +19,15 @@ on:
       tag:
         description: 要补传产物的 tag（例如 v1.31.0）
         required: true
+      platform:
+        description: 需要补传的平台
+        type: choice
+        options: [all, windows, macos]
+        default: all
+      test_harness_sha:
+        description: 可选的完整 40 位受信提交，仅修正更新 E2E 测试；应用仍构建指定 tag
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -158,7 +167,7 @@ jobs:
   build-desktop:
     needs: resolve-tag
     # 没有新版本时不构建（省掉一次十几分钟的 Windows 构建）
-    if: needs.resolve-tag.outputs.tag != ''
+    if: needs.resolve-tag.outputs.tag != '' && (github.event_name != 'workflow_dispatch' || inputs.platform != 'macos')
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -216,6 +225,22 @@ jobs:
       # 跑的是上一步刚构建出来的 win-unpacked（真实 Electron 外壳 + 后端 exe，
       # 和安装包里的文件是同一份），跑不过就不挂 Release。
       # _electron 驱动的是 Electron 二进制本身，不需要 playwright install 下载浏览器。
+      - name: 固定应用来源并按需纠正更新测试
+        shell: bash
+        env:
+          TARGET_TAG: ${{ needs.resolve-tag.outputs.tag }}
+          HARNESS_SHA: ${{ inputs.test_harness_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          echo "Application source: $(git rev-parse HEAD) (tag ${TARGET_TAG})"
+          if [ -n "${HARNESS_SHA:-}" ]; then
+            git show "${WORKFLOW_SHA}:scripts/apply-desktop-test-harness.cjs" > "$RUNNER_TEMP/apply-desktop-test-harness.cjs"
+            node "$RUNNER_TEMP/apply-desktop-test-harness.cjs" "$TARGET_TAG" "$HARNESS_SHA" "$WORKFLOW_SHA"
+          else
+            echo "Test harness: $(git rev-parse HEAD) (original tag source)"
+          fi
+
       - name: 桌面版 E2E（真实打包产物）
         working-directory: e2e
         shell: bash
@@ -250,7 +275,7 @@ jobs:
 
   build-desktop-mac:
     needs: resolve-tag
-    if: needs.resolve-tag.outputs.mac_supported == 'true'
+    if: needs.resolve-tag.outputs.mac_supported == 'true' && (github.event_name != 'workflow_dispatch' || inputs.platform != 'windows')
     # 必须是 arm64 的 runner（macos-13 是 Intel）。PyInstaller 不能交叉编译，
     # 后端的架构由构建机决定，而 electron-builder 也只能给 mac 出 arm64 目标，
     # 所以 Intel 包得另开一个 macos-13 的 job 才行，目前没有。
@@ -309,6 +334,22 @@ jobs:
 
       # 驱动刚构建出来的 mac-arm64/Panache.app。未签名，但它是本机构建的、
       # 没有 quarantine 属性（只有从浏览器下载的文件才会被加上），所以能直接启动。
+      - name: 固定应用来源并按需纠正更新测试
+        shell: bash
+        env:
+          TARGET_TAG: ${{ needs.resolve-tag.outputs.tag }}
+          HARNESS_SHA: ${{ inputs.test_harness_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          echo "Application source: $(git rev-parse HEAD) (tag ${TARGET_TAG})"
+          if [ -n "${HARNESS_SHA:-}" ]; then
+            git show "${WORKFLOW_SHA}:scripts/apply-desktop-test-harness.cjs" > "$RUNNER_TEMP/apply-desktop-test-harness.cjs"
+            node "$RUNNER_TEMP/apply-desktop-test-harness.cjs" "$TARGET_TAG" "$HARNESS_SHA" "$WORKFLOW_SHA"
+          else
+            echo "Test harness: $(git rev-parse HEAD) (original tag source)"
+          fi
+
       - name: 桌面版 E2E（真实打包产物）
         working-directory: e2e
         shell: bash

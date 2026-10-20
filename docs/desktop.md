@@ -91,3 +91,18 @@ PYTHON=python bash desktop/build.sh   # 指定解释器（CI 用）
 
 开发约定见仓库根的 [`AGENTS.md`](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md)，
 存储与退出保存见[架构说明](architecture.md)。修改构建、安全或跨平台行为时，以相应源码和测试为准。
+
+## 补传已有版本安装包
+
+在 Actions 的 **Desktop Release Assets** 手动运行，`tag` 填已有版本，`platform` 选择
+`all`、`windows` 或 `macos`。只缺 Mac 包时选 `macos`，避免重建并覆盖已发布的 Windows 包。
+应用源码、依赖和打包配置始终来自指定 tag，完整桌面 E2E 通过后才上传。
+
+`test_harness_sha` 通常留空，使用 tag 自带测试。历史版本仅因更新测试的平台断言错误而阻塞时，
+可填写纠错提交的完整 40 位 SHA；它必须是本次工作流提交的祖先或自身。构建结束后只替换
+`e2e/desktop-tests/updates.spec.js`，其余应用文件和测试保持原样；运行日志记录应用来源与测试 SHA。
+这不会移动 tag 或创建新版本。
+
+```shell
+gh workflow run desktop_release.yml --ref custom-base -f tag=v1.7.1 -f platform=macos -f test_harness_sha=<完整纠错提交SHA>
+```

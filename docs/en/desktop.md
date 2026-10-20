@@ -99,3 +99,20 @@ Artifacts land in `desktop/build/`. For development, run `--app-only` first, the
 Read [`AGENTS.md`](https://github.com/SXP-Simon/Panache/blob/custom-base/AGENTS.md) for development
 conventions and [Architecture](architecture.md) for persistence and saving before exit. Consult the
 corresponding source and tests before changing build, security, or platform behavior.
+
+## Attaching missing packages to an existing release
+
+Manually run **Desktop Release Assets** in Actions with an existing `tag` and choose `all`, `windows`,
+or `macos` for `platform`. Choose `macos` when only Mac packages are missing, so published Windows
+packages are not rebuilt and overwritten. Application source, dependencies, and packaging settings
+always come from the selected tag. Uploads require the complete desktop E2E suite to pass.
+
+Normally leave `test_harness_sha` empty to use the tag's tests. If a historical release is blocked
+solely by an incorrect platform assertion in the update test, supply the full 40-character corrective
+commit SHA. It must be the workflow commit itself or its ancestor. After building, only
+`e2e/desktop-tests/updates.spec.js` is replaced; other application and test files remain unchanged.
+Logs record both the application source and test SHA. This neither moves the tag nor creates a version.
+
+```shell
+gh workflow run desktop_release.yml --ref custom-base -f tag=v1.7.1 -f platform=macos -f test_harness_sha=<full-corrective-commit-SHA>
+```

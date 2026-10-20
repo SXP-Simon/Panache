@@ -296,3 +296,80 @@ test("Flutter assets pin source and keep write permission out of build jobs", ()
   assert.equal(plan.desktop_e2e, false);
   assert.equal(plan.release, false);
 });
+
+// Historical release harness contracts use real temporary Git repositories.
+{
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { execFileSync } = require("node:child_process");
+const { test } = require("node:test");
+const { applyHarness, TEST_FILE } = require("../apply-desktop-test-harness.cjs");
+
+function fixture(t) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "panache-harness-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const git = (...arguments_) => execFileSync("git", arguments_, { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  git("init", "-b", "custom-base");
+  git("config", "core.autocrlf", "false");
+  git("config", "commit.gpgsign", "false");
+  git("config", "core.hooksPath", path.join(directory, ".git/hooks"));
+  git("config", "user.name", "Harness fixture"); git("config", "user.email", "fixture@example.invalid");
+  fs.mkdirSync(path.dirname(path.join(directory, TEST_FILE)), { recursive: true });
+  fs.writeFileSync(path.join(directory, TEST_FILE), "tag tests\n");
+  fs.writeFileSync(path.join(directory, "application.txt"), "immutable tag application\n");
+  git("add", "."); git("commit", "-m", "initial"); git("tag", "v1.7.1");
+  const sourceSha = git("rev-parse", "HEAD");
+  fs.writeFileSync(path.join(directory, TEST_FILE), "platform-correct tests\n");
+  fs.writeFileSync(path.join(directory, "application.txt"), "later application must not be used\n");
+  git("add", "."); git("commit", "-m", "correct tests");
+  const harnessSha = git("rev-parse", "HEAD");
+  git("switch", "--detach", "v1.7.1");
+  return { directory, git, sourceSha, harnessSha, workflowSha: harnessSha, tag: "v1.7.1" };
+}
+
+test("only the allowlisted harness changes while application source stays at the original tag", (t) => {
+  const item = fixture(t);
+  assert.equal(applyHarness(item).sourceSha, item.sourceSha);
+  assert.equal(item.git("rev-parse", "HEAD"), item.sourceSha);
+  assert.equal(item.git("diff", "--name-only"), TEST_FILE);
+  assert.equal(fs.readFileSync(path.join(item.directory, "application.txt"), "utf8"), "immutable tag application\n");
+  assert.equal(fs.readFileSync(path.join(item.directory, TEST_FILE), "utf8"), "platform-correct tests\n");
+});
+
+test("invalid and abbreviated SHA inputs cannot modify the tag checkout", (t) => {
+  const item = fixture(t);
+  for (const harnessSha of ["custom-base", item.harnessSha.slice(0, 12), "--help", "a".repeat(40)]) {
+    assert.throws(() => applyHarness({ ...item, harnessSha }));
+    assert.equal(item.git("status", "--porcelain"), "");
+  }
+});
+
+test("a commit outside the workflow ancestry is rejected without touching files", (t) => {
+  const item = fixture(t);
+  assert.throws(() => applyHarness({ ...item, workflowSha: item.sourceSha }));
+  assert.equal(item.git("status", "--porcelain"), "");
+});
+
+test("the release application checkout cannot be replaced by a newer branch", (t) => {
+  const item = fixture(t);
+  item.git("switch", "custom-base");
+  assert.throws(() => applyHarness(item), /release tag/u);
+  assert.equal(item.git("status", "--porcelain"), "");
+});
+
+test("manual platform selection and explicit trusted harness keep full desktop E2E gates", () => {
+  const workflow = source("desktop_release");
+  assert.ok(workflow.includes("options: [all, windows, macos]"));
+  assert.ok(workflow.includes("inputs.platform != 'macos'"));
+  assert.ok(workflow.includes("inputs.platform != 'windows'"));
+  assert.equal(workflow.match(/HARNESS_SHA: \$\{\{ inputs\.test_harness_sha \}\}/gu).length, 2);
+  assert.equal(workflow.match(/WORKFLOW_SHA: \$\{\{ github\.workflow_sha \}\}/gu).length, 2);
+  assert.equal(workflow.match(/pnpm run test:desktop/gu).length, 2);
+  assert.equal(workflow.match(/ref: \$\{\{ needs\.resolve-tag\.outputs\.tag \}\}/gu).length, 2);
+});
+
+}
