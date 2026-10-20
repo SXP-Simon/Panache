@@ -17,7 +17,7 @@ Y&1&2&3\\ \hline
 P&\frac13&\frac13&\frac13
 \end{array}}
 \]`;
-const expected = '于是，X 的分布律为\n[ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ]\n因此，Y 的分布律为\n[ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ]';
+const expected = '于是，X 的分布律为\n⟦ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ⟧\n因此，Y 的分布律为\n⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧';
 
 for (const order of [
   ['clean-markdown-btn', 'convert-latex-btn'],
@@ -25,9 +25,10 @@ for (const order of [
 ]) {
   test(`distribution arrays convert and render: ${order.join(' then ')}`, async ({ page }) => {
     await openHome(page);
-    await useSmallCanvas(page, { fontSize: 40, lineSpacing: 110 });
-    await page.getByTestId('width-input').fill('2000');
-    await page.getByTestId('height-input').fill('1000');
+    await useSmallCanvas(page, { fontSize: 70, lineSpacing: 120 });
+    await page.getByTestId('width-input').fill('1600');
+    await page.getByTestId('height-input').fill('1600');
+    await page.getByTestId('underlined-checkbox').setChecked(order[0] === 'convert-latex-btn');
     const input = page.getByTestId('text-input');
     await input.fill(source);
     for (const action of order) await page.getByTestId(action).click();

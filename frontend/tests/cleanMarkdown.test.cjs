@@ -17,7 +17,7 @@ test("distribution arrays preserve rows and rules in either cleanup order", asyn
 X&0&1&2&3\\ \hline
 P&\frac8{15}&\frac4{15}&\frac2{15}&\frac1{15}
 \end{array}
-\]`, '于是，X 的分布律为\n[ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ]'],
+\]`, '于是，X 的分布律为\n⟦ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ⟧'],
     [String.raw`因此，Y 的分布律为
 \[
 \boxed{
@@ -25,7 +25,7 @@ P&\frac8{15}&\frac4{15}&\frac2{15}&\frac1{15}
 Y&1&2&3\\ \hline
 P&\frac13&\frac13&\frac13
 \end{array}}
-\]`, '因此，Y 的分布律为\n[ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ]'],
+\]`, '因此，Y 的分布律为\n⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧'],
   ]) {
     assert.equal(convert(cleanMarkdown(source)), expected);
     assert.equal(cleanMarkdown(convert(source)), expected);

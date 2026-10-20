@@ -370,6 +370,19 @@ function blackboard(text: string) {
     .join('');
 }
 
+function safeTableCell(text: string): boolean {
+  if (text === '──' || text === '╌╌') return false;
+  const closing: Record<string, string> = { '(': ')', '[': ']', '{': '}', '⟦': '⟧' };
+  const stack: string[] = [];
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index] ?? '';
+    if (!stack.length && (';|┆'.includes(char) || text.startsWith('  ', index))) return false;
+    if (closing[char]) stack.push(closing[char]);
+    else if (')]}⟧'.includes(char) && stack.pop() !== char) return false;
+  }
+  return stack.length === 0;
+}
+
 function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'standalone'): string {
   if (depth > MAX_FORMULA_DEPTH) throw new Error('Math nesting limit');
   if (value === null || value === undefined) return '';
@@ -456,6 +469,8 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
         horizontalRules.some((lines) => nodeArray(lines).length > 0)
       ) {
         // 2026-10-20：保留增广列与表格分隔，不因辅助线放弃整个数组的转写。
+        if (rows.some((row) => row.some((cell) => !safeTableCell(cell))))
+          throw new Error('Ambiguous table cell separators');
         const separators = new Map<number, string>();
         let column = 0;
         for (const value of columns) {
@@ -485,7 +500,8 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
           content.push(line);
         }
         const table = ` ${content.join(' ; ')} `;
-        return arrayMode === 'standalone' ? `[${table}]` : table;
+        // 表格标记与 bmatrix 的真实方括号区分，绘制时只展开表格本身。
+        return arrayMode === 'standalone' ? `⟦${table}⟧` : table;
       }
       if (node['colSeparationType'] === 'align' || node['colSeparationType'] === 'gather') {
         return rows
