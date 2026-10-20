@@ -22,6 +22,43 @@ class ProcessIdentity {
     reject('unsupported_platform');
   }
 
+  static List<ProcessIdentity> matchingExecutable(String executable) {
+    final wanted = p.normalize(executable);
+    final ids = Platform.isWindows
+        ? _Windows.pids()
+        : Platform.isMacOS
+        ? _Mac.pids()
+        : Platform.isLinux
+        ? Directory('/proc')
+              .listSync(followLinks: false)
+              .map((entry) => int.tryParse(p.basename(entry.path)))
+              .whereType<int>()
+              .toList()
+        : reject('unsupported_platform');
+    final matches = <ProcessIdentity>[];
+    for (final candidate in ids.where((value) => value > 0)) {
+      try {
+        final identity = capture(candidate);
+        if (identity == null) continue;
+        final same = Platform.isWindows
+            ? p.normalize(identity.executable).toLowerCase() ==
+                  wanted.toLowerCase()
+            : p.equals(identity.executable, wanted);
+        if (same && identity.matchesLive()) matches.add(identity);
+      } on UpdaterFailure catch (error) {
+        // System/protected processes can be inaccessible and are not app instances.
+        // A process exiting during enumeration is equally unrelated to this result.
+        if (!{
+          'process_identity_denied',
+          'process_identity_changed',
+        }.contains(error.code)) {
+          rethrow;
+        }
+      }
+    }
+    return matches;
+  }
+
   factory ProcessIdentity.fromJson(Map<String, dynamic> value) {
     final pid = value['pid'], executable = value['executable'];
     final started = value['started'];
@@ -168,7 +205,9 @@ class _Windows {
     return handle;
   }
 
-  static bool _listed(int pid) {
+  static bool _listed(int pid) => pids().contains(pid);
+
+  static List<int> pids() {
     for (var count = 1024; count <= 262144; count *= 2) {
       final processes = calloc<Uint32>(count), needed = calloc<Uint32>();
       try {
@@ -176,7 +215,7 @@ class _Windows {
           reject('process_identity_denied');
         }
         if (needed.value < count * 4) {
-          return processes.asTypedList(needed.value ~/ 4).contains(pid);
+          return processes.asTypedList(needed.value ~/ 4).toList();
         }
       } finally {
         calloc.free(processes);
@@ -334,6 +373,25 @@ class _Mac {
       .lookupFunction<Pointer<Int32> Function(), Pointer<Int32> Function()>(
         '__error',
       );
+
+  static List<int> pids() {
+    final list = _library
+        .lookupFunction<
+          Int32 Function(Pointer<Void>, Int32),
+          int Function(Pointer<Void>, int)
+        >('proc_listallpids');
+    for (var count = 1024; count <= 262144; count *= 2) {
+      final buffer = calloc<Int32>(count);
+      try {
+        final length = list(buffer.cast(), count * 4);
+        if (length < 0) reject('process_identity_denied');
+        if (length < count) return buffer.asTypedList(length).toList();
+      } finally {
+        calloc.free(buffer);
+      }
+    }
+    reject('process_identity_denied');
+  }
 
   static String? _start(int pid, Pointer<Uint8> buffer) {
     final result = _info(pid, 3, 0, buffer.cast(), 136);

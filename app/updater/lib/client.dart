@@ -122,16 +122,28 @@ Future<PreparedDesktopUpdate> launchPreparedHelper(
     }
   });
   onStarted?.call(session);
+  final stderrDone = Completer<void>();
   process.stderr
       .transform(utf8.decoder)
+      .transform(const LineSplitter())
       .listen(
         (text) {
-          if (text.contains('PANACHE_UPDATE_ERROR') && !ready.isCompleted) {
-            ready.completeError(const UpdaterFailure('prepare_failed'));
+          if (text.startsWith('PANACHE_UPDATE_ERROR ') && !ready.isCompleted) {
+            final code = text.substring('PANACHE_UPDATE_ERROR '.length);
+            ready.completeError(
+              UpdaterFailure(
+                RegExp(r'^[a-z_]{1,80}$').hasMatch(code)
+                    ? code
+                    : 'prepare_failed',
+              ),
+            );
           }
         },
         onError: (Object error) {
           if (!ready.isCompleted) ready.completeError(error);
+        },
+        onDone: () {
+          if (!stderrDone.isCompleted) stderrDone.complete();
         },
       );
   process.stdout
@@ -144,9 +156,15 @@ Future<PreparedDesktopUpdate> launchPreparedHelper(
           }
         },
         onDone: () {
-          if (!ready.isCompleted) {
-            ready.completeError(const UpdaterFailure('helper_exited'));
-          }
+          unawaited(
+            stderrDone.future
+                .timeout(const Duration(seconds: 1), onTimeout: () {})
+                .then((_) {
+                  if (!ready.isCompleted) {
+                    ready.completeError(const UpdaterFailure('helper_exited'));
+                  }
+                }),
+          );
         },
         onError: (Object error) {
           if (!ready.isCompleted) ready.completeError(error);

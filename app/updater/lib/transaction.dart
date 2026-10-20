@@ -95,6 +95,10 @@ class UpdateTransaction {
       }
     }
     _lock = InstallationLock(plan.target);
+    if (ProcessIdentity.matchingExecutable(plan.parent.executable)
+        .any((instance) => instance.pid != plan.parent.pid)) {
+      reject('another_instance_running');
+    }
     if (File(pendingPath(plan.target)).existsSync()) {
       reject('recovery_required');
     }
