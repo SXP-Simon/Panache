@@ -106,10 +106,35 @@ class ProcessIdentity {
         if (!matchesLive()) return true;
       } on UpdaterFailure catch (error) {
         // An access error while a process exits is not evidence it has gone.
-        if (error.code != 'process_identity_denied') rethrow;
+        if (!{
+          'process_identity_denied',
+          'process_identity_changed',
+        }.contains(error.code)) {
+          rethrow;
+        }
       }
       if (clock.elapsed >= timeout) return false;
       await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+  }
+
+  Future<bool> _matchesForSignal(Duration timeout) async {
+    final clock = Stopwatch()..start();
+    while (true) {
+      try {
+        return matchesLive();
+      } on UpdaterFailure catch (error) {
+        if (!{
+          'process_identity_denied',
+          'process_identity_changed',
+        }.contains(error.code)) {
+          rethrow;
+        }
+        // An unreadable snapshot is unknown, never gone and never a signal
+        // target. Re-read until one coherent identity can be compared.
+        if (clock.elapsed >= timeout) rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
 
@@ -121,7 +146,7 @@ class ProcessIdentity {
       await _Windows.stop(this, timeout);
       return;
     }
-    if (!matchesLive()) return;
+    if (!await _matchesForSignal(timeout)) return;
     if (Platform.isLinux) {
       await _linuxStop(this, timeout);
       return;
@@ -129,10 +154,10 @@ class ProcessIdentity {
     if (!Platform.isMacOS) reject('unsupported_platform');
     // Darwin exposes PID-based signals. Recheck creation time before each one;
     // never fall back to a name/group-wide kill if identity cannot be read.
-    if (!matchesLive()) return;
+    if (!await _matchesForSignal(timeout)) return;
     Process.killPid(pid, ProcessSignal.sigterm);
     if (await waitGone(timeout: timeout)) return;
-    if (!matchesLive()) return;
+    if (!await _matchesForSignal(timeout)) return;
     Process.killPid(pid, ProcessSignal.sigkill);
     if (!await waitGone(timeout: const Duration(seconds: 2))) {
       reject('process_stop_failed');
@@ -302,11 +327,15 @@ String? _linuxStart(int pid) {
 }
 
 ProcessIdentity? _linuxCapture(int pid) {
+  String? sampled;
   try {
     final start = _linuxStart(pid);
+    sampled = start;
     if (start == null) return null;
     final executable = Link('/proc/$pid/exe').resolveSymbolicLinksSync();
-    if (_linuxStart(pid) != start) reject('process_identity_changed');
+    final after = _linuxStart(pid);
+    if (after == null) return null;
+    if (after != start) reject('process_identity_changed');
     final boot = File('/proc/sys/kernel/random/boot_id')
         .readAsStringSync()
         .trim();
@@ -315,9 +344,18 @@ ProcessIdentity? _linuxCapture(int pid) {
     }
     return ProcessIdentity(pid, executable, 'linux:$boot:$start');
   } on FileSystemException catch (error) {
-    if ({2, 3}.contains(error.osError?.errorCode) &&
-        !Directory('/proc/$pid').existsSync()) {
-      return null;
+    if ({2, 3}.contains(error.osError?.errorCode)) {
+      // Linux drops /proc/PID/exe before the task directory disappears. A
+      // zombie/dead stat is conclusive; an unreadable live executable is not.
+      try {
+        final after = _linuxStart(pid);
+        if (after == null) return null;
+        if (sampled != null && after != sampled) {
+          reject('process_identity_changed');
+        }
+      } on FileSystemException catch (recheck) {
+        if ({2, 3}.contains(recheck.osError?.errorCode)) return null;
+      }
     }
     reject('process_identity_denied');
   }
@@ -337,16 +375,18 @@ Future<void> _linuxStop(ProcessIdentity identity, Duration timeout) async {
       .lookupFunction<Int32 Function(Int32), int Function(int)>('close');
   final fd = call(434, identity.pid, 0, 0, 0);
   if (fd < 0) {
-    if (!identity.matchesLive()) return;
+    if (!await identity._matchesForSignal(timeout)) return;
     reject('process_identity_denied');
   }
   try {
-    if (!identity.matchesLive()) return;
-    if (call(424, fd, 15, 0, 0) < 0 && identity.matchesLive()) {
+    if (!await identity._matchesForSignal(timeout)) return;
+    if (call(424, fd, 15, 0, 0) < 0 &&
+        await identity._matchesForSignal(timeout)) {
       reject('process_stop_failed');
     }
     if (await identity.waitGone(timeout: timeout)) return;
-    if (call(424, fd, 9, 0, 0) < 0 && identity.matchesLive()) {
+    if (call(424, fd, 9, 0, 0) < 0 &&
+        await identity._matchesForSignal(timeout)) {
       reject('process_stop_failed');
     }
     if (!await identity.waitGone(timeout: const Duration(seconds: 2))) {
@@ -419,7 +459,9 @@ class _Mac {
         reject('process_identity_denied');
       }
       final executable = path.cast<Utf8>().toDartString();
-      if (_start(pid, buffer) != started) reject('process_identity_changed');
+      final after = _start(pid, buffer);
+      if (after == null) return null;
+      if (after != started) reject('process_identity_changed');
       return ProcessIdentity(pid, executable, started);
     } finally {
       calloc.free(buffer);
