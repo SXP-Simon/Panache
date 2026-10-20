@@ -1,3 +1,17 @@
+## [1.7.1](https://github.com/SXP-Simon/Panache/compare/v1.7.0...v1.7.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **desktop:** 下载后自动安装重启并恢复失败更新 ([e9fd501](https://github.com/SXP-Simon/Panache/commit/e9fd501b9eb67be711543d72b2f00d1c8a559611))
+* **desktop:** 使用稳定解释器入口运行原生更新测试 ([11b8c5c](https://github.com/SXP-Simon/Panache/commit/11b8c5c816d8d53c6c742284e5ce8482298c9124))
+* **desktop:** 回收退出主进程遗留的更新子进程 ([64f2962](https://github.com/SXP-Simon/Panache/commit/64f29623c9ef3a941d9e09e7adaabd9387f08c87))
+* **desktop:** 对新构建的 Mac 应用签名并验证更新助手 ([fe60840](https://github.com/SXP-Simon/Panache/commit/fe6084005c453c9229a3525e85f2fa85acf0a145))
+* **desktop:** 等待 Windows 更新进程完成内核退出 ([be358a1](https://github.com/SXP-Simon/Panache/commit/be358a1778b9b832705cbd6af866a53fad7d3263))
+* **desktop:** 适配系统接口并避免更新强关其他窗口 ([879a26f](https://github.com/SXP-Simon/Panache/commit/879a26ff84ccae8d900279d3861eab1cbfcb15da))
+* **fe/src:** 一次操作完成更新并保护未保存内容 ([6850eec](https://github.com/SXP-Simon/Panache/commit/6850eecd438cfe00919a59a7fc4938426d4a5eab))
+* **fe/src:** 兼容缺少更新接口的旧桌面桥接 ([9f7d643](https://github.com/SXP-Simon/Panache/commit/9f7d643663d2746f94ca1b958ee8b625471620a6))
+
 # [1.7.0](https://github.com/SXP-Simon/Panache/compare/v1.6.0...v1.7.0) (2026-10-20)
 
 
