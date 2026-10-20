@@ -49,13 +49,13 @@ async function start() {
 }
 function StartupHealth({ restored }: { restored: boolean }) {
   useEffect(() => {
-    if (!restored || !window.handwritingDesktop?.updates.healthy) return;
+    const updates = window.handwritingDesktop?.updates;
+    if (!restored || !updates?.healthy) return;
     let cancelled = false;
     const frame = requestAnimationFrame(() => {
       void (async () => {
         await flushWorkspaceNow();
-        if (!cancelled && useSaveStatus.getState().status === 'saved')
-          await window.handwritingDesktop?.updates.healthy();
+        if (!cancelled && useSaveStatus.getState().status === 'saved') await updates.healthy();
       })().catch(() => {});
     });
     return () => {
