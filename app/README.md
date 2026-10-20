@@ -28,7 +28,7 @@ python3 scripts/build-flutter-desktop.py
 python3 scripts/build-flutter-desktop.py --flutter /path/to/flutter
 ```
 
-脚本构建当前平台的原生 UI 和 Rust 服务，随包复制默认字体、VERSION 和许可。产物在 `target/desktop-package/<platform>/`：macOS 为 `.app` 和 ZIP，Windows 为完整应用目录和 ZIP，Linux 为应用目录和 tar.gz。Windows 可用 `python` 执行脚本。必须分发完整目录，不能只复制 UI 可执行文件。版本读取根目录的 `VERSION`。
+脚本构建当前平台的原生 UI、Rust 服务和独立原生更新助手，随包复制默认字体、VERSION 和许可。产物在 `target/desktop-package/<platform>/`：macOS 为 `.app` 和 ZIP，Windows 为完整应用目录和 ZIP，Linux 为应用目录和 tar.gz。Windows 可用 `python` 执行脚本。必须分发完整目录，不能只复制 UI 可执行文件；Windows 根目录的 `handwriting_app.exe` 是稳定启动器，实际应用位于 `versions/`。版本读取根目录的 `VERSION`，正式发布由构建参数覆盖。
 
 启动 `.app`、Windows 目录中的 `.exe` 或 Linux 目录中的 `handwriting_app` 即可。客户端自动拉起内置服务，等待握手和健康检查，再恢复草稿并连接工作台。服务只绑定 `127.0.0.1` 的随机端口，访问令牌每次随机生成；桌面模式忽略保存的远程地址并禁用地址切换。生成、文档导入、背景识别与导出不需要网络；项目链接和 GitHub 问题反馈需要网络。
 
