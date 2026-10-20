@@ -601,4 +601,44 @@ void main() {
       expect(currentInstall(fixture.plan).version, '1.6.0');
     },
   );
+  test('a second live GUI at the same exact executable blocks prepare without terminating either', () async {
+    final fixture = await Fixture.create();
+    addTearDown(fixture.dispose);
+    final second = await Process.start(fixture.plan.parent.executable, [
+      '--hold',
+    ]);
+    second.stderr.drain<void>().ignore();
+    await second.stdout.first;
+    addTearDown(() async {
+      second.kill();
+      await second.exitCode;
+    });
+    final identity = ProcessIdentity.capture(second.pid)!;
+    final found = ProcessIdentity.matchingExecutable(
+      fixture.plan.parent.executable,
+    );
+    expect(
+      found.map((item) => item.pid),
+      containsAll([fixture.parent.pid, second.pid]),
+    );
+    final result = await Process.run(helper, [
+      '--prepare',
+      fixture.directory,
+      fixture.plan.token,
+    ]);
+    expect(result.exitCode, 1);
+    expect('${result.stderr}', contains('another_instance_running'));
+    await expectLater(
+      launchPreparedHelper(helper, fixture.directory, fixture.plan.token),
+      throwsA(
+        predicate(
+          (e) => e is UpdaterFailure && e.code == 'another_instance_running',
+        ),
+      ),
+    );
+    expect(fixture.plan.parent.matchesLive(), true);
+    expect(identity.matchesLive(), true);
+    expect(currentInstall(fixture.plan).version, '1.6.0');
+    expect(File(pendingPath(fixture.target)).existsSync(), false);
+  });
 }
