@@ -1,4 +1,5 @@
 # Copyright (C) 2026 SXP-Simon
+import contextlib
 import dataclasses
 import hashlib
 import os
@@ -151,6 +152,68 @@ def test_fixture_uses_actual_runtime_even_when_python_executable_names_a_launche
     actual = Path(psutil.Process().exe()).resolve()
     monkeypatch.setattr(sys, "executable", str(actual.with_name("framework-launcher")))
     assert Path(running_python()) == actual
+
+
+@pytest.mark.parametrize("changed", ["exe", "created"])
+def test_session_capture_refuses_live_changed_identity(native_plan, monkeypatch, changed):
+    root = native._identity(psutil.Process())
+    if changed == "exe":
+        root["exe"] = str(native_plan.work / "old-entry")
+    else:
+        root["created"] = psutil.Process().create_time() - 1
+    launched = native.LaunchedApp(native_plan, root)
+    monkeypatch.setattr(
+        native.psutil, "process_iter", Mock(side_effect=AssertionError("unsafe scan"))
+    )
+    with pytest.raises(UpdateFailure, match=native.STOP_FAILED):
+        launched._capture_session()
+    assert not launched.identities
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX zombie and independent session")
+def test_zombie_root_does_not_hide_unrecorded_owned_sidecar(native_plan, monkeypatch):
+    start = native_plan.work / "spawn-child"
+    child_file = native_plan.work / "orphan-child"
+    code = f"""
+import os,subprocess,time
+from pathlib import Path
+while not Path({str(start)!r}).exists(): time.sleep(.01)
+child = subprocess.Popen([{running_python()!r}, '-c', 'import time;time.sleep(60)'])
+Path({str(child_file)!r}).write_text(str(child.pid))
+os._exit(0)
+"""
+    handles = []
+    original = native._spawn_process
+
+    def spawn(_arguments, directory, environment, output):
+        process, job = original([running_python(), "-c", code], directory, environment, output)
+        handles.append(process)
+        return process, job
+
+    monkeypatch.setattr(native, "_spawn_process", spawn)
+    launched = native.launch_application(native_plan)
+    child_identity = None
+    try:
+        start.touch()
+        child_identity = native._identity(psutil.Process(wait_file(child_file)))
+        root = psutil.Process(launched.root["pid"])
+        deadline = time.monotonic() + 10
+        while root.status() != psutil.STATUS_ZOMBIE:
+            if time.monotonic() >= deadline:
+                pytest.fail("Fixture root did not become a zombie")
+            time.sleep(0.02)
+        assert not launched.identities
+        launched.stop()
+        wait_stopped(child_identity)
+    finally:
+        for identity in [child_identity, launched.root]:
+            if identity is None:
+                continue
+            with contextlib.suppress(psutil.Error, UpdateFailure):
+                process = native._matching_process(identity)
+                if process:
+                    process.kill()
+        handles[0].wait(timeout=10)
 
 
 def test_real_new_application_tree_stops_even_when_recording_is_broken(native_plan, monkeypatch):

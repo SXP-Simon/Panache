@@ -781,8 +781,13 @@ class LaunchedApp:
         """2026-10-20：旧根已退出时只收集本次独立 session 内仍存活的同用户后代."""
         root_pid = cast("int", self.root["pid"])
         created = cast("float", self.root["created"])
-        if psutil.pid_exists(root_pid):
-            return
+        try:
+            root = _owned_process(root_pid)
+            if root.create_time() != created or root.status() != psutil.STATUS_ZOMBIE:
+                # 2026-10-20：活着但入口改变、或 PID 已复用时，不能冒充已退出并继续回滚。
+                raise UpdateFailure(STOP_FAILED)
+        except psutil.NoSuchProcess:
+            pass
         for process in psutil.process_iter():
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError):
                 if process.username() != psutil.Process().username():
