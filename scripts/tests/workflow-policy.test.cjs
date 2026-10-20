@@ -65,10 +65,10 @@ function gateChecks(selected) {
   const checks = {
     changes: {
       result: "success",
-      outputs: { has_quality: selected, docker: selected, docs: selected, desktop_e2e: selected },
+      outputs: { has_quality: selected, docker: selected, docs: selected, desktop_e2e: selected, unit_desktop: selected },
     },
   };
-  for (const name of ["quality", "docker", "docs", "desktop"]) {
+  for (const name of ["quality", "docker", "docs", "desktop", "desktop_macos"]) {
     checks[name] = { result: selected === "true" ? "success" : "skipped" };
   }
   return checks;
@@ -100,17 +100,17 @@ test("Engineering 读取共享计划全部检查开关，文档不创建代码 r
 test("稳定 gate 始终执行，所有选中检查都必须成功，缺失选择与失败不能伪装为跳过", () => {
   const workflow = source("engineering-quality");
   const gate = snippets("engineering-quality")[1];
-  assert.match(workflow, /name: Engineering quality gate\n\s+needs: \[changes, quality, docker, docs, desktop\]\n\s+if: always\(\)/u);
+  assert.match(workflow, /name: Engineering quality gate\n\s+needs: \[changes, quality, docker, docs, desktop, desktop_macos\]\n\s+if: always\(\)/u);
   evaluate(gate, { checks: gateChecks("true") });
   evaluate(gate, { checks: gateChecks("false") });
-  for (const name of ["quality", "docker", "docs", "desktop"]) {
+  for (const name of ["quality", "docker", "docs", "desktop", "desktop_macos"]) {
     for (const result of ["skipped", "failure", "cancelled"]) {
       const checks = gateChecks("true");
       checks[name].result = result;
       assert.throws(() => evaluate(gate, { checks }), /did not succeed|failed or was cancelled/u, `${name}: ${result}`);
     }
     const checks = gateChecks("true");
-    delete checks.changes.outputs[name === "quality" ? "has_quality" : name === "desktop" ? "desktop_e2e" : name];
+    delete checks.changes.outputs[name === "quality" ? "has_quality" : name === "desktop" ? "desktop_e2e" : name === "desktop_macos" ? "unit_desktop" : name];
     assert.throws(() => evaluate(gate, { checks }), /Missing check selection/u);
   }
   const failedPlanning = gateChecks("false");
@@ -119,6 +119,23 @@ test("稳定 gate 始终执行，所有选中检查都必须成功，缺失选�
   const unexpectedFailure = gateChecks("false");
   unexpectedFailure.docker.result = "failure";
   assert.throws(() => evaluate(gate, { checks: unexpectedFailure }), /failed or was cancelled/u);
+});
+
+test("桌面单测要求 macOS 原生回归，其他检查跳过不能替代它", () => {
+  const workflow = source("engineering-quality");
+  const gate = snippets("engineering-quality")[1];
+  const job = workflow.split("\n  desktop_macos:\n")[1].split("\n  gate:\n")[0];
+  assert.match(job, /if: needs\.changes\.outputs\.unit_desktop == 'true'/u);
+  assert.match(job, /runs-on: macos-14/u);
+  assert.match(job, /pnpm run test:desktop-storage/u);
+  const checks = gateChecks("false");
+  checks.changes.outputs.unit_desktop = "true";
+  checks.desktop_macos.result = "success";
+  evaluate(gate, { checks });
+  for (const result of ["failure", "cancelled", "skipped"]) {
+    checks.desktop_macos.result = result;
+    assert.throws(() => evaluate(gate, { checks }), /did not succeed|failed or was cancelled/u);
+  }
 });
 
 for (const [name, flag, outputKey] of [
@@ -220,7 +237,7 @@ test("Semantic API 显式使用已检出的 custom-base SHA，按真实返回值
 test("Python 与桌面打包使用独立 job，打包后不再执行会移除 build extra 的 uv 同步", () => {
   const workflow = source("engineering-quality");
   const quality = workflow.split("\n  quality:\n")[1].split("\n  docker:\n")[0];
-  const desktop = workflow.split("\n  desktop:\n")[1].split("\n  gate:\n")[0];
+  const desktop = workflow.split("\n  desktop:\n")[1].split("\n  desktop_macos:\n")[0];
   assert.match(quality, /NEEDS_PYTHON: .*outputs\.python == 'true'.*outputs\.unit_python == 'true'.*matrix\.os == 'ubuntu-latest'.*outputs\.e2e == 'true'/u);
   assert.match(quality, /if: env\.NEEDS_PYTHON == 'true'/u);
   assert.match(quality, /uv sync --locked --extra dev/u);

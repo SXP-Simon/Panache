@@ -11,7 +11,7 @@ function testCommands(plan) {
     ...(plan.hooks ? ["pnpm run test:hooks"] : []),
     ...(plan.unit_frontend ? ["pnpm run test:frontend"] : []),
     ...(plan.unit_python ? ["uv run --extra dev python -m pytest backend/tests"] : []),
-    ...(plan.unit_desktop ? ["pnpm run test:desktop-storage"] : []),
+    ...(plan.unit_desktop ? ["pnpm run test:desktop-storage", "pnpm run test:desktop-updater"] : []),
     ...(plan.build || plan.sw_upgrade ? ["pnpm --filter handwrite run build"] : []),
     ...(plan.sw_upgrade ? ["pnpm run test:sw-upgrade"] : []),
     ...(plan.e2e ? ["pnpm --filter handwriting-web-e2e run test"] : []),

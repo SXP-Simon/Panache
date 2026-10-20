@@ -50,8 +50,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["backend"]
 [tool.pyright]
-include = ["backend/*.py", "scripts/*.py"]
-extraPaths = ["backend"]
+include = ["backend/*.py", "scripts/*.py", "desktop/*.py"]
+extraPaths = ["backend", "desktop"]
 typeCheckingMode = "strict"
 stubPath = "backend/stubs"
 pythonVersion = "3.12"
@@ -72,6 +72,7 @@ ignore = ["D203", "D213", "COM812"]
 [tool.ruff.lint.per-file-ignores]
 # Tests intentionally assert behavior and inspect private rendering geometry.
 "backend/tests/**" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "D100", "D101", "D102", "D103", "D107", "INP001", "PLR2004", "PT009", "PT027", "S101", "SLF001"]
+"desktop/tests/**" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "D100", "D101", "D102", "D103", "D107", "INP001", "PLR2004", "PT009", "PT027", "S101", "SLF001"]
 # Third-party declarations must preserve their existing keyword and API names.
 "backend/stubs/**/*.pyi" = ["A001", "A002", "N802", "N803"]
 # Rendering tests deliberately seed non-cryptographic pseudo-random generators.

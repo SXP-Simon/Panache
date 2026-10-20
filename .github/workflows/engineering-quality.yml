@@ -106,7 +106,7 @@ jobs:
       PYTHONIOENCODING: utf-8
       SENTRY_DSN: ""
       NEEDS_NODE: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.hooks == 'true' || needs.changes.outputs.unit_frontend == 'true' || needs.changes.outputs.unit_desktop == 'true' || (matrix.os == 'ubuntu-latest' && (needs.changes.outputs.build == 'true' || needs.changes.outputs.e2e == 'true' || needs.changes.outputs.sw_upgrade == 'true')) }}
-      NEEDS_PYTHON: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.unit_python == 'true' || (matrix.os == 'ubuntu-latest' && needs.changes.outputs.e2e == 'true') }}
+      NEEDS_PYTHON: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.unit_python == 'true' || needs.changes.outputs.unit_desktop == 'true' || (matrix.os == 'ubuntu-latest' && needs.changes.outputs.e2e == 'true') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -152,6 +152,9 @@ jobs:
       - name: Desktop storage unit tests
         if: needs.changes.outputs.unit_desktop == 'true'
         run: pnpm run test:desktop-storage
+      - name: Desktop updater fault and process regression tests
+        if: needs.changes.outputs.unit_desktop == 'true'
+        run: pnpm run test:desktop-updater
       - name: Backend unit tests
         if: needs.changes.outputs.unit_python == 'true'
         run: uv run --locked --extra dev python -m pytest backend/tests
@@ -274,9 +277,32 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  desktop_macos:
+    name: macOS desktop update and storage regression
+    needs: changes
+    if: needs.changes.outputs.unit_desktop == 'true'
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --locked --extra dev --extra build
+      - run: pnpm run test:desktop-storage
+      - run: pnpm run test:desktop-updater
+
   gate:
     name: Engineering quality gate
-    needs: [changes, quality, docker, docs, desktop]
+    needs: [changes, quality, docker, docs, desktop, desktop_macos]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -292,6 +318,7 @@ jobs:
             docker: checks.changes.outputs.docker,
             docs: checks.changes.outputs.docs,
             desktop: checks.changes.outputs.desktop_e2e,
+            desktop_macos: checks.changes.outputs.unit_desktop,
           };
           for (const [name, selected] of Object.entries(required)) {
             if (!['true', 'false'].includes(selected)) throw new Error(`Missing check selection for ${name}.`);
