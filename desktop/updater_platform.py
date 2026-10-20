@@ -39,6 +39,9 @@ RUN_ONCE = r"Software\Microsoft\Windows\CurrentVersion\RunOnce"
 VERSION_SIGNATURE = 0xFEEF04BD
 RUN_ONCE_LIMIT = 260
 MAX_QUARANTINE_BYTES = 65536
+MAX_JOB_PROCESSES = 65536
+WIN_MORE_DATA = 234
+WIN_NO_PROCESS = 87
 
 
 def _same_path(left: Path, right: Path) -> bool:
@@ -689,13 +692,96 @@ class _WindowsJob:
                 raise UpdateFailure(EXIT_TIMEOUT)
             time.sleep(0.05)
 
-    def stop(self) -> None:
-        """2026-10-20：结束 Job 内的本次进程树，确认文件锁已释放."""
-        function = self.library.TerminateJobObject
-        function.argtypes, function.restype = [ctypes.c_void_p, ctypes.c_uint32], ctypes.c_int
-        if not function(self.handle, 1):
+    def _member_handles(self) -> list[ctypes.c_void_p]:
+        """2026-10-20：保留本 Job 现存成员的等待句柄，退出计数归零不等于句柄已发信号."""
+        if sys.platform != "win32":
+            raise UpdateFailure(UNSUPPORTED_INSTALL)
+        query = self.library.QueryInformationJobObject
+        query.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+        ]
+        query.restype = ctypes.c_int
+        capacity = 64
+        while capacity <= MAX_JOB_PROCESSES:
+            buffer = ctypes.create_string_buffer(8 + capacity * ctypes.sizeof(ctypes.c_size_t))
+            if query(self.handle, 3, buffer, ctypes.sizeof(buffer), None):
+                count = ctypes.c_uint32.from_buffer(buffer, 4).value
+                if count > capacity:
+                    raise UpdateFailure(STOP_FAILED)
+                return self._open_members(buffer, count)
+            if ctypes.get_last_error() != WIN_MORE_DATA:
+                raise UpdateFailure(STOP_FAILED)
+            capacity = max(capacity * 2, ctypes.c_uint32.from_buffer(buffer).value)
+        raise UpdateFailure(STOP_FAILED)
+
+    def _member_handle(self, pid: int) -> ctypes.c_void_p | None:
+        """2026-10-20：打开后再次确认 Job 归属，PID 复用不能延伸等待目标."""
+        if sys.platform != "win32":
+            raise UpdateFailure(UNSUPPORTED_INSTALL)
+        function = self.library.OpenProcess
+        function.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        function.restype = ctypes.c_void_p
+        handle = ctypes.c_void_p(function(0x100000 | 0x1000, 0, pid))
+        if not handle.value:
+            if ctypes.get_last_error() == WIN_NO_PROCESS:
+                return None
             raise UpdateFailure(STOP_FAILED)
-        self.wait(10)
+        accepted = False
+        try:
+            belongs = ctypes.c_int()
+            check = self.library.IsProcessInJob
+            check.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+            check.restype = ctypes.c_int
+            if not check(handle, self.handle, ctypes.byref(belongs)) or not belongs.value:
+                raise UpdateFailure(STOP_FAILED)
+            accepted = True
+            return handle
+        finally:
+            if not accepted:
+                self._close_handle(handle)
+
+    def _open_members(
+        self, buffer: ctypes.Array[ctypes.c_char], count: int
+    ) -> list[ctypes.c_void_p]:
+        """2026-10-20：只能等待精确 Job 成员，不按进程名终止或扩展目标."""
+        handles: list[ctypes.c_void_p] = []
+        try:
+            for index in range(count):
+                offset = 8 + index * ctypes.sizeof(ctypes.c_size_t)
+                pid = ctypes.c_size_t.from_buffer(buffer, offset).value
+                if handle := self._member_handle(pid):
+                    handles.append(handle)
+        except (OSError, UpdateFailure):
+            for handle in handles:
+                self._close_handle(handle)
+            raise
+        return handles
+
+    def stop(self) -> None:
+        """2026-10-20：结束 Job 内的本次树，同时等待成员的内核退出信号与 Job 清空."""
+        handles = self._member_handles()
+        deadline = time.monotonic() + 10
+        try:
+            function = self.library.TerminateJobObject
+            function.argtypes, function.restype = [ctypes.c_void_p, ctypes.c_uint32], ctypes.c_int
+            if not function(self.handle, 1):
+                raise UpdateFailure(STOP_FAILED)
+            # 2026-10-20：终止后再捕获一次，覆盖首次枚举后派生、尚未退出的成员。
+            handles.extend(self._member_handles())
+            self.wait(max(0, deadline - time.monotonic()))
+            wait = self.library.WaitForSingleObject
+            wait.argtypes, wait.restype = [ctypes.c_void_p, ctypes.c_uint32], ctypes.c_uint32
+            for handle in handles:
+                remaining = max(0, int((deadline - time.monotonic()) * 1000))
+                if wait(handle, remaining) != 0:
+                    raise UpdateFailure(STOP_FAILED)
+        finally:
+            for handle in handles:
+                self._close_handle(handle)
         self._close()
 
     def release(self) -> None:

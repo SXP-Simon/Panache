@@ -62,6 +62,18 @@ def wait_stopped(identity):
         time.sleep(0.02)
 
 
+def assert_stopped(pid):
+    try:
+        process = psutil.Process(pid)
+        if sys.platform == "win32":
+            # 2026-10-20：Windows status 不能区分已终止的句柄，零超时等待必须已发出退出信号。
+            process.wait(timeout=0)
+        else:
+            assert process.status() == psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        pass
+
+
 @pytest.mark.parametrize("mode", ["win-install", "win-portable", "mac-bundle"])
 def test_other_window_of_same_target_is_rejected_without_termination(
     native_plan, monkeypatch, mode
@@ -232,12 +244,44 @@ def test_launch_record_failure_cleans_real_root_and_sidecar_before_return(native
     with pytest.raises(UpdateFailure, match=native.INSTALL_FAILED):
         native.launch_application(native_plan)
     for path in (root_file, child_file):
-        pid = wait_file(path)
-        try:
-            process = psutil.Process(pid)
-            assert process.status() == psutil.STATUS_ZOMBIE
-        except psutil.NoSuchProcess:
-            pass
+        assert_stopped(wait_file(path))
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process exit signal")
+def test_exit_assertion_rejects_a_live_process_without_waiting_for_cleanup():
+    process = subprocess.Popen([running_python(), "-c", "import time;time.sleep(60)"])  # noqa: S603
+    try:
+        with pytest.raises(psutil.TimeoutExpired):
+            assert_stopped(process.pid)
+    finally:
+        process.kill()
+        process.wait(timeout=10)
+    assert_stopped(process.pid)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Job membership")
+def test_job_wait_handle_rejects_unrelated_process_without_stopping_it():
+    process = subprocess.Popen([running_python(), "-c", "import time;time.sleep(60)"])  # noqa: S603
+    job = native._WindowsJob()
+    try:
+        with pytest.raises(UpdateFailure, match=native.STOP_FAILED):
+            job._member_handle(process.pid)
+        assert process.poll() is None
+    finally:
+        process.kill()
+        process.wait(timeout=10)
+        job.stop()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows status has no zombie state")
+def test_exit_assertion_uses_signal_even_when_windows_status_reports_running(monkeypatch):
+    process = Mock()
+    process.status.return_value = psutil.STATUS_RUNNING
+    process.wait.return_value = 1
+    monkeypatch.setattr(psutil, "Process", Mock(return_value=process))
+    assert_stopped(12345)
+    process.wait.assert_called_once_with(timeout=0)
+    process.status.assert_not_called()
 
 
 def test_fast_exit_is_reported_as_fixed_failure(native_plan, monkeypatch):
