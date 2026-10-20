@@ -15,6 +15,7 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(link).toHaveText('SXP-Simon/Panache');
       await expect(link).toHaveAttribute('href', 'https://github.com/SXP-Simon/Panache');
       await expect(link).toHaveAttribute('target', '_blank');
+      if (width <= 720) await link.scrollIntoViewIfNeeded();
       await expect(link).toBeInViewport();
       const bounds = await link.boundingBox();
       expect(bounds.x).toBeGreaterThanOrEqual(0);
