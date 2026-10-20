@@ -382,7 +382,7 @@
   [
     "array with column and row separators",
     "$\\begin{array}{c|c}1&2\\\\\\hline3&4\\end{array}$",
-    "[ 1 | 2 ; ── ; 3 | 4 ]"
+    "⟦ 1 | 2 ; ── ; 3 | 4 ⟧"
   ],
   [
     "preserves unsupported/literal $\\not\\models$",

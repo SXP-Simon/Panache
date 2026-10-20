@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/services/desktop_backend.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/latex.dart';
+import 'package:handwriting_app/utils/text_tools.dart';
 
 void main() {
   const executable = String.fromEnvironment('DESKTOP_BACKEND_EXECUTABLE');
@@ -46,6 +47,14 @@ void main() {
           'strikethrough_probability': '0',
         });
         w.settings.fullPreview = true;
+        final markdown = cleanMarkdown(
+          '| 名称 | 概率 |\n'
+          '| --- | --- |\n'
+          r'| 甲\|乙 | $\frac8{15}$ |'
+          '\n'
+          r'| `a ; b` | $\frac13$ |',
+          tableMode: 'latex',
+        );
         w.text = convertLatex(
           r'公式 $x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$'
           '\n'
@@ -59,11 +68,14 @@ void main() {
           '\n'
           r'\[\boxed{\begin{array}{c|ccc}Y&1&2&3\\\hline P&\frac13&\frac13&\frac13\end{array}}\]'
           '\n---\n'
-          r'$\frac{a+b+c+d+e+f+g+h+i+j+k+l+m+n}{x+y}$',
+          r'$\frac{a+b+c+d+e+f+g+h+i+j+k+l+m+n}{x+y}$'
+          '\n$markdown',
         );
         expect(w.text, isNot(contains(r'\begin')));
-        expect(w.text, contains('[ X | 0  1  2  3 ; ── ; P |'));
-        expect(w.text, contains('[ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ]'));
+        expect(w.text, contains('⟦ X | 0  1  2  3 ; ── ; P |'));
+        expect(w.text, contains('⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧'));
+        expect(w.text, contains('"甲|乙"'));
+        expect(w.text, contains('"a ; b"'));
         for (final grid in [false, true]) {
           w.settings.values['grid_layout'] = '$grid';
           w.settings.underlined = grid;
@@ -71,6 +83,14 @@ void main() {
           expect(w.error, isEmpty, reason: 'grid=$grid');
           expect(w.pages.length, greaterThanOrEqualTo(2));
           for (final png in w.pages) {
+            const output = String.fromEnvironment('MATH_RENDER_OUTPUT');
+            if (output.isNotEmpty) {
+              final destination = Directory(output);
+              await destination.create(recursive: true);
+              await File(
+                '${destination.path}/math-grid-$grid-page-${w.pages.indexOf(png) + 1}.png',
+              ).writeAsBytes(png);
+            }
             expect(png.take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
             final codec = await ui.instantiateImageCodec(png);
             final frame = await codec.getNextFrame();

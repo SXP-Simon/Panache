@@ -595,6 +595,7 @@ dependencies = [
  "rand_chacha 0.10.0",
  "rand_distr",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "ttf-parser",

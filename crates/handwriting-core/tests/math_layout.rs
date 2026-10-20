@@ -79,6 +79,23 @@ fn assert_inside(images: &[RgbaImage], margin: u32) {
     }
 }
 #[test]
+fn distribution_tables_fit_narrow_pages_and_move_as_complete_rows() {
+    let x = "⟦ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ⟧";
+    let y = "⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧";
+    for width in [180, 420] {
+        for grid in [false, true] {
+            let source = format!("开始\n{x}\n{y}\n{x}\n{y}\n结束");
+            let mut r = request(&source, width, 300);
+            r.params.grid_layout = grid;
+            r.params.underlined = false;
+            r.params.english_spacing = true;
+            let images = pages(&r);
+            assert!(images.len() >= 2);
+            assert_inside(&images, 14);
+        }
+    }
+}
+#[test]
 fn protected_urls_dates_paths_and_code_remain_literal() {
     for source in [
         "https://example.com/a/b/x_1/√(x)",
