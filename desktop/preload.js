@@ -52,6 +52,19 @@ contextBridge.exposeInMainWorld("handwritingDesktop", {
     closeHandlers.add(callback);
     return () => { closeHandlers.delete(callback); };
   },
+  updates: {
+    state: () => ipcRenderer.invoke("updates:state"),
+    check: () => ipcRenderer.invoke("updates:check"),
+    download: () => ipcRenderer.invoke("updates:download"),
+    cancel: () => ipcRenderer.invoke("updates:cancel"),
+    open: () => ipcRenderer.invoke("updates:open"),
+    subscribe: (callback) => {
+      if (typeof callback !== "function") throw new TypeError("Invalid update listener");
+      const listener = (_event, state) => callback(state);
+      ipcRenderer.on("updates:state", listener);
+      return () => ipcRenderer.removeListener("updates:state", listener);
+    },
+  },
   storage: {
     readRecord: (key) => ipcRenderer.invoke("storage:read-record", key),
     writeRecord: (key, value) => ipcRenderer.invoke("storage:write-record", key, value),

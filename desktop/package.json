@@ -28,6 +28,7 @@
       "main.js",
       "app-identity.js",
       "studio-storage.js",
+      "app-updates.js",
       "preload.js",
       "splash.html",
       "package.json",

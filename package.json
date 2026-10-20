@@ -16,7 +16,7 @@
     "test:affected": "node scripts/run-affected-tests.cjs",
     "test:hooks": "node --test scripts/tests/check-commit-message.test.cjs scripts/tests/install-hooks.test.cjs scripts/tests/run-quality-checks.test.cjs scripts/tests/change-impact.test.cjs scripts/tests/git-change-set.test.cjs scripts/tests/workflow-policy.test.cjs",
     "test:frontend": "pnpm --filter handwrite run test:letter-format && pnpm --filter handwrite run test:clean-markdown && pnpm --filter handwrite run test:latex-unicode && pnpm --filter handwrite run test:inline-image && pnpm --filter handwrite run test:generation",
-    "test:desktop-storage": "node --test desktop/tests/studio-storage.test.cjs",
+    "test:desktop-storage": "node --test desktop/tests/*.test.cjs",
     "test:desktop": "node scripts/run-desktop-tests.cjs",
     "test:unit": "pnpm run test:hooks && pnpm run test:frontend && pnpm run test:desktop-storage && uv run --extra dev python -m pytest backend/tests",
     "test:sw-upgrade": "node --test scripts/tests/service-worker-upgrade.test.cjs",

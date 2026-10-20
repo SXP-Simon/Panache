@@ -1,5 +1,5 @@
 // Electron 主进程：拉起打包好的后端 exe，等它就绪后开窗加载本地站点。
-const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, net, session, shell } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
@@ -7,6 +7,7 @@ const path = require("path");
 const { randomUUID } = require("crypto");
 const { setupPersistence } = require("./studio-storage");
 const { configureAppIdentity } = require("./app-identity");
+const { setupUpdater, cleanupStaleUpdates } = require("./app-updates");
 configureAppIdentity(app);
 
 // PyInstaller 只在 Windows 上给可执行文件加 .exe 后缀，macOS 上没有
@@ -461,6 +462,26 @@ if (!app.requestSingleInstanceLock()) {
       getAllowedOrigin: () => allowedStorageOrigin, dataDir,
     });
     setupCloseAcknowledgements();
+    void cleanupStaleUpdates(path.join(dataDir(), "updates")).catch((error) => console.error("Update cache cleanup failed", error));
+    setupUpdater({
+      fetcher: (url, options) => net.fetch(url, options),
+      ipcMain, trustedRenderer: studioStorage.trustedRenderer, getWindow: () => mainWindow,
+      development: !app.isPackaged, current: app.getVersion(), platform: process.platform, arch: process.arch,
+      portable: Boolean(process.env.PORTABLE_EXECUTABLE_FILE),
+      directory: path.join(dataDir(), "updates"),
+      openPath: (file) => shell.openPath(file), reveal: (file) => shell.showItemInFolder(file),
+      beforeOpen: async () => {
+        try {
+          await withDeadline((async () => {
+            if (mainWindow) await flushRendererBeforeClose(mainWindow);
+            await studioStorage.drain();
+          })(), 5000);
+        } catch { closeAcknowledgement = null; throw new Error("saveFailed"); }
+        finally {
+          if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("storage:close-cancelled");
+        }
+      },
+    });
     // 后端启动要几秒（PyInstaller 引导 + fastapi 等基础依赖载入），先给个等待页
     // 而不是白屏。opencv/sklearn/PyMuPDF 那些重家伙已经不在启动路径上了 ——
     // 见 backend/app.py 顶部的说明，它们改成了按需导入。
