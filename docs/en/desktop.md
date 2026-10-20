@@ -14,6 +14,14 @@ described below. Upstream installers do not represent this fork's features.
 | Windows | `.exe` installer (NSIS), or the portable exe |
 | macOS (Apple Silicon) | `.dmg` |
 
+## In-app updates
+
+The update dialog shows what changed. Choose “Update and restart” to download and verify the package, prepare recovery, save your draft, exit, install or replace the application, and reopen it. Active generation delays installation. Choosing “Later” or a failed save keeps the application open.
+
+Windows per-user installations run the installer silently; portable updates retain the old EXE. macOS uses a complete application ZIP and atomic directory exchange. The new version must restore the workspace, render its interface, and connect to its backend before the update is confirmed. Startup failure triggers recovery of the previous version. User data is outside the replaced installation.
+
+Protected or read-only installation locations, missing recovery packages or startup entries, and system trust requirements can require manual installation. macOS may still request system approval; the updater does not bypass it. Older versions without the native helper need a one-time manual installation of a helper-enabled version.
+
 !!! warning "Only Apple Silicon Mac builds are published"
     There is currently only an **arm64** macOS build; Intel Macs cannot install it.
     Windows builds are unaffected.

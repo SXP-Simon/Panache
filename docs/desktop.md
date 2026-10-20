@@ -13,6 +13,14 @@
 | Windows | `.exe` 安装包（NSIS），或者免安装的便携版 exe |
 | macOS（Apple Silicon） | `.dmg` |
 
+## 应用内更新
+
+发现新版本时会展示更新要点。点击「更新并重启」后，应用会下载、校验并准备恢复方案，保存草稿后退出，完成安装或替换并重新打开。正在生成时等待任务结束；选择稍后或保存失败不会强制退出。
+
+Windows 当前用户安装版使用静默安装，便携版保留原 EXE 的备份；macOS 使用完整应用 ZIP 和同卷目录交换。新版只有在工作区、界面和后端均可用后才确认成功，启动失败会尝试恢复旧版。更新不会替换用户资料目录。
+
+受管理员保护或只读的安装位置、系统信任许可、无法准备旧安装包或恢复入口等情况，需要按提示手动安装。macOS 仍可能要求系统许可，更新助手不会替用户绕过。较早版本尚无更新助手，需要先手动安装带助手的版本，之后才能使用完整自动流程。
+
 !!! warning "只发 Apple Silicon 的 Mac 包"
     目前只构建 **arm64** 的 macOS 包，Intel Mac 装不了。
     Windows 包不受影响。
@@ -34,7 +42,7 @@ macOS 会拦下它。在 macOS 15 及以上，提示可能直接说**「文件�
 确认之后，在终端里执行一次：
 
 ```shell
-xattr -dr com.apple.quarantine /Applications/HandwritingWeb.app
+xattr -dr com.apple.quarantine /Applications/Panache.app
 ```
 
 或者去「系统设置 → 隐私与安全性」，在提示里点**「仍要打开」**。
