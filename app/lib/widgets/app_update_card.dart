@@ -12,10 +12,12 @@ class AppUpdateCard extends StatelessWidget {
     required this.controller,
     required this.onReload,
     this.compact = false,
+    this.onRestart,
   });
   final UpdateController controller;
   final Future<void> Function() onReload;
   final bool compact;
+  final Future<void> Function()? onRestart;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -31,6 +33,8 @@ class AppUpdateCard extends StatelessWidget {
         UpdatePhase.available => l.updateAvailable,
         UpdatePhase.downloading => l.updateDownloading,
         UpdatePhase.ready => l.updateReady,
+        UpdatePhase.preparing => l.updatePreparing,
+        UpdatePhase.restarting => l.updateRestarting,
         UpdatePhase.failed => l.updateFailed,
       };
       final problem = switch (c.problem) {
@@ -45,6 +49,10 @@ class AppUpdateCard extends StatelessWidget {
         UpdateProblem.cancelled => l.updateCancelled,
         UpdateProblem.storage => l.updateStorage,
         UpdateProblem.openFailed => l.updateOpenFailed,
+        UpdateProblem.desktopUnavailable => l.updateDesktopUnavailable,
+        UpdateProblem.saveFailed => l.updateSaveFailed,
+        UpdateProblem.restartDeferred => l.updateRestartDeferred,
+        UpdateProblem.restartCancelled => l.updateRestartCancelled,
       };
       return Card(
         key: const ValueKey('app-updates'),
@@ -95,8 +103,17 @@ class AppUpdateCard extends StatelessWidget {
                     ? l.updateAndroidSummary
                     : c.installed?.target.os == 'ios'
                     ? l.updateIosHelp
-                    : l.updateDesktopSummary,
+                    : c.desktopAutomatic
+                    ? l.updateDesktopSummary
+                    : l.updateDesktopUnavailable,
               ),
+              if ({
+                UpdatePhase.preparing,
+                UpdatePhase.restarting,
+              }.contains(c.phase)) ...[
+                const SizedBox(height: 16),
+                const LinearProgressIndicator(),
+              ],
               if (c.phase == UpdatePhase.downloading) ...[
                 const SizedBox(height: 16),
                 LinearProgressIndicator(
@@ -131,7 +148,11 @@ class AppUpdateCard extends StatelessWidget {
                       icon: const Icon(Icons.refresh),
                       label: Text(l.checkUpdates),
                     ),
-                  if (c.phase == UpdatePhase.downloading)
+                  if ({
+                    UpdatePhase.downloading,
+                    UpdatePhase.preparing,
+                    UpdatePhase.restarting,
+                  }.contains(c.phase))
                     TextButton.icon(
                       onPressed: c.cancel,
                       icon: const Icon(Icons.close),
@@ -146,18 +167,34 @@ class AppUpdateCard extends StatelessWidget {
                       }.contains(c.phase))
                     FilledButton.icon(
                       key: const ValueKey('download-update'),
-                      onPressed: c.download,
+                      onPressed: c.desktopAutomatic && onRestart != null
+                          ? onRestart
+                          : c.download,
                       icon: const Icon(Icons.download_outlined),
-                      label: Text(l.updateDownload),
+                      label: Text(
+                        c.desktopAutomatic && onRestart != null
+                            ? l.updateRestart
+                            : l.updateDownload,
+                      ),
                     ),
                   if (c.phase == UpdatePhase.ready)
                     FilledButton.icon(
                       key: const ValueKey('open-update'),
-                      onPressed: c.opening ? null : c.open,
+                      onPressed: c.opening
+                          ? null
+                          : c.desktopAutomatic &&
+                                onRestart != null &&
+                                c.problem != UpdateProblem.desktopUnavailable
+                          ? onRestart
+                          : c.open,
                       icon: const Icon(Icons.open_in_new),
                       label: Text(
                         c.installed?.target.os == 'android'
                             ? l.updateInstall
+                            : c.desktopAutomatic &&
+                                  onRestart != null &&
+                                  c.problem != UpdateProblem.desktopUnavailable
+                            ? l.updateRestart
                             : l.updateOpenArchive,
                       ),
                     ),

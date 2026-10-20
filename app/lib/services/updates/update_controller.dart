@@ -11,6 +11,8 @@ enum UpdatePhase {
   available,
   downloading,
   ready,
+  preparing,
+  restarting,
   failed,
 }
 
@@ -44,6 +46,12 @@ class UpdateController extends ChangeNotifier {
   String? downloadedPath;
   VerifiedPackage? _package;
   DownloadCancellation? _cancellation;
+  DesktopPreparedUpdate? _prepared;
+  bool _restartIntent = false, _restartRunning = false;
+  bool get desktopAutomatic => desktop && installed!.canRestartDesktop;
+  bool get desktop =>
+      installed != null &&
+      {'windows', 'macos', 'linux'}.contains(installed!.target.os);
   UpdateNotice? notice;
   int _noticeSequence = 0, _claimedSequence = 0;
   final Set<String> _seenIdentities = {};
@@ -62,7 +70,10 @@ class UpdateController extends ChangeNotifier {
   }
 
   bool get busy =>
-      phase == UpdatePhase.checking || phase == UpdatePhase.downloading;
+      phase == UpdatePhase.checking ||
+      phase == UpdatePhase.downloading ||
+      phase == UpdatePhase.preparing ||
+      phase == UpdatePhase.restarting;
   bool get web => installed?.target.web ?? kIsWeb;
   bool get canDownload =>
       installed != null && release?.packageFor(installed!.target) != null;
@@ -198,7 +209,103 @@ class UpdateController extends ChangeNotifier {
     }
   }
 
-  void cancel() => _cancellation?.cancel();
+  void cancel() {
+    _restartIntent = false;
+    _cancellation?.cancel();
+    final prepared = _prepared;
+    if (prepared != null) {
+      _prepared = null;
+      prepared.abort().then((_) {
+        if (!_disposed) {
+          phase = UpdatePhase.ready;
+          problem = UpdateProblem.restartCancelled;
+          _emit();
+        }
+      });
+    }
+  }
+
+  Future<void> updateAndRestart({
+    required Future<bool> Function() persist,
+    required bool Function() canRestart,
+    required Future<bool> Function() requestExit,
+  }) async {
+    if (_restartRunning ||
+        busy ||
+        opening ||
+        _disposed ||
+        host is! DesktopUpdateHost ||
+        !desktopAutomatic) {
+      return;
+    }
+    _restartRunning = true;
+    _restartIntent = true;
+    try {
+      if (phase != UpdatePhase.ready) await download();
+      if (!_restartIntent ||
+          _disposed ||
+          phase != UpdatePhase.ready ||
+          _package == null ||
+          release == null) {
+        return;
+      }
+      if (!canRestart()) {
+        problem = UpdateProblem.restartDeferred;
+        return;
+      }
+      phase = UpdatePhase.preparing;
+      problem = null;
+      _emit();
+      final preparingCancellation = DownloadCancellation();
+      _cancellation = preparingCancellation;
+      final prepared = await (host as DesktopUpdateHost).prepareRestart(
+        downloadedPath!,
+        _package!,
+        release!.version,
+        cancellation: preparingCancellation,
+      );
+      _prepared = prepared;
+      if (!_restartIntent || _disposed) {
+        await prepared.abort();
+        _prepared = null;
+        phase = UpdatePhase.ready;
+        return;
+      }
+      if (!await persist()) {
+        throw const UpdateException(UpdateProblem.saveFailed);
+      }
+      if (!_restartIntent || _disposed || !canRestart()) {
+        await prepared.abort();
+        _prepared = null;
+        phase = UpdatePhase.ready;
+        problem = UpdateProblem.restartDeferred;
+        return;
+      }
+      prepared.arm();
+      phase = UpdatePhase.restarting;
+      _emit();
+      if (!await requestExit()) {
+        await prepared.abort();
+        _prepared = null;
+        phase = UpdatePhase.ready;
+        problem = UpdateProblem.restartCancelled;
+      }
+    } on UpdateException catch (error) {
+      await _prepared?.abort();
+      _prepared = null;
+      problem = error.problem;
+      phase = downloadedPath == null ? UpdatePhase.failed : UpdatePhase.ready;
+    } catch (_) {
+      await _prepared?.abort();
+      _prepared = null;
+      problem = UpdateProblem.openFailed;
+      phase = downloadedPath == null ? UpdatePhase.failed : UpdatePhase.ready;
+    } finally {
+      _restartRunning = false;
+      _cancellation = null;
+      _emit();
+    }
+  }
 
   Future<void> open() async {
     if (phase != UpdatePhase.ready ||
@@ -226,7 +333,7 @@ class UpdateController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     notice = null;
-    cancel();
+    if (phase != UpdatePhase.restarting) cancel();
     repository.close();
     super.dispose();
   }

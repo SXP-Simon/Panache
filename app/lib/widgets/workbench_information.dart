@@ -11,10 +11,11 @@ class WorkbenchInformation extends StatelessWidget {
     required this.guide,
     this.updates,
     this.onReload,
+    this.onRestart,
   });
   final bool guide;
   final UpdateController? updates;
-  final Future<void> Function()? onReload;
+  final Future<void> Function()? onReload, onRestart;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -75,7 +76,11 @@ class WorkbenchInformation extends StatelessWidget {
               Text(l.feedbackHelp),
               if (updates != null && onReload != null) ...[
                 const SizedBox(height: 24),
-                AppUpdateCard(controller: updates!, onReload: onReload!),
+                AppUpdateCard(
+                  controller: updates!,
+                  onReload: onReload!,
+                  onRestart: onRestart,
+                ),
               ],
             ],
           ],
