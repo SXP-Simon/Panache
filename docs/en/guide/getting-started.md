@@ -38,6 +38,7 @@ Phones omit the top brand header. The compact workspace action row provides the 
 
 - Text, settings, and uploaded assets are saved on this device. Check the save status; clearing site data or storage failures can affect recovery.
 - Uploading a document only **fills the text box** — you can keep editing afterwards.
+- Markdown cleanup preserves formula source; use the LaTeX conversion button to transcribe it. Arrays, matrices, and probability tables become linear text in row/column order, retaining horizontal and vertical separator markers rather than reproducing TeX's two-dimensional table layout. Unsafe conversions preserve the source.
 - This fork has no fixed 10-page truncation. Long documents remain subject to hardware and [server limits](../self-hosting/fonts-and-limits.md).
 
 ## Choosing a font
