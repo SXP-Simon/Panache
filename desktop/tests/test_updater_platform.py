@@ -15,13 +15,18 @@ import updater_platform as native
 from updater_core import Package, Plan, UpdateFailure
 
 
+def running_python():
+    # 2026-10-20：framework Python 的 sys.executable 是会再次 exec 的启动器，不能充当稳定 GUI。
+    return str(Path(psutil.Process().exe()).resolve())
+
+
 @pytest.fixture
 def native_plan(tmp_path):
     work = tmp_path / "事务 中文"
     work.mkdir()
     package = work / "package.exe"
     package.write_bytes(b"verified")
-    executable = Path(sys.executable).resolve()
+    executable = Path(running_python())
     return Plan(
         work,
         "a" * 32,
@@ -108,14 +113,14 @@ def start_fixture(plan, monkeypatch, *, broken_record=False):
     code = (
         "import os,subprocess,sys,time;from pathlib import Path;"
         f"Path({str(root_file)!r}).write_text(str(os.getpid()));"
-        f"child=subprocess.Popen([sys.executable,'-c',{child_code!r}]);"
+        f"child=subprocess.Popen([{running_python()!r},'-c',{child_code!r}]);"
         f"Path({str(child_file)!r}).write_text(str(child.pid));time.sleep(60)"
     )
     original = native._spawn_process
 
     def spawn(arguments, directory, environment, output):
         assert arguments[0] == str(plan.executable)
-        return original([sys.executable, "-c", code], directory, environment, output)
+        return original([running_python(), "-c", code], directory, environment, output)
 
     monkeypatch.setattr(native, "_spawn_process", spawn)
     if broken_record:
@@ -140,6 +145,12 @@ def test_native_identity_refuses_reused_pid_without_touching_live_process():
     )
     with pytest.raises(UpdateFailure, match=native.PROCESS_IDENTITY):
         native._matching_process({**identity, "pid": True})
+
+
+def test_fixture_uses_actual_runtime_even_when_python_executable_names_a_launcher(monkeypatch):
+    actual = Path(psutil.Process().exe()).resolve()
+    monkeypatch.setattr(sys, "executable", str(actual.with_name("framework-launcher")))
+    assert Path(running_python()) == actual
 
 
 def test_real_new_application_tree_stops_even_when_recording_is_broken(native_plan, monkeypatch):
@@ -171,7 +182,7 @@ def test_fast_exit_is_reported_as_fixed_failure(native_plan, monkeypatch):
 
     def spawn(_arguments, directory, environment, output):
         process, job = original(
-            [sys.executable, "-c", "raise SystemExit(2)"], directory, environment, output
+            [running_python(), "-c", "raise SystemExit(2)"], directory, environment, output
         )
         process.wait(timeout=10)
         return process, job
@@ -187,12 +198,12 @@ def test_real_installer_timeout_cleans_only_its_owned_tree(tmp_path):
     child_code = "import time;time.sleep(60)"
     code = (
         "import subprocess,sys,time;from pathlib import Path;"
-        f"child=subprocess.Popen([sys.executable,'-c',{child_code!r}]);"
+        f"child=subprocess.Popen([{running_python()!r},'-c',{child_code!r}]);"
         f"Path({str(child_file)!r}).write_text(str(child.pid));time.sleep(60)"
     )
     with (tmp_path / "installer.log").open("wb") as output:
         process, job = native._spawn_process(
-            [sys.executable, "-c", code], tmp_path, dict(os.environ), output
+            [running_python(), "-c", code], tmp_path, dict(os.environ), output
         )
     child = psutil.Process(wait_file(child_file))
     child_identity = native._identity(child)
@@ -298,7 +309,7 @@ def test_relaunch_preserves_workspace_without_overriding_chromium_profile(native
         if sys.platform == "win32":
             assert Path(environment["LOCALAPPDATA"]) == native_plan.data_root.parent
         return original(
-            [sys.executable, "-c", "import time;time.sleep(60)"], directory, environment, output
+            [running_python(), "-c", "import time;time.sleep(60)"], directory, environment, output
         )
 
     monkeypatch.setattr(native, "_spawn_process", spawn)
@@ -344,7 +355,7 @@ def test_windows_helper_abrupt_exit_kills_only_unacknowledged_tree(native_plan, 
     log_file = native_plan.work / "owned.log"
     child_code = (
         "import subprocess,sys,time;from pathlib import Path;"
-        "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']);"
+        f"child=subprocess.Popen([{running_python()!r},'-c','import time;time.sleep(60)']);"
         f"Path({str(child_file)!r}).write_text(str(child.pid));time.sleep(60)"
     )
     code = f"""
@@ -354,7 +365,7 @@ sys.path.insert(0, {str(Path(native.__file__).parent)!r})
 import psutil
 import updater_platform as native
 with Path({str(log_file)!r}).open('wb') as output:
-    arguments = [sys.executable, '-c', {child_code!r}]
+    arguments = [{running_python()!r}, '-c', {child_code!r}]
     directory = Path({str(native_plan.work)!r})
     process, job = native._spawn_process(arguments, directory, dict(os.environ), output)
 deadline = time.monotonic() + 15
@@ -368,7 +379,7 @@ native.write_record(Path({str(info_file)!r}), identities)
 if {release!r}: job.release()
 os._exit(0)
 """
-    supervisor = subprocess.Popen([sys.executable, "-c", code])  # noqa: S603
+    supervisor = subprocess.Popen([running_python(), "-c", code])  # noqa: S603
     assert supervisor.wait(timeout=20) == 0
     identities = native.read_record(info_file)
     root, child = identities["root"], identities["child"]
