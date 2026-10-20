@@ -442,7 +442,8 @@ native.write_record(Path({str(info_file)!r}), identities)
 if {release!r}: job.release()
 os._exit(0)
 """
-    supervisor = subprocess.Popen([running_python(), "-c", code])  # noqa: S603
+    # 2026-10-20：监督进程需要虚拟环境依赖；被跟踪的应用替身仍直接用稳定入口。
+    supervisor = subprocess.Popen([sys.executable, "-c", code])  # noqa: S603
     assert supervisor.wait(timeout=20) == 0
     identities = native.read_record(info_file)
     root, child = identities["root"], identities["child"]
