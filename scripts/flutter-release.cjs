@@ -20,6 +20,23 @@ function releaseVersion(tag) {
   return { version: tag.slice(1), build_number: buildNumber };
 }
 
+// Flutter ABI splits retain their historical version-code offsets so installed APKs can upgrade.
+function androidVersionCode(buildNumber, platform) {
+  const offset = { "android-arm64-v8a": 2000, "android-x86_64": 4000 }[platform];
+  if (offset === undefined || !Number.isSafeInteger(buildNumber) || buildNumber < 1 || buildNumber + offset > 2_100_000_000) {
+    throw new Error("Invalid Android ABI version code.");
+  }
+  return buildNumber + offset;
+}
+
+function verifyAndroidPackage(badging, platform, manifest) {
+  const header = /^package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'(?: |$)/u.exec(badging);
+  if (!header || header[1] !== "io.github.sxpsimon.handwriting" || header[3] !== manifest.version || Number(header[2]) !== androidVersionCode(manifest.build_number, platform)) {
+    throw new Error("APK identity or version code does not match the update contract.");
+  }
+  return Number(header[2]);
+}
+
 function sourceSha(value) {
   if (!/^[a-f0-9]{40}$/u.test(value ?? "")) throw new Error("Flutter source must be a full lowercase 40-character commit SHA.");
   return value;
@@ -190,6 +207,7 @@ function stagePackage(input, output, platform, manifest) {
     schema_version: 1, product_name: productName(manifest), repository: manifest.repository, release_tag: manifest.release_tag,
     version: manifest.version, build_number: manifest.build_number,
     flutter_sha: manifest.flutter_sha, platform, file: name, sha256: digest(destination),
+    ...(platform.startsWith("android") ? { android_version_code: androidVersionCode(manifest.build_number, platform) } : {}),
   }, null, 2)}\n`);
   return destination;
 }
@@ -204,6 +222,7 @@ function verifyPackages(directory, manifest, android) {
     const extension = info.platform.startsWith("android") ? ".apk" : info.platform.startsWith("linux") ? ".tar.gz" : ".zip";
     const expected = `Flutter-${productName(manifest)}-${manifest.version}-${info.platform}${extension}`;
     if (info.file !== expected || file !== `${expected}.json` || digest(path.join(directory, expected)) !== info.sha256) throw new Error("Package name or checksum does not match provenance.");
+    if (info.platform.startsWith("android") && info.android_version_code !== undefined && info.android_version_code !== androidVersionCode(manifest.build_number, info.platform)) throw new Error("APK version code does not match the update contract.");
     platforms.add(info.platform);
     packages.push(expected, file);
   }
@@ -264,6 +283,11 @@ async function main() {
     fs.writeFileSync(`release-plan/${MANIFEST}`, `${JSON.stringify(manifest, null, 2)}\n`);
     fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${manifest.release_tag}\nversion=${manifest.version}\nbuild_number=${manifest.build_number}\nflutter_sha=${manifest.flutter_sha}\nandroid=${process.env.ANDROID_SIGNING_READY === "true"}\n`);
     if (process.env.ANDROID_SIGNING_READY !== "true" && process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "\nAndroid APK omitted: all four formal release signing secrets are required. No debug-signed APK or unsigned iOS IPA is distributed.\n");
+  } else if (command === "verify-apk") {
+    const [manifestFile, platform, badgingFile] = args;
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+    validateManifest(manifest, process.env.GITHUB_REPOSITORY, manifest.release_tag);
+    verifyAndroidPackage(fs.readFileSync(badgingFile, "utf8"), platform, manifest);
   } else if (command === "stage" || command === "verify") {
     const [manifestFile, directory, platform, input] = args;
     const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -273,5 +297,5 @@ async function main() {
   } else throw new Error("Use flutter-release.cjs resolve|stage|verify.");
 }
 
-module.exports = { MANIFEST, REQUIRED_WORKFLOWS, releaseVersion, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, sourceContract, resolveRelease, stagePackage, verifyPackages, waitForWorkflow };
+module.exports = { MANIFEST, REQUIRED_WORKFLOWS, releaseVersion, androidVersionCode, verifyAndroidPackage, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, sourceContract, resolveRelease, stagePackage, verifyPackages, waitForWorkflow };
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });

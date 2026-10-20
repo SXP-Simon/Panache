@@ -260,6 +260,8 @@ jobs:
               echo "::error::Missing split APK: $APK"
               exit 1
             fi
+            "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" > "$RUNNER_TEMP/apk-badging-${ABI}.txt"
+            node ../../scripts/flutter-release.cjs verify-apk ../../release-plan/Flutter-source.json "android-${ABI}" "$RUNNER_TEMP/apk-badging-${ABI}.txt"
             "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apk-signature-${ABI}.txt"
             if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature-${ABI}.txt"; then
               echo "::error::Debug-signed APK cannot be uploaded as a release"

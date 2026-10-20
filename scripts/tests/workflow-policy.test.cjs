@@ -254,6 +254,8 @@ test("Flutter assets pin source and keep write permission out of build jobs", ()
     assert.ok(workflow.includes(`secrets.HANDWRITING_ANDROID_${secret} != ''`));
   }
   assert.match(android, /apksigner.*verify/u);
+  assert.match(android, /aapt2.*dump badging/u);
+  assert.match(android, /flutter-release\.cjs verify-apk/u);
   assert.match(android, /flutter build apk .*--split-per-abi .*--target-platform "\$TARGET_PLATFORM"/u);
   assert.match(android, /for ABI in arm64-v8a x86_64/u);
   assert.match(android, /native != \{sys.argv\[2\]\}/u);

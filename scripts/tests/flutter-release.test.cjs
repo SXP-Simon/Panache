@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
-const { REQUIRED_WORKFLOWS, releaseVersion, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, resolveRelease, stagePackage, verifyPackages, waitForWorkflow } = require("../flutter-release.cjs");
+const { REQUIRED_WORKFLOWS, releaseVersion, androidVersionCode, verifyAndroidPackage, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, resolveRelease, stagePackage, verifyPackages, waitForWorkflow } = require("../flutter-release.cjs");
 
 const repository = "owner/fork";
 const sha = "a".repeat(40);
@@ -277,4 +277,38 @@ test("historical names require matching live GitHub repository IDs, never an ali
   pin.branchSha = () => { throw new Error("cannot re-resolve source after rename"); };
   assert.equal((await resolveRelease(input, pin)).repository, old.repository);
   assert.equal(pin.writes.length, 0);
+});
+
+
+test("Android updates retain installed ABI version codes and reject mismatched APK identity", () => {
+  const target = { ...manifest(), version: "1.6.0", build_number: 1_006_000 };
+  assert.equal(androidVersionCode(target.build_number, "android-arm64-v8a"), 1_008_000);
+  assert.equal(androidVersionCode(target.build_number, "android-x86_64"), 1_010_000);
+  const header = "package: name='io.github.sxpsimon.handwriting' versionCode='1008000' versionName='1.6.0' compileSdkVersion='36'";
+  assert.equal(verifyAndroidPackage(header, "android-arm64-v8a", target), 1_008_000);
+  for (const wrong of [header.replace('1008000', '1006000'), header.replace('1008000', '1010000'), header.replace('handwriting', 'another'), header.replace('1.6.0', '1.6.1'), 'not an APK']) assert.throws(() => verifyAndroidPackage(wrong, "android-arm64-v8a", target));
+  for (const [number, platform] of [[2_100_000_000, "android-arm64-v8a"], [1, "windows-x64"], [0, "android-x86_64"]]) assert.throws(() => androidVersionCode(number, platform));
+});
+
+
+test("Android package metadata exposes the real installed code and rejects tampering", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "panache-update-code-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const output = path.join(root, "assets");
+  for (const platform of ["windows-x64", "linux-x64", "macos-arm64", "android-arm64-v8a", "android-x86_64"]) {
+    const extension = platform.startsWith("android") ? ".apk" : platform.startsWith("linux") ? ".tar.gz" : ".zip";
+    const inputFile = path.join(root, platform + extension);
+    fs.writeFileSync(inputFile, "verified package");
+    stagePackage(inputFile, output, platform, manifest());
+  }
+  const metadataFile = path.join(output, `Flutter-HandwritingWeb-${manifest().version}-android-arm64-v8a.apk.json`);
+  const metadata = JSON.parse(fs.readFileSync(metadataFile, "utf8"));
+  assert.equal(metadata.android_version_code, manifest().build_number + 2000);
+  verifyPackages(output, manifest(), true);
+  metadata.android_version_code = manifest().build_number;
+  fs.writeFileSync(metadataFile, JSON.stringify(metadata));
+  assert.throws(() => verifyPackages(output, manifest(), true), /APK version code/);
+  delete metadata.android_version_code;
+  fs.writeFileSync(metadataFile, JSON.stringify(metadata));
+  verifyPackages(output, manifest(), true); // Published manifests without this field remain readable.
 });
