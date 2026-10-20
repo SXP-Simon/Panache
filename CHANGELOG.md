@@ -1,3 +1,18 @@
+# [1.7.0](https://github.com/SXP-Simon/Panache/compare/v1.6.0...v1.7.0) (2026-10-20)
+
+
+### Bug Fixes
+
+* **fe/src/features/updates:** 精简面向用户的更新提示与摘要 ([2c6e662](https://github.com/SXP-Simon/Panache/commit/2c6e662b85fb320b9369e1412a1c2dc37b2a2b06))
+* **scripts:** 校验并发布 Android 更新所需的实际版本码 ([47d0fc3](https://github.com/SXP-Simon/Panache/commit/47d0fc3a87d872b55e31c434d78839f04abd525c))
+
+
+### Features
+
+* **desktop:** 安全检查下载并打开匹配平台的更新 ([faeb086](https://github.com/SXP-Simon/Panache/commit/faeb086e44f456643c2476cb5b9775a92f1d5ebd))
+* **fe/src/features/updates:** 发现新版时展示更新日志弹窗 ([d76410e](https://github.com/SXP-Simon/Panache/commit/d76410ec7694a49a4d2ec4f4999bf0a42a791c41))
+* **fe/src/features/updates:** 提供更新设置与保存后部署刷新 ([7c288ec](https://github.com/SXP-Simon/Panache/commit/7c288ec86de058f7173dfe5533da6295e1d04c46))
+
 # [1.6.0](https://github.com/SXP-Simon/Panache/compare/v1.5.0...v1.6.0) (2026-10-20)
 
 
