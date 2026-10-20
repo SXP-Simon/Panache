@@ -181,5 +181,6 @@
   "updateDesktopUnavailable": "This installation cannot update itself. Open the package and replace the app after quitting.",
   "updateRestartDeferred": "Update downloaded. Finish your current task, then update and restart.",
   "updateRestartCancelled": "Restart cancelled. Your current work is unchanged.",
-  "updateRolledBack": "The update did not finish, so Panache restored the previous version. Your work is safe; try again later."
+  "updateRolledBack": "The update did not finish, so Panache restored the previous version. Your work is safe; try again later.",
+  "updateAnotherInstance": "Close other Panache windows, then try the update again."
 }

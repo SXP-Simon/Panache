@@ -12,6 +12,7 @@ import 'update_model.dart';
 import '../desktop_backend.dart';
 
 import 'package:panache_updater/client.dart' as updater;
+import 'package:panache_updater/protocol.dart' show UpdaterFailure;
 
 import 'update_download.dart';
 import 'update_http_native.dart';
@@ -208,6 +209,13 @@ class NativeUpdateHost implements UpdateHost, DesktopUpdateHost {
       return _PreparedUpdate(prepared);
     } on UpdateException {
       rethrow;
+    } on UpdaterFailure catch (error) {
+      cancellation?.check();
+      throw UpdateException(
+        error.code == 'another_instance_running'
+            ? UpdateProblem.anotherInstance
+            : UpdateProblem.desktopUnavailable,
+      );
     } catch (_) {
       cancellation?.check();
       throw const UpdateException(UpdateProblem.desktopUnavailable);

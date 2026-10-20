@@ -181,5 +181,6 @@
   "updateDesktopUnavailable": "这里无法自动替换应用。请打开安装包，退出后手动替换。",
   "updateRestartDeferred": "更新已下载。请等当前任务完成后再更新并重启。",
   "updateRestartCancelled": "已取消重启，当前内容保持不变。",
-  "updateRolledBack": "更新未能完成，已恢复原版本。你的内容已保留，可稍后重试。"
+  "updateRolledBack": "更新未能完成，已恢复原版本。你的内容已保留，可稍后重试。",
+  "updateAnotherInstance": "请先关闭其他 Panache 窗口，然后重试更新。"
 }

@@ -18,6 +18,7 @@ enum UpdateProblem {
   saveFailed,
   restartDeferred,
   restartCancelled,
+  anotherInstance,
 }
 
 class UpdateException implements Exception {
