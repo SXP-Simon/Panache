@@ -448,13 +448,45 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
       return `${Array.from(base).length === 1 ? base : `(${base})`}\u0332`;
     }
     case 'array': {
-      if (
-        nodeArray(node['cols']).some((col) => isRecord(col) && col['type'] === 'separator') ||
-        nodeArray(node['hLinesBeforeRow']).some((lines) => nodeArray(lines).length > 0)
-      ) {
-        throw new Error('Matrix separator has mathematical meaning');
-      }
       const rows = nodeArray(node['body']).map((row) => nodeArray(row).map((cell) => child(cell)));
+      const columns = nodeArray(node['cols']);
+      const horizontalRules = nodeArray(node['hLinesBeforeRow']);
+      if (
+        columns.some((col) => isRecord(col) && col['type'] === 'separator') ||
+        horizontalRules.some((lines) => nodeArray(lines).length > 0)
+      ) {
+        // 2026-10-20：保留增广列与表格分隔，不因辅助线放弃整个数组的转写。
+        const separators = new Map<number, string>();
+        let column = 0;
+        for (const value of columns) {
+          if (!isRecord(value)) throw new Error('Invalid array column');
+          if (value['type'] === 'align') column++;
+          else if (value['type'] === 'separator') {
+            const rule = value['separator'];
+            if (rule !== '|' && rule !== ':') throw new Error('Unsupported column rule');
+            separators.set(column, (separators.get(column) ?? '') + (rule === ':' ? '┆' : '|'));
+          } else throw new Error('Unsupported array column');
+        }
+        const width = Math.max(column, ...rows.map((row) => row.length));
+        const content: string[] = [];
+        for (let index = 0; index <= rows.length; index++) {
+          for (const dashed of nodeArray(horizontalRules[index])) {
+            if (typeof dashed !== 'boolean') throw new Error('Unsupported row rule');
+            content.push(dashed ? '╌╌' : '──');
+          }
+          const row = rows[index];
+          if (!row) continue;
+          let line = separators.has(0) ? `${separators.get(0)} ` : '';
+          for (let cell = 0; cell < width; cell++) {
+            if (cell > 0) line += separators.has(cell) ? ` ${separators.get(cell)} ` : '  ';
+            line += row[cell] ?? '';
+          }
+          if (separators.has(width)) line += ` ${separators.get(width)}`;
+          content.push(line);
+        }
+        const table = ` ${content.join(' ; ')} `;
+        return arrayMode === 'standalone' ? `[${table}]` : table;
+      }
       if (node['colSeparationType'] === 'align' || node['colSeparationType'] === 'gather') {
         return rows
           .map((row) =>

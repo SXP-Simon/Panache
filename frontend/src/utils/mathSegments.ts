@@ -224,6 +224,24 @@ export function scanMathSegments(text: string, options: ScanOptions = {}): MathS
     }
     if ((char === '\\' || char === '$') && !escapedAt(text, cursor)) {
       if (char === '\\') {
+        // 2026-10-20：先保护外层裸框选组，避免内部 array 环境把 boxed 命令切断。
+        const enclosure = /^\\(?:boxed|fbox)\s*\{/.exec(text.slice(cursor));
+        if (enclosure) {
+          let end = cursor + enclosure[0].length;
+          let depth = 1;
+          while (end < text.length && depth > 0) {
+            if (text[end] === '\\') end += Math.min(2, text.length - end);
+            else {
+              if (text[end] === '{') depth++;
+              if (text[end] === '}') depth--;
+              end++;
+            }
+          }
+          const body = text.slice(start, end);
+          const valid = depth === 0 && withinMathBudget(body);
+          cursor = add(start, end, valid ? 'math' : 'literal', body, false, !valid);
+          continue;
+        }
         if (options.includeBareSizedGroups && /^\\left(?![a-zA-Z])/.test(text.slice(cursor))) {
           const end = sizedGroupEnd(text, cursor);
           if (end !== null) {

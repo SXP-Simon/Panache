@@ -7,6 +7,33 @@ function test(name, run) {
 
 const cleanModule = import("../src/utils/cleanMarkdown.ts");
 
+test("distribution arrays preserve rows and rules in either cleanup order", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const { convertLatexToUnicode: convert } = await import('../src/utils/latexToUnicode.ts');
+  for (const [source, expected] of [
+    [String.raw`于是，\(X\) 的分布律为
+\[
+\begin{array}{c|cccc}
+X&0&1&2&3\\ \hline
+P&\frac8{15}&\frac4{15}&\frac2{15}&\frac1{15}
+\end{array}
+\]`, '于是，X 的分布律为\n[ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ]'],
+    [String.raw`因此，Y 的分布律为
+\[
+\boxed{
+\begin{array}{c|ccc}
+Y&1&2&3\\ \hline
+P&\frac13&\frac13&\frac13
+\end{array}}
+\]`, '因此，Y 的分布律为\n[ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ]'],
+  ]) {
+    assert.equal(convert(cleanMarkdown(source)), expected);
+    assert.equal(cleanMarkdown(convert(source)), expected);
+    assert.equal(convert(convert(source)), expected);
+    assert.equal(cleanMarkdown(cleanMarkdown(convert(source))), expected);
+  }
+});
+
 test("single-character emphasis closes before following paragraphs", async () => {
   const { cleanMarkdown } = await cleanModule;
   for (const marker of ["**", "__", "***", "___", "~~", "=="]) {
