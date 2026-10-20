@@ -81,6 +81,10 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    implementation("androidx.core:core:1.16.0")
+}
+
 // 2026-10-12：flutter run/build 均会编译并打包本地引擎。
 val buildMobileEngine by tasks.registering(Exec::class) {
     val repository = rootProject.projectDir.parentFile.parentFile
