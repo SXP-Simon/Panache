@@ -6,9 +6,10 @@ test('语言与主题切换即时生效并在刷新后保留草稿', async ({ pa
   await page.getByTestId('language-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByTestId('preview-btn')).toHaveText('Generate preview');
-  await expect(page.getByTestId('markdown-table-mode').locator('option').first()).toHaveText(
-    'Tables: item list',
+  await expect(page.getByTestId('markdown-table-mode').locator('option[value="latex"]')).toHaveText(
+    'Tables: handwriting grid (LaTeX)',
   );
+  await expect(page.getByTestId('markdown-table-mode').locator('option[value="list"]')).toHaveText('Tables: item list');
   await page.getByTestId('theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.reload();
