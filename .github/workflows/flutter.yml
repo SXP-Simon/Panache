@@ -1,14 +1,66 @@
 name: Flutter UI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: ["flutter"]
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   pull_request:
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   workflow_dispatch:
 
 jobs:
+  desktop-updater:
+    name: Desktop updater (${{ matrix.os }})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app/updater
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed bin lib test
+      - run: dart analyze --fatal-infos
+      - name: Compile the independent native updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          HELPER="$RUNNER_TEMP/panache-updater"
+          if [ "$RUNNER_OS" = Windows ]; then HELPER="${HELPER}.exe"; fi
+          dart compile exe bin/panache_updater.dart -o "$HELPER"
+          echo "PANACHE_COMPILED_UPDATER=$HELPER" >> "$GITHUB_ENV"
+      - name: Exercise update and rollback with real child processes
+        if: runner.os != 'Windows'
+        run: dart test
+      - name: Exercise the real updater as a standard Windows user
+        if: runner.os == 'Windows'
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/test-desktop-updater.ps1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify package layout and native launcher
+        working-directory: .
+        env:
+          PANACHE_COMPILED_UPDATER: ${{ runner.temp }}/panache-updater${{ runner.os == 'Windows' && '.exe' || '' }}
+        run: python -m unittest discover -s scripts/tests -p "test_*desktop*.py"
+      - name: Verify Windows launcher resources and executable snapshot
+        if: runner.os == 'Windows'
+        working-directory: .
+        run: python -m unittest discover -s scripts/tests -p test_windows_launcher.py
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -17,6 +69,8 @@ jobs:
         with:
           flutter-version: "3.47.5"
           cache: true
+      - run: dart pub get
+        working-directory: app/updater
       - run: flutter pub get
         working-directory: app
       - run: flutter analyze

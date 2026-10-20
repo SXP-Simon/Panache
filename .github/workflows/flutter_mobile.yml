@@ -27,6 +27,8 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+      - run: dart pub get
+        working-directory: app/updater
       - run: flutter pub get && flutter analyze && flutter test
         working-directory: app
       - run: flutter build apk --release --target-platform android-arm64,android-x64
