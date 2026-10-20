@@ -9,12 +9,16 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'update_model.dart';
+import '../desktop_backend.dart';
+
+import 'package:panache_updater/client.dart' as updater;
+
 import 'update_download.dart';
 import 'update_http_native.dart';
 
 UpdateHost createUpdateHost() => NativeUpdateHost();
 
-class NativeUpdateHost implements UpdateHost {
+class NativeUpdateHost implements UpdateHost, DesktopUpdateHost {
   static const channel = MethodChannel('io.github.sxpsimon.panache/updates');
   final Map<String, String> _verifiedHashes = {};
   @override
@@ -34,6 +38,10 @@ class NativeUpdateHost implements UpdateHost {
     return InstalledApp(
       info.version == '0.1.0' && info.buildNumber == '1' ? '' : info.version,
       UpdateTarget(os, arch),
+      canRestartDesktop:
+          usesDesktopBackend && updater.supportsAutomaticDesktopUpdate(),
+      recovered:
+          (Platform.environment['PANACHE_UPDATE_FAILURE'] ?? '').isNotEmpty,
     );
   }
 
@@ -174,5 +182,49 @@ class NativeUpdateHost implements UpdateHost {
   }
 
   @override
+  Future<DesktopPreparedUpdate> prepareRestart(
+    String path,
+    VerifiedPackage package,
+    String version, {
+    DownloadCancellation? cancellation,
+  }) async {
+    try {
+      if (_verifiedHashes[path] != package.sha256) {
+        throw const UpdateException(UpdateProblem.verification);
+      }
+      final prepared = await updater.prepareDesktopUpdate(
+        supportDirectory: (await getApplicationSupportDirectory()).path,
+        archive: path,
+        sha256: package.sha256,
+        version: version,
+        build: package.buildNumber,
+        sidecarPid: DesktopBackend.activePid,
+        onStarted: (session) {
+          cancellation?.abort = () => unawaited(session.abort());
+          if (cancellation?.cancelled == true) unawaited(session.abort());
+        },
+      );
+      cancellation?.check();
+      return _PreparedUpdate(prepared);
+    } on UpdateException {
+      rethrow;
+    } catch (_) {
+      cancellation?.check();
+      throw const UpdateException(UpdateProblem.desktopUnavailable);
+    } finally {
+      cancellation?.abort = null;
+    }
+  }
+
+  @override
   void reload() {}
+}
+
+class _PreparedUpdate implements DesktopPreparedUpdate {
+  _PreparedUpdate(this.prepared);
+  final updater.PreparedDesktopUpdate prepared;
+  @override
+  void arm() => prepared.arm();
+  @override
+  Future<void> abort() => prepared.abort();
 }

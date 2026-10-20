@@ -13,6 +13,7 @@ bool get usesDesktopBackend =>
 
 /// Owns only the bundled process. Closing stdin also covers a crashed parent.
 class DesktopBackend {
+  static int? activePid;
   Process? _process;
   bool _stopping = false;
   Future<int>? exited;
@@ -28,6 +29,7 @@ class DesktopBackend {
     String? executable,
     String? dataDirectory,
     Duration timeout = const Duration(seconds: 30),
+    void Function(int)? onSpawn,
   }) async {
     if (_process != null) throw StateError('Backend already started');
     final binary = executable ?? bundledExecutable();
@@ -51,6 +53,8 @@ class DesktopBackend {
         },
       );
       final process = _process!;
+      activePid = process.pid;
+      onSpawn?.call(process.pid);
       // Drain both pipes throughout the process lifetime to prevent deadlocks.
       process.stderr.transform(utf8.decoder).listen((text) {
         diagnostic = '$diagnostic$text';
@@ -132,6 +136,7 @@ class DesktopBackend {
         await process.exitCode;
       }
     } finally {
+      if (activePid == process.pid) activePid = null;
       _process = null;
       _stopping = false;
     }

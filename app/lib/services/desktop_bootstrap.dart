@@ -8,6 +8,10 @@ import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
 import '../theme/handwriting_theme.dart';
 import 'desktop_backend.dart';
+import 'desktop_exit.dart';
+
+import 'package:panache_updater/client.dart' as updater;
+
 import 'workspace.dart';
 import 'mobile_api.dart';
 
@@ -32,6 +36,7 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
     super.initState();
     lifecycle = AppLifecycleListener(
       onExitRequested: () async {
+        if (desktopUpdateExitRequested) return AppExitResponse.exit;
         closing = true;
         await backend?.stop();
         if (workspace?.api case final MobileHandwritingApi api) {
@@ -62,11 +67,26 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
     final current = DesktopBackend();
     backend = current;
     Workspace? candidate;
+    updater.DesktopUpdateStartup? updateStartup;
     try {
+      final support = (await getApplicationSupportDirectory()).path;
+      if (!usesMobileBackend) {
+        updateStartup = updater.DesktopUpdateStartup.read(support);
+        if (updateStartup == null) {
+          final recovery = await updater.recoverInterruptedUpdate(support);
+          if (recovery != null) {
+            recovery.arm();
+            if (!await requestDesktopUpdateExit()) await recovery.abort();
+            return;
+          }
+        }
+        updateStartup?.recordStarted();
+      }
       final api = usesMobileBackend
           ? await MobileHandwritingApi.bundled()
           : await current.start(
-              dataDirectory: (await getApplicationSupportDirectory()).path,
+              dataDirectory: support,
+              onSpawn: (pid) => updateStartup?.recordStarted(sidecarPid: pid),
             );
       if (!mounted || closing) {
         api.close();
@@ -97,6 +117,15 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
         starting = false;
       });
       if (!usesMobileBackend) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !closing && readyWorkspace.connected) {
+            try {
+              updateStartup?.acknowledge(readyWorkspace.version);
+            } catch (error) {
+              debugPrint('Update health confirmation failed: $error');
+            }
+          }
+        });
         unawaited(
           current.exited!.then((_) {
             if (mounted &&

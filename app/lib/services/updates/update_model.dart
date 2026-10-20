@@ -14,6 +14,10 @@ enum UpdateProblem {
   cancelled,
   storage,
   openFailed,
+  desktopUnavailable,
+  saveFailed,
+  restartDeferred,
+  restartCancelled,
 }
 
 class UpdateException implements Exception {
@@ -45,7 +49,13 @@ class UpdateTarget {
 }
 
 class InstalledApp {
-  const InstalledApp(this.version, this.target);
+  const InstalledApp(
+    this.version,
+    this.target, {
+    this.recovered = false,
+    this.canRestartDesktop = true,
+  });
+  final bool recovered, canRestartDesktop;
   final String version;
   final UpdateTarget target;
 }
@@ -130,4 +140,18 @@ class DeployedApp {
       (parseAppVersion(this.version) != null &&
           parseAppVersion(version) != null &&
           parseAppVersion(this.version) != parseAppVersion(version));
+}
+
+abstract interface class DesktopPreparedUpdate {
+  void arm();
+  Future<void> abort();
+}
+
+abstract interface class DesktopUpdateHost {
+  Future<DesktopPreparedUpdate> prepareRestart(
+    String path,
+    VerifiedPackage package,
+    String version, {
+    DownloadCancellation? cancellation,
+  });
 }

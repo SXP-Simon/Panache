@@ -16,6 +16,7 @@ import 'dialogs/text_preview_dialog.dart';
 import '../services/api.dart';
 import '../services/illustration_import.dart';
 import '../services/workspace.dart';
+import '../services/desktop_exit.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
 import '../utils/latex.dart';
@@ -63,12 +64,19 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   int settingsRevision = 0;
   bool restored = false;
   bool firstFrameReady = false;
+  bool recoveryShown = false;
   UpdatePromptCoordinator? updatePrompts;
   String tableMode = 'latex';
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';
-  bool get locked => w.busy || operation;
+  bool get locked =>
+      w.busy ||
+      operation ||
+      {
+        UpdatePhase.preparing,
+        UpdatePhase.restarting,
+      }.contains(widget.updates?.phase);
   // This context is above Scaffold, before it consumes body keyboard insets.
   bool get keyboardVisible => MediaQuery.viewInsetsOf(context).bottom > 0;
 
@@ -104,6 +112,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
               context,
               updates,
               onReload: reloadUpdatedWeb,
+              onRestart: updateDesktop,
             );
           }
         },
@@ -117,6 +126,14 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   }
 
   void refreshUpdates() {
+    if (mounted &&
+        !recoveryShown &&
+        widget.updates?.installed?.recovered == true) {
+      recoveryShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) notify(l.updateRolledBack);
+      });
+    }
     if (mounted) setState(() {});
   }
 
@@ -568,10 +585,24 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     widget.updates?.host.reload();
   }
 
+  Future<void> updateDesktop() async {
+    final updates = widget.updates;
+    if (updates == null) return;
+    await updates.updateAndRestart(
+      persist: () async {
+        w.text = editor.text;
+        return w.persistDraft();
+      },
+      canRestart: () => mounted && !w.busy && !operation,
+      requestExit: requestDesktopUpdateExit,
+    );
+  }
+
   Widget information() => WorkbenchInformation(
     guide: destination == 1,
     updates: widget.updates,
     onReload: reloadUpdatedWeb,
+    onRestart: updateDesktop,
   );
 }
 

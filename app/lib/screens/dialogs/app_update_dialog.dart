@@ -101,7 +101,15 @@ class AppUpdateAvailableDialog extends StatelessWidget {
           FilledButton(
             key: const ValueKey('update-prompt-now'),
             onPressed: () => Navigator.pop(context, true),
-            child: Text(web ? l.updateReloadNow : l.updateNow),
+            child: Text(
+              web
+                  ? l.updateReloadNow
+                  : controller.desktopAutomatic
+                  ? l.updateRestart
+                  : controller.desktop
+                  ? l.updateDownload
+                  : l.updateNow,
+            ),
           ),
       ],
     );
@@ -112,11 +120,15 @@ Future<void> showAppUpdateProgress(
   BuildContext context,
   UpdateController controller, {
   required Future<void> Function() onReload,
+  Future<void> Function()? onRestart,
 }) => showDialog<void>(
   context: context,
   barrierDismissible: false,
-  builder: (_) =>
-      AppUpdateProgressDialog(controller: controller, onReload: onReload),
+  builder: (_) => AppUpdateProgressDialog(
+    controller: controller,
+    onReload: onReload,
+    onRestart: onRestart,
+  ),
 );
 
 class AppUpdateProgressDialog extends StatefulWidget {
@@ -124,9 +136,11 @@ class AppUpdateProgressDialog extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onReload,
+    this.onRestart,
   });
   final UpdateController controller;
   final Future<void> Function() onReload;
+  final Future<void> Function()? onRestart;
   @override
   State<AppUpdateProgressDialog> createState() =>
       _AppUpdateProgressDialogState();
@@ -140,13 +154,18 @@ class _AppUpdateProgressDialogState extends State<AppUpdateProgressDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => started = true);
-      unawaited(widget.controller.download());
+      unawaited(
+        widget.controller.desktopAutomatic && widget.onRestart != null
+            ? widget.onRestart!()
+            : widget.controller.download(),
+      );
     });
   }
 
   @override
   void dispose() {
-    if (widget.controller.phase == UpdatePhase.downloading) {
+    if (widget.controller.busy &&
+        widget.controller.phase != UpdatePhase.restarting) {
       widget.controller.cancel();
     }
     super.dispose();
@@ -177,6 +196,7 @@ class _AppUpdateProgressDialogState extends State<AppUpdateProgressDialog> {
                       controller: widget.controller,
                       onReload: widget.onReload,
                       compact: true,
+                      onRestart: widget.onRestart,
                     ),
                   ),
                 ),
