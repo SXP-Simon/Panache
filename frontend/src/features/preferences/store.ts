@@ -8,6 +8,7 @@ export interface PreferencesData {
   theme: 'light' | 'dark';
   tableMode: TableMode;
   themeColor: string;
+  autoCheckUpdates: boolean;
 }
 interface PreferencesState extends PreferencesData {
   patch: (values: Partial<PreferencesData>) => void;
@@ -19,6 +20,7 @@ export const usePreferencesStore = create<PreferencesState>()((set) => ({
   theme: 'light',
   tableMode: 'latex',
   themeColor: DEFAULT_THEME_COLOR,
+  autoCheckUpdates: true,
   patch: (values) => set(values),
   toggleLocale: () => set((state) => ({ locale: state.locale === 'cn' ? 'en' : 'cn' })),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),

@@ -1,3 +1,5 @@
+import UpdateSettings from './features/updates/UpdateSettings';
+import { useInitializeUpdates } from './features/updates/runtime';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import ThemeColorEditor from './features/preferences/ThemeColorEditor';
 import { applyThemeColor } from './features/preferences/themeColors';
@@ -46,6 +48,7 @@ export default function App() {
   );
 }
 function Studio() {
+  useInitializeUpdates();
   const { locale, t, toggle } = useI18n();
   const reduced = useReducedMotion();
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
@@ -193,6 +196,7 @@ function Studio() {
             onClose={() => setAppearance(false)}
           >
             <ThemeColorEditor />
+            <UpdateSettings />
             <div className="appearance-tools">
               <Button variant="secondary" data-testid="settings-language-toggle" onClick={toggle}>
                 <Languages size={16} />

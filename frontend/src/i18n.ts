@@ -1,5 +1,89 @@
 import { createContext, useContext } from 'react';
 const words = {
+  updates: ['应用更新', 'App updates'],
+  updateCleanupFailed: [
+    '下载临时文件被系统占用，无法清理；请稍后重新检查',
+    'Temporary update files are in use and could not be removed. Please check again later.',
+  ],
+  updateDevelopment: [
+    '开发环境不安装发布版更新，请使用源码更新',
+    'Release installation is disabled in development. Update your source checkout.',
+  ],
+  updateLaunched: [
+    '安装包已打开，请按照系统提示完成更新',
+    'The installer has opened. Follow the system instructions to finish updating.',
+  ],
+  updateOpenAgain: ['重新打开安装包', 'Reopen installer'],
+  updateGenerationBusy: [
+    '正在生成内容，请等待生成完成后再安装或刷新',
+    'A generation is in progress. Wait for it to finish before installing or reloading.',
+  ],
+  updateIdle: ['尚未检查更新', 'Updates have not been checked'],
+  updateChecking: ['正在检查更新…', 'Checking for updates…'],
+  updateCurrent: ['当前已是最新可用版本', 'You have the latest available version'],
+  updateAvailable: ['有新版本可用', 'An update is available'],
+  updateUnsupported: [
+    '此系统或架构暂未提供安装包，可查看发布页面',
+    'No package is available for this system or architecture. See the release page.',
+  ],
+  updatePending: [
+    '新版本安装包尚未就绪，请稍后再检查',
+    'The new package is still being prepared. Please check again later.',
+  ],
+  updateDownloading: ['正在下载并校验更新…', 'Downloading and verifying the update…'],
+  updateCancelled: ['已取消下载，可以重新下载', 'Download cancelled. You can try again.'],
+  updateReady: ['更新已下载并通过校验', 'The update is downloaded and verified'],
+  updateNetwork: [
+    '无法连接更新服务，请检查网络后重试',
+    'Cannot reach the update service. Check your connection and try again.',
+  ],
+  updateRateLimited: [
+    'GitHub 请求达到限额，请稍后重试',
+    'GitHub request limit reached. Please try again later.',
+  ],
+  updateInvalid: [
+    '更新信息无效，未下载任何程序',
+    'The update information is invalid. No program was downloaded.',
+  ],
+  updateIntegrity: [
+    '安装包校验失败，已移除下载，请重新检查',
+    'Package verification failed. The download was removed. Please check again.',
+  ],
+  updateSaveFailed: [
+    '当前内容尚未保存成功，请先处理保存错误再更新',
+    'Your work could not be saved. Resolve the save error before updating.',
+  ],
+  updateWebUnsupported: [
+    '此环境不支持网页更新检查，可重新打开页面获取部署版本',
+    'Update checks are unavailable here. Reopen the page to load the deployed version.',
+  ],
+  updateDesktopHint: [
+    '检查 Panache 正式版本；安装前会保存当前内容，由你确认打开安装程序。',
+    'Checks stable Panache releases. Your work is saved before you choose to open the installer.',
+  ],
+  updateWebHint: [
+    '检查本站已部署的网页更新。服务端升级由部署管理员处理，与 GitHub 客户端版本独立。',
+    'Checks updates deployed on this site. Server upgrades are managed by the administrator, separately from GitHub client releases.',
+  ],
+  updateAuto: [
+    '自动检查更新（仅检查，不自动下载或安装）',
+    'Check automatically (never download or install automatically)',
+  ],
+  updateInstalledVersion: ['当前版本', 'Installed version'],
+  updateCheck: ['检查更新', 'Check for updates'],
+  updateDownload: ['下载更新', 'Download update'],
+  updateReload: ['保存并刷新', 'Save and reload'],
+  updateReveal: ['打开文件位置', 'Show downloaded file'],
+  updateOpen: ['保存并打开安装包', 'Save and open installer'],
+  updatePortableHint: [
+    '这是免安装版。请先退出当前应用，再用下载的新文件替换原文件；保留现有应用数据。',
+    'This is a portable build. Quit the app, then replace the old executable with the downloaded file. Keep your existing app data.',
+  ],
+  updateInstallHint: [
+    '请按安装程序提示完成更新；如需退出当前应用，可正常关闭窗口。macOS 请将新 App 拖入应用程序目录替换旧版。',
+    'Follow the installer to update; close this window normally when needed. On macOS, drag the new app into Applications to replace the old version.',
+  ],
+  updateNotes: ['更新说明', 'Release notes'],
   tableLatex: ['表格：手写方格（LaTeX）', 'Tables: handwriting grid (LaTeX)'],
   tableList: ['表格：条目列表', 'Tables: item list'],
   tableAligned: ['表格：纯文本对齐', 'Tables: aligned text'],

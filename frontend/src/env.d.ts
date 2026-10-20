@@ -6,6 +6,16 @@ declare global {
       onDownloadFinished(callback: (payload: { file: string; state: string }) => void): () => void;
       revealLastDownload(): void;
       onBeforeClose(callback: () => Promise<void>): () => void;
+      updates: {
+        state(): Promise<import('./features/updates/contracts').UpdateState>;
+        check(): Promise<import('./features/updates/contracts').UpdateState>;
+        download(): Promise<import('./features/updates/contracts').UpdateState>;
+        cancel(): Promise<import('./features/updates/contracts').UpdateState>;
+        open(): Promise<import('./features/updates/contracts').UpdateState>;
+        subscribe(
+          callback: (state: import('./features/updates/contracts').UpdateState) => void,
+        ): () => void;
+      };
       storage: {
         readRecord(key: import('./persistence/contracts').RecordKey): Promise<string | null>;
         writeRecord(key: import('./persistence/contracts').RecordKey, value: string): Promise<void>;

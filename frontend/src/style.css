@@ -1426,3 +1426,35 @@ input[type='color'] {
     gap: 0;
   }
 }
+
+.update-settings {
+  border-top: 1px solid var(--border);
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+}
+.update-settings h3 {
+  margin: 0 0 0.5rem;
+}
+.update-auto {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+.update-settings progress {
+  accent-color: var(--accent);
+  max-width: 100%;
+}
+.update-notes {
+  margin-top: 0.8rem;
+}
+.update-notes summary {
+  cursor: pointer;
+}
+.update-notes p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 16rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}

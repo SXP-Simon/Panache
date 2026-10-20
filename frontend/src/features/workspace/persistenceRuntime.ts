@@ -30,6 +30,7 @@ export const generationRecordSchema = v.object({
 });
 export type GenerationRecord = v.InferOutput<typeof generationRecordSchema>;
 const preferencesSchema = v.object({
+  autoCheckUpdates: v.optional(v.boolean(), true),
   locale: v.picklist(['cn', 'en']),
   theme: v.picklist(['light', 'dark']),
   themeColor: v.optional(
@@ -231,6 +232,7 @@ export function startWorkspacePersistence(): () => void {
           locale: preferences.locale,
           theme: preferences.theme,
           themeColor: preferences.themeColor,
+          autoCheckUpdates: preferences.autoCheckUpdates,
           tableMode: preferences.tableMode,
         },
         legacyFontIndex,

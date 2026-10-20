@@ -16,7 +16,6 @@ worker.addEventListener('install', (event) => {
     (async () => {
       const cache = await caches.open(cacheName);
       await cache.addAll(Array.from(shellUrls, (url) => new Request(url, { cache: 'reload' })));
-      await worker.skipWaiting();
     })(),
   );
 });
@@ -57,4 +56,8 @@ worker.addEventListener('fetch', (event) => {
     return;
   if (request.mode === 'navigate') event.respondWith(navigation(request));
   else if (shellUrls.has(url.href)) event.respondWith(shellAsset(request));
+});
+
+worker.addEventListener('message', (event) => {
+  if (event.data === 'PANACHE_ACTIVATE_UPDATE') void worker.skipWaiting();
 });

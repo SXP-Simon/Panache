@@ -9,10 +9,12 @@ export interface PwaState {
   online: boolean;
   installable: boolean;
   installed: boolean;
+  updateAvailable: boolean;
 }
 
 let prompt: InstallPrompt | null = null;
 let state: PwaState = {
+  updateAvailable: false,
   online: navigator.onLine,
   installable: false,
   installed: window.matchMedia('(display-mode: standalone)').matches,
@@ -51,6 +53,66 @@ export async function installPwa(): Promise<void> {
   if (choice.outcome === 'accepted') update({ installed: true });
 }
 
+let studioRegistration: ServiceWorkerRegistration | null = null;
+function observeWorker(registration: ServiceWorkerRegistration): void {
+  studioRegistration = registration;
+  const waiting = () => {
+    if (registration.waiting && navigator.serviceWorker.controller)
+      update({ updateAvailable: true });
+  };
+  waiting();
+  registration.addEventListener('updatefound', () => {
+    const installing = registration.installing;
+    installing?.addEventListener('statechange', waiting);
+  });
+}
+export async function checkDeploymentUpdate(): Promise<boolean> {
+  if (desktop() || !import.meta.env.PROD || !('serviceWorker' in navigator))
+    throw new Error('unsupported');
+  if (!navigator.onLine) throw new Error('network');
+  await registerWorker();
+  const registration = studioRegistration;
+  if (!registration) throw new Error('unsupported');
+  await registration.update();
+  const installing = registration.installing;
+  if (installing)
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        installing.removeEventListener('statechange', changed);
+        reject(new Error('network'));
+      }, 20000);
+      function changed() {
+        if (['installed', 'activated', 'redundant'].includes(installing?.state ?? '')) {
+          clearTimeout(timer);
+          installing?.removeEventListener('statechange', changed);
+          resolve();
+        }
+      }
+      installing.addEventListener('statechange', changed);
+      changed();
+    });
+  if (registration.waiting) update({ updateAvailable: true });
+  return state.updateAvailable;
+}
+export async function activateDeploymentUpdate(): Promise<void> {
+  const waiting = studioRegistration?.waiting;
+  if (waiting) {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        navigator.serviceWorker.removeEventListener('controllerchange', changed);
+        reject(new Error('network'));
+      }, 20000);
+      function changed() {
+        clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener('controllerchange', changed);
+        resolve();
+      }
+      navigator.serviceWorker.addEventListener('controllerchange', changed);
+      waiting.postMessage('PANACHE_ACTIVATE_UPDATE');
+    });
+  }
+  window.location.reload();
+}
 async function registerWorker(): Promise<void> {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator) || desktop()) return;
   const scope = new URL(import.meta.env.BASE_URL, window.location.href);
@@ -66,11 +128,15 @@ async function registerWorker(): Promise<void> {
       return;
     }
     if (pathname !== new URL('studio-worker.js', scope).pathname) return;
+    observeWorker(existing);
+    return;
   }
-  await navigator.serviceWorker.register(new URL('studio-worker.js', scope), {
-    scope: scope.href,
-    updateViaCache: 'none',
-  });
+  observeWorker(
+    await navigator.serviceWorker.register(new URL('studio-worker.js', scope), {
+      scope: scope.href,
+      updateViaCache: 'none',
+    }),
+  );
 }
 
 export function initializePwa(): () => void {
