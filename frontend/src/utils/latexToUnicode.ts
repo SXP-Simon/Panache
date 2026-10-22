@@ -595,7 +595,11 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
         // 表格标记与 bmatrix 的真实方括号区分，绘制时只展开表格本身。
         return `⟦${matrixMode ? ` ${matrixMode}:` : ''}${table}⟧`;
       }
-      if (node['colSeparationType'] === 'align' || node['colSeparationType'] === 'gather') {
+      if (
+        node['colSeparationType'] === 'align' ||
+        node['colSeparationType'] === 'alignat' ||
+        node['colSeparationType'] === 'gather'
+      ) {
         return rows
           .map((row) =>
             row
@@ -605,6 +609,7 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
           )
           .join('\n');
       }
+
       // 保留空单元格的位置，不能 filter(Boolean)。
       const content = ` ${rows.map((row) => row.join('  ')).join(' ; ')} `;
       return `[${content}]`;

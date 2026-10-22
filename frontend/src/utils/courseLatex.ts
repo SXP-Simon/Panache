@@ -124,6 +124,26 @@ function groupAt(source: string, offset: number): { body: string; end: number } 
   return null;
 }
 
+function chemicalFormulaLatex(source: string): string | null {
+  // Convert standard mhchem \ce{...} formula into standard math LaTeX with correct sub/superscripts
+  // Example: 'H2O' -> '\mathrm{H_2O}', 'Fe^{3+} + 3OH^- -> Fe(OH)3 v'
+  let s = source.trim();
+  if (!s) return null;
+  // Handle reaction arrows and states
+  s = s.replace(/<->|<=>/g, ' \\rightleftharpoons ');
+  s = s.replace(/->/g, ' \\rightarrow ');
+  s = s.replace(/\s+v(?=\s|$)/g, '\\downarrow');
+  s = s.replace(/\s+\^(?=\s|$)/g, '\\uparrow');
+  // Handle ion charges like ^2+, ^-, ^+, or bare trailing - and +: e.g. H+, CH3COO-, Fe3+
+  s = s.replace(/\^([0-9]*[+-])/g, '^{$1}');
+  s = s.replace(/([A-Za-z)\]])(\d*[+-])(?=\s|$)/g, '$1^{$2}');
+  // Subscript numbers immediately following an element or parenthesis: e.g. H2 -> H_2, (OH)3 -> (OH)_3
+  s = s.replace(/([A-Za-z)])(\d+)/g, '$1_{$2}');
+  // Wrap non-math symbols in \mathrm for clean upright chemical representation
+
+  return `\\mathrm{${s}}`;
+}
+
 export function normalizeCourseLatex(source: string): string {
   const commands = /\\([a-zA-Z]+|[^a-zA-Z])/g;
   let result = '',
@@ -135,6 +155,18 @@ export function normalizeCourseLatex(source: string): string {
       const text = groupAt(source, commands.lastIndex);
       if (text) commands.lastIndex = text.end;
       continue;
+    }
+    if (name === 'ce') {
+      const group = groupAt(source, commands.lastIndex);
+      if (group) {
+        const chem = chemicalFormulaLatex(group.body);
+        if (chem !== null) {
+          result += source.slice(cursor, match.index) + chem;
+          cursor = group.end;
+          commands.lastIndex = group.end;
+          continue;
+        }
+      }
     }
     if (!['SI', 'si', 'num'].includes(name)) continue;
     const first = groupAt(source, commands.lastIndex);
