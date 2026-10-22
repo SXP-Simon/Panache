@@ -47,6 +47,20 @@ String cleanMarkdown(
     return '$tokenPrefix${protected.length - 1}\uE101';
   }
 
+  // A diagram can contain pipes and Markdown-looking labels. Mask its entire
+  // source before table recognition so an unsupported diagram stays editable.
+  final diagrams = StringBuffer();
+  var diagramCursor = 0;
+  for (final segment in scanMathSegments(s)) {
+    final source = s.substring(segment.start, segment.end);
+    if (!source.contains(r'\begin{circuitikz}')) continue;
+    diagrams.write(s.substring(diagramCursor, segment.start));
+    diagrams.write(protect(source));
+    diagramCursor = segment.end;
+  }
+  diagrams.write(s.substring(diagramCursor));
+  s = diagrams.toString();
+
   if (tableMode == 'latex') {
     s = _convertMarkdownTables(s, protect);
   }

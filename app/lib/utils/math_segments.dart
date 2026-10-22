@@ -229,9 +229,17 @@ List<MathSegment> scanMathSegments(String text) {
       }
       final env = _env.firstMatch(tail);
       if (env != null && env[1] == 'begin') {
+        // Circuit topology and labels belong to the engine, not the math AST.
+        // Keep the whole environment intact through both editing tools.
+        final circuit = env[2] == 'circuitikz';
         final stack = <String>[env[2]!];
         var end = cursor + env[0]!.length, valid = false;
         while (end < text.length) {
+          if (text[end] == '%' && !_escaped(text, end)) {
+            final newline = text.indexOf('\n', end);
+            end = newline < 0 ? text.length : newline + 1;
+            continue;
+          }
           if (text.startsWith(r'\\', end)) {
             end += 2;
             continue;
@@ -265,7 +273,13 @@ List<MathSegment> scanMathSegments(String text) {
         }
         final body = text.substring(start, end);
         valid = valid && withinMathBudget(body);
-        add(start, end, math: valid, display: true, safe: !valid);
+        add(
+          start,
+          end,
+          math: valid && !circuit,
+          display: true,
+          safe: !valid || circuit,
+        );
         continue;
       }
       String? open, close;
