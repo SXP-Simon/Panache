@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
-"""2026-10-20：识别带明确分隔线的可读二维表格，普通矩阵保持原样."""
+"""2026-10-22：识别带明确分隔线的二维表格和显式类型矩阵，普通文本保持原样."""
 
 import itertools
 import json
@@ -9,6 +9,11 @@ _MAX_SOURCE = 16384
 _MAX_PARTS = 65
 _MAX_COLUMNS = 32
 _MIN_ROWS = 2
+_MAX_ROWS = 32
+_CASE_COLUMNS = 2
+_MATRIX_KINDS = frozenset(
+    ("matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "cases")
+)
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,7 @@ class Table:
     rows: tuple[tuple[str, ...], ...]
     vertical: tuple[Rule, ...]
     horizontal: tuple[Rule, ...]
+    kind: str = "table"
 
 
 def _unquoted_tokens(text: str) -> list[tuple[int, str]] | None:
@@ -139,7 +145,7 @@ def _cells(line: str) -> tuple[tuple[str, ...], tuple[Rule, ...]] | None:
     return tuple(cells), tuple(rules)
 
 
-def _parse_parts(parts: list[str]) -> Table | None:
+def _parse_parts(parts: list[str], kind: str = "table") -> Table | None:
     rows: list[tuple[str, ...]] = []
     horizontal: list[Rule] = []
     vertical: tuple[Rule, ...] | None = None
@@ -160,9 +166,11 @@ def _parse_parts(parts: list[str]) -> Table | None:
         rows.append(cells)
     if len({rule.position for rule in horizontal}) != len(horizontal):
         return None
-    if len(rows) < _MIN_ROWS or not (horizontal or vertical):
+    if kind == "table" and (len(rows) < _MIN_ROWS or not (horizontal or vertical)):
         return None
-    return Table(tuple(rows), vertical or (), tuple(horizontal))
+    if not rows or len(rows) > _MAX_ROWS or (kind == "cases" and len(rows[0]) != _CASE_COLUMNS):
+        return None
+    return Table(tuple(rows), vertical or (), tuple(horizontal), kind)
 
 
 def parse_table(text: str) -> Table | None:
@@ -172,10 +180,15 @@ def parse_table(text: str) -> Table | None:
     # 2026-10-20：协议限定单行；控制字符不能悄悄改变单元格内的排版。
     if any(char in text for char in "\n\r\t"):
         return None
-    split = _split(text[2:-2], (";",))
+    body = text[2:-2]
+    kind = "table"
+    marker, separator, remaining = body.partition(": ")
+    if separator and marker in _MATRIX_KINDS:
+        kind, body = marker, remaining
+    split = _split(body, (";",))
     if split is None or len(split[0]) > _MAX_PARTS:
         return None
-    return _parse_parts(split[0])
+    return _parse_parts(split[0], kind)
 
 
 def table_spans(text: str, protected: tuple[tuple[int, int], ...] = ()) -> list[tuple[int, int]]:

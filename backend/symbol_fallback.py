@@ -26,11 +26,13 @@ from PIL import Image, ImageDraw, ImageFont
 if __package__:
     from .library_boundary import install_member, member
     from .logging_setup import get_logger
+    from .math_matrix import matrix_delimiters
     from .math_page_layout import install_math_page_layout
     from .math_table import Table, parse_table, table_spans
 else:
     from library_boundary import install_member, member
     from logging_setup import get_logger
+    from math_matrix import matrix_delimiters
     from math_page_layout import install_math_page_layout
     from math_table import Table, parse_table, table_spans
 
@@ -325,10 +327,13 @@ _ACCENT_MARKS = frozenset("\u0304\u0302\u20d7\u0332\u0307\u0308\u0303\u0306\u030
 
 _TABLE_MAP: dict[str, Table] = {}
 _TABLE_KEYS: dict[Table, str] = {}
+_MAX_TABLE_DEPTH = 16
 
 
-def convert_tables_to_drawn(text: str) -> str:
-    """2026-10-20：只将带明确规则的完整表格注册为不可拆分的复合字形."""
+def convert_tables_to_drawn(text: str, _depth: int = 0) -> str:
+    """2026-10-22：将明确表格或矩阵注册为不可拆分的复合字形，限制嵌套深度."""
+    if _depth >= _MAX_TABLE_DEPTH:
+        return text
 
     def replace(source: str) -> str:
         table = parse_table(source)
@@ -336,11 +341,17 @@ def convert_tables_to_drawn(text: str) -> str:
             return source
         table = Table(
             tuple(
-                tuple(_transform_math_segments(cell, _normalize_math_content) for cell in row)
+                tuple(
+                    _transform_math_segments(
+                        convert_tables_to_drawn(cell, _depth + 1), _normalize_math_content
+                    )
+                    for cell in row
+                )
                 for row in table.rows
             ),
             table.vertical,
             table.horizontal,
+            table.kind,
         )
         with _REGISTRY_LOCK:
             if table in _TABLE_KEYS:
@@ -1042,6 +1053,8 @@ def _table_grid_paths(
     horizontal = {rule.position: rule for rule in table.horizontal}
     for index in range(len(widths) + 1):
         rule = vertical.get(index)
+        if table.kind != "table" and rule is None:
+            continue
         x = sum(widths[:index])
         paths.extend(
             _table_rule(
@@ -1054,6 +1067,8 @@ def _table_grid_paths(
         )
     for index in range(len(heights) + 1):
         rule = horizontal.get(index)
+        if table.kind != "table" and rule is None:
+            continue
         y = sum(heights[:index])
         paths.extend(
             _table_rule(
@@ -1091,7 +1106,9 @@ def _layout_table(table: Table, font: Font, font_path: str | None, memo: _Layout
             children.append(
                 (
                     box,
-                    x + (width - box.bbox[2] + box.bbox[0]) // 2 - box.bbox[0],
+                    x
+                    + (pad if table.kind == "cases" else (width - box.bbox[2] + box.bbox[0]) // 2)
+                    - box.bbox[0],
                     y + (height - box.bbox[3] + box.bbox[1]) // 2 - box.bbox[1],
                 )
             )
@@ -1099,6 +1116,18 @@ def _layout_table(table: Table, font: Font, font_path: str | None, memo: _Layout
         y += height
     # 2026-10-20：补齐每个单元格的四边；全部格线同宽，原文虚线保留虚线样式。
     paths = _table_grid_paths(table, widths, heights, size)
+    if table.kind != "table":
+        # 2026-10-22：矩阵按数学轴居中，条件两列左对齐，括号随完整行高伸缩。
+        inset, delimiters = matrix_delimiters(table.kind, sum(widths), sum(heights), size)
+        top = _math_axis(font, font_path) - sum(heights) // 2
+        if table.kind == "matrix":
+            ink = _compose_box(sum(widths), children, paths).bbox
+            top = _math_axis(font, font_path) - (ink[1] + ink[3]) // 2
+        children = [(box, x + inset, y + top) for box, x, y in children]
+        paths = [(tuple((x + inset, y + top) for x, y in path), pen) for path, pen in paths]
+        paths.extend((tuple((x, y + top) for x, y in path), pen) for path, pen in delimiters)
+        right = 0 if table.kind == "cases" else inset
+        return _compose_box(sum(widths) + inset + right + pad, children, paths)
     return _compose_box(sum(widths) + pad, children, paths)
 
 
