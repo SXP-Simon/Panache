@@ -133,6 +133,79 @@ fn paired_scripts_share_one_column_and_use_normal_handwritten_letters() {
         assert_eq!(both.mask, explicit.mask);
     }
 }
+
+#[test]
+fn matrix_delimiters_are_continuous_equal_weight_and_do_not_add_a_grid() {
+    use crate::text::TableKind;
+    for kind in [
+        TableKind::Parentheses,
+        TableKind::Brackets,
+        TableKind::Braces,
+        TableKind::Determinant,
+        TableKind::Norm,
+        TableKind::Cases,
+    ] {
+        let (_, paths) = table::matrix::delimiters(kind, 200, 220, 64.);
+        assert!(!paths.is_empty());
+        assert!(paths.iter().all(|(_, pen)| *pen == 2));
+        for (points, _) in &paths {
+            assert_eq!(points.first().unwrap().1, 0);
+            assert_eq!(points.last().unwrap().1, 220);
+            assert!(points.windows(2).all(|pair| pair[0].1 <= pair[1].1));
+        }
+        if kind == TableKind::Cases {
+            assert_eq!(paths.len(), 1, "piecewise functions only have a left brace");
+        }
+    }
+    for book in books() {
+        for size in [24., 40., 70.] {
+            let mut gs = Glyphs::new(book);
+            let plain = gs
+                .sequence(&text::parse("⟦ matrix: 1  0 ; 0  1 ⟧"), size)
+                .unwrap();
+            assert!(
+                plain.mask.height() as f32 > size,
+                "two physical rows required"
+            );
+            // 2026-10-22：裸矩阵不能自动画表格横线；至少有一整行留白分开两行数字。
+            assert!((0..plain.mask.height()).any(|y| {
+                plain
+                    .mask
+                    .rows()
+                    .nth(y as usize)
+                    .unwrap()
+                    .all(|pixel| pixel[0] == 0)
+            }));
+            let bracket = gs
+                .sequence(&text::parse("⟦ bmatrix: 1  0 ; 0  1 ⟧"), size)
+                .unwrap();
+            assert!(bracket.mask.width() > plain.mask.width());
+            let column_coverage = (0..bracket.mask.width())
+                .map(|x| {
+                    (0..bracket.mask.height())
+                        .filter(|&y| bracket.mask[(x, y)][0] > 0)
+                        .count()
+                })
+                .max()
+                .unwrap();
+            assert!(
+                column_coverage as f32 > bracket.mask.height() as f32 * 0.9,
+                "bracket must span both rows"
+            );
+            let axis = gs.glyph('x', size).unwrap();
+            assert!(
+                (bracket.top + bracket.bottom() - axis.top - axis.bottom()).abs() <= 3,
+                "matrix must be centered on mathematical axis"
+            );
+            let cases = gs
+                .sequence(&text::parse("⟦ cases: (1)/(2)  x≥0 ; -x²  x<0 ⟧"), size)
+                .unwrap();
+            assert!(cases.ink);
+            let fitted = cases.fit(100., 90.);
+            assert!(fitted.mask.width() <= 100 && fitted.mask.height() <= 90);
+        }
+    }
+}
 #[test]
 fn unicode_minus_preserves_the_same_handwritten_ink_as_ascii_minus() {
     for book in books() {

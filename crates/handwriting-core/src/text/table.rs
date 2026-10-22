@@ -1,5 +1,5 @@
 //! 2026-10-20：仅识别带一致分隔规则的可读矩阵协议，普通括号与歧义输入保留原文。
-use super::{Table, TableRule, parse_inline};
+use super::{Table, TableKind, TableRule, parse_inline};
 
 fn split_top(source: &[char], delimiter: char) -> Option<Vec<String>> {
     let mut stack = Vec::new();
@@ -148,14 +148,40 @@ fn cells(row: &str) -> Option<(Vec<String>, Vec<TableRule>)> {
             }
         })
         .collect::<Option<Vec<_>>>()?;
+    if values
+        .iter()
+        .any(|value| value.chars().any(char::is_control))
+    {
+        return None;
+    }
     Some((values, boundaries))
 }
 
 pub(super) fn parse(source: &[char], depth: usize) -> Option<Table> {
-    if source.len() > 16_000 || depth > 20 {
+    if source.len() > 16_000 || depth > 16 || source.iter().any(|c| c.is_control()) {
         return None;
     }
-    let pieces = split_top(source, ';')?;
+    let mut kind = TableKind::Grid;
+    let text: String = source.iter().collect();
+    let text = text.strip_prefix(' ').unwrap_or(&text);
+    let mut content = source;
+    for (prefix, value) in [
+        ("matrix: ", TableKind::Matrix),
+        ("pmatrix: ", TableKind::Parentheses),
+        ("bmatrix: ", TableKind::Brackets),
+        ("Bmatrix: ", TableKind::Braces),
+        ("vmatrix: ", TableKind::Determinant),
+        ("Vmatrix: ", TableKind::Norm),
+        ("cases: ", TableKind::Cases),
+    ] {
+        if source.first() == Some(&' ') && text.starts_with(prefix) {
+            kind = value;
+            // 2026-10-22：保留首个单元格原有空格约定，不吞掉空单元格。
+            content = &source[prefix.chars().count()..];
+            break;
+        }
+    }
+    let pieces = split_top(content, ';')?;
     let mut rows = Vec::new();
     let mut vertical = None;
     let mut horizontal = vec![TableRule::None];
@@ -200,10 +226,14 @@ pub(super) fn parse(source: &[char], depth: usize) -> Option<Table> {
         rows.push(row);
         horizontal.push(TableRule::None);
     }
-    if rows.len() < 2 || !has_rule {
+    if rows.is_empty() || (kind == TableKind::Grid && (rows.len() < 2 || !has_rule)) {
+        return None;
+    }
+    if kind == TableKind::Cases && rows[0].len() != 2 {
         return None;
     }
     Some(Table {
+        kind,
         rows,
         vertical: vertical?,
         horizontal,
@@ -214,6 +244,75 @@ pub(super) fn parse(source: &[char], depth: usize) -> Option<Table> {
 mod tests {
     use super::*;
     use crate::text::{self, Node};
+
+    #[test]
+    fn explicit_matrices_keep_two_dimensions_without_forcing_a_grid() {
+        for (kind, expected) in [
+            ("matrix", TableKind::Matrix),
+            ("pmatrix", TableKind::Parentheses),
+            ("bmatrix", TableKind::Brackets),
+            ("Bmatrix", TableKind::Braces),
+            ("vmatrix", TableKind::Determinant),
+            ("Vmatrix", TableKind::Norm),
+            ("cases", TableKind::Cases),
+        ] {
+            for body in ["a  b", "a  b ; (1)/(2)  x²"] {
+                let source = format!("⟦ {kind}: {body} ⟧");
+                for english in [false, true] {
+                    let parsed = text::parse(&text::normalize(&source, english));
+                    let [Node::Table(matrix)] = parsed.as_slice() else {
+                        panic!("lost matrix: {parsed:?}");
+                    };
+                    assert_eq!(matrix.kind, expected);
+                    assert_eq!(matrix.rows[0].len(), 2);
+                    assert!(matrix.vertical.iter().all(|rule| *rule == TableRule::None));
+                    assert!(
+                        matrix
+                            .horizontal
+                            .iter()
+                            .all(|rule| *rule == TableRule::None)
+                    );
+                }
+            }
+        }
+        let nested = text::parse("⟦ bmatrix: ⟦ pmatrix: 1 ; 2 ⟧  b ; c  d ⟧");
+        let [Node::Table(matrix)] = nested.as_slice() else {
+            panic!("lost outer matrix")
+        };
+        assert!(matches!(matrix.rows[0][0].as_slice(), [Node::Table(_)]));
+        let augmented = text::parse("⟦ bmatrix: 1  0 | a ; 0  1 | b ⟧");
+        let [Node::Table(matrix)] = augmented.as_slice() else {
+            panic!("lost augmented matrix")
+        };
+        assert_eq!(
+            matrix.vertical,
+            [
+                TableRule::None,
+                TableRule::None,
+                TableRule::Solid,
+                TableRule::None
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_matrix_protocol_and_control_characters_stay_literal() {
+        for source in [
+            "⟦ cases: a ; b ⟧",
+            "⟦ cases: a  b  c ; d  e  f ⟧",
+            "⟦ pmatrix: a  b ; c ⟧",
+            "⟦ pmatrix: a  b ; ── ; ── ; c  d ⟧",
+            "⟦ pmatrix: a\tb  c ; d  e ⟧",
+            "⟦ pmatrix: \"a\\n\"  b ; c  d ⟧",
+        ] {
+            assert!(
+                !text::parse(source)
+                    .iter()
+                    .any(|node| matches!(node, Node::Table(_))),
+                "{source}"
+            );
+        }
+    }
 
     #[test]
     fn distribution_rows_cells_rules_and_english_spacing_are_structural() {
