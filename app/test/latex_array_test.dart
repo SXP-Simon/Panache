@@ -26,11 +26,11 @@ void main() {
   test('分隔线前后的空单元格保留列位置', () {
     expect(
       convertLatex(r'$\begin{array}{c|cc}&c&d\\\hline a&b&c\end{array}$'),
-      '⟦  | c  d ; ── ; a | b  c ⟧',
+      '⟦ "" | c  d ; ── ; a | b  c ⟧',
     );
     expect(
       convertLatex(r'$\begin{array}{cc|c}a&b&\\\hline c&d&e\end{array}$'),
-      '⟦ a  b |  ; ── ; c  d | e ⟧',
+      '⟦ a  b | "" ; ── ; c  d | e ⟧',
     );
   });
   test('增广矩阵、首尾规则和普通矩阵', () {
@@ -42,15 +42,15 @@ void main() {
     );
     expect(
       convertLatex(r'$\begin{pmatrix}1&2\\3&4\end{pmatrix}$'),
-      '( 1  2 ; 3  4 )',
+      '⟦ pmatrix: 1  2 ; 3  4 ⟧',
     );
     expect(
       convertLatex(r'$\begin{vmatrix}1&2\\3&4\end{vmatrix}$'),
-      '| 1  2 ; 3  4 |',
+      '⟦ vmatrix: 1  2 ; 3  4 ⟧',
     );
     expect(
       convertLatex(r'$\begin{array}{cc}1&\\&2\end{array}$'),
-      '[ 1   ;   2 ]',
+      '⟦ matrix: 1  "" ; ""  2 ⟧',
     );
   });
   test('非法或不完整公式整体保留', () {
@@ -94,7 +94,7 @@ void main() {
   test('结构化表格标记及 JSON cell 再清洗和转换不会损坏', () {
     for (final source in [
       r'⟦ "a\\b" | "c ; d" ; ── ; "[ ] ⟧" | "say \"hi\"" ⟧',
-      r'⟦  | c  d ; ── ; a | b  c ⟧',
+      r'⟦ "" | c  d ; ── ; a | b  c ⟧',
     ]) {
       expect(convertLatex(source), source);
       expect(cleanMarkdown(source), source);
@@ -124,7 +124,7 @@ void main() {
     );
     expect(
       convertLatex(r'$f(x)=\begin{cases}x^2&x>0\\0&x\le0\end{cases}$'),
-      'f(x)={ x²  x>0 ; 0  x≤0 }',
+      'f(x)=⟦ cases: x²  x>0 ; 0  x≤0 ⟧',
     );
   });
 }

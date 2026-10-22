@@ -13,7 +13,7 @@ void main() {
           '展开：2 × ((½)³+3×½×((1)/(2√(3)))²)',
       r"导数 f'(x) = 3x^2，abc3x^2 原样": "导数 f'(x) = 3x²，abc3x^2 原样",
       r'代入：(-1)^2 + 8(0)^2 + 3(1)^2': '代入：(-1)² + 8(0)² + 3(1)²',
-      r'嵌套：\left[\left(x^2+1\right)^3\right]': '嵌套：[((x²+1))³]',
+      r'嵌套：\left[\left(x^2+1\right)^3\right]': '嵌套：[(x²+1)³]',
     };
     for (final entry in cases.entries) {
       expect(convertLatex(entry.key), entry.value, reason: entry.key);
@@ -51,10 +51,7 @@ void main() {
       cleanMarkdown('标题\n * 条目\n   继续说明\n\n  普通缩进\n  >   引用\n > > - 嵌套条目'),
       '标题\n条目\n继续说明\n  普通缩进\n引用\n嵌套条目',
     );
-    expect(
-      cleanMarkdown('正文\n```text\n   - literal\n```'),
-      '正文\n   - literal',
-    );
+    expect(cleanMarkdown('正文\n```text\n   - literal\n```'), '正文\n   - literal');
     expect(convertLatex(r'原样：\left(x^2'), r'原样：\left(x²');
   });
 }
