@@ -58,6 +58,14 @@ class _FontBounds(Protocol):
     def getbbox(self, text: str) -> object: ...
 
 
+class _GlyphMask(Protocol):
+    def getbbox(self) -> object: ...
+
+
+class _FontMask(Protocol):
+    def getmask(self, text: str) -> _GlyphMask: ...
+
+
 class MathDrawer(Protocol):
     """Drawing operations used by composed handwritten mathematical glyphs."""
 
@@ -203,15 +211,20 @@ def _get_cached_image_font(font_path: object, size: int) -> Font:
 
 
 def _find_fallback_font_for_char(cp: int) -> str | None:
-    """快速 O(1) 查找覆盖指定码点的备用字库路径."""
+    """2026-10-22：缓存有实际墨迹的备用字库，跳过只有 cmap 占位的空轮廓."""
     if cp in _CHAR_FALLBACK_CACHE:
         return _CHAR_FALLBACK_CACHE[cp]
     for fb_path, fb_cmap in _FALLBACK_FONTS_POOL:
-        if cp in fb_cmap:
+        if cp in fb_cmap and _font_has_visible_glyph(_get_cached_image_font(fb_path, 36), chr(cp)):
             _CHAR_FALLBACK_CACHE[cp] = fb_path
             return fb_path
     _CHAR_FALLBACK_CACHE[cp] = None
     return None
+
+
+def _font_has_visible_glyph(font: Font, char: str) -> bool:
+    # 2026-10-22：字体度量框可能非空但位图全透明；空白字符本来就不需要墨迹。
+    return char.isspace() or cast("_FontMask", font).getmask(char).getbbox() is not None
 
 
 def _find_fallback_font_files() -> list[str]:
@@ -232,7 +245,8 @@ def _find_fallback_font_files() -> list[str]:
     for d in possible_dirs:
         if not d:
             continue
-        for candidate in Path(d).glob("*.ttf"):
+        # 2026-10-22：内部数学字库放子目录，随字体资源打包但不进入用户字体菜单。
+        for candidate in (*Path(d).glob("*.ttf"), *(Path(d) / "math").glob("*.ttf")):
             f = str(candidate)
             if f not in candidates:
                 candidates.append(f)
@@ -844,13 +858,13 @@ def _get_char_glyph_and_bbox_cached(
     cmap = _get_font_cmap(font_path) if font_path else set[int]()
     if main is not None and (not cmap or ord(char) in cmap):
         bbox = font_bbox_of(main, char)
-        if bbox[2] > bbox[0] and bbox[3] > bbox[1]:
+        if bbox[2] > bbox[0] and bbox[3] > bbox[1] and _font_has_visible_glyph(main, char):
             return main, bbox, max(1, bbox[2] - bbox[0] + 1), False
     fallback = _find_fallback_font_for_char(ord(char))
     if fallback and fallback != font_path:
         font = _get_cached_image_font(fallback, font_size)
         bbox = font_bbox_of(font, char)
-        if bbox[2] > bbox[0] and bbox[3] > bbox[1]:
+        if bbox[2] > bbox[0] and bbox[3] > bbox[1] and _font_has_visible_glyph(font, char):
             return font, bbox, max(1, bbox[2] - bbox[0] + 1), True
     width = int(font_size * 0.4)
     return main or ImageFont.load_default(), (0, 0, width, font_size), width, False

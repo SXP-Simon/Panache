@@ -1,0 +1,6 @@
+# Copyright (c) 2026 Simon and Handwriting Web contributors.
+class NameRecord:
+    @property
+    def nameID(self) -> int: ...
+    string: bytes
+    def getEncoding(self) -> str: ...
