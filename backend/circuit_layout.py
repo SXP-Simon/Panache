@@ -340,6 +340,71 @@ def _clear_hollow_contacts(geometry: _Geometry) -> None:
             geometry.paths = [part for path in geometry.paths for part in _clip_path(path, disc)]
 
 
+_CIRCLE_POINTS = 49
+_MIN_WOBBLE_DIST = 16.0
+
+
+def handdrawn_stroke(points: tuple[Point, ...], unit: float) -> tuple[Point, ...]:
+    """2026-10-22：在端点绝对重合的前提下引入自然的微小手绘起伏，保持粗细统一与接点精确."""
+    if len(points) == _CIRCLE_POINTS:
+        # 闭合圆形：保留中心与半径，以谐波正弦波产生圆润的手绘闭合圆
+        segment_count = _CIRCLE_POINTS - 1
+        cx = sum(p[0] for p in points[:-1]) / segment_count
+        cy = sum(p[1] for p in points[:-1]) / segment_count
+        r = math.hypot(points[0][0] - cx, points[0][1] - cy)
+        seed = int((round(r, 2) * 89.0) * 10.0) & 0xFFFFFFFF
+        p1 = ((seed % 1000) / 1000.0) * math.tau
+        p2 = (((seed // 1000) % 1000) / 1000.0) * math.tau
+        w_dev = max(0.4, min(1.2, r * 0.022))
+        c_pts: list[Point] = []
+        for i in range(segment_count):
+            ang = i * math.tau / segment_count
+            dr = (0.7 * math.sin(ang * 2.0 + p1) + 0.3 * math.sin(ang * 3.0 + p2)) * w_dev
+            c_pts.append((cx + (r + dr) * math.cos(ang), cy + (r + dr) * math.sin(ang)))
+        c_pts.append(c_pts[0])
+        return tuple(c_pts)
+
+    res: list[Point] = []
+    max_dev = max(0.6, min(1.7, unit * 0.015))
+    for idx in range(len(points) - 1):
+        p1 = points[idx]
+        p2 = points[idx + 1]
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        dist = math.hypot(dx, dy)
+        if dist < _MIN_WOBBLE_DIST:
+            if not res:
+                res.append(p1)
+            res.append(p2)
+            continue
+        nx = -dy / dist
+        ny = dx / dist
+        seed_raw = (round(dist, 2) * 137.0 + round(dx, 2) * 31.0 + round(dy, 2) * 73.0) * 10.0
+        seed = int(seed_raw) & 0xFFFFFFFF
+        phase1 = ((seed % 1000) / 1000.0) * math.tau
+        phase2 = (((seed // 1000) % 1000) / 1000.0) * math.tau
+        dev = min(max_dev, dist * 0.015)
+        steps = max(3, int(dist / 9.0))
+        if not res:
+            res.append(p1)
+        for i in range(1, steps):
+            t = i / steps
+            envelope = math.sin(t * math.pi)
+            wobble = (
+                (
+                    0.75 * math.sin(t * math.pi * 2.0 + phase1)
+                    + 0.25 * math.sin(t * math.pi * 3.0 + phase2)
+                )
+                * envelope
+                * dev
+            )
+            x = p1[0] + dx * t + nx * wobble
+            y = p1[1] + dy * t + ny * wobble
+            res.append((x, y))
+        res.append(p2)
+    return tuple(res)
+
+
 def layout_circuit(circuit: Circuit, unit: float = 100.0) -> CircuitLayout:
     """2026-10-22：将电路整体缩放为像素图元，连线和端点始终共享精确坐标."""
     if not math.isfinite(unit) or unit <= 0:
@@ -370,7 +435,10 @@ def layout_circuit(circuit: Circuit, unit: float = 100.0) -> CircuitLayout:
 
     return CircuitLayout(
         tuple(
-            CircuitStroke(tuple(transform(point) for point in path), max(1.0, unit * 0.019))
+            CircuitStroke(
+                handdrawn_stroke(tuple(transform(point) for point in path), unit),
+                max(1.0, unit * 0.019),
+            )
             for path in geometry.paths
         ),
         tuple(
