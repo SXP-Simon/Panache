@@ -189,11 +189,13 @@ def _source(geometry: _Geometry, kind: str, half: float, point: _Transform) -> N
     if kind == "I":
         geometry.arrow(point(-radius * 0.58), point(radius * 0.58))
     elif kind == "sV":
+        # 2026-10-22：正弦源内的交流记号保持水平，导线方向不应把波形转成竖直字母。
+        center_x, center_y = point(0)
         geometry.line(
             *(
-                point(
-                    radius * (-0.7 + 1.4 * step / 32),
-                    radius * 0.34 * math.sin(step / 32 * math.tau),
+                (
+                    center_x + radius * (-0.7 + 1.4 * step / 32),
+                    center_y + radius * 0.34 * math.sin(step / 32 * math.tau),
                 )
                 for step in range(33)
             )

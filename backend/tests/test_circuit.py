@@ -45,6 +45,15 @@ def test_variant_labels_remain_distinct_and_match_course_formula_conventions():
     )
 
 
+@pytest.mark.parametrize("end", [(4, 0), (-4, 0), (0, 4), (0, -4)])
+def test_ac_source_waveform_stays_upright_when_branch_rotates(end):
+    circuit = _parse(f"\\draw (0,0) to[sV] {end};")
+    wave = layout_circuit(circuit, 100).strokes[-1].points
+    width = max(point[0] for point in wave) - min(point[0] for point in wave)
+    height = max(point[1] for point in wave) - min(point[1] for point in wave)
+    assert width > height * 1.8
+
+
 @pytest.mark.parametrize("case", _FIXTURES, ids=lambda case: case["id"])
 def test_shared_cross_platform_conformance(case):
     circuit = parse_circuit(case["source"])
