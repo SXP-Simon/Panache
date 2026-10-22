@@ -41,6 +41,16 @@ Phones omit the top brand header. The compact workspace action row provides the 
 - Markdown cleanup preserves formula source; use the LaTeX conversion button to transcribe it. Arrays, probability tables, and augmented matrices with explicit separator rules remain editable structured text and render as two-dimensional cells using the selected handwriting font and ink. Wide tables scale as a whole and cells stay together across page breaks. Unsupported syntax preserves the source.
 - This fork has no fixed 10-page truncation. Long documents remain subject to hardware and [server limits](../self-hosting/fonts-and-limits.md).
 
+## Engineering coursework and formulas
+
+Clean Markdown, convert LaTeX, then generate a preview. Matrices, determinants and piecewise functions use two-dimensional layouts with scalable delimiters; conditions are left-aligned. Table cells use the same font fallback and fraction layout as ordinary formulas.
+
+Common inputs include `\mathcal{L}`, `\oiint`, `\SI{4.7}{\kilo\ohm}`, `\si{\metre\per\second\squared}` and `\num{1.2e-3}`. Unsupported options, custom macros and expressions that cannot be parsed reliably remain as source text. Check the preview before exporting.
+
+Markdown cleanup removes code fences and backticks while preserving their contents, including pointers, underscores, comparisons and indentation. This is a text conversion: once those boundaries are removed, a subsequent cleanup or formula conversion cannot recover the original code context.
+
+Panache does not run a complete TeX/TikZ engine. Export CircuiTikZ circuits or other package-generated diagrams as images and use **Insert image**; circuit equations can be converted directly. For legible layout checks, use LXGW WenKai and the **Neat handwriting** preset before switching to your preferred handwriting font.
+
 ## Choosing a font
 
 Two options, pick one:
