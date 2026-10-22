@@ -49,7 +49,19 @@ Common inputs include `\mathcal{L}`, `\oiint`, `\SI{4.7}{\kilo\ohm}`, `\si{\metr
 
 Markdown cleanup removes code fences and backticks while preserving their contents, including pointers, underscores, comparisons and indentation. This is a text conversion: once those boundaries are removed, a subsequent cleanup or formula conversion cannot recover the original code context.
 
-Panache does not run a complete TeX/TikZ engine. Export CircuiTikZ circuits or other package-generated diagrams as images and use **Insert image**; circuit equations can be converted directly. For legible layout checks, use LXGW WenKai and the **Neat handwriting** preset before switching to your preferred handwriting font.
+Paste a common CircuiTikZ circuit directly into the editor and generate a preview. Cleanup and formula conversion preserve its source; rendering draws the connections and handwritten labels. For example:
+
+```tex
+\begin{circuitikz}
+\draw (0,0) to[V,l=$U_s$] (0,3)
+  to[R,l=$R$] (4,3) to[C,l=$C$] (4,0)
+  -- (0,0) node[ground]{};
+\end{circuitikz}
+```
+
+Supported components include resistors, capacitors, inductors, voltage/current/sine sources, batteries, diodes, LEDs, switches, shorts and open branches, with junctions, terminals, grounds and labels. Use absolute, `+` / `++` relative or `\coordinate` named coordinates, `--` / `|-` / `-|` wires and `cycle`. `[american]` selects zigzag resistors. Use explicit annotation directions such as `i>^=$i$`; implicit `i/v` require `[RPvoltages]` so direction conventions remain unambiguous.
+
+Circuits scale and paginate as one structure; connections never jitter separately, and labels use your selected font. Panache does not run complete TeX/TikZ: op-amps, transistors, macros, custom styles or unsupported commands preserve the entire circuit as source. Export complex diagrams as images and use **Insert image**. For legible layout checks, use LXGW WenKai and the **Neat handwriting** preset.
 
 ## Choosing a font
 
