@@ -17,25 +17,68 @@ impl Drawing {
         )
     }
     fn path(&mut self, points: Vec<Point>) {
-        self.paths.push((
-            points.into_iter().map(|p| self.point(p)).collect(),
-            self.thickness,
-        ));
+        if points.len() < 2 {
+            return;
+        }
+        let mut screen_points: Vec<(i32, i32)> = Vec::new();
+        let max_dev = (self.scale * 0.015).clamp(0.6, 1.7);
+        for pair in points.windows(2) {
+            let (p1, p2) = (self.point(pair[0]), self.point(pair[1]));
+            let dx = (p2.0 - p1.0) as f32;
+            let dy = (p2.1 - p1.1) as f32;
+            let dist = dx.hypot(dy);
+            if dist < 16.0 {
+                if screen_points.is_empty() {
+                    screen_points.push(p1);
+                }
+                screen_points.push(p2);
+                continue;
+            }
+            let nx = -dy / dist;
+            let ny = dx / dist;
+            let seed_raw = ((dist * 10.0).round() * 137.0 + (dx * 10.0).round() * 31.0 + (dy * 10.0).round() * 73.0).abs() as u32;
+            let phase1 = (seed_raw % 1000) as f32 / 1000.0 * 2.0 * PI;
+            let phase2 = ((seed_raw / 1000) % 1000) as f32 / 1000.0 * 2.0 * PI;
+            let dev = (dist * 0.015).min(max_dev);
+            let steps = (dist / 9.0).round().max(3.0) as usize;
+            if screen_points.is_empty() {
+                screen_points.push(p1);
+            }
+            for i in 1..steps {
+                let t = i as f32 / steps as f32;
+                let envelope = (t * PI).sin();
+                let wobble = (0.75 * (t * 2.0 * PI + phase1).sin() + 0.25 * (t * 3.0 * PI + phase2).sin()) * envelope * dev;
+                let x = (p1.0 as f32 + dx * t + nx * wobble).round() as i32;
+                let y = (p1.1 as f32 + dy * t + ny * wobble).round() as i32;
+                screen_points.push((x, y));
+            }
+            screen_points.push(p2);
+        }
+        self.paths.push((screen_points, self.thickness));
     }
     fn line(&mut self, a: Point, b: Point) {
         self.path(vec![a, b]);
     }
     fn circle(&mut self, c: Point, r: f32) {
-        self.path(
-            (0..=40)
-                .map(|i| {
-                    Point(
-                        c.0 + r * (i as f32 * PI / 20.).cos(),
-                        c.1 + r * (i as f32 * PI / 20.).sin(),
-                    )
-                })
-                .collect(),
-        );
+        let (cx, cy) = self.point(c);
+        let radius = (r * self.scale).round().max(1.0);
+        let seed = ((radius * 89.0).round() as u32) & 0xFFFFFFFF;
+        let p1 = (seed % 1000) as f32 / 1000.0 * 2.0 * PI;
+        let p2 = ((seed / 1000) % 1000) as f32 / 1000.0 * 2.0 * PI;
+        let w_dev = (radius * 0.022).clamp(0.4, 1.2);
+        let steps = 40;
+        let mut screen_points = Vec::new();
+        for i in 0..steps {
+            let ang = i as f32 * 2.0 * PI / steps as f32;
+            let dr = (0.7 * (ang * 2.0 + p1).sin() + 0.3 * (ang * 3.0 + p2).sin()) * w_dev;
+            let x = (cx as f32 + (radius + dr) * ang.cos()).round() as i32;
+            let y = (cy as f32 + (radius + dr) * ang.sin()).round() as i32;
+            screen_points.push((x, y));
+        }
+        if let Some(&first) = screen_points.first() {
+            screen_points.push(first);
+        }
+        self.paths.push((screen_points, self.thickness));
     }
     fn dot(&mut self, c: Point, open: bool) {
         if open {
