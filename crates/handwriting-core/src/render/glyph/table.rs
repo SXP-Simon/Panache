@@ -1,6 +1,7 @@
 //! 2026-10-20：整表按真实手写墨迹测量列宽与基线，作为单个刚性结构缩放和分页。
 use super::*;
-use crate::text::{Table, TableRule};
+use crate::text::{Table, TableKind, TableRule};
+pub(super) mod matrix;
 
 impl Glyphs<'_> {
     pub(super) fn table(&mut self, table: &Table, size: f32, depth: usize) -> Result<Glyph> {
@@ -46,11 +47,22 @@ impl Glyphs<'_> {
         let width = *xs.last().unwrap();
         let height = *ys.last().unwrap();
         Self::check_size(width as u32 + 4, height as u32 + 4)?;
-        let offset = -height / 2;
+        let offset = if table.kind == TableKind::Grid {
+            -height / 2
+        } else {
+            let x = self.glyph('x', size)?;
+            (x.top + x.bottom()) / 2 - height / 2
+        };
+        let (inset, delimiters) = matrix::delimiters(table.kind, width, height, size);
         let mut children = Vec::new();
         for (row, cells) in rendered.into_iter().enumerate() {
             for (column, g) in cells.into_iter().enumerate() {
-                let x = (xs[column] + xs[column + 1] - g.mask.width() as i32) / 2 - g.left;
+                let x = inset
+                    + if table.kind == TableKind::Cases {
+                        xs[column] + pad - g.left
+                    } else {
+                        (xs[column] + xs[column + 1] - g.mask.width() as i32) / 2 - g.left
+                    };
                 // 2026-10-20：以实际墨迹居中，避免字体基线差异让数字和分数上下漂移。
                 let y = offset + (ys[row] + ys[row + 1] - g.mask.height() as i32) / 2 - g.top;
                 children.push((g, x, y));
@@ -58,6 +70,9 @@ impl Glyphs<'_> {
         }
         let mut paths = Vec::new();
         let mut draw = |rule, start: (i32, i32), end: (i32, i32)| {
+            if table.kind != TableKind::Grid && rule == TableRule::None {
+                return;
+            }
             let thickness = grid_thickness;
             let length = (end.0 - start.0).abs().max((end.1 - start.1).abs());
             if rule != TableRule::Dashed {
@@ -79,11 +94,35 @@ impl Glyphs<'_> {
             }
         };
         for (index, rule) in table.vertical.iter().enumerate() {
-            draw(*rule, (xs[index], offset), (xs[index], offset + height));
+            draw(
+                *rule,
+                (inset + xs[index], offset),
+                (inset + xs[index], offset + height),
+            );
         }
         for (index, rule) in table.horizontal.iter().enumerate() {
-            draw(*rule, (0, offset + ys[index]), (width, offset + ys[index]));
+            draw(
+                *rule,
+                (inset, offset + ys[index]),
+                (inset + width, offset + ys[index]),
+            );
         }
-        Self::compose((width + pad) as f32, children, paths)
+        paths.extend(delimiters.into_iter().map(|(points, thickness)| {
+            (
+                points.into_iter().map(|(x, y)| (x, y + offset)).collect(),
+                thickness,
+            )
+        }));
+        let right = if table.kind == TableKind::Cases {
+            0
+        } else {
+            inset
+        };
+        let mut result = Self::compose((width + inset + right + pad) as f32, children, paths)?;
+        if table.kind == TableKind::Matrix {
+            let axis = self.glyph('x', size)?;
+            result.top += (axis.top + axis.bottom() - result.top - result.bottom()) / 2;
+        }
+        Ok(result)
     }
 }

@@ -20,9 +20,21 @@ pub enum TableRule {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
+    pub kind: TableKind,
     pub rows: Vec<Vec<Vec<Node>>>,
     pub vertical: Vec<TableRule>,
     pub horizontal: Vec<TableRule>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableKind {
+    Grid,
+    Matrix,
+    Parentheses,
+    Brackets,
+    Braces,
+    Determinant,
+    Norm,
+    Cases,
 }
 mod table;
 
