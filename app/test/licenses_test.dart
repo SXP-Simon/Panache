@@ -19,6 +19,8 @@ void main() {
       'handright-NOTICE.txt': '../crates/handwriting-core/NOTICE',
       'katex-fonts-MIT.txt':
           '../crates/handwriting-core/licenses/katex-fonts-MIT.txt',
+      'katex-math-fonts-OFL.txt':
+          '../crates/handwriting-core/licenses/katex-math-fonts-OFL.txt',
     };
     for (final entry in originals.entries) {
       final bundled = await rootBundle.loadString(
@@ -31,6 +33,7 @@ void main() {
       'lxgw-marker-gothic',
       'yozai',
       'zhimangxing',
+      'katex-math-fonts',
     ]) {
       final text = await rootBundle.loadString(
         'packages/handwriting_assets/licenses/$font-OFL.txt',

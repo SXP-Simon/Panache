@@ -151,3 +151,93 @@ fn blackboard_capitals_have_real_ink_without_loading_large_handwriting_fonts() {
         .unwrap();
     assert!(visible_glyph(only_expectation.for_char('𝔼'), '𝔼'));
 }
+
+#[test]
+fn engineering_tables_load_fallbacks_for_cells_and_nested_structures() {
+    let sources = [
+        ("⟦ ϑ | ϕ | ϱ ; ── ; ϵ | Ω | ℒ ⟧", "ϑϕϱϵΩℒ"),
+        (
+            "⟦ ω | Ω ; ── ; (μ)/(ϕ) | √(ϵ) ; ── ; x_(θ) | (∇)⃗ ⟧",
+            "ωΩμϕϵθ∇",
+        ),
+        ("⟦ E | Var ; ── ; 𝔼 | 𝔻 ⟧", "𝔼𝔻"),
+    ];
+    for (source, symbols) in sources {
+        assert!(matches!(text::parse(source).as_slice(), [Node::Table(_)]));
+        let primary = fonts()["云烟体.ttf"].clone();
+        let book = FontBook::with_text_fallbacks(primary.clone(), source, |name| {
+            Ok(fonts().get(name).cloned())
+        })
+        .unwrap();
+        assert!(Arc::ptr_eq(&book.fonts[0], &primary));
+        for c in symbols.chars() {
+            assert!(
+                visible_glyph(book.for_char(c), c),
+                "table lost {c}: {source}"
+            );
+            assert_eq!(
+                book.for_char(c).rasterize(c, 40.).1,
+                {
+                    let plain =
+                        FontBook::with_text_fallbacks(primary.clone(), &c.to_string(), |name| {
+                            Ok(fonts().get(name).cloned())
+                        })
+                        .unwrap();
+                    plain.for_char(c).rasterize(c, 40.).1
+                },
+                "table and prose must use the same visible symbol {c}"
+            );
+        }
+    }
+    FontBook::with_text_fallbacks(
+        fonts()["云烟体.ttf"].clone(),
+        "⟦ A | 1 ; ── ; B | 2 ⟧",
+        |_| panic!("ASCII table must keep lazy font loading"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn engineering_symbols_and_calligraphic_transforms_have_real_ink() {
+    let source = "ϑϕϖϱϵϰℒℱℋℰℬℐℛℳΩμ°∮∯∰∬∭ℏ∠⊕⊗⊙ℵℓ≅≃≜∴∵";
+    let book = FontBook::with_text_fallbacks(fonts()["云烟体.ttf"].clone(), source, |name| {
+        Ok(fonts().get(name).cloned())
+    })
+    .unwrap();
+    for symbol in source.chars() {
+        assert!(
+            visible_glyph(book.for_char(symbol), symbol),
+            "missing engineering glyph {symbol}"
+        );
+    }
+}
+
+#[test]
+fn all_calligraphic_capitals_have_internal_ink_in_prose_and_table_cells() {
+    for source in [
+        CALLIGRAPHIC_CAPITALS.to_owned(),
+        format!("⟦ {CALLIGRAPHIC_CAPITALS} ; ── ; ℒ ⟧"),
+    ] {
+        let book = FontBook::with_text_fallbacks(fonts()["云烟体.ttf"].clone(), &source, |_| {
+            panic!("calligraphic fallback must work without system or external font assets")
+        })
+        .unwrap();
+        for symbol in CALLIGRAPHIC_CAPITALS.chars() {
+            for size in [24., 40., 70.] {
+                let font = book.for_char(symbol);
+                assert_ne!(
+                    font.lookup_glyph_index(symbol),
+                    0,
+                    "missing calligraphic {symbol}"
+                );
+                assert!(
+                    font.rasterize(symbol, size)
+                        .1
+                        .iter()
+                        .any(|alpha| *alpha >= 128),
+                    "invisible calligraphic {symbol}/{size}"
+                );
+            }
+        }
+    }
+}
