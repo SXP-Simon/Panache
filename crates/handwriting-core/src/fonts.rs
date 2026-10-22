@@ -47,6 +47,16 @@ fn rendered_characters(source: &str) -> Vec<char> {
                 }
                 Node::Accent(body, _) => collect(body, chars),
                 // 2026-10-22：表格也可能独占某个希腊字母或工程符号，递归收集嵌套公式。
+                Node::Circuit(circuit) => {
+                    for segment in &circuit.segments {
+                        for label in &segment.labels {
+                            collect(&text::parse(&label.text), chars);
+                        }
+                    }
+                    for decoration in &circuit.decorations {
+                        collect(&text::parse(&decoration.text), chars);
+                    }
+                }
                 Node::Table(table) => {
                     for row in &table.rows {
                         for cell in row {

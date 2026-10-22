@@ -7,6 +7,7 @@ pub enum Node {
     Scripts { upper: Vec<Node>, lower: Vec<Node> },
     Accent(Vec<Node>, char),
     Table(Table),
+    Circuit(circuit::Circuit),
     Image { alt: String, data: String },
     Break,
     Newline,
@@ -36,6 +37,7 @@ pub enum TableKind {
     Norm,
     Cases,
 }
+pub mod circuit;
 mod table;
 
 pub fn normalize(text: &str, english_spacing: bool) -> String {
@@ -99,6 +101,9 @@ pub fn normalize(text: &str, english_spacing: bool) -> String {
 }
 
 pub fn parse(text: &str) -> Vec<Node> {
+    if let Some(nodes) = circuit::document(text) {
+        return nodes;
+    }
     let spans = crate::inline_document::image_payloads(text);
     if spans.is_empty() {
         return parse_document(text);
