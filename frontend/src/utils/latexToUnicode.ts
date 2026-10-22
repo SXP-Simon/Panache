@@ -1,9 +1,18 @@
 import katex from 'katex';
 import { scanMathSegments, sizedGroupEnd } from './mathSegments.ts';
+import { normalizeCourseLatex } from './courseLatex.ts';
 
 // KaTeX exposes an internal parser. Its output crosses an unknown boundary and
 // is narrowed before access; unsupported shapes preserve the original formula.
-type ArrayMode = 'standalone' | 'matrix' | 'cases';
+type ArrayMode =
+  | 'standalone'
+  | 'matrix'
+  | 'pmatrix'
+  | 'bmatrix'
+  | 'Bmatrix'
+  | 'vmatrix'
+  | 'Vmatrix'
+  | 'cases';
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -267,6 +276,7 @@ const SUBSCRIPT_MAP: Record<string, string> = {
 function script(text: string, superscript: boolean) {
   const map = superscript ? SUPERSCRIPT_MAP : SUBSCRIPT_MAP;
   const chars = Array.from(text);
+  if (superscript && text === '∘') return '°';
   if (superscript && /^[′″‴⁗]+$/.test(text)) return text;
   return chars.length && chars.every((c) => map[c])
     ? chars.map((c) => map[c]).join('')
@@ -332,6 +342,26 @@ const EXTRA_SYMBOLS: Record<string, string> = {
   '\\not': '̸',
   '\\smallsetminus': '\\',
   '\\triangle': '△',
+  '\\triangleq': '≜',
+  '\\doteq': '≐',
+  '\\because': '∵',
+  '\\therefore': '∴',
+  '\\ll': '≪',
+  '\\gg': '≫',
+  '\\nparallel': '∦',
+  '\\nmid': '∤',
+  '\\sphericalangle': '∢',
+  '\\measuredangle': '∡',
+  '\\oiint': '∯',
+  '\\oiiint': '∰',
+  '\\intop': '∫',
+  '\\smallint': '∫',
+  '\\leftharpoonup': '↼',
+  '\\leftharpoondown': '↽',
+  '\\rightharpoonup': '⇀',
+  '\\rightharpoondown': '⇁',
+  '\\rightleftharpoons': '⇌',
+  '\\leftrightharpoons': '⇋',
 };
 Object.assign(LATEX_SYMBOL_MAP, EXTRA_SYMBOLS);
 
@@ -373,8 +403,28 @@ function blackboard(text: string) {
     .join('');
 }
 
+function calligraphic(text: string): string {
+  // 数学花体不能降成普通字母：傅里叶/拉普拉斯算子及事件族需要区别。
+  const letters = Array.from('𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵');
+  if (!/^[A-Z]+$/.test(text)) throw new Error('Unsupported calligraphic glyph');
+  return Array.from(text)
+    .map((char) => letters[char.charCodeAt(0) - 65])
+    .join('');
+}
+
+function isNamedOperator(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value['type'] === 'supsub') return isNamedOperator(value['base']);
+  return (
+    value['type'] === 'operatorname' ||
+    (value['type'] === 'op' && value['symbol'] === false && typeof value['name'] === 'string')
+  );
+}
+
 function safeTableCell(text: string): boolean {
   if (text === '──' || text === '╌╌') return false;
+  if (/^(?:matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|cases):/.test(text.trimStart()))
+    return false;
   const closing: Record<string, string> = { '(': ')', '[': ']', '{': '}', '⟦': '⟧' };
   const stack: string[] = [];
   for (let index = 0; index < text.length; index++) {
@@ -391,7 +441,20 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
   if (value === null || value === undefined) return '';
   const child = (n: unknown, mode: ArrayMode = arrayMode): string =>
     astNodeToUnicode(n, depth + 1, mode);
-  if (isUnknownArray(value)) return value.map((n) => child(n)).join('');
+  if (isUnknownArray(value)) {
+    const parts = value.map((n) => child(n));
+    return parts
+      .map((part, index) => {
+        const next = parts[index + 1] ?? '';
+        const separatesArgument =
+          /^[\p{L}\p{N}√∫∬∭∮∯∰]/u.test(next) || nodeKind(value[index + 1]) === 'genfrac';
+        return (
+          part +
+          (isNamedOperator(value[index]) && separatesArgument && !/\s$/.test(part) ? ' ' : '')
+        );
+      })
+      .join('');
+  }
   if (!isRecord(value)) throw new Error('Invalid math node');
   const node = value;
   switch (node['type']) {
@@ -401,7 +464,10 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
       return symbol(textField(node['text']) || '');
     case 'op':
       return textField(node['name'])
-        ? LATEX_SYMBOL_MAP[textField(node['name'])] || textField(node['name']).replace(/^\\/, '')
+        ? LATEX_SYMBOL_MAP[textField(node['name'])] ||
+            (node['symbol']
+              ? symbol(textField(node['name']))
+              : textField(node['name']).replace(/^\\/, ''))
         : child(node['body']);
     case 'operatorname':
       return child(node['body']);
@@ -443,6 +509,7 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
         '\\hat': '\u0302',
         '\\widehat': '\u0302',
         '\\vec': '\u20d7',
+        '\\overrightarrow': '\u20d7',
         '\\tilde': '\u0303',
         '\\widetilde': '\u0303',
         '\\dot': '\u0307',
@@ -464,10 +531,19 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
       return `${Array.from(base).length === 1 ? base : `(${base})`}\u0332`;
     }
     case 'array': {
-      const rows = nodeArray(node['body']).map((row) => nodeArray(row).map((cell) => child(cell)));
+      const rows = nodeArray(node['body']).map((row) =>
+        nodeArray(row).map((cell) => child(cell, 'standalone')),
+      );
       const columns = nodeArray(node['cols']);
       const horizontalRules = nodeArray(node['hLinesBeforeRow']);
+      const matrixMode =
+        arrayMode !== 'standalone'
+          ? arrayMode
+          : node['hskipBeforeAndAfter'] === false || node['colSeparationType'] === 'small'
+            ? 'matrix'
+            : null;
       if (
+        matrixMode ||
         columns.some((col) => isRecord(col) && col['type'] === 'separator') ||
         horizontalRules.some((lines) => nodeArray(lines).length > 0)
       ) {
@@ -489,6 +565,16 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
           } else throw new Error('Unsupported array column');
         }
         const width = Math.max(column, ...cells.map((row) => row.length));
+        if (
+          matrixMode &&
+          (!cells.length ||
+            cells.length > 32 ||
+            width < 1 ||
+            width > 32 ||
+            (matrixMode === 'cases' && width !== 2))
+        ) {
+          throw new Error('Unsupported matrix dimensions');
+        }
         const content: string[] = [];
         for (let index = 0; index <= cells.length; index++) {
           for (const dashed of nodeArray(horizontalRules[index])) {
@@ -507,7 +593,7 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
         }
         const table = ` ${content.join(' ; ')} `;
         // 表格标记与 bmatrix 的真实方括号区分，绘制时只展开表格本身。
-        return arrayMode === 'standalone' ? `⟦${table}⟧` : table;
+        return `⟦${matrixMode ? ` ${matrixMode}:` : ''}${table}⟧`;
       }
       if (node['colSeparationType'] === 'align' || node['colSeparationType'] === 'gather') {
         return rows
@@ -519,22 +605,33 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
           )
           .join('\n');
       }
-      if (arrayMode === 'cases') return ` ${rows.map((row) => row.join('  ')).join(' ; ')} `;
       // 保留空单元格的位置，不能 filter(Boolean)。
       const content = ` ${rows.map((row) => row.join('  ')).join(' ; ')} `;
-      return arrayMode === 'standalone' ? `[${content}]` : content;
+      return `[${content}]`;
     }
     case 'leftright': {
       const left = textField(node['left']) === '.' ? '' : symbol(textField(node['left']) || '');
       const right = textField(node['right']) === '.' ? '' : symbol(textField(node['right']) || '');
-      const cases =
-        left === '{' && !right && nodeArray(node['body']).some((n) => nodeKind(n) === 'array');
-      return `${left}${child(node['body'], cases ? 'cases' : 'matrix')}${cases ? '}' : right}`;
+      const body = nodeArray(node['body']);
+      const kinds: Record<string, ArrayMode> = {
+        '()': 'pmatrix',
+        '[]': 'bmatrix',
+        '{}': 'Bmatrix',
+        '||': 'vmatrix',
+        '||||': 'Vmatrix',
+        '{': 'cases',
+      };
+      const matrixMode = kinds[left + right];
+      if (matrixMode && body.length === 1 && nodeKind(body[0]) === 'array')
+        return child(body, matrixMode);
+      return `${left}${child(body, 'standalone')}${right}`;
     }
     case 'delimsizing':
+    case 'middle':
       return textField(node['delim']) === '.' ? '' : symbol(textField(node['delim']) || '');
     case 'font':
       if (textField(node['font']) === 'mathbb') return blackboard(child(node['body']));
+      if (textField(node['font']) === 'mathcal') return calligraphic(child(node['body']));
       if (
         [
           'mathrm',
@@ -566,8 +663,12 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
       throw new Error('Unsupported enclosure changes mathematical meaning');
     case 'htmlmathml':
       return child(node['mathml']);
+    case 'mathchoice':
+      return child(node['display']);
+    case 'tag':
+      return `${child(node['body'])}  ${child(node['tag'])}`;
     case 'spacing':
-      return textField(node['text']) === '\\!'
+      return ['\\!', '\\allowbreak', '\\nobreak'].includes(textField(node['text']))
         ? ''
         : textField(node['text']) === '\\qquad'
           ? '    '
@@ -610,7 +711,7 @@ function tryConvertFormulaViaKatex(text: string) {
       '<': '≮',
       '>': '≯',
     };
-    let normalized = text.replace(
+    let normalized = normalizeCourseLatex(text).replace(
       /\\not(?![a-zA-Z])\s*(?:\\([a-zA-Z]+)|([=<>]))/g,
       (raw: string, command: string | undefined, character: string | undefined) =>
         negated[command || character || ''] || raw,
@@ -705,9 +806,9 @@ function convertBareText(text: string) {
             cursor = end;
             continue;
           }
-          const arity = /^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset)$/.test(name)
+          const arity = /^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset|SI)$/.test(name)
             ? 2
-            : /^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|tilde|widetilde|dot|ddot|underbrace|overbrace)$/.test(
+            : /^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|overrightarrow|overleftarrow|tilde|widetilde|dot|ddot|underbrace|overbrace|xrightarrow|xleftarrow|xleftrightarrow|xRightarrow|xLeftarrow|xLeftrightarrow|xmapsto|xrightleftharpoons|xleftrightharpoons|pmod|si|num)$/.test(
                   name,
                 )
               ? 1
@@ -718,7 +819,7 @@ function convertBareText(text: string) {
             cursor = end;
             continue;
           }
-          if (name === 'sqrt') {
+          if (name === 'sqrt' || name.startsWith('x') || ['SI', 'si', 'num'].includes(name)) {
             const next = end + (line.slice(end).match(/^\s*/)?.[0].length ?? 0);
             if (line[next] === '[') end = argumentEnd(line, next);
           }

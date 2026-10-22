@@ -23,8 +23,8 @@ async function run() {
     ['literal ampersand', String.raw`$\text{R&D}\quad A\&B$`, 'R&D A&B'],
     ['plain prose', 'R&D，https://example.com/a//b，a/b，普通正文。', 'R&D，https://example.com/a//b，a/b，普通正文。'],
     ['invalid box retains content', String.raw`\boxed{x+1 后面的正文`, String.raw`\boxed{x+1 后面的正文`],
-    ['pmatrix matrix', String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`, '( 1  2 ; 3  4 )'],
-    ['bmatrix matrix', String.raw`\begin{bmatrix}a & b \\ c & d\end{bmatrix}`, '[ a  b ; c  d ]'],
+    ['pmatrix matrix', String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`, '⟦ pmatrix: 1  2 ; 3  4 ⟧'],
+    ['bmatrix matrix', String.raw`\begin{bmatrix}a & b \\ c & d\end{bmatrix}`, '⟦ bmatrix: a  b ; c  d ⟧'],
     ['pearson complex formula', String.raw`$r = \frac{\sum (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum(x_i - \bar{x})^2}\sqrt{\sum(y_i - \bar{y})^2}}$`, 'r=(∑(xᵢ-x̄)(yᵢ-ȳ))/(√(∑(xᵢ-x̄)²)√(∑(yᵢ-ȳ)²))'],
     ['euclidean distance formula', String.raw`$d(x, y) = \sqrt{(1-2)^2 + (1-2)^2} = \sqrt{4} = 2$`, 'd(x,y)=√((1-2)²+(1-2)²)=√(4)=2'],
     ['cosine similarity fraction', String.raw`$\cos(x, y) = \frac{x \cdot y}{\|x\|_2 \|y\|_2}$`, 'cos(x,y)=(x·y)/(||x||₂||y||₂)'],
@@ -40,6 +40,48 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     ['sizing does not match longer commands', String.raw`\bigcup+\Biggish`, String.raw`\bigcup+\Biggish`],
   ];
   const sizes = ['big', 'Big', 'bigg', 'Bigg'];
+  // Course examples retain meaning, and matrix markers are consumed by the
+  // handwriting renderer rather than flattened into semicolon-separated text.
+  cases.push(
+    ['Laplace transform uses distinct calligraphic operator', String.raw`$\mathcal{L}\{f(t)\}=F(s)$`, 'ℒ{f(t)}=F(s)'],
+    ['Fourier transform retains bound and complex phase', String.raw`$\mathcal{F}\{x(t)\}=\int_{-\infty}^{\infty}x(t)e^{-j\omega t}\,dt$`, 'ℱ{x(t)}=∫_(-∞)^(∞)x(t)e^(-jωt) dt'],
+    ['all calligraphic capitals including legacy Unicode positions', String.raw`$\mathcal{ABCDEFGHIJKLMNOPQRSTUVWXYZ}$`, '𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵'],
+    ['RLC impedance', String.raw`$Z=R+j\omega L+\frac{1}{j\omega C}$`, 'Z=R+jωL+(1)/(jωC)'],
+    ['phasor polar notation', String.raw`$\dot{U}=220\angle30^\circ\,\mathrm{V}$`, 'U̇=220∠30° V'],
+    ['function composition stays on the baseline', String.raw`$(f\circ g)(x)=f(g(x))$`, '(f∘g)(x)=f(g(x))'],
+    ['named functions separate from their arguments', String.raw`$\sin x+\cos\theta+\log_2 n+\sin^2 x$`, 'sin x+cos θ+log₂ n+sin² x'],
+    ['operator name keeps argument boundary', String.raw`$\operatorname{rank}A+\arg\max_x P(x)$`, 'rank A+arg maxₓ P(x)'],
+    ['function parentheses remain compact', String.raw`$\det(A)+\exp(-x)+\sin(x)$`, 'det(A)+exp(-x)+sin(x)'],
+    ['Gauss surface integral is not the word oiint', String.raw`$\oiint_S\vec{D}\cdot d\vec{S}=Q$`, '∯_(S)D⃗·dS⃗=Q'],
+    ['closed volume and integral aliases', String.raw`$\oiiint_Vf\,dV+\intop_0^1x\,dx+\smallint f$`, '∰_(V)f dV+∫₀¹x dx+∫f'],
+    ['Faraday law', String.raw`$\oint_C\vec{E}\cdot d\vec{l}=-\frac{d\Phi_B}{dt}$`, '∮_(C)E⃗·dl⃗=-(dΦ_(B))/(dt)'],
+    ['heat equation partial derivatives', String.raw`$\frac{\partial u}{\partial t}=\alpha\frac{\partial^2u}{\partial x^2}$`, '(∂u)/(∂t)=α(∂²u)/(∂x²)'],
+    ['conditional probability', String.raw`$\Pr(A\mid B)=\frac{\Pr(A\cap B)}{\Pr(B)}$`, 'Pr(A|B)=(Pr(A∩B))/(Pr(B))'],
+    ['quantum state ket', String.raw`$\ket{\psi}=\alpha\ket0+\beta\ket1$`, '|ψ⟩=α|0⟩+β|1⟩'],
+    ['number theory congruence', String.raw`$a\equiv b\pmod{n}$`, 'a≡b (mod n)'],
+    ['number theory remainder', String.raw`$a\bmod n$`, 'a mod n'],
+    ['definition and logical inference', String.raw`$A\triangleq B\quad\because x\ll y\quad\therefore x\ne y$`, 'A≜B ∵x≪y ∴x≠y'],
+    ['geometry angle variants', String.raw`$\measuredangle ABC+\sphericalangle DEF$`, '∡ABC+∢DEF'],
+    ['chemical equilibrium direction retained', String.raw`$A\rightleftharpoons B$`, 'A⇌B'],
+    ['set builder middle delimiter', String.raw`$\left\{x\in\mathbb R\middle|x>0\right\}$`, '{x∈ℝ|x>0}'],
+    ['paper equation number remains visible', String.raw`\[E=mc^2\tag{1}\]`, 'E=mc²  (1)'],
+    ['SI resistor and capacitor', String.raw`$R=\SI{4.7}{\kilo\ohm},C=\SI{100}{\nano\farad}$`, 'R=4.7 kΩ,C=100 nF'],
+    ['SI scientific notation', String.raw`$c=\SI{3e8}{\metre\per\second}$`, 'c=3×10⁸ m/s'],
+    ['SI negative exponent and leading decimal', String.raw`$\num{-.25e-03}$`, '-.25×10⁻³'],
+    ['SI acceleration unit', String.raw`$g=\SI{9.81}{\metre\per\second\squared}$`, 'g=9.81 m/s²'],
+    ['SI per applies to only the next unit', String.raw`$\si{\pascal\per\second\henry}$`, 'Pa H/s'],
+    ['SI repeated per groups denominator', String.raw`$\si{\joule\per\mole\per\kelvin}$`, 'J/(mol K)'],
+    ['SI inverse area signed unit power', String.raw`$\si{\metre\tothe{-2}}$`, 'm⁻²'],
+    ['SI leading reciprocal unit', String.raw`$\si{\per\second}$`, '1/s'],
+    ['SI Celsius and percentage', String.raw`$T=\SI{25}{\degreeCelsius},\eta=\SI{95}{\percent}$`, 'T=25 °C,η=95 %'],
+    ['SI macro in prose keeps adjacent words', String.raw`电阻为 \SI{10}{\kilo\ohm}，正常。`, '电阻为 10 kΩ，正常。'],
+    ['all matrix delimiter types are structural', String.raw`$\begin{Bmatrix}a&b\end{Bmatrix}+\begin{Vmatrix}c&d\end{Vmatrix}$`, '⟦ Bmatrix: a  b ⟧+⟦ Vmatrix: c  d ⟧'],
+    ['augmented matrix keeps explicit rule', String.raw`$\left(\begin{array}{cc|c}1&0&2\\0&1&3\end{array}\right)$`, '⟦ pmatrix: 1  0 | 2 ; 0  1 | 3 ⟧'],
+    ['matrix cells quote semicolons', String.raw`$\begin{pmatrix}\text{a ; b}&x\\y&z\end{pmatrix}$`, '⟦ pmatrix: "a ; b"  x ; y  z ⟧'],
+    ['small matrix keeps two dimensional layout', String.raw`$\begin{smallmatrix}1&0\\0&1\end{smallmatrix}$`, '⟦ matrix: 1  0 ; 0  1 ⟧'],
+    ['table text cannot impersonate a matrix protocol header', String.raw`$\begin{array}{c|c}\text{matrix: label}&x\\y&z\end{array}$`, '⟦ "matrix: label" | x ; y | z ⟧'],
+    ['ordinary delimiters are not matrices', String.raw`$\left(x+1\right)^2$`, '(x+1)²'],
+  );
   // 2026-10-15：正文范围、数学语义与失败保真回归。
   cases.push(
     ['mixed English preserves spaces', String.raw`The result $\frac{a}{b}$ is useful.`, 'The result (a)/(b) is useful.'],
@@ -66,10 +108,10 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     ['underline nested radical', String.raw`$\underline{\sqrt{x}}$`, '(√(x))̲'],
     ['vector whole group', String.raw`$\vec{AB}$`, '(AB)⃗'],
     ['wide hat group', String.raw`$\widehat{xy}$`, '(xy)̂'],
-    ['cases retain conditions', String.raw`$\begin{cases}x&x>0\\-x&x\leq0\end{cases}$`, '{ x  x>0 ; -x  x≤0 }'],
-    ['empty matrix cells retain positions', String.raw`$\begin{pmatrix}1&\\&1\end{pmatrix}$`, '( 1   ;   1 )'],
-    ['text in matrix does not create a column', String.raw`$\begin{pmatrix}\text{R&D}&2\\3&4\end{pmatrix}$`, '( R&D  2 ; 3  4 )'],
-    ['nested matrix environments', String.raw`$\begin{pmatrix}1&\begin{bmatrix}a&b\\c&d\end{bmatrix}\\0&1\end{pmatrix}$`, '( 1  [ a  b ; c  d ] ; 0  1 )'],
+    ['cases retain conditions', String.raw`$\begin{cases}x&x>0\\-x&x\leq0\end{cases}$`, '⟦ cases: x  x>0 ; -x  x≤0 ⟧'],
+    ['empty matrix cells retain positions', String.raw`$\begin{pmatrix}1&\\&1\end{pmatrix}$`, '⟦ pmatrix: 1   ;   1 ⟧'],
+    ['text in matrix does not create a column', String.raw`$\begin{pmatrix}\text{R&D}&2\\3&4\end{pmatrix}$`, '⟦ pmatrix: R&D  2 ; 3  4 ⟧'],
+    ['nested matrix environments', String.raw`$\begin{pmatrix}1&\begin{bmatrix}a&b\\c&d\end{bmatrix}\\0&1\end{pmatrix}$`, '⟦ pmatrix: 1  ⟦ bmatrix: a  b ; c  d ⟧ ; 0  1 ⟧'],
     ['gather rows', String.raw`\begin{gather}x=1\\y=2\end{gather}`, 'x=1\ny=2'],
     ['bare scripts', 'x^2 + x_n', 'x²+xₙ'],
     ['escaped underscore is literal', String.raw`$x\_n$`, 'x_n'],
@@ -81,31 +123,40 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     ['negated equals', String.raw`$x\not=y$`, 'x≠y'],
     ['mentioning commands is not a fraction', String.raw`Use \frac in prose and \sqrt in prose.`, String.raw`Use \frac in prose and \sqrt in prose.`],
     ['multiple align groups stay distinct', String.raw`$\begin{aligned}x&=y&z&=w\\a&=b&c&=d\end{aligned}$`, 'x=y  z=w\na=b  c=d'],
-    ['plain matrix has visible bounds', String.raw`$\begin{matrix}a&b\\c&d\end{matrix}$`, '[ a  b ; c  d ]'],
+    ['plain matrix preserves its unbounded layout', String.raw`$\begin{matrix}a&b\\c&d\end{matrix}$`, '⟦ matrix: a  b ; c  d ⟧'],
     ['distribution array with abbreviated fractions', String.raw`\[\begin{array}{c|cccc}X&0&1&2&3\\ \hline P&\frac8{15}&\frac4{15}&\frac2{15}&\frac1{15}\end{array}\]`, '⟦ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ⟧'],
     ['boxed distribution array', String.raw`\[\boxed{\begin{array}{c|ccc}Y&1&2&3\\ \hline P&\frac13&\frac13&\frac13\end{array}}\]`, '⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧'],
     ['bare boxed distribution array is one formula', String.raw`因此，\boxed{\begin{array}{c|cc}Y&1&2\\ \hline P&\frac12&\frac12\end{array}}。`, '因此，⟦ Y | 1  2 ; ── ; P | ½  ½ ⟧。'],
-    ['bare box containing matrix and formula', String.raw`\boxed{x+\begin{matrix}1&2\\3&4\end{matrix}}`, 'x+[ 1  2 ; 3  4 ]'],
+    ['bare box containing matrix and formula', String.raw`\boxed{x+\begin{matrix}1&2\\3&4\end{matrix}}`, 'x+⟦ matrix: 1  2 ; 3  4 ⟧'],
     ['bare augmented array preserves the column rule', String.raw`\begin{array}{cc|c}1&0&2\\0&1&3\end{array}`, '⟦ 1  0 | 2 ; 0  1 | 3 ⟧'],
     ['double column rules and outer rules', String.raw`$\begin{array}{|c||c|}a&b\\c&d\end{array}$`, '⟦ | a || b | ; | c || d | ⟧'],
     ['row rules at boundaries and repeated rules', String.raw`$\begin{array}{cc}\hline a&b\\\hline\hline c&d\\\hdashline\end{array}$`, '⟦ ── ; a  b ; ── ; ── ; c  d ; ╌╌ ⟧'],
     ['dashed column rule preserves position', String.raw`$\begin{array}{c:c}1&2\\3&4\end{array}$`, '⟦ 1 ┆ 2 ; 3 ┆ 4 ⟧'],
     ['empty cells retain augmented positions', String.raw`$\begin{array}{c|cc}a&&b\\&c&\end{array}$`, '⟦ a |   b ;  | c   ⟧'],
-    ['determinant bounds survive internal horizontal rule', String.raw`$\begin{vmatrix}1&2\\\hline3&4\end{vmatrix}$`, '| 1  2 ; ── ; 3  4 |'],
+    ['determinant bounds survive internal horizontal rule', String.raw`$\begin{vmatrix}1&2\\\hline3&4\end{vmatrix}$`, '⟦ vmatrix: 1  2 ; ── ; 3  4 ⟧'],
     ['table cell semicolon is quoted without adding rows', String.raw`$\begin{array}{c|c}X&\text{a ; b}\\\hline P&1\end{array}$`, '⟦ X | "a ; b" ; ── ; P | 1 ⟧'],
     ['table text whitespace normalizes safely', String.raw`$\begin{array}{c|c}X&\text{a  b}\\\hline P&1\end{array}$`, '⟦ X | a b ; ── ; P | 1 ⟧'],
     ['table absolute bars remain cell content', String.raw`$\begin{array}{c|c}X&|a|\\\hline P&|b|\end{array}$`, '⟦ X | "|a|" ; ── ; P | "|b|" ⟧'],
     ['integral and spacing', String.raw`$\int_0^1 x\,dx$`, '∫₀¹x dx'],
-    ['limit with structural lower bound', String.raw`$\lim_{x\to0}\frac{\sin x}{x}$`, 'lim_(x→0)(sinx)/(x)'],
+    ['limit with structural lower bound', String.raw`$\lim_{x\to0}\frac{\sin x}{x}$`, 'lim_(x→0) (sin x)/(x)'],
     ['double integral', String.raw`$\iint_D f(x,y)dxdy$`, '∬_(D)f(x,y)dxdy'],
     ['Greek variant variables stay distinct', String.raw`$\epsilon+\varepsilon+\theta+\vartheta+\phi+\varphi$`, 'ϵ+ε+θ+ϑ+ϕ+φ'],
     ['amount arithmetic does not swallow later formulas', String.raw`Pay $5 + $10; $x^2$.`, 'Pay $5 + $10; x².'],
   );
   const preserved = [
+    String.raw`$\SI[round-mode=places]{1.234}{\volt}$`,
+    String.raw`$\SI{1.2(3)}{\volt}$`, String.raw`$\SI{5}{\customunit}$`,
+    String.raw`$\si{\milli\kilo\ohm}$`, String.raw`$\si{\per\per\second}$`,
+    String.raw`$\si{\metre\squared\cubed}$`, String.raw`$\si{\metre\per}$`,
+    String.raw`$\si{\metre\tothe{1000}}$`, String.raw`$\num{1e1000}$`,
+    String.raw`$\qty(\frac ab)$`, String.raw`$\ce{2H2 + O2 -> 2H2O}$`,
+    String.raw`$x\xrightarrow{\mathcal F}X$`, String.raw`$\overleftarrow{AB}$`,
+    String.raw`\begin{circuitikz}\draw (0,0) to[R=$R$] (2,0);\end{circuitikz}`,
+    String.raw`\begin{tikzpicture}\draw[->] (0,0)--(1,1);\end{tikzpicture}`,
     String.raw`$\unknown{x+1}$`, String.raw`$\frac{a}{$`,
     String.raw`\fbox{x+\begin{matrix}1&2\\3&4\end{matrix}}`,
     String.raw`Before $\unknown{x}$ after $x^2$.`,
-    String.raw`$\cancel{x}$`, String.raw`$\mathcal{A}$`,
+    String.raw`$\cancel{x}$`, String.raw`$\mathcal{a}$`,
     String.raw`$\begin{array}{c|c}1&\unknown{x}\\\hline3&4\end{array}$`,
     String.raw`\[\boxed{\begin{array}{c|c}X&0\\\hline P&\frac1{2}\end{array}\]`,
     String.raw`$\not\models$`,
@@ -144,6 +195,16 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     assert.equal(convert(input), expected, name);
     console.log(`PASS: ${name}`);
   }
+  const { normalizeCourseLatex } = await import('../src/utils/courseLatex.ts');
+  for (const source of [String.raw`\\SI{5}{\volt}`, String.raw`\text{Use \SI{5}{\volt} here}`, String.raw`\SI[round-mode=places]{1.2}{\volt}`]) {
+    assert.equal(normalizeCourseLatex(source), source, 'literal command contexts are not unit conversions');
+  }
+  for (const source of [String.raw`$\begin{pmatrix}1&2\\3&4\end{pmatrix}$`, String.raw`$\begin{cases}x&x>0\\0&x\le0\end{cases}$`]) {
+    const rendered = convert(source);
+    assert.equal(convert(rendered), rendered, 'matrix protocol is idempotent');
+  }
+  const oversizedMatrix = '$\\begin{pmatrix}' + Array.from({ length: 33 }, () => '1').join('\\\\') + '\\end{pmatrix}$';
+  assert.equal(convert(oversizedMatrix), oversizedMatrix, 'matrix renderer dimension budget preserves source');
   for (const input of [String.raw`\boxed{x}`, String.raw`\begin{aligned}x\end{aligned}`, String.raw`\[x\]`, String.raw`x\\`]) {
     assert.equal(hasLatexMarkup(input), true, input);
   }
