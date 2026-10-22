@@ -6,8 +6,8 @@ const latexCurriculumCases = <String, List<(String, String, String)>>{
     ('定积分与幂次', r'$\int_0^1 x^2 dx=\frac{1}{3}$', '∫₀¹x²dx=⅓'),
     ('偏导数', r'$\frac{\partial f}{\partial x}=2x$', '(∂f)/(∂x)=2x'),
     ('梯度', r'$\nabla f=(2x,2y)$', '∇f=(2x,2y)'),
-    ('三角恒等式', r'$\sin^2 x+\cos^2 x=1$', 'sin²x+cos²x=1'),
-    ('无穷极限', r'$\lim_{n\to\infty}\frac{1}{n}=0$', 'lim_(n→∞)(1)/(n)=0'),
+    ('三角恒等式', r'$\sin^2 x+\cos^2 x=1$', 'sin² x+cos² x=1'),
+    ('无穷极限', r'$\lim_{n\to\infty}\frac{1}{n}=0$', 'lim_(n→∞) (1)/(n)=0'),
     ('泰勒系数', r'$a_n=\frac{f^{(n)}(0)}{n!}$', 'aₙ=(f⁽ⁿ⁾(0))/(n!)'),
   ],
   '线性代数': [
@@ -16,7 +16,11 @@ const latexCurriculumCases = <String, List<(String, String, String)>>{
     ('转置', r'$(AB)^T=B^TA^T$', '(AB)^(T)=B^(T)A^(T)'),
     ('秩的上界', r'$\operatorname{rank}(A)\leq\min(m,n)$', 'rank(A)≤min(m,n)'),
     ('内积', r'$\langle x,y\rangle=\sum_{i=1}^n x_i y_i$', '⟨x,y⟩=∑ᵢ₌₁ⁿxᵢyᵢ'),
-    ('二维矩阵', r'$A=\begin{pmatrix}1&2\\3&4\end{pmatrix}$', 'A=( 1  2 ; 3  4 )'),
+    (
+      '二维矩阵',
+      r'$A=\begin{pmatrix}1&2\\3&4\end{pmatrix}$',
+      'A=⟦ pmatrix: 1  2 ; 3  4 ⟧',
+    ),
   ],
   '概率与统计': [
     ('条件概率', r'$P(A\mid B)=\frac{P(A\cap B)}{P(B)}$', 'P(A|B)=(P(A∩B))/(P(B))'),
@@ -31,9 +35,9 @@ const latexCurriculumCases = <String, List<(String, String, String)>>{
     ('独立事件', r'$P(A\cap B)=P(A)P(B)$', 'P(A∩B)=P(A)P(B)'),
   ],
   '复变函数': [
-    ('欧拉公式', r'$e^{i\theta}=\cos\theta+i\sin\theta$', 'e^(iθ)=cosθ+isinθ'),
+    ('欧拉公式', r'$e^{i\theta}=\cos\theta+i\sin\theta$', 'e^(iθ)=cos θ+isin θ'),
     ('虚数单位', r'$i^2=-1$', 'i²=-1'),
-    ('共轭', r'$z+\bar z=2\operatorname{Re}z$', 'z+z̄=2Rez'),
+    ('共轭', r'$z+\bar z=2\operatorname{Re}z$', 'z+z̄=2Re z'),
     ('复数域', r'$z\in\mathbb{C}$', 'z∈ℂ'),
     ('复积分闭路符号', r'$\oint_C f(z)dz=0$', '∮_(C)f(z)dz=0'),
     ('留数因子', r'$2\pi i\operatorname{Res}(f,a)$', '2πiRes(f,a)'),
@@ -74,7 +78,7 @@ const latexCurriculumCases = <String, List<(String, String, String)>>{
       'N₂+3H₂⇌2NH₃',
     ),
     ('反应自由能', r'$\Delta G=\Delta H-T\Delta S$', 'ΔG=ΔH-TΔS'),
-    ('化学势', r'$\mu=\mu_0+RT\ln a$', 'μ=μ₀+RTlna'),
+    ('化学势', r'$\mu=\mu_0+RT\ln a$', 'μ=μ₀+RTln a'),
   ],
   '离散数学': [
     ('命题等价', r'$p\Rightarrow q\equiv\neg p\lor q$', 'p⇒q≡¬p∨q'),
@@ -122,9 +126,9 @@ const latexCurriculumCases = <String, List<(String, String, String)>>{
     ('Carnot效率', r'$\eta=1-\frac{T_c}{T_h}$', 'η=1-(T_(c))/(Tₕ)'),
   ],
   '光学与波动': [
-    ('Snell折射定律', r'$n_1\sin\theta_1=n_2\sin\theta_2$', 'n₁sinθ₁=n₂sinθ₂'),
+    ('Snell折射定律', r'$n_1\sin\theta_1=n_2\sin\theta_2$', 'n₁sin θ₁=n₂sin θ₂'),
     ('简谐行波', r'$u=A\cos(kx-\omega t+\phi)$', 'u=Acos(kx-ωt+ϕ)'),
-    ('光栅衍射条件', r'$d\sin\theta=m\lambda$', 'dsinθ=mλ'),
+    ('光栅衍射条件', r'$d\sin\theta=m\lambda$', 'dsin θ=mλ'),
   ],
   '流体力学': [
     ('Bernoulli能量方程', r'$p+\frac{1}{2}\rho v^2+\rho gh=C$', 'p+½ρv²+ρgh=C'),
@@ -175,9 +179,9 @@ const latexCurriculumCases = <String, List<(String, String, String)>>{
     ),
   ],
   '信息论与算法': [
-    ('Shannon熵', r'$H(X)=-\sum_i p_i\log_2 p_i$', 'H(X)=-∑ᵢpᵢlog₂pᵢ'),
+    ('Shannon熵', r'$H(X)=-\sum_i p_i\log_2 p_i$', 'H(X)=-∑ᵢpᵢlog₂ pᵢ'),
     ('互信息', r'$I(X;Y)=H(X)+H(Y)-H(X,Y)$', 'I(X;Y)=H(X)+H(Y)-H(X,Y)'),
-    ('归并排序复杂度', r'$T(n)=O(n\log n)$', 'T(n)=O(nlogn)'),
+    ('归并排序复杂度', r'$T(n)=O(n\log n)$', 'T(n)=O(nlog n)'),
   ],
   '量子力学与张量': [
     (

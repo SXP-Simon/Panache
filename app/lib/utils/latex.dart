@@ -5,12 +5,14 @@ import 'package:flutter_math_fork/ast.dart';
 import 'package:flutter_math_fork/tex.dart';
 
 import 'math_segments.dart';
+import 'course_latex.dart';
 
 const _superSource = '0123456789+-=()nixykm';
 const _superTarget = '⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱˣʸᵏᵐ';
 const _subSource = '0123456789+-=()aehijklmnoprstuvxy';
 const _subTarget = '₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ';
 String _script(String value, bool sup) {
+  if (sup && value == '∘') return '°';
   if (sup && RegExp(r'^[′″‴⁗]+$').hasMatch(value)) return value;
   final source = sup ? _superSource : _subSource;
   final target = sup ? _superTarget : _subTarget;
@@ -74,7 +76,22 @@ String _symbol(String s) =>
       '⪰': '≽',
     }[s] ??
     s;
-String _group(String s) => s.runes.length > 1 ? '($s)' : s;
+String _group(String s) {
+  if (s.runes.length <= 1) return s;
+  const pairs = {'(': ')', '[': ']', '{': '}', '⟨': '⟩'};
+  if (pairs.containsKey(s[0])) {
+    final stack = <String>[];
+    for (var i = 0; i < s.length; i++) {
+      if (pairs.containsKey(s[i])) {
+        stack.add(pairs[s[i]]!);
+      } else if (pairs.containsValue(s[i])) {
+        if (stack.isEmpty || stack.removeLast() != s[i]) return '($s)';
+        if (stack.isEmpty) return i == s.length - 1 ? s : '($s)';
+      }
+    }
+  }
+  return '($s)';
+}
 
 bool _uprightLabel(GreenNode? node, String text) {
   if (node is EquationRowNode && node.children.length == 1) {
@@ -101,6 +118,7 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
     final body = n.children.map(child).join();
     final family = n.optionsDiff.mathFontOptions?.fontFamily;
     if (family == 'AMS') return _blackboard(body);
+    if (family == 'Caligraphic') return calligraphicCapitals(body);
     if (family != null &&
         !{'Main', 'Math', 'SansSerif', 'Typewriter'}.contains(family)) {
       throw const FormatException('Unsupported math font');
@@ -134,7 +152,16 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
   if (n is NaryOperatorNode) {
     return '${_symbol(n.operator)}${n.lowerLimit == null ? '' : _script(child(n.lowerLimit), false)}${n.upperLimit == null ? '' : _script(child(n.upperLimit), true)}${child(n.naryand)}';
   }
-  if (n is FunctionNode) return '${child(n.functionName)}${child(n.argument)}';
+  if (n is FunctionNode) {
+    final name = child(n.functionName), argument = child(n.argument);
+    final first = n.argument.children.firstOrNull;
+    final space =
+        argument.isEmpty ||
+            (first is! FracNode && RegExp(r'^[\s([{]').hasMatch(argument))
+        ? ''
+        : ' ';
+    return '$name$space$argument';
+  }
   if (n is AccentNode) {
     final mark = const {
       '¯': '\u0304',
@@ -183,6 +210,21 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
       }
     }
     final cases = left == '{' && right.isEmpty;
+    if (n.body.length == 1 && n.body.first.children.length == 1) {
+      final content = n.body.first.children.first;
+      final kind = const {
+        '()': 'pmatrix',
+        '[]': 'bmatrix',
+        '{}': 'Bmatrix',
+        '||': 'vmatrix',
+        '||||': 'Vmatrix',
+        '{': 'cases',
+      }['$left$right'];
+      if (kind != null &&
+          (content is MatrixNode || content is EquationArrayNode)) {
+        return child(content, kind);
+      }
+    }
     final body = StringBuffer();
     for (var i = 0; i < n.body.length; i++) {
       if (i > 0) body.write(_symbol(n.middle[i - 1] ?? ''));
@@ -191,6 +233,11 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
     return '$left$body${cases ? ' }' : right}';
   }
   if (n is MatrixNode) {
+    if (n.body.isEmpty ||
+        n.body.length > 32 ||
+        n.body.any((row) => row.isEmpty || row.length > 32)) {
+      throw const FormatException('Matrix dimensions exceed renderer limits');
+    }
     final ruled =
         n.vLines.any((v) => v != MatrixSeparatorStyle.none) ||
         n.hLines.any((v) => v != MatrixSeparatorStyle.none);
@@ -216,9 +263,14 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
           cells.write(vertical.isEmpty ? '  ' : ' ');
         }
         final value = child(n.body[row][col]);
-        if (ruled &&
-            mode == 'standalone' &&
-            (RegExp(r'[;|┆⟦⟧"\\]').hasMatch(value) ||
+        if ((mode == 'standalone' ||
+                mode.endsWith('matrix') ||
+                mode == 'cases') &&
+            (value.isEmpty ||
+                RegExp(
+                  r'^\s*(?:matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|cases):',
+                ).hasMatch(value) ||
+                RegExp(r'[;|┆⟦⟧"\\]').hasMatch(value) ||
                 value.contains('  ') ||
                 value.trim() == '──' ||
                 value.trim() == '╌╌')) {
@@ -229,21 +281,49 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
       }
       lines.add(cells.toString());
     }
-    final rows = lines.join(mode == 'cases' ? '\n' : ' ; ');
-    return mode == 'cases'
-        ? '\n$rows'
-        : mode == 'standalone'
-        ? ruled
-              ? '⟦ $rows ⟧'
-              : '[ $rows ]'
-        : ' $rows ';
+    final rows = lines.join(' ; ');
+    if (mode == 'standalone') return ruled ? '⟦ $rows ⟧' : '⟦ matrix: $rows ⟧';
+    if (mode.endsWith('matrix') || mode == 'cases') return '⟦ $mode: $rows ⟧';
+    return ' $rows ';
   }
   if (n is EquationArrayNode) {
+    if (mode == 'cases' && (n.body.isEmpty || n.body.length > 32)) {
+      throw const FormatException('Cases dimensions exceed renderer limits');
+    }
     if (n.hlines.any((v) => v != MatrixSeparatorStyle.none)) {
       throw const FormatException('Equation rules');
     }
     final rows = n.body.map((row) {
-      if (mode == 'cases') return child(row);
+      if (mode == 'cases') {
+        final cells = <String>[];
+        var cell = StringBuffer();
+        var inside = false;
+        for (final item in row.children) {
+          if (item is SpaceNode && item.alignerOrSpacer) {
+            if (inside) {
+              cells.add(cell.toString());
+              cell = StringBuffer();
+            }
+            inside = !inside;
+          } else if (inside) {
+            cell.write(child(item));
+          }
+        }
+        if (inside) throw const FormatException('Incomplete cases column');
+        if (cells.length != 2) {
+          throw const FormatException('Cases need two columns');
+        }
+        return cells
+            .map(
+              (value) =>
+                  value.isEmpty ||
+                      RegExp(r'[;|┆⟦⟧"\\]').hasMatch(value) ||
+                      value.contains('  ')
+                  ? jsonEncode(value)
+                  : value,
+            )
+            .join('  ');
+      }
       var columns = 0;
       final out = StringBuffer();
       for (var i = 0; i < row.children.length; i++) {
@@ -257,7 +337,7 @@ String _node(GreenNode? n, [int depth = 0, String mode = 'standalone']) {
       }
       return out.toString();
     }).toList();
-    return mode == 'cases' ? ' ${rows.join(' ; ')}' : rows.join('\n');
+    return mode == 'cases' ? '⟦ cases: ${rows.join(' ; ')} ⟧' : rows.join('\n');
   }
   if (n is EnclosureNode) {
     if (n.notation.isNotEmpty) {
@@ -292,8 +372,12 @@ String? _formula(String source) {
       RegExp(r'\\(begin|end)\{(align\*?|gather\*?|gathered)\}'),
       (m) => '\\${m[1]}{aligned}',
     );
+    // flutter_math_fork 0.7.4 incorrectly gives Vmatrix a single-bar delimiter.
+    normalized = normalized
+        .replaceAll(r'\begin{Vmatrix}', r'\left\Vert\begin{matrix}')
+        .replaceAll(r'\end{Vmatrix}', r'\end{matrix}\right\Vert');
     final tree = TexParser(
-      normalized,
+      normalizeCourseLatex(normalized),
       const TexParserSettings(
         displayMode: true,
         throwOnError: true,
@@ -403,11 +487,11 @@ String _bareText(String text) {
             }
             final arity =
                 RegExp(
-                  r'^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset)$',
+                  r'^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset|SI)$',
                 ).hasMatch(name)
                 ? 2
                 : RegExp(
-                    r'^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|tilde|widetilde|dot|ddot|underbrace|overbrace|breve|acute|grave|check)$',
+                    r'^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|tilde|widetilde|dot|ddot|underbrace|overbrace|breve|acute|grave|check|si|num)$',
                   ).hasMatch(name)
                 ? 1
                 : 0;

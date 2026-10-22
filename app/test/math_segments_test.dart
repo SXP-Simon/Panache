@@ -68,7 +68,7 @@ void main() {
   test('未知节点和超限公式完整回退，后续合法公式继续转换', () {
     for (final source in [
       r'$\cancel{x}$',
-      r'$\mathcal{F}$',
+      r'$\mathcal{abc}$',
       r'$\unknown{x}$',
       r'\[x+1',
       '\$${'x' * 16001}\$',

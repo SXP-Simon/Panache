@@ -72,12 +72,12 @@
   [
     "pmatrix matrix",
     "\\begin{pmatrix}1 & 2 \\\\ 3 & 4\\end{pmatrix}",
-    "( 1  2 ; 3  4 )"
+    "⟦ pmatrix: 1  2 ; 3  4 ⟧"
   ],
   [
     "bmatrix matrix",
     "\\begin{bmatrix}a & b \\\\ c & d\\end{bmatrix}",
-    "[ a  b ; c  d ]"
+    "⟦ bmatrix: a  b ; c  d ⟧"
   ],
   [
     "pearson complex formula",
@@ -257,22 +257,22 @@
   [
     "cases retain conditions",
     "$\\begin{cases}x&x>0\\\\-x&x\\leq0\\end{cases}$",
-    "{ x  x>0 ; -x  x≤0 }"
+    "⟦ cases: x  x>0 ; -x  x≤0 ⟧"
   ],
   [
     "empty matrix cells retain positions",
     "$\\begin{pmatrix}1&\\\\&1\\end{pmatrix}$",
-    "( 1   ;   1 )"
+    "⟦ pmatrix: 1  \"\" ; \"\"  1 ⟧"
   ],
   [
     "text in matrix does not create a column",
     "$\\begin{pmatrix}\\text{R&D}&2\\\\3&4\\end{pmatrix}$",
-    "( R&D  2 ; 3  4 )"
+    "⟦ pmatrix: R&D  2 ; 3  4 ⟧"
   ],
   [
     "nested matrix environments",
     "$\\begin{pmatrix}1&\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}\\\\0&1\\end{pmatrix}$",
-    "( 1  [ a  b ; c  d ] ; 0  1 )"
+    "⟦ pmatrix: 1  \"⟦ bmatrix: a  b ; c  d ⟧\" ; 0  1 ⟧"
   ],
   [
     "gather rows",
@@ -332,7 +332,7 @@
   [
     "plain matrix has visible bounds",
     "$\\begin{matrix}a&b\\\\c&d\\end{matrix}$",
-    "[ a  b ; c  d ]"
+    "⟦ matrix: a  b ; c  d ⟧"
   ],
   [
     "integral and spacing",
@@ -342,7 +342,7 @@
   [
     "limit with structural lower bound",
     "$\\lim_{x\\to0}\\frac{\\sin x}{x}$",
-    "lim_(x→0)(sinx)/(x)"
+    "lim_(x→0) (sin x)/(x)"
   ],
   [
     "double integral",
@@ -375,9 +375,9 @@
     "$\\cancel{x}$"
   ],
   [
-    "preserves unsupported/literal $\\mathcal{A}$",
+    "calligraphic set preserves script style",
     "$\\mathcal{A}$",
-    "$\\mathcal{A}$"
+    "𝒜"
   ],
   [
     "array with column and row separators",

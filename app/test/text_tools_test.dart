@@ -72,7 +72,7 @@ void main() {
     expect(convertLatex(r'\begin{aligned}x&=1\\y&=2\end{aligned}'), 'x=1\ny=2');
     expect(
       convertLatex(r'\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}'),
-      '( 1  2 ; 3  4 )',
+      '⟦ pmatrix: 1  2 ; 3  4 ⟧',
     );
     expect(convertLatex(r'$\frac{1}{2}+\Bigl\{p\Bigr\}$'), '½+{p}');
   });
