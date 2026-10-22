@@ -10,6 +10,7 @@
 
 import functools
 import io
+import math
 import os
 import re
 import threading
@@ -24,12 +25,18 @@ from handright import Template
 from PIL import Image, ImageDraw, ImageFont
 
 if __package__:
+    from .circuit import Circuit, parse_circuit
+    from .circuit_document import map_circuit_document
+    from .circuit_layout import layout_circuit
     from .library_boundary import install_member, member
     from .logging_setup import get_logger
     from .math_matrix import matrix_delimiters
     from .math_page_layout import install_math_page_layout
     from .math_table import Table, parse_table, table_spans
 else:
+    from circuit import Circuit, parse_circuit
+    from circuit_document import map_circuit_document
+    from circuit_layout import layout_circuit
     from library_boundary import install_member, member
     from logging_setup import get_logger
     from math_matrix import matrix_delimiters
@@ -328,6 +335,24 @@ _ACCENT_MARKS = frozenset("\u0304\u0302\u20d7\u0332\u0307\u0308\u0303\u0306\u030
 _TABLE_MAP: dict[str, Table] = {}
 _TABLE_KEYS: dict[Table, str] = {}
 _MAX_TABLE_DEPTH = 16
+_CIRCUIT_MAP: dict[str, Circuit] = {}
+_CIRCUIT_KEYS: dict[str, str] = {}
+_MAX_CIRCUITS = 256
+
+
+def _register_circuit(source: str) -> str:
+    # 2026-10-22：电路源码是明确边界，未知语法整段保留，不猜测连接关系。
+    with _REGISTRY_LOCK:
+        if source in _CIRCUIT_KEYS:
+            return _CIRCUIT_KEYS[source]
+        if len(_CIRCUIT_KEYS) >= _MAX_CIRCUITS:
+            return source
+        circuit = parse_circuit(source)
+        if circuit is None:
+            return source
+        char = chr(0x105000 + len(_CIRCUIT_KEYS))
+        _CIRCUIT_KEYS[source], _CIRCUIT_MAP[char] = char, circuit
+        return char
 
 
 def convert_tables_to_drawn(text: str, _depth: int = 0) -> str:
@@ -380,7 +405,8 @@ def convert_tables_to_drawn(text: str, _depth: int = 0) -> str:
 def is_math_glyph(char: str) -> bool:
     """Check whether a registered glyph requires mathematical layout."""
     return (
-        char in _TABLE_MAP
+        char in _CIRCUIT_MAP
+        or char in _TABLE_MAP
         or char in _VULGAR_FRACTION_MAP
         or char in _RADICAL_MAP
         or char in _SCRIPT_MAP
@@ -1131,10 +1157,72 @@ def _layout_table(table: Table, font: Font, font_path: str | None, memo: _Layout
     return _compose_box(sum(widths) + pad, children, paths)
 
 
+def _layout_circuit(
+    circuit: Circuit, font: Font, font_path: str | None, memo: _LayoutMemo
+) -> _MathBox:
+    # 2026-10-22：电路作为刚性复合字形缩放分页，笔迹扰动不会移动单独的接点。
+    size = font_size_of(font)
+    draft = layout_circuit(circuit, 1.0)
+    unit = min(size * 2.3, size * 24 / max(draft.width, draft.height, 1))
+    layout = layout_circuit(circuit, unit)
+    paths: list[BoxPath] = [
+        (tuple((round(x), round(y)) for x, y in stroke.points), max(1, round(stroke.width)))
+        for stroke in layout.strokes
+    ]
+    for disc in layout.discs:
+        cx, cy = disc.center
+        if disc.filled:
+            radius = max(1, round(disc.radius))
+            for offset in range(-radius, radius + 1):
+                half = math.sqrt(max(0, radius**2 - offset**2))
+                paths.append(
+                    (
+                        (
+                            (round(cx - half), round(cy + offset)),
+                            (round(cx + half), round(cy + offset)),
+                        ),
+                        1,
+                    )
+                )
+        else:
+            points = tuple(
+                (
+                    round(cx + disc.radius * math.cos(step * math.tau / 48)),
+                    round(cy + disc.radius * math.sin(step * math.tau / 48)),
+                )
+                for step in range(49)
+            )
+            paths.append((points, max(1, round(unit * 0.019))))
+    label_font = _get_cached_image_font(font_path, max(10, round(size * 0.78)))
+    children: list[BoxChild] = []
+    for label in layout.labels:
+        body = _layout_math_text(_normalize_math_content(label.text), label_font, font_path, memo)
+        x, y = label.position
+        left, top, right, bottom = body.bbox
+        dx = x - (left + right) / 2
+        if label.anchor == "left":
+            dx = x - left
+        elif label.anchor == "right":
+            dx = x - right
+        children.append((body, round(dx), round(y - (top + bottom) / 2)))
+    box = _compose_box(round(layout.width), children, paths)
+    left, top, right, bottom = box.bbox
+    dx = -min(0, left) + max(2, round(size * 0.12))
+    dy = _math_axis(font, font_path) - (top + bottom) // 2
+    return _compose_box(
+        right + dx + max(2, round(size * 0.12)),
+        ((box, dx, dy),),
+    )
+
+
 def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _LayoutMemo) -> _MathBox:
     size = font_size_of(font)
-    if char in _TABLE_MAP:
-        return _layout_table(_TABLE_MAP[char], font, font_path, memo)
+    if char in _CIRCUIT_MAP or char in _TABLE_MAP:
+        return (
+            _layout_circuit(_CIRCUIT_MAP[char], font, font_path, memo)
+            if char in _CIRCUIT_MAP
+            else _layout_table(_TABLE_MAP[char], font, font_path, memo)
+        )
     if char in _ACCENT_MAP:
         return _layout_accent(_ACCENT_MAP[char], font, font_path, memo)
     if char in _SCRIPT_MAP:
@@ -1398,7 +1486,13 @@ def normalize_text_for_font(text: str, font_path: str | None = None) -> str:
 
     cleaned = clean_invisible_and_special_characters(text)
     # 2026-10-20：先解码表格 JSON 单元格，避免数学转换破坏引号中的反斜杠转义。
-    return _transform_math_segments(convert_tables_to_drawn(cleaned), _normalize_math_content)
+    return map_circuit_document(
+        cleaned,
+        lambda source: _transform_math_segments(
+            convert_tables_to_drawn(source), _normalize_math_content
+        ),
+        _register_circuit,
+    )
 
 
 def _normalize_math_content(segment: str) -> str:
