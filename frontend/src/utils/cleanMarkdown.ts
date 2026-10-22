@@ -117,6 +117,17 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   }
 
   const tableMode = options.tableMode || 'latex';
+  // Circuit source can contain pipes, labels and comments resembling tables.
+  // Protect the complete environment before the Markdown table prepass.
+  let circuitPrefix = '\ue120CIRCUIT';
+  while (text.includes(circuitPrefix)) circuitPrefix += '\ue120';
+  const circuits: string[] = [];
+  text = mapMathSegments(text, (source, segment) => {
+    if (!/^\s*\\begin\{circuitikz\}/.test(segment.body)) return source;
+    const token = `${circuitPrefix}${circuits.length}\ue121`;
+    circuits.push(source);
+    return token;
+  });
   if (tableMode === 'latex')
     text = markdownTablesToLatex(text, (cell) => cleanMarkdown(cell, { tableMode: 'clean' }));
 
@@ -273,11 +284,15 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     (raw: string, index: string) => mathSources[Number(index)] ?? raw,
   );
   // 2026-10-16：仅显式清洗删除分隔线与空行，保留有内容行的缩进及单个换行。
-  return code.restore(
+  const cleaned = code.restore(
     s
       .split('\n')
       .filter((line) => line.trim() !== '' && line.trim() !== '---')
       .join('\n'),
+  );
+  return cleaned.replace(
+    new RegExp(`${circuitPrefix}(\\d+)\ue121`, 'g'),
+    (raw: string, index: string) => circuits[Number(index)] ?? raw,
   );
 }
 

@@ -336,8 +336,8 @@ const words = {
   insertedImages: ['正文插图', 'Inline images'],
   guideTitle: ['在这里，让文字变成笔迹', 'Turn your words into handwriting'],
   guideText: [
-    '输入正文或导入 TXT、DOCX、PDF。数学公式先用「转换 LaTeX」转写；分式、根式和上下标由手写引擎排版。使用 --- 独占一行分页，使用 >>> 开头将一行右对齐。',
-    'Enter text or import TXT, DOCX or PDF. Convert LaTeX before rendering fractions, radicals and scripts. A line with --- creates a page break; a line starting with >>> is right-aligned.',
+    '输入正文或导入 TXT、DOCX、PDF。数学公式先用「转换 LaTeX」转写；常见 CircuiTikZ 电路可直接生成预览。使用 --- 独占一行分页，使用 >>> 开头将一行右对齐。',
+    'Enter text or import TXT, DOCX or PDF. Convert LaTeX formulas first; common CircuiTikZ circuits render directly in Preview. A line with --- creates a page break; a line starting with >>> is right-aligned.',
   ],
   privacy: [
     '本地草稿和预设留在此浏览器中。生成时，正文、字体与背景会发送给当前后端服务。',

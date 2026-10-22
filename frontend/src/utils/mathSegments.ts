@@ -69,6 +69,12 @@ function scanEnvironment(text: string, start: number) {
   let cursor = start + first.length;
   while (cursor < text.length) {
     if (cursor - start > MAX_MATH_LENGTH) tooLarge = true;
+    // TeX comments may mention a closing tag without ending the diagram.
+    if (text[cursor] === '%' && !escapedAt(text, cursor)) {
+      const newline = text.indexOf('\n', cursor);
+      cursor = newline < 0 ? text.length : newline + 1;
+      continue;
+    }
     if (text.startsWith('\\\\', cursor)) {
       cursor += 2;
       continue;
@@ -273,7 +279,15 @@ export function scanMathSegments(text: string, options: ScanOptions = {}): MathS
           const found = scanEnvironment(text, cursor);
           const body = text.slice(start, found.end);
           const valid = found.valid && withinMathBudget(body);
-          cursor = add(start, found.end, valid ? 'math' : 'literal', body, true, !valid);
+          const circuit = env.name === 'circuitikz';
+          cursor = add(
+            start,
+            found.end,
+            valid && !circuit ? 'math' : 'literal',
+            body,
+            true,
+            !valid || circuit,
+          );
           continue;
         }
       }

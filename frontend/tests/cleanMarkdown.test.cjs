@@ -328,6 +328,30 @@ test("cleanup removes only complete separator lines without losing leading conte
   assert.equal(cleanMarkdown("---\ntitle: Example\n---\n正文"), "正文");
 });
 
+test("circuit source survives both cleanup orders and every table mode", async () => {
+  const { readFileSync } = require('node:fs');
+  const { cleanMarkdown } = await cleanModule;
+  const { convertLatexToUnicode: convert } = await import('../src/utils/latexToUnicode.ts');
+  const fixtures = JSON.parse(readFileSync(require('node:path').join(__dirname, '../../e2e/fixtures/circuitikz.json'), 'utf8'));
+  for (const {source} of fixtures) {
+    for (const tableMode of ['latex', 'list', 'aligned', 'raw_pipe', 'clean']) {
+      assert.equal(cleanMarkdown('**电路**\n' + source, {tableMode}), '电路\n' + source);
+    }
+    assert.equal(convert(source), source);
+    assert.equal(convert(cleanMarkdown(source)), source);
+    assert.equal(cleanMarkdown(convert(source)), source);
+  }
+  const tricky = String.raw`\begin{circuitikz}
+% \end{circuitikz} $x^2$
+\draw (0,0) node[op amp] {a | b
+--- | ---
+x | y};
+\end{circuitikz}`;
+  assert.equal(cleanMarkdown(tricky), tricky);
+  assert.equal(convert(tricky), tricky);
+  assert.equal(cleanMarkdown('```latex\n' + tricky + '\n```'), tricky);
+});
+
 async function runAll() {
   let passed = 0;
   for (const { name, run } of tests) {
