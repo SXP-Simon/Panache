@@ -1,0 +1,87 @@
+[
+  {
+    "id": "rc-lowpass",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[V,l=$U_s$] (0,3) to[R,l=$R_1$] (4,3) to[C,l=$C_1$] (4,0) -- (0,0) node[ground]{};\n\\end{circuitikz}"
+  },
+  {
+    "id": "rlc-ac",
+    "valid": true,
+    "source": "\\begin{circuitikz}[american]\n\\draw (0,0) to[sV,l=$u(t)$] (0,3) to[R,l=$R$] (3,3) to[L,l=$L$] (6,3) to[C,l=$C$] (6,0) -- (0,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "parallel-current",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[I,l=$I_s$] (0,3) -- (6,3);\n\\draw (0,0) -- (6,0);\n\\draw (3,3) to[R,l=$R$, *-*] (3,0);\n\\draw (6,3) to[C,l=$C$, *-*] (6,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "switch-capacitor",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[battery1,l=$E$] (0,3) to[switch,l=$S$] (3,3) to[R,l=$R$] (6,3) to[C,l=$C$] (6,0) -- (0,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "diode-bridge",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,2) to[D,l=$D_1$] (2,4);\n\\draw (4,2) to[D,l_=$D_2$] (2,4);\n\\draw (2,0) to[D,l=$D_3$] (0,2);\n\\draw (2,0) to[D,l_=$D_4$] (4,2);\n\\draw (2,4) -- (6,4) to[R,l=$R_L$] (6,0) -- (2,0);\n\\draw (0,2) node[ocirc]{} node[left]{$A$};\n\\draw (4,2) node[ocirc]{} node[right]{$B$};\n\\end{circuitikz}"
+  },
+  {
+    "id": "named-relative",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\coordinate (a) at (0,0);\n\\coordinate (b) at (0,3);\n\\draw (a) to[V,l=$U$] (b) to[R,l=$R$] ++(4,0) to[C,l=$C$] ++(0,-3) -- (a);\n\\end{circuitikz}"
+  },
+  {
+    "id": "orthogonal-ports",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[short,o-*] (2,0) |- (4,2) to[R,l=$R$] (7,2) -| (8,0) to[short,-o] (9,0);\n\\draw (4,2) to[C,l_=$C$] (4,-1) node[ground]{};\n\\end{circuitikz}"
+  },
+  {
+    "id": "unit-labels",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[R,l=$4.7\\,\\mathrm{k\\Omega}$] (4,0) to[C,l=$100\\,\\mathrm{nF}$] (8,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "reverse-led",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (5,0) to[led,l=$LED$] (2,0) to[R,l_=$R$] (-1,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "node-labels",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) node[above]{$A$} to[R,l=$R$] (4,0) node[above]{$B$};\n\\end{circuitikz}"
+  },
+  {
+    "id": "component-shorthand",
+    "valid": true,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[V=$U_s$] (0,3) to[R=$R_1$] (4,3) to[C=100 nF] (4,0) -- (0,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "unsupported-opamp",
+    "valid": false,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) node[op amp] (amp) {};\n\\end{circuitikz}"
+  },
+  {
+    "id": "unsupported-options",
+    "valid": false,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[R,mirror] (3,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "unknown-label-command",
+    "valid": false,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[R,l=$\\custom{R}$] (3,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "unknown-coordinate",
+    "valid": false,
+    "source": "\\begin{circuitikz}\n\\draw (missing) to[R] (3,0);\n\\end{circuitikz}"
+  },
+  {
+    "id": "unknown-path-command",
+    "valid": false,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[R] (3,0);\n\\foreach \\x in {1,2} {\\draw (0,0)--(1,1);}\n\\end{circuitikz}"
+  },
+  {
+    "id": "unclosed-environment",
+    "valid": false,
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[R] (3,0);"
+  }
+]
