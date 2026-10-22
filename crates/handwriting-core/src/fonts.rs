@@ -15,6 +15,7 @@ pub const FALLBACK_FONT_NAMES: [&str; 4] = [
     "李国夫手写体.ttf",
     "悠哉手写体.ttf",
 ];
+const CALLIGRAPHIC_CAPITALS: &str = "𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵";
 
 #[derive(Clone)]
 pub struct FontBook {
@@ -45,6 +46,14 @@ fn rendered_characters(source: &str) -> Vec<char> {
                     collect(lower, chars);
                 }
                 Node::Accent(body, _) => collect(body, chars),
+                // 2026-10-22：表格也可能独占某个希腊字母或工程符号，递归收集嵌套公式。
+                Node::Table(table) => {
+                    for row in &table.rows {
+                        for cell in row {
+                            collect(cell, chars);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -89,6 +98,27 @@ impl FontBook {
             }
         });
         let mut fallbacks = Vec::new();
+        if missing.iter().any(|c| CALLIGRAPHIC_CAPITALS.contains(*c)) {
+            // 2026-10-22：随包字库只覆盖八个花体字母；内部 OFL 子集补全而不依赖系统字体。
+            static SCRIPT: OnceLock<std::result::Result<Arc<Font>, String>> = OnceLock::new();
+            let font = SCRIPT
+                .get_or_init(|| {
+                    Self::load(include_bytes!("../assets/PanacheMathScript.ttf"))
+                        .map_err(|error| error.to_string())
+                })
+                .as_ref()
+                .map(Arc::clone)
+                .map_err(|message| Error::new("invalid_font", message.clone()))?;
+            missing.retain(|c| {
+                if CALLIGRAPHIC_CAPITALS.contains(*c) && visible_glyph(&font, *c) {
+                    coverage.insert(*c, fallbacks.len() + 1);
+                    false
+                } else {
+                    true
+                }
+            });
+            fallbacks.push(font);
+        }
         if missing
             .iter()
             .any(|c| ('\u{1d538}'..='\u{1d551}').contains(c))

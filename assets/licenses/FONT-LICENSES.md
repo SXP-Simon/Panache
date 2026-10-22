@@ -27,6 +27,8 @@ OFL 允许将字体与软件一起分发和销售，但不能单独销售字体�
 
 ## 许可文件维护
 
-内部数学备用字体 `HandwritingMathSymbols.ttf` 来自 `flutter_math_fork` 随附的 KaTeX AMS 字体，保留其 [MIT 许可](katex-fonts-MIT.txt)。它经过大写黑板粗体的 Unicode 重映射与子集化，名称已改为 Handwriting Math Symbols；仅用于缺字回退，不作为用户可选手写字体。可用 `scripts/build-math-symbol-font.py` 从原始 KaTeX AMS 字体重建。
+内部数学备用字体 `HandwritingMathSymbols.ttf` 来自 KaTeX AMS，`PanacheMathScript.ttf` 来自 KaTeX Caligraphic。两个原始 TTF 的内部许可字段均指定 **SIL OFL 1.1**，随附[完整字体许可与版权](katex-math-fonts-OFL.txt)；KaTeX 仓库的 MIT 许可不替代字体许可。
+
+两个字库分别重映射黑板粗体和花体大写字母，均已修改家族名称以遵守 Reserved Font Name；只在所选手写字体缺字时回退，不作为用户可选字体。分别通过 `scripts/build-math-symbol-font.py` 和 `scripts/build-math-script-font.py` 从 KaTeX 原始 TTF 重建；后者接受 `--source` 与 `--output` 参数。字体内原始版权与许可记录保留。
 
 `project-MIT.txt` 是根目录 `LICENSE` 的完整副本；`handright-BSD-3-Clause.txt` 和 `handright-NOTICE.txt` 是 `crates/handwriting-core/` 对应文件的完整副本，供 Flutter 各平台作为资产读取。更新原文件时同步更新副本；测试检查二者一致。

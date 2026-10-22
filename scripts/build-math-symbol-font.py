@@ -1,4 +1,4 @@
-"""Build the internal blackboard-capital fallback from KaTeX AMS (MIT).
+"""Build the internal blackboard-capital fallback from KaTeX AMS (SIL OFL 1.1).
 
 Requires fonttools. Supply flutter_math_fork's lib/katex_fonts/fonts/
 KaTeX_AMS-Regular.ttf as --source. Normal application builds use the checked-in
