@@ -4,6 +4,7 @@ export interface MarkdownOptions {
 }
 import { mapMathSegments } from './mathSegments.ts';
 import { markdownTablesToLatex } from './markdownTableLatex.ts';
+import { protectMarkdownCode, stripMarkdownLinks } from './markdownLiterals.ts';
 
 /**
  * Markdown 标记清洗与纯文本提取工具模块
@@ -134,6 +135,8 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     },
     { includeBareSizedGroups: true },
   );
+  const code = protectMarkdownCode(s);
+  s = code.text;
   s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // 1. 移除文档顶部的 YAML / TOML Front Matter
@@ -143,14 +146,11 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   s = s.replace(/<!--[\s\S]*?-->/g, '');
   s = s.replace(/<br\s*\/?>/gi, '\n');
   s = s.replace(/<hr\s*\/?>/gi, '\n---\n');
-  s = s.replace(/<\/?[a-zA-Z][^>]*>/g, '');
-
-  // 3. 剥离多行代码块（保留代码内部纯文本）
-  s = s.replace(/```[^\n]*\n([\s\S]*?)```/g, '$1');
-  s = s.replace(/~~~[^\n]*\n([\s\S]*?)~~~/g, '$1');
-
-  // 4. 剥离行内代码反引号 `code` -> code
-  s = s.replace(/`([^`\n]+)`/g, '$1');
+  // Known HTML wrappers only: C++ <T>, signal comparisons and autolinks are text.
+  s = s.replace(
+    /<\/?(?:a|abbr|b|blockquote|code|del|details|div|em|h[1-6]|i|li|mark|ol|p|pre|s|small|span|strong|summary|table|tbody|td|th|thead|tr|u|ul)(?=[\s/>])(?:"[^"]*"|'[^']*'|[^'">])*\/?>/gi,
+    '',
+  );
 
   // 5. 剥离普通外部网页图片与超链接，同时精准保护本地手绘插图（包含 Base64 数据与短占位符 ![插图 1]、![插图 1|50%]）
   // 5.1 暂存受保护的插图标记
@@ -164,8 +164,7 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   );
 
   // 5.2 剥离普通外部链接与普通非手绘网页图片：![alt](http://...) -> alt，[text](url) -> text
-  s = s.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
-  s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+  s = stripMarkdownLinks(s);
   s = s.replace(/<([a-zA-Z]+:\/\/[^>]+)>/g, '$1');
 
   // 5.3 恢复受保护的插图标记
@@ -209,7 +208,7 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     line = line.replace(/^[ \t]*#{1,6}[ \t]+/, '');
 
     // 6.2 剥离引用前缀 > 符号：> 引用内容 -> 引用内容
-    line = line.replace(/^[ \t]*>+[ \t]?/, '');
+    line = line.replace(/^[ \t]*(?:>[ \t]*)+/, '');
 
     // 6.3 剥离任务列表标记：- [ ] 待办 / - [x] 已办 -> 待办
     line = line.replace(/^([ \t]*[-*+])[ \t]+\[[ xX]\][ \t]+/, '$1 ');
@@ -274,10 +273,12 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     (raw: string, index: string) => mathSources[Number(index)] ?? raw,
   );
   // 2026-10-16：仅显式清洗删除分隔线与空行，保留有内容行的缩进及单个换行。
-  return s
-    .split('\n')
-    .filter((line) => line.trim() !== '' && line.trim() !== '---')
-    .join('\n');
+  return code.restore(
+    s
+      .split('\n')
+      .filter((line) => line.trim() !== '' && line.trim() !== '---')
+      .join('\n'),
+  );
 }
 
 /**

@@ -237,11 +237,34 @@ test("preserves incomplete and over-budget formulas during Markdown cleanup", as
   for (const source of sources) assert.equal(cleanMarkdown('**标题**\n' + source), '标题\n' + source);
 });
 
-test("math placeholders cannot collide and code retains its original cleaning behavior", async () => {
+test("math placeholders cannot collide and code contents stay literal", async () => {
   const { cleanMarkdown } = await cleanModule;
   assert.equal(cleanMarkdown('\ue100MATH0\ue101 **粗体** $a<b>c$'), '\ue100MATH0\ue101 粗体 $a<b>c$');
-  assert.equal(cleanMarkdown('```text\n**code** $x$\n```'), 'code $x$');
-  assert.equal(cleanMarkdown('`**code**`'), 'code');
+  assert.equal(cleanMarkdown('```text\n**code** $x$\n```'), '**code** $x$');
+  assert.equal(cleanMarkdown('`**code**`'), '**code**');
+});
+
+test("engineering source snippets preserve operators, includes, indentation and literal markup", async () => {
+  const { cleanMarkdown: clean } = await cleanModule;
+  const code = '#include <stdio.h>\nif (x < y && y > z) {\n    *p = a * b; // **literal**\n}\n---';
+  assert.equal(clean('## 程序\n```cpp\n' + code + '\n```\n**结论**'), '程序\n' + code + '\n结论');
+  assert.equal(clean('使用 `` `a_b` <T> **p** `` 与 `x<=y`。'), '使用 `a_b` <T> **p** 与 x<=y。');
+  assert.equal(clean('~~~text\n  - literal\n**bold**\n~~~~\n正文'), '  - literal\n**bold**\n正文');
+  assert.equal(clean('````text\n```\nA_B\n````'), '```\nA_B');
+  assert.equal(clean('```text\n未闭合 **源码**'), '未闭合 **源码**');
+  assert.equal(clean('\ue110CODE0\ue111 `*p`'), '\ue110CODE0\ue111 *p');
+  assert.equal(clean('`` unmatched `*p`'), '`` unmatched *p');
+  assert.equal(clean('$\\text{`literal`}+x_1$ **说明**'), '$\\text{`literal`}+x_1$ 说明');
+  const longBroken = Array.from({length: 10000}, () => '[x](').join('');
+  assert.equal(clean(longBroken), longBroken);
+});
+
+test("reference destinations with balanced parentheses and HTML autolinks retain readable labels", async () => {
+  const { cleanMarkdown: clean } = await cleanModule;
+  assert.equal(clean('[传递函数](https://example.invalid/wiki/Transfer_function_(control)) 与 ![电路](plots/rc_(lowpass).png)'), '传递函数 与 电路');
+  assert.equal(clean('<https://example.invalid/RC_filter> <b>重点</b> template<T> x<y>z'), 'https://example.invalid/RC_filter 重点 template<T> x<y>z');
+  assert.equal(clean('[未闭合](somewhere'), '[未闭合](somewhere');
+  assert.equal(clean('> > - 电路\n> >   叠加定理\n> **结论**'), '电路\n叠加定理\n结论');
 });
 
 test("shared scanner isolates nested formulas, escaped delimiters and literal content", async () => {
