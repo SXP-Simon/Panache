@@ -1,5 +1,6 @@
 import 'math_segments.dart';
 import 'image_markers.dart';
+import 'markdown_literals.dart';
 
 String expandImages(String text, Map<String, String> images) {
   var result = text.replaceAllMapped(
@@ -34,6 +35,8 @@ String cleanMarkdown(
   bool english = false,
 }) {
   var s = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  final code = protectMarkdownCode(s, inline: false);
+  s = code.text;
   final protected = <String>[];
   var tokenPrefix = '\uE100HW';
   while (s.contains(tokenPrefix)) {
@@ -45,20 +48,7 @@ String cleanMarkdown(
   }
 
   if (tableMode == 'latex') {
-    final original = s;
-    final buffer = StringBuffer();
-    var offset = 0;
-    for (final segment in scanMathSegments(original)) {
-      final value = original.substring(segment.start, segment.end);
-      if (!value.startsWith('```') && !value.startsWith('~~~')) continue;
-      buffer.write(original.substring(offset, segment.start));
-      final fenced = RegExp(r'^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\1$')
-          .firstMatch(value);
-      buffer.write(protect(fenced?[2] ?? value));
-      offset = segment.end;
-    }
-    buffer.write(original.substring(offset));
-    s = _convertMarkdownTables(buffer.toString(), protect);
+    s = _convertMarkdownTables(s, protect);
   }
 
   final math = StringBuffer();
@@ -70,14 +60,17 @@ String cleanMarkdown(
         .firstMatch(source);
     // Links and images retain the existing Markdown extraction rules.
     math.write(
-      source.startsWith('![') || source.startsWith('[')
+      source.startsWith('![') ||
+              source.startsWith('[') ||
+              source.startsWith('`')
           ? source
           : protect(fenced?[2] ?? source),
     );
     cursor = segment.end;
   }
   math.write(s.substring(cursor));
-  s = math.toString();
+  final bodyCode = protectMarkdownCode(math.toString());
+  s = bodyCode.text;
   final bareMath = StringBuffer();
   cursor = 0;
   for (final match in RegExp(r'\\left\b').allMatches(s)) {
@@ -107,13 +100,19 @@ String cleanMarkdown(
       .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
   s = s
       .replaceAll(RegExp(r'<hr\s*/?>', caseSensitive: false), '\n---\n')
-      .replaceAll(RegExp(r'</?[a-zA-Z][^>]*>'), '');
+      .replaceAll(
+        RegExp(
+          r'''</?(?:p|div|span|strong|em|b|i|u|s|del|strike|sub|sup|pre|code|blockquote|ul|ol|li|h[1-6]|table|thead|tbody|tr|td|th)(?:\s+(?:class|id|style|title|lang|dir)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s<>]+))*\s*/?>''',
+          caseSensitive: false,
+        ),
+        '',
+      );
   s = s.replaceAllMapped(
     RegExp(r'```[^\n]*\n([\s\S]*?)```|~~~[^\n]*\n([\s\S]*?)~~~'),
     (m) => m[1] ?? m[2]!,
   );
   s = s.replaceAllMapped(RegExp(r'`([^`\n]+)`'), (m) => m[1]!);
-  s = s.replaceAllMapped(RegExp(r'!?\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!);
+  s = stripMarkdownLinks(s);
   final output = <String>[], table = <String>[];
   void flush() {
     if (table.isEmpty) return;
@@ -215,11 +214,15 @@ String cleanMarkdown(
     RegExp('${RegExp.escape(tokenPrefix)}(\\d+)\uE101'),
     (m) => protected[int.parse(m[1]!)],
   );
-  return s
-      .split('\n')
-      .where((line) => line.trim().isNotEmpty && line.trim() != '---')
-      .join('\n')
-      .trim();
+  return code.restore(
+    bodyCode.restore(
+      s
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty && line.trim() != '---')
+          .join('\n')
+          .trim(),
+    ),
+  );
 }
 
 // Markdown 表格仅在完整分隔行后识别；不完整或超宽数据保持原文。
@@ -353,9 +356,19 @@ String _tableLatexCell(String cell) {
 
 String _tableText(String value) {
   if (value.isEmpty) return '';
-  value = value
-      .replaceAllMapped(RegExp(r'^(`+)([\s\S]*?)\1$'), (m) => m[2]!)
-      .replaceAll(r'\|', '|');
+  final code = protectMarkdownCode(value);
+  value = stripMarkdownLinks(code.text).replaceAll(r'\|', '|');
+  for (final marker in ['***', '___', '**', '__', '~~']) {
+    value = value.replaceAllMapped(
+      RegExp('${RegExp.escape(marker)}(.+?)${RegExp.escape(marker)}'),
+      (match) => match[1]!,
+    );
+  }
+  value = value.replaceAllMapped(
+    RegExp(r'(^|[^\w*])\*([^\s*][^*\n]*?)\*(?=[^\w*]|$)'),
+    (match) => '${match[1]}${match[2]}',
+  );
+  value = code.restore(value);
   const escapes = <String, String>{
     '\\': r'\textbackslash{}',
     '{': r'\{',

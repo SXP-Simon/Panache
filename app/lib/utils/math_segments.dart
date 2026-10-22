@@ -53,6 +53,34 @@ final _env = RegExp(r'^\\(begin|end)\{([a-zA-Z][a-zA-Z0-9*]*)\}');
 // cleanup agree about where source must be preserved.
 List<MathSegment> scanMathSegments(String text) {
   final result = <MathSegment>[];
+  // Index link delimiters once: incomplete pasted links must not scan the rest
+  // of a long document again at every opening bracket.
+  final linkEnds = <int, int>{}, parentheses = <int>[];
+  final brackets = <int>[];
+  for (var i = 0; i < text.length; i++) {
+    if (text[i] == r'\') {
+      i++;
+      continue;
+    }
+    if (text[i] == ']') brackets.add(i);
+    if (text[i] == '(') parentheses.add(i);
+    if (text[i] == ')' && parentheses.isNotEmpty) {
+      linkEnds[parentheses.removeLast()] = i + 1;
+    }
+  }
+  int nextBracket(int start) {
+    var low = 0, high = brackets.length;
+    while (low < high) {
+      final middle = (low + high) ~/ 2;
+      if (brackets[middle] < start) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low == brackets.length ? text.length : brackets[low];
+  }
+
   var cursor = 0;
   void add(
     int start,
@@ -159,19 +187,11 @@ List<MathSegment> scanMathSegments(String text) {
       continue;
     }
     if (text.startsWith('![', cursor) || c == '[') {
-      var end = cursor + (c == '!' ? 2 : 1);
-      while (end < text.length && (text[end] != ']' || _escaped(text, end))) {
-        end++;
-      }
+      var end = nextBracket(cursor + (c == '!' ? 2 : 1));
       if (end < text.length) {
         end++;
         if (end < text.length && text[end] == '(') {
-          var depth = 1;
-          for (end++; end < text.length && depth > 0; end++) {
-            if (_escaped(text, end)) continue;
-            if (text[end] == '(') depth++;
-            if (text[end] == ')') depth--;
-          }
+          end = linkEnds[end] ?? text.length;
         }
         if (c == '!' || text[end - 1] == ')') {
           add(start, end);
