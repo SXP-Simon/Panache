@@ -224,7 +224,11 @@ impl Glyphs<'_> {
                                 (0..=24)
                                     .map(|i| {
                                         let x = -radius * 0.6 + i as f32 * radius * 1.2 / 24.;
-                                        p(x, (i as f32 * 2. * PI / 24.).sin() * h * 0.7)
+                                        // 2026-10-22：交流波形保持正立，仅支路引线与端子随方向旋转。
+                                        Point(
+                                            mid.0 + x,
+                                            mid.1 + (i as f32 * 2. * PI / 24.).sin() * h * 0.7,
+                                        )
                                     })
                                     .collect(),
                             );
@@ -370,12 +374,15 @@ impl Glyphs<'_> {
 mod tests {
     use super::*;
     fn glyph(kind: &str) -> Glyph {
+        glyph_to(kind, "4,0")
+    }
+    fn glyph_to(kind: &str, end: &str) -> Glyph {
         let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../assets/font_assets/霞鹜文楷.ttf");
         static BOOK: std::sync::OnceLock<FontBook> = std::sync::OnceLock::new();
         let book = BOOK.get_or_init(|| FontBook::new(&std::fs::read(dir).unwrap(), &[]).unwrap());
         let source = format!(
-            "{}\\draw (0,0) to[{kind}] (4,0);{}",
+            "{}\\draw (0,0) to[{kind}] ({end});{}",
             crate::text::circuit::BEGIN,
             crate::text::circuit::END
         );
@@ -429,6 +436,34 @@ mod tests {
             ink
         };
         assert!(count(center_x + delta) > count(center_x - delta));
+    }
+    #[test]
+    fn ac_wave_stays_upright_for_all_four_branch_directions() {
+        let mut reference = None;
+        for end in ["4,0", "-4,0", "0,4", "0,-4"] {
+            let g = glyph_to("sV", end);
+            let cx = g.mask.width() / 2;
+            let cy = g.mask.height() / 2;
+            let wave = image::imageops::crop_imm(&g.mask, cx - 15, cy - 10, 31, 21).to_image();
+            let mut bounds = (31, 21, 0, 0);
+            for (x, y, pixel) in wave.enumerate_pixels() {
+                if pixel[0] > 127 {
+                    bounds.0 = bounds.0.min(x);
+                    bounds.1 = bounds.1.min(y);
+                    bounds.2 = bounds.2.max(x);
+                    bounds.3 = bounds.3.max(y);
+                }
+            }
+            assert!(
+                bounds.2 - bounds.0 > bounds.3 - bounds.1,
+                "{end}: wave must be horizontal"
+            );
+            if let Some(expected) = &reference {
+                assert_eq!(&wave, expected, "{end}: internal wave rotated");
+            } else {
+                reference = Some(wave);
+            }
+        }
     }
     #[test]
     fn open_terminals_have_transparent_centers_even_on_a_wire() {
