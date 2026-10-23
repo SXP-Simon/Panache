@@ -1,3 +1,27 @@
+# [1.8.0](https://github.com/SXP-Simon/Panache/compare/v1.7.1...v1.8.0) (2026-10-23)
+
+
+### Bug Fixes
+
+* **be/font_assets:** 补全课程数学字形并跳过空轮廓 ([f1cbc4f](https://github.com/SXP-Simon/Panache/commit/f1cbc4f781e545ee71746205ab84dba0f9d64b32))
+* **be:** 为手写电路增加自然微扰笔触并严格保持接点重合 ([23391fa](https://github.com/SXP-Simon/Panache/commit/23391fa4671da4afb833214d8560e18a3ce3d998))
+* **be:** 保持交流电源波形的书写方向 ([c4043b0](https://github.com/SXP-Simon/Panache/commit/c4043b007e642eb6ee7bd07e8649451c78bba6cd))
+* **be:** 固定手绘电路接点并保护空心端子 ([760eae4](https://github.com/SXP-Simon/Panache/commit/760eae447d83f67b336bef6b5bff9be2cde38a15))
+* **fe/src/utils:** 区分化学计数和电荷并兼容常用单位宏 ([da56a91](https://github.com/SXP-Simon/Panache/commit/da56a9187797de57dfbc50a8805d0250f68dad43))
+* **fe/src/utils:** 清洗 Markdown 时保留程序片段和完整链接标签 ([a5399ca](https://github.com/SXP-Simon/Panache/commit/a5399ca2f7f1c4667c76eaef5829e110beb38d9a))
+* **fe/src/utils:** 清洗时保护电路接线并接入预览提示 ([9b072d4](https://github.com/SXP-Simon/Panache/commit/9b072d4f52bfebeec589010891b90677a14a8feb))
+* **scripts:** 记录数学字库生成脚本的可执行权限 ([c492dcc](https://github.com/SXP-Simon/Panache/commit/c492dccd5d59f1ef344842dc9a604964f75b44ac))
+
+
+### Features
+
+* **be:** 将电路作为整体接入纸张渲染与分页 ([949c44c](https://github.com/SXP-Simon/Panache/commit/949c44cb0b02e3842236ad10ec3f597607a02fb2))
+* **be:** 绘制保持数学轴对齐的二维矩阵与分段函数 ([7d6e829](https://github.com/SXP-Simon/Panache/commit/7d6e8294248e8a88c2bfbc86f8087f8b9f675827))
+* **be:** 解析常见 CircuiTikZ 电路并生成手写几何 ([43cb21c](https://github.com/SXP-Simon/Panache/commit/43cb21c1fd3eee62537aea82c92b289f4d21f4e9))
+* **fe/src/utils:** 增强理工科公式的自然转写 ([4944e82](https://github.com/SXP-Simon/Panache/commit/4944e82ed9f58a2e4163644b473d5dd4be8a3a52))
+* **fe/src/utils:** 转写常用导数绝对值和范数宏 ([bf6c326](https://github.com/SXP-Simon/Panache/commit/bf6c326344eee8c5a4d4aae721a923cddee0a1c9))
+* **frontend/utils:** 支持 mhchem 化学式与 alignat 多行公式环境 ([4b0172d](https://github.com/SXP-Simon/Panache/commit/4b0172d1ce5488f3670d507f1482849ad12123ea))
+
 ## [1.7.1](https://github.com/SXP-Simon/Panache/compare/v1.7.0...v1.7.1) (2026-10-20)
 
 
