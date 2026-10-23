@@ -70,12 +70,12 @@ class _Geometry:
         if len(points) >= _MIN_PATH_POINTS:
             self.paths.append(tuple(points))
 
-    def circle(self, center: Point, radius: float) -> None:
+    def circle(self, center: Point, radius: float, angle: float = 0) -> None:
         self.paths.append(
             tuple(
                 (
-                    center[0] + radius * math.cos(step * math.tau / 48),
-                    center[1] + radius * math.sin(step * math.tau / 48),
+                    center[0] + radius * math.cos(angle + step * math.tau / 48),
+                    center[1] + radius * math.sin(angle + step * math.tau / 48),
                 )
                 for step in range(49)
             )
@@ -185,7 +185,9 @@ def _source(geometry: _Geometry, kind: str, half: float, point: _Transform) -> N
     radius = min(0.32, half)
     geometry.line(point(-half), point(-radius))
     geometry.line(point(radius), point(half))
-    geometry.circle(point(0), radius)
+    center = point(0)
+    contact = point(radius)
+    geometry.circle(center, radius, math.atan2(contact[1] - center[1], contact[0] - center[0]))
     if kind == "I":
         geometry.arrow(point(-radius * 0.58), point(radius * 0.58))
     elif kind == "sV":
@@ -334,38 +336,82 @@ def _clip_path(path: tuple[Point, ...], disc: CircuitDisc) -> list[tuple[Point, 
     return result
 
 
-def _clear_hollow_contacts(geometry: _Geometry) -> None:
-    for disc in geometry.discs:
-        if not disc.filled:
-            geometry.paths = [part for path in geometry.paths for part in _clip_path(path, disc)]
+def _pin_connections(path: tuple[Point, ...], anchors: tuple[Point, ...]) -> tuple[Point, ...]:
+    # 2026-10-23：没有实心圆点的 T 形支路也应精确相接，先固定长导线内部的电气节点。
+    result: list[Point] = []
+    for start, end in pairwise(path):
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        square_length = dx * dx + dy * dy
+        interior: list[tuple[float, Point]] = []
+        if square_length > 0:
+            for point in anchors:
+                parameter = (
+                    (point[0] - start[0]) * dx + (point[1] - start[1]) * dy
+                ) / square_length
+                if not 0 < parameter < 1:
+                    continue
+                projection = (start[0] + parameter * dx, start[1] + parameter * dy)
+                if math.dist(point, projection) <= _JOIN_TOLERANCE:
+                    interior.append((parameter, point))
+        if not result:
+            result.append(start)
+        for _, point in sorted(interior):
+            if math.dist(result[-1], point) > _JOIN_TOLERANCE:
+                result.append(point)
+        result.append(end)
+    return tuple(result)
 
 
 _CIRCLE_POINTS = 49
 _MIN_WOBBLE_DIST = 16.0
 
 
+def _handdrawn_circle(points: tuple[Point, ...], unit: float) -> tuple[Point, ...] | None:
+    # 2026-10-23：只识别闭合、均匀采样的圆；点数不能作为圆形语义，原始方向和引脚保持不变。
+    if len(points) != _CIRCLE_POINTS or math.dist(points[0], points[-1]) > _JOIN_TOLERANCE:
+        return None
+    segment_count = _CIRCLE_POINTS - 1
+    cx = sum(p[0] for p in points[:-1]) / segment_count
+    cy = sum(p[1] for p in points[:-1]) / segment_count
+    radius = math.hypot(points[0][0] - cx, points[0][1] - cy)
+    if radius <= 0:
+        return None
+    tolerance = max(1e-9, radius * 1e-7)
+    if any(abs(math.hypot(x - cx, y - cy) - radius) > tolerance for x, y in points[:-1]):
+        return None
+    seed = int((round(radius, 2) * 89.0) * 10.0) & 0xFFFFFFFF
+    phase1 = ((seed % 1000) / 1000.0) * math.tau
+    phase2 = (((seed // 1000) % 1000) / 1000.0) * math.tau
+    deviation = min(1.2, radius * 0.022, unit * 0.015)
+    result: list[Point] = []
+    quarter = segment_count // 4
+    for index, point in enumerate(points[:-1]):
+        if index % quarter == 0:
+            result.append(point)
+            continue
+        angle = index * math.tau / segment_count
+        envelope = math.sin(angle * 2) ** 2
+        wobble = (
+            (0.7 * math.sin(angle * 2 + phase1) + 0.3 * math.sin(angle * 3 + phase2))
+            * deviation
+            * envelope
+        )
+        scale = 1 + wobble / radius
+        result.append((cx + (point[0] - cx) * scale, cy + (point[1] - cy) * scale))
+    result.append(result[0])
+    return tuple(result)
+
+
 def handdrawn_stroke(points: tuple[Point, ...], unit: float) -> tuple[Point, ...]:
-    """2026-10-22：在端点绝对重合的前提下引入自然的微小手绘起伏，保持粗细统一与接点精确."""
-    if len(points) == _CIRCLE_POINTS:
-        # 闭合圆形：保留中心与半径，以谐波正弦波产生圆润的手绘闭合圆
-        segment_count = _CIRCLE_POINTS - 1
-        cx = sum(p[0] for p in points[:-1]) / segment_count
-        cy = sum(p[1] for p in points[:-1]) / segment_count
-        r = math.hypot(points[0][0] - cx, points[0][1] - cy)
-        seed = int((round(r, 2) * 89.0) * 10.0) & 0xFFFFFFFF
-        p1 = ((seed % 1000) / 1000.0) * math.tau
-        p2 = (((seed // 1000) % 1000) / 1000.0) * math.tau
-        w_dev = max(0.4, min(1.2, r * 0.022))
-        c_pts: list[Point] = []
-        for i in range(segment_count):
-            ang = i * math.tau / segment_count
-            dr = (0.7 * math.sin(ang * 2.0 + p1) + 0.3 * math.sin(ang * 3.0 + p2)) * w_dev
-            c_pts.append((cx + (r + dr) * math.cos(ang), cy + (r + dr) * math.sin(ang)))
-        c_pts.append(c_pts[0])
-        return tuple(c_pts)
+    """2026-10-23：端点和圆源引脚保持精确重合，微小手绘起伏不改变电气连接."""
+    if len(points) < _MIN_PATH_POINTS:
+        return points
+    circle = _handdrawn_circle(points, unit)
+    if circle is not None:
+        return circle
 
     res: list[Point] = []
-    max_dev = max(0.6, min(1.7, unit * 0.015))
+    max_dev = min(1.7, unit * 0.015)
     for idx in range(len(points) - 1):
         p1 = points[idx]
         p2 = points[idx + 1]
@@ -415,7 +461,13 @@ def layout_circuit(circuit: Circuit, unit: float = 100.0) -> CircuitLayout:
         _segment(geometry, segment, american=circuit.american)
     for node in circuit.nodes:
         geometry.node(node)
-    _clear_hollow_contacts(geometry)
+    anchors = tuple(
+        dict.fromkeys(
+            [point for segment in circuit.segments for point in (segment.start, segment.end)]
+            + [node.position for node in circuit.nodes]
+        )
+    )
+    geometry.paths = [_pin_connections(path, anchors) for path in geometry.paths]
     points = [point for path in geometry.paths for point in path]
     points.extend(label.position for label in geometry.labels)
     points.extend(
@@ -433,18 +485,20 @@ def layout_circuit(circuit: Circuit, unit: float = 100.0) -> CircuitLayout:
     def transform(point: Point) -> Point:
         return (point[0] - left) * unit, (top - point[1]) * unit
 
+    # 2026-10-23：起伏后再裁剪空心接点，避免绘制线段再次穿入端子空白区域。
+    discs = tuple(
+        CircuitDisc(transform(disc.center), disc.radius * unit, disc.filled)
+        for disc in geometry.discs
+    )
+    paths = [
+        handdrawn_stroke(tuple(transform(point) for point in path), unit) for path in geometry.paths
+    ]
+    for disc in discs:
+        if not disc.filled:
+            paths = [part for path in paths for part in _clip_path(path, disc)]
     return CircuitLayout(
-        tuple(
-            CircuitStroke(
-                handdrawn_stroke(tuple(transform(point) for point in path), unit),
-                max(1.0, unit * 0.019),
-            )
-            for path in geometry.paths
-        ),
-        tuple(
-            CircuitDisc(transform(disc.center), disc.radius * unit, disc.filled)
-            for disc in geometry.discs
-        ),
+        tuple(CircuitStroke(path, max(1.0, unit * 0.019)) for path in paths),
+        discs,
         tuple(
             PositionedLabel(label.text, transform(label.position), label.anchor)
             for label in geometry.labels
