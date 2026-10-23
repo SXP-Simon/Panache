@@ -1,3 +1,4 @@
+import 'physics_latex.dart';
 
 import 'dart:convert' show jsonEncode;
 import 'dart:ui' show FontStyle;
@@ -440,6 +441,11 @@ String _bareText(String text) {
       (() {
         final line = lines[li];
         if (!withinMathBudget(line)) return line;
+        // Keep all physics arguments in view before the generic token scanner.
+        if (RegExp(r'\\(?:dv|pdv|abs|norm)(?![A-Za-z])').hasMatch(line)) {
+          final normalized = normalizePhysicsLatex(line);
+          return normalized == line ? line : _bareText(normalized);
+        }
         if (RegExp(r'\\\\[ \t]*(?:\[[^\]]*\])?[ \t]*$').hasMatch(line)) {
           final prefix = line.replaceFirst(
             RegExp(r'\\\\[ \t]*(?:\[[^\]]*\])?[ \t]*$'),
