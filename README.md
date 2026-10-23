@@ -8,7 +8,7 @@ Panache 是手写体生成应用，本分支为自用定制基准分支。基于
 
 感谢 [@HakimYu](https://github.com/HakimYu) 提供的 flutter rust 分支支持，现已在 release 发布，全平台可用
 
-![手写数学公式、竖式分式与封顶根式排版预览](./docs/assets/images/math_formula_preview.png)
+![Panache 云烟体横线纸效果：电路、矩阵、概率表格、化学式与微积分作业](./docs/assets/images/panache-showcase.webp)
 
 ---
 

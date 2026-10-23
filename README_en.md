@@ -6,7 +6,7 @@ Run the application locally, self-host it, or download a [desktop build](https:/
 On `custom-base`, the React workspace combines the document editor, preview, and handwriting settings with a responsive layout.
 The handwriting renderer supports nested fractions, radicals, scripts, and fallback glyphs:
 
-![Handwritten mathematics preview](docs/assets/images/math_formula_preview.png)
+![Panache cursive notebook samples: circuits, matrices, probability tables, chemistry and calculus](docs/assets/images/panache-showcase.webp)
 
 📖 **[Documentation: user guide, self-hosting, and development](https://heliannuits.me/Panache/en/)**
 
