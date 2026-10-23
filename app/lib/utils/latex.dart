@@ -1,3 +1,4 @@
+
 import 'dart:convert' show jsonEncode;
 import 'dart:ui' show FontStyle;
 
@@ -372,6 +373,11 @@ String? _formula(String source) {
       RegExp(r'\\(begin|end)\{(align\*?|gather\*?|gathered)\}'),
       (m) => '\\${m[1]}{aligned}',
     );
+    // alignedat retains the declared column budget in the upstream AST parser.
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'\\(begin|end)\{alignat\*?\}'),
+      (m) => '\\${m[1]}{alignedat}',
+    );
     // flutter_math_fork 0.7.4 incorrectly gives Vmatrix a single-bar delimiter.
     normalized = normalized
         .replaceAll(r'\begin{Vmatrix}', r'\left\Vert\begin{matrix}')
@@ -487,11 +493,11 @@ String _bareText(String text) {
             }
             final arity =
                 RegExp(
-                  r'^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset|SI)$',
+                  r'^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset|SI|qty)$',
                 ).hasMatch(name)
                 ? 2
                 : RegExp(
-                    r'^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|tilde|widetilde|dot|ddot|underbrace|overbrace|breve|acute|grave|check|si|num)$',
+                    r'^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|tilde|widetilde|dot|ddot|underbrace|overbrace|breve|acute|grave|check|ce|si|unit|num)$',
                   ).hasMatch(name)
                 ? 1
                 : 0;

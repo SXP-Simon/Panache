@@ -19,7 +19,7 @@ void main() {
 
   group('不认识的领域命令必须整体保留', () {
     for (final source in [
-      r'$\ce{SO4^2- + Ba^2+ -> BaSO4 v}$',
+      r'$\ce{SO4^2- + Ba^2+ ->[\Delta] BaSO4 v}$',
       r'$\pu{9.81 m/s^2}$',
       r'$\qty(\frac{a}{b})$',
       r'$\SI{9.81}{m.s^{-2}}$',

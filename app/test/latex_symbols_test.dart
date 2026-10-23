@@ -171,9 +171,9 @@ void main() {
   }
 
   for (final formula in [
-    r'$\ce{2H2 + O2 -> 2H2O}$',
+    r'$\ce{2H2 + O2 ->[\Delta] 2H2O}$',
     r'$\pu{9.81 m/s2}$',
-    r'$\qty{5}{\metre\per\second}$',
+    r'$\qty[round-mode=places]{5}{\metre\per\second}$',
     r'$\begin{circuitikz}\draw (0,0) to[R] (1,0);\end{circuitikz}$',
     r'$\def\foo{\foo}\foo$',
     r'$\unknownphysics{x}+\alpha$',
