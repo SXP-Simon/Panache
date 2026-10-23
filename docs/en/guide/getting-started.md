@@ -63,6 +63,17 @@ Supported components include resistors, capacitors, inductors, voltage/current/s
 
 Circuits scale and paginate as one structure; connections never jitter separately, and labels use your selected font. Panache does not run complete TeX/TikZ: op-amps, transistors, macros, custom styles or unsupported commands preserve the entire circuit as source. Export complex diagrams as images and use **Insert image**. For legible layout checks, use LXGW WenKai and the **Neat handwriting** preset.
 
+## Common course macros
+
+Formula conversion accepts these common forms without a `\usepackage` preamble:
+
+- `amsmath`: fractions, matrices, cases and multi-line `alignat` derivations.
+- `siunitx`: `\SI{4.7}{\kilo\ohm}`, `\qty{9.81}{\metre\per\second\squared}` and `\unit{\volt}`.
+- `mhchem`: `\ce{(NH4)2SO4 -> 2NH4+ + SO4^2-}`, reaction arrows, states and hydrates, with separate atom counts and ionic charges.
+- `physics`: `\dv{x}{t}`, `\dv[2]{x}{t}`, `\pdv{f}{x}`, `\abs{x}` and `\norm{\mathbf v}`.
+
+These are compatible command subsets, not a full TeX package runtime. Custom macros, complex chemical structures and unsupported options remain as source; inspect the preview before exporting.
+
 ## Choosing a font
 
 Two options, pick one:
