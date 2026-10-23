@@ -1,0 +1,267 @@
+[
+  {
+    "name": "ordinary derivative",
+    "source": "\\dv{f}{x}",
+    "expected": "\\frac{\\mathrm{d}{f}}{\\mathrm{d}{x}}"
+  },
+  {
+    "name": "derivative operator",
+    "source": "\\dv{x}",
+    "expected": "\\frac{\\mathrm{d}}{\\mathrm{d}{x}}"
+  },
+  {
+    "name": "second derivative",
+    "source": "\\dv[2]{x}{t}",
+    "expected": "\\frac{\\mathrm{d}^{2}{x}}{\\mathrm{d}{t}^{2}}"
+  },
+  {
+    "name": "symbolic derivative",
+    "source": "\\dv[n]{f}{x}",
+    "expected": "\\frac{\\mathrm{d}^{n}{f}}{\\mathrm{d}{x}^{n}}"
+  },
+  {
+    "name": "first order is unadorned",
+    "source": "\\dv[1]{f}{t}",
+    "expected": "\\frac{\\mathrm{d}{f}}{\\mathrm{d}{t}}"
+  },
+  {
+    "name": "highest bounded order",
+    "source": "\\dv[99]{f}{x}",
+    "expected": "\\frac{\\mathrm{d}^{99}{f}}{\\mathrm{d}{x}^{99}}"
+  },
+  {
+    "name": "partial derivative",
+    "source": "\\pdv{u}{t}",
+    "expected": "\\frac{\\partial{u}}{\\partial{t}}"
+  },
+  {
+    "name": "partial operator",
+    "source": "\\pdv{x}",
+    "expected": "\\frac{\\partial}{\\partial{x}}"
+  },
+  {
+    "name": "second partial",
+    "source": "\\pdv[2]{u}{x}",
+    "expected": "\\frac{\\partial^{2}{u}}{\\partial{x}^{2}}"
+  },
+  {
+    "name": "symbolic partial",
+    "source": "\\pdv[n]{u}{x}",
+    "expected": "\\frac{\\partial^{n}{u}}{\\partial{x}^{n}}"
+  },
+  {
+    "name": "theta variable",
+    "source": "\\pdv{E}{\\theta}",
+    "expected": "\\frac{\\partial{E}}{\\partial{\\theta}}"
+  },
+  {
+    "name": "coordinate subscript",
+    "source": "\\pdv{f}{x_i}",
+    "expected": "\\frac{\\partial{f}}{\\partial{x_i}}"
+  },
+  {
+    "name": "braced coordinate subscript",
+    "source": "\\pdv{f}{x_{ij}}",
+    "expected": "\\frac{\\partial{f}}{\\partial{x_{ij}}}"
+  },
+  {
+    "name": "Greek unicode variable",
+    "source": "\\pdv{f}{θ}",
+    "expected": "\\frac{\\partial{f}}{\\partial{θ}}"
+  },
+  {
+    "name": "absolute value",
+    "source": "\\abs{x+y}",
+    "expected": "\\left|{x+y}\\right|"
+  },
+  {
+    "name": "norm",
+    "source": "\\norm{\\vec{x}}",
+    "expected": "\\left\\Vert{\\vec{x}}\\right\\Vert"
+  },
+  {
+    "name": "nested bars",
+    "source": "\\norm{\\abs{x}}",
+    "expected": "\\left\\Vert{\\left|{x}\\right|}\\right\\Vert"
+  },
+  {
+    "name": "differentiate nested norm",
+    "source": "\\dv{\\norm{x}}{t}",
+    "expected": "\\frac{\\mathrm{d}{\\left\\Vert{x}\\right\\Vert}}{\\mathrm{d}{t}}"
+  },
+  {
+    "name": "prose and spaces",
+    "source": "求导 \\dv [2] { f(t) } { t }。",
+    "expected": "求导 \\frac{\\mathrm{d}^{2}{ f(t) }}{\\mathrm{d}{t}^{2}}。"
+  },
+  {
+    "name": "remaining standard math is untouched",
+    "source": "\\pdv{\\frac{x}{y}}{t}+\\sin x",
+    "expected": "\\frac{\\partial{\\frac{x}{y}}}{\\partial{t}}+\\sin x"
+  },
+  {
+    "name": "preserve 0",
+    "source": "\\pdv{f}{x}{y}",
+    "expected": "\\pdv{f}{x}{y}"
+  },
+  {
+    "name": "preserve 1",
+    "source": "\\pdv[2]{f}{x}{y}",
+    "expected": "\\pdv[2]{f}{x}{y}"
+  },
+  {
+    "name": "preserve 2",
+    "source": "\\pdv{\\abs{x}}{x}{y}",
+    "expected": "\\pdv{\\abs{x}}{x}{y}"
+  },
+  {
+    "name": "preserve 3",
+    "source": "\\dv*{f}{x}",
+    "expected": "\\dv*{f}{x}"
+  },
+  {
+    "name": "preserve 4",
+    "source": "\\pdv*{f}{x}",
+    "expected": "\\pdv*{f}{x}"
+  },
+  {
+    "name": "preserve 5",
+    "source": "\\abs*{x}",
+    "expected": "\\abs*{x}"
+  },
+  {
+    "name": "preserve 6",
+    "source": "\\norm*{x}",
+    "expected": "\\norm*{x}"
+  },
+  {
+    "name": "preserve 7",
+    "source": "\\dv{x}(f(x))",
+    "expected": "\\dv{x}(f(x))"
+  },
+  {
+    "name": "preserve 8",
+    "source": "\\pdv{x}(f(x))",
+    "expected": "\\pdv{x}(f(x))"
+  },
+  {
+    "name": "preserve 9",
+    "source": "\\dv[2n]{f}{x}",
+    "expected": "\\dv[2n]{f}{x}"
+  },
+  {
+    "name": "preserve 10",
+    "source": "\\pdv[2,1]{f}{x}{y}",
+    "expected": "\\pdv[2,1]{f}{x}{y}"
+  },
+  {
+    "name": "preserve 11",
+    "source": "\\dv[0]{f}{x}",
+    "expected": "\\dv[0]{f}{x}"
+  },
+  {
+    "name": "preserve 12",
+    "source": "\\dv[-1]{f}{x}",
+    "expected": "\\dv[-1]{f}{x}"
+  },
+  {
+    "name": "preserve 13",
+    "source": "\\dv[100]{f}{x}",
+    "expected": "\\dv[100]{f}{x}"
+  },
+  {
+    "name": "preserve 14",
+    "source": "\\dv{f}{x+y}",
+    "expected": "\\dv{f}{x+y}"
+  },
+  {
+    "name": "preserve 15",
+    "source": "\\dv{f}{xy}",
+    "expected": "\\dv{f}{xy}"
+  },
+  {
+    "name": "preserve 16",
+    "source": "\\dv{f}{x^2}",
+    "expected": "\\dv{f}{x^2}"
+  },
+  {
+    "name": "preserve 17",
+    "source": "\\dv{f}{}",
+    "expected": "\\dv{f}{}"
+  },
+  {
+    "name": "preserve 18",
+    "source": "\\dv{}{x}",
+    "expected": "\\dv{}{x}"
+  },
+  {
+    "name": "preserve 19",
+    "source": "\\dv",
+    "expected": "\\dv"
+  },
+  {
+    "name": "preserve 20",
+    "source": "\\dv{x",
+    "expected": "\\dv{x"
+  },
+  {
+    "name": "preserve 21",
+    "source": "\\abs{x",
+    "expected": "\\abs{x"
+  },
+  {
+    "name": "preserve 22",
+    "source": "\\norm\\Big{x}",
+    "expected": "\\norm\\Big{x}"
+  },
+  {
+    "name": "preserve 23",
+    "source": "\\text{\\dv{f}{x}}",
+    "expected": "\\text{\\dv{f}{x}}"
+  },
+  {
+    "name": "preserve 24",
+    "source": "\\operatorname{\\norm{x}}",
+    "expected": "\\operatorname{\\norm{x}}"
+  },
+  {
+    "name": "preserve 25",
+    "source": "\\\\dv{f}{x}",
+    "expected": "\\\\dv{f}{x}"
+  },
+  {
+    "name": "preserve 26",
+    "source": "\\dvx{f}{x}",
+    "expected": "\\dvx{f}{x}"
+  },
+  {
+    "name": "preserve 27",
+    "source": "\\pdvalue{x}",
+    "expected": "\\pdvalue{x}"
+  },
+  {
+    "name": "preserve 28",
+    "source": "\\SI{2}{\\volt}",
+    "expected": "\\SI{2}{\\volt}"
+  },
+  {
+    "name": "preserve 29",
+    "source": "\\qty(\\frac{x}{y})",
+    "expected": "\\qty(\\frac{x}{y})"
+  },
+  {
+    "name": "opaque \\ce{X + \\abs{x} -> Y}",
+    "source": "\\ce{X + \\abs{x} -> Y}",
+    "expected": "\\ce{X + \\abs{x} -> Y}"
+  },
+  {
+    "name": "opaque \\ce {\\dv{f}{x} + X -> Y}",
+    "source": "\\ce {\\dv{f}{x} + X -> Y}",
+    "expected": "\\ce {\\dv{f}{x} + X -> Y}"
+  },
+  {
+    "name": "opaque \\texttt{\\norm{x}}",
+    "source": "\\texttt{\\norm{x}}",
+    "expected": "\\texttt{\\norm{x}}"
+  }
+]

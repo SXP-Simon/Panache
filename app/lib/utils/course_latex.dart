@@ -1,6 +1,9 @@
+import 'physics_latex.dart';
+
 // A deliberately small siunitx subset. Unrecognised options, units and numeric
 // uncertainties remain source, so a course formula cannot silently change units.
 String normalizeCourseLatex(String source) {
+  source = normalizePhysicsLatex(source);
   final out = StringBuffer();
   var cursor = 0;
   while (cursor < source.length) {
