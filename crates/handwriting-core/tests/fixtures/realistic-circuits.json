@@ -1,0 +1,26 @@
+[
+  {
+    "id": "two-node-dc",
+    "title": "双节点直流网络：电压源与电流源共同作用",
+    "components": {"V": 1, "I": 1, "R": 4},
+    "source": "\\begin{circuitikz}\n\\draw (0,0) to[V,l=$U_s$] (0,4) to[R,l=$R_1$] (4,4) node[above]{$A$} to[R,l=$R_3$] (8,4) node[above]{$B$};\n\\draw (4,4) to[R,l_=$R_2$,*-*] (4,0);\n\\draw (8,4) to[R,l_=$R_4$,*-*] (8,0);\n\\draw (11,0) to[I,l=$I_s$] (11,4) -- (8,4);\n\\draw (0,0) -- (11,0) node[ground]{};\n\\end{circuitikz}"
+  },
+  {
+    "id": "loaded-rc-ladder",
+    "title": "两级无源 RC 梯形网络：考虑级间负载",
+    "components": {"sV": 1, "R": 2, "C": 2},
+    "source": "\\begin{circuitikz}[american]\n\\draw (0,0) to[sV,l=$u_s$] (0,4) to[R,l=$R_1$] (4,4) node[above]{$U_1$} to[R,l=$R_2$] (8,4);\n\\draw (4,4) to[C,l_=$C_1$,*-*] (4,0);\n\\draw (8,4) to[C,l_=$C_2$,*-*] (8,0);\n\\draw (8,4) to[short,*-o] (10,4) node[above]{$u_o$};\n\\draw (0,0) -- (8,0) to[short,-o] (10,0);\n\\draw (4,0) node[ground]{};\n\\end{circuitikz}"
+  },
+  {
+    "id": "loaded-wheatstone",
+    "title": "非平衡电桥：中间支路有电流",
+    "components": {"V": 1, "R": 5},
+    "source": "\\begin{circuitikz}\n\\draw (-2,0) to[V,l=$U_s$] (-2,6) -- (0,6) to[R,l=$R_1$] (4,6) node[above]{$A$} to[R,l=$R_2$] (8,6) -- (8,0);\n\\draw (0,6) to[short,*-] (0,3) to[R,l_=$R_3$] (4,3) node[below]{$B$} to[R,l_=$R_4$] (8,3) node[circ]{};\n\\draw (4,6) to[R,l=$R_5$,*-*] (4,3);\n\\draw (-2,0) -- (8,0) node[ground]{};\n\\end{circuitikz}"
+  },
+  {
+    "id": "bridge-filter-load",
+    "title": "单相桥式整流与电容滤波负载",
+    "components": {"D": 4, "C": 1, "R": 1},
+    "source": "\\begin{circuitikz}\n\\draw (0,3) to[D,l=$D_1$] (3,6);\n\\draw (6,3) to[D,l_=$D_2$] (3,6);\n\\draw (3,0) to[D,l=$D_3$] (0,3);\n\\draw (3,0) to[D,l_=$D_4$] (6,3);\n\\draw (3,6) -- (11,6) to[R,l=$R_L$] (11,0) -- (3,0);\n\\draw (8,6) to[C,l_=$C$,*-*] (8,0);\n\\draw (0,3) node[ocirc]{} node[left]{$a$};\n\\draw (6,3) node[ocirc]{} node[right]{$b$};\n\\draw (11,6) to[short,*-o] (13,6) node[above]{$U_o$};\n\\draw (11,0) to[short,*-o] (13,0);\n\\end{circuitikz}"
+  }
+]
