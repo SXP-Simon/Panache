@@ -1,3 +1,5 @@
+import { normalizePhysicsLatex } from './physicsLatex.ts';
+
 // Only unambiguous siunitx number/unit syntax is accepted. Options, uncertain
 // values and custom unit definitions stay intact for the caller's safe fallback.
 const PREFIXES: Record<string, string> = {
@@ -224,6 +226,7 @@ function chemicalFormulaLatex(source: string): string | null {
 }
 
 export function normalizeCourseLatex(source: string): string {
+  source = normalizePhysicsLatex(source);
   const commands = /\\([a-zA-Z]+|[^a-zA-Z])/g;
   let result = '',
     cursor = 0;

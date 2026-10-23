@@ -13,7 +13,7 @@
     "format:check": "oxfmt --check src worker vite.config.ts tsconfig.json package.json index.html",
     "test:letter-format": "node tests/chineseLetterFormatter.test.cjs",
     "test:clean-markdown": "node tests/cleanMarkdown.test.cjs && node --test tests/markdownTableLatex.test.cjs",
-    "test:latex-unicode": "node tests/latexToUnicode.test.cjs",
+    "test:latex-unicode": "node tests/latexToUnicode.test.cjs && node --test tests/physicsLatex.test.cjs tests/physicsConversion.test.cjs",
     "test:inline-image": "node tests/inlineImageManager.test.cjs",
     "test:generation": "node --test tests/generation.test.cjs tests/releaseSummary.test.cjs tests/updatePrompt.test.cjs"
   },

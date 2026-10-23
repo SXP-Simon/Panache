@@ -1,3 +1,4 @@
+import { normalizePhysicsLatex } from './physicsLatex.ts';
 import katex from 'katex';
 import { scanMathSegments, sizedGroupEnd } from './mathSegments.ts';
 import { normalizeCourseLatex } from './courseLatex.ts';
@@ -774,11 +775,17 @@ function argumentEnd(text: string, start: number) {
 }
 
 // 正文中孤立的裸宏只消费自己的参数，不改周围空格、路径或标识符。
-function convertBareText(text: string) {
+function convertBareText(text: string): string {
   const lines = text.split('\n');
   return lines
     .map((line, lineIndex) => {
       if (!withinBudget(line)) return line;
+      // Inspect the entire physics macro before tokenisation: a third argument,
+      // starred macro or long form must not be truncated into a valid derivative.
+      if (/\\(?:dv|pdv|abs|norm)(?![A-Za-z])/.test(line)) {
+        const normalized = normalizePhysicsLatex(line);
+        return normalized === line ? line : convertBareText(normalized);
+      }
       if (isBareFormula(line.trim())) {
         const converted = tryConvertFormulaViaKatex(line.trim());
         if (converted !== null) {
