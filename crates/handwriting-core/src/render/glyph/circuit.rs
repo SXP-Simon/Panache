@@ -8,6 +8,7 @@ struct Drawing {
     thickness: i32,
     scale: f32,
     holes: Vec<Point>,
+    contacts: Vec<Point>,
 }
 impl Drawing {
     fn point(&self, p: Point) -> (i32, i32) {
@@ -36,7 +37,10 @@ impl Drawing {
             }
             let nx = -dy / dist;
             let ny = dx / dist;
-            let seed_raw = ((dist * 10.0).round() * 137.0 + (dx * 10.0).round() * 31.0 + (dy * 10.0).round() * 73.0).abs() as u32;
+            let seed_raw = ((dist * 10.0).round() * 137.0
+                + (dx * 10.0).round() * 31.0
+                + (dy * 10.0).round() * 73.0)
+                .abs() as u32;
             let phase1 = (seed_raw % 1000) as f32 / 1000.0 * 2.0 * PI;
             let phase2 = ((seed_raw / 1000) % 1000) as f32 / 1000.0 * 2.0 * PI;
             let dev = (dist * 0.015).min(max_dev);
@@ -47,7 +51,10 @@ impl Drawing {
             for i in 1..steps {
                 let t = i as f32 / steps as f32;
                 let envelope = (t * PI).sin();
-                let wobble = (0.75 * (t * 2.0 * PI + phase1).sin() + 0.25 * (t * 3.0 * PI + phase2).sin()) * envelope * dev;
+                let wobble = (0.75 * (t * 2.0 * PI + phase1).sin()
+                    + 0.25 * (t * 3.0 * PI + phase2).sin())
+                    * envelope
+                    * dev;
                 let x = (p1.0 as f32 + dx * t + nx * wobble).round() as i32;
                 let y = (p1.1 as f32 + dy * t + ny * wobble).round() as i32;
                 screen_points.push((x, y));
@@ -57,23 +64,50 @@ impl Drawing {
         self.paths.push((screen_points, self.thickness));
     }
     fn line(&mut self, a: Point, b: Point) {
-        self.path(vec![a, b]);
+        // 2026-10-23：长导线中间的 T 形分支同样固定，避免微扰把接点画离母线。
+        let dx = b.0 - a.0;
+        let dy = b.1 - a.1;
+        let length_squared = dx * dx + dy * dy;
+        let mut interior = Vec::new();
+        if length_squared > 0. {
+            for point in &self.contacts {
+                let px = point.0 - a.0;
+                let py = point.1 - a.1;
+                let t = (px * dx + py * dy) / length_squared;
+                let cross = px * dy - py * dx;
+                if t > 0. && t < 1. && cross.abs() <= length_squared.sqrt() * 0.00001 {
+                    interior.push((t, *point));
+                }
+            }
+        }
+        interior.sort_by(|a, b| a.0.total_cmp(&b.0));
+        interior.dedup_by(|a, b| a.1 == b.1);
+        let points = std::iter::once(a)
+            .chain(interior.into_iter().map(|(_, point)| point))
+            .chain(std::iter::once(b))
+            .collect();
+        self.path(points);
     }
     fn circle(&mut self, c: Point, r: f32) {
-        let (cx, cy) = self.point(c);
+        self.contact_circle(c, r, 0.);
+    }
+    fn contact_circle(&mut self, c: Point, r: f32, contact_angle: f32) {
+        // 2026-10-23：只在端子之间扰动，任意方向的引线端点都与圆周精确重合。
         let radius = (r * self.scale).round().max(1.0);
-        let seed = ((radius * 89.0).round() as u32) & 0xFFFFFFFF;
+        let seed = (radius * 89.0).round() as u32;
         let p1 = (seed % 1000) as f32 / 1000.0 * 2.0 * PI;
         let p2 = ((seed / 1000) % 1000) as f32 / 1000.0 * 2.0 * PI;
         let w_dev = (radius * 0.022).clamp(0.4, 1.2);
         let steps = 40;
         let mut screen_points = Vec::new();
         for i in 0..steps {
-            let ang = i as f32 * 2.0 * PI / steps as f32;
-            let dr = (0.7 * (ang * 2.0 + p1).sin() + 0.3 * (ang * 3.0 + p2).sin()) * w_dev;
-            let x = (cx as f32 + (radius + dr) * ang.cos()).round() as i32;
-            let y = (cy as f32 + (radius + dr) * ang.sin()).round() as i32;
-            screen_points.push((x, y));
+            let local = i as f32 * 2.0 * PI / steps as f32;
+            let ang = local + contact_angle;
+            let envelope = (local * 2.).sin().powi(2);
+            let dr =
+                (0.7 * (ang * 2.0 + p1).sin() + 0.3 * (ang * 3.0 + p2).sin()) * w_dev * envelope;
+            let rr = r + dr / self.scale;
+            screen_points.push(self.point(Point(c.0 + rr * ang.cos(), c.1 + rr * ang.sin())));
         }
         if let Some(&first) = screen_points.first() {
             screen_points.push(first);
@@ -183,6 +217,12 @@ impl Glyphs<'_> {
             thickness,
             scale,
             holes: Vec::new(),
+            contacts: circuit
+                .segments
+                .iter()
+                .flat_map(|s| [s.start, s.end])
+                .chain(circuit.decorations.iter().map(|d| d.point))
+                .collect(),
         };
         let mut labels: Vec<(String, Point, i32)> = Vec::new();
         for segment in &circuit.segments {
@@ -249,7 +289,7 @@ impl Glyphs<'_> {
                         let radius = 0.32f32.min(half);
                         draw.line(p(-half, 0.), p(-radius, 0.));
                         draw.line(p(radius, 0.), p(half, 0.));
-                        draw.circle(mid, radius);
+                        draw.contact_circle(mid, radius, uy.atan2(ux));
                         if kind == "I" {
                             draw.arrow(p(-radius * 0.55, 0.), p(radius * 0.55, 0.));
                         } else if kind == "V" {
@@ -416,6 +456,85 @@ impl Glyphs<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn drawing(scale: f32) -> Drawing {
+        Drawing {
+            paths: Vec::new(),
+            thickness: 1,
+            scale,
+            holes: Vec::new(),
+            contacts: Vec::new(),
+        }
+    }
+    #[test]
+    fn natural_source_circles_pin_exact_contacts_for_rotated_and_fractional_centers() {
+        for scale in [10., 24.5, 70., 122.5, 160.] {
+            for angle in [0., PI / 2., PI, -PI / 2., PI / 4., -PI / 3.] {
+                let mut draw = drawing(scale);
+                let c = Point(0.123, -0.247);
+                let r = 0.32;
+                draw.contact_circle(c, r, angle);
+                let points = &draw.paths[0].0;
+                for (index, sign) in [(0, 1.), (20, -1.)] {
+                    let expected = draw.point(Point(
+                        c.0 + sign * r * angle.cos(),
+                        c.1 + sign * r * angle.sin(),
+                    ));
+                    assert_eq!(points[index], expected, "scale={scale}, angle={angle}");
+                }
+                assert_eq!(points.first(), points.last());
+                // 至少保留非端子位置的自然笔画，不能为保证连接退化为规则圆形。
+                let ideal: Vec<_> = (0..40)
+                    .map(|i| {
+                        let a = angle + i as f32 * 2. * PI / 40.;
+                        draw.point(Point(c.0 + r * a.cos(), c.1 + r * a.sin()))
+                    })
+                    .collect();
+                if scale >= 70. {
+                    assert!(points[..40].iter().zip(ideal).any(|(a, b)| *a != b));
+                }
+            }
+        }
+    }
+    #[test]
+    fn natural_wires_keep_every_corner_and_both_endpoints() {
+        for scale in [10., 70., 160.] {
+            let mut draw = drawing(scale);
+            let world = vec![
+                Point(-2.3, 0.7),
+                Point(-2.3, 3.4),
+                Point(4.5, 3.4),
+                Point(4.5, -0.1),
+            ];
+            let pinned: Vec<_> = world.iter().map(|p| draw.point(*p)).collect();
+            draw.path(world);
+            let points = &draw.paths[0].0;
+            assert_eq!(points.first(), pinned.first());
+            assert_eq!(points.last(), pinned.last());
+            assert!(pinned.iter().all(|p| points.contains(p)));
+        }
+    }
+    #[test]
+    fn natural_wires_pin_interior_t_junctions_without_a_junction_dot() {
+        for scale in [10., 70., 160.] {
+            for (a, b, join) in [
+                (Point(0., 3.), Point(6., 3.), Point(3., 3.)),
+                (Point(6., 3.), Point(0., 3.), Point(3., 3.)),
+                (Point(0., 0.), Point(0., 6.), Point(0., 2.)),
+                (Point(-2., -2.), Point(4., 4.), Point(1., 1.)),
+            ] {
+                let mut draw = drawing(scale);
+                // 接近导线但不在其上的标签或另一个端点不能把母线拉歪。
+                draw.contacts = vec![join, Point(join.0 + 0.1, join.1 + 0.2), join];
+                draw.line(a, b);
+                let expected = draw.point(join);
+                assert!(draw.paths[0].0.contains(&expected));
+                assert_eq!(
+                    draw.paths[0].0.iter().filter(|p| **p == expected).count(),
+                    1
+                );
+            }
+        }
+    }
     fn glyph(kind: &str) -> Glyph {
         glyph_to(kind, "4,0")
     }
@@ -459,6 +578,66 @@ mod tests {
                 fingerprints.insert((g.mask.width(), g.mask.height(), g.mask.into_raw())),
                 "same component silhouette {kind}"
             );
+        }
+    }
+    #[test]
+    fn actual_source_ink_keeps_both_leads_connected_to_the_outline() {
+        for kind in ["V", "I", "sV"] {
+            for end in ["4,0", "-4,0", "0,4", "0,-4", "4,4", "-4,4", "4,-4"] {
+                let g = glyph_to(kind, end);
+                let mut mask = g.mask.clone();
+                let mut whole = (u32::MAX, u32::MAX, 0, 0);
+                for (x, y, p) in mask.enumerate_pixels() {
+                    if p[0] > 127 {
+                        whole = (
+                            whole.0.min(x),
+                            whole.1.min(y),
+                            whole.2.max(x),
+                            whole.3.max(y),
+                        );
+                    }
+                }
+                let mut connected_outline = false;
+                for y in 0..mask.height() {
+                    for x in 0..mask.width() {
+                        if mask[(x, y)][0] <= 127 {
+                            continue;
+                        }
+                        let mut stack = vec![(x, y)];
+                        let mut bounds = (x, y, x, y);
+                        mask[(x, y)][0] = 0;
+                        while let Some((x, y)) = stack.pop() {
+                            bounds = (
+                                bounds.0.min(x),
+                                bounds.1.min(y),
+                                bounds.2.max(x),
+                                bounds.3.max(y),
+                            );
+                            for dy in -1..=1 {
+                                for dx in -1..=1 {
+                                    let (xx, yy) = (x as i32 + dx, y as i32 + dy);
+                                    if xx >= 0
+                                        && yy >= 0
+                                        && xx < mask.width() as i32
+                                        && yy < mask.height() as i32
+                                    {
+                                        let pixel = &mut mask[(xx as u32, yy as u32)];
+                                        if pixel[0] > 127 {
+                                            pixel[0] = 0;
+                                            stack.push((xx as u32, yy as u32));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        connected_outline |= bounds == whole;
+                    }
+                }
+                assert!(
+                    connected_outline,
+                    "{kind} {end}: a source lead floats off its outline"
+                );
+            }
         }
     }
     #[test]
