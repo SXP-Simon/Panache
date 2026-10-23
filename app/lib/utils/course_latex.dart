@@ -14,12 +14,31 @@ String normalizeCourseLatex(String source) {
       out.write(source[cursor++]);
       continue;
     }
-    final name = command[1]!;
+    final rawName = command[1]!;
+    final name = rawName == 'qty'
+        ? 'SI'
+        : rawName == 'unit'
+        ? 'si'
+        : rawName;
     final end = cursor + command[0]!.length;
     final first = _argument(source, end);
-    if ({'text', 'textrm', 'textbf', 'textit', 'verb'}.contains(name) &&
+    if ({
+          'text',
+          'textrm',
+          'textbf',
+          'textit',
+          'texttt',
+          'verb',
+        }.contains(name) &&
         first != null) {
       out.write(source.substring(cursor, first.end));
+      cursor = first.end;
+      continue;
+    }
+    if (name == 'ce' && first != null) {
+      out.write(
+        _chemicalFormula(first.body) ?? source.substring(cursor, first.end),
+      );
       cursor = first.end;
       continue;
     }
@@ -196,4 +215,117 @@ String calligraphicCapitals(String value) {
             String.fromCharCode(0x1d49c + letter.codeUnitAt(0) - 65),
       )
       .join();
+}
+
+// A bounded mhchem subset. Bare counts remain subscripts; charge magnitude uses ^.
+String? _chemicalSpecies(String source) {
+  var value = source.trim(), suffix = '';
+  final gas = RegExp(r'\s+([v^])$').firstMatch(value);
+  if (gas != null) {
+    suffix = gas[1] == 'v' ? r'\downarrow' : r'\uparrow';
+    value = value.substring(0, gas.start).trim();
+  }
+  final state = RegExp(r'\((aq|s|l|g)\)$').firstMatch(value);
+  if (state != null) {
+    suffix = '\\mathrm{${state[0]}}$suffix';
+    value = value.substring(0, state.start);
+  }
+  var charge = '';
+  final ion = RegExp(r'(?:\^(?:\{(\d{0,3}[+-])\}|(\d{0,3}[+-]))|([+-]))$')
+      .firstMatch(value);
+  if (ion != null) {
+    charge = '^{${ion[1] ?? ion[2] ?? ion[3]}}';
+    value = value.substring(0, ion.start);
+  }
+  final coefficient = RegExp(r'^(\d+\/\d+|\d+(?:\.\d+)?)\s*').firstMatch(value);
+  var result = coefficient?[1] ?? '';
+  if (result.contains('/')) {
+    final parts = result.split('/');
+    if (int.parse(parts[1]) == 0) return null;
+    result = '\\frac{${parts[0]}}{${parts[1]}}\\,';
+  }
+  if (coefficient != null) value = value.substring(coefficient.end);
+  final stack = <String>[];
+  var atoms = 0, previous = false;
+  for (var cursor = 0; cursor < value.length;) {
+    final rest = value.substring(cursor);
+    final element = RegExp(r'^(?:[A-Z][a-z]?|e)').firstMatch(rest);
+    if (element != null) {
+      result += element[0]!;
+      atoms++;
+      previous = true;
+      cursor += element.end;
+      continue;
+    }
+    final count = RegExp(r'^\d+').firstMatch(rest);
+    if (count != null && previous) {
+      if (count[0]!.length > 3) return null;
+      result += '_{${count[0]}}';
+      previous = true;
+      cursor += count.end;
+      continue;
+    }
+    final char = value[cursor];
+    if (char == '(' || char == '[') {
+      if (stack.length >= 8) return null;
+      stack.add(char);
+      result += char;
+      previous = false;
+    } else if (char == ')' || char == ']') {
+      if (!previous ||
+          stack.isEmpty ||
+          stack.removeLast() != (char == ')' ? '(' : '[')) {
+        return null;
+      }
+      result += char;
+      previous = true;
+    } else {
+      return null;
+    }
+    cursor++;
+  }
+  if (atoms == 0 || stack.isNotEmpty) return null;
+  return '\\mathrm{$result$charge}$suffix';
+}
+
+String? _chemicalFormula(String source) {
+  if (source.length > 4096 || source.trim().isEmpty) return null;
+  const arrows = {
+    '->': r'\rightarrow',
+    '<-': r'\leftarrow',
+    '<->': r'\leftrightarrow',
+    '<=>': r'\rightleftharpoons',
+  };
+  final delimiter = RegExp(r'\s*(<=>|<->|->|<-)\s*|\s+(\+)\s+');
+  final parts = <String>[];
+  var cursor = 0;
+  final value = source.trim();
+  for (final match in delimiter.allMatches(value)) {
+    parts.add(value.substring(cursor, match.start));
+    parts.add(match[1] ?? match[2]!);
+    cursor = match.end;
+  }
+  parts.add(value.substring(cursor));
+  if (parts.length > 127) return null;
+  final result = <String>[];
+  for (var index = 0; index < parts.length; index++) {
+    final part = parts[index];
+    if (index.isOdd) {
+      final op = part == '+' ? '+' : arrows[part];
+      if (op == null) return null;
+      result.add(op);
+    } else {
+      final pieces = RegExp(r'^\d+\.\d+\s*[A-Z]').hasMatch(part)
+          ? [part]
+          : part.split(RegExp(r'\s*[*.·]\s*'));
+      final converted = <String>[];
+      for (final piece in pieces) {
+        final formula = _chemicalSpecies(piece);
+        if (formula == null) return null;
+        converted.add(formula);
+      }
+      result.add(converted.join(r'\cdot '));
+    }
+  }
+  return result.join(' ');
 }
