@@ -146,7 +146,44 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     ['chemical equilibrium with ion charge', String.raw`$\ce{CH3COOH <=> CH3COO- + H+}$`, 'CH₃COOH⇌CH₃COO⁻+H⁺'],
     ['alignat aligned multi-column equations', String.raw`$\begin{alignat*}{2}x&=1&\quad y&=2\\a&=3&\quad b&=4\end{alignat*}$`, 'x=1   y=2\na=3   b=4'],
   );
+  cases.push(
+    ['ammonium sulfate dissociation', String.raw`$\ce{(NH4)2SO4 -> 2NH4+ + SO4^2-}$`, '(NH₄)₂SO₄→2NH₄⁺+SO₄²⁻'],
+    ['ammonia synthesis equilibrium', String.raw`$\ce{N2 + 3H2 <=> 2NH3}$`, 'N₂+3H₂⇌2NH₃'],
+    ['silver chloride precipitation', String.raw`$\ce{Ag+ + Cl- -> AgCl v}$`, 'Ag⁺+Cl⁻→AgCl↓'],
+    ['siunitx v3 qty', String.raw`$R=\qty{4.7}{\kilo\ohm}$`, 'R=4.7 kΩ'],
+    ['siunitx v3 unit', String.raw`$\unit{\joule\per\mole\per\kelvin}$`, 'J/(mol K)'],
+    ['ammonium atom count is not charge magnitude', String.raw`$\ce{NH4+}$`, 'NH₄⁺'],
+    ['bare digits follow actual mhchem semantics', String.raw`$\ce{Fe3+}$`, 'Fe₃⁺'],
+    ['iron charge requires caret', String.raw`$\ce{Fe^3+}$`, 'Fe³⁺'],
+    ['sulfate count and charge', String.raw`$\ce{SO4^2-}$`, 'SO₄²⁻'],
+    ['braced charge', String.raw`$\ce{Fe^{3+}}$`, 'Fe³⁺'],
+    ['coordination complex', String.raw`$\ce{[Cu(NH3)4]^2+}$`, '[Cu(NH₃)₄]²⁺'],
+    ['electron in half reaction', String.raw`$\ce{Fe^3+ + e- -> Fe^2+}$`, 'Fe³⁺+e⁻→Fe²⁺'],
+    ['precipitation lab', String.raw`$\ce{Fe^{3+} + 3OH- -> Fe(OH)3 v}$`, 'Fe³⁺+3OH⁻→Fe(OH)₃↓'],
+    ['gas and aggregate states', String.raw`$\ce{CaCO3(s) -> CaO(s) + CO2 ^}$`, 'CaCO₃(s)→CaO(s)+CO₂↑'],
+    ['aqueous neutralisation', String.raw`$\ce{H+(aq) + OH-(aq) -> H2O(l)}$`, 'H⁺(aq)+OH⁻(aq)→H₂O(l)'],
+    ['hydrate asterisk', String.raw`$\ce{CuSO4*5H2O}$`, 'CuSO₄·5H₂O'],
+    ['hydrate period', String.raw`$\ce{CuSO4.5H2O}$`, 'CuSO₄·5H₂O'],
+    ['decimal coefficient remains coefficient', String.raw`$\ce{0.5 O2}$`, '0.5O₂'],
+    ['fractional coefficient remains legible', String.raw`$\ce{1/2 O2}$`, '½ O₂'],
+    ['left reaction arrow', String.raw`$\ce{H2O <- H+ + OH-}$`, 'H₂O←H⁺+OH⁻'],
+    ['reversible reaction is not equilibrium', String.raw`$\ce{A <-> B}$`, 'A↔B'],
+    ['bare chemistry formula', String.raw`离子 \ce{NH4+}。`, '离子 NH₄⁺。'],
+    ['alignat multi relation columns', String.raw`$\begin{alignat}{2}x+y&=3,&\qquad x-y&=1\\2x&=4,&x&=2\end{alignat}$`, 'x+y=3,   x-y=1\n2x=4,  x=2'],
+  );
   const preserved = [
+    String.raw`$\qty[round-mode=places]{1.23}{\volt}$`,
+    String.raw`$\unit{\unknown}$`,
+    String.raw`$\begin{alignat}{1}a&=b&c&=d\end{alignat}$`,
+    ...[
+      '^{14}_{6}C', 'Fe^{II}', 'C6H5-CHO', 'A=B', 'A#B',
+      String.raw`H2 ->[\Delta] H`, String.raw`A <=>[H2O][OH-] B`,
+      String.raw`\unknown{formula}`, String.raw`\SI{2}{\volt}`,
+      'H2 +', '+ H2', 'H2 ->', '-> H2', 'H2 + + O2', 'H2 + O2 -> ',
+      'Mg(OH2', 'Mg()2', 'H9999', 'H2 + cat -> H2', 'H2 + O2? -> H2O',
+      'H2 <--> H2', 'H2 <=>> H2', 'H2/CO2', 'n H2O', 'NO_x',
+    ].map((body) => '$' + String.raw`\ce{` + body + '}$'),
+
     String.raw`$\SI[round-mode=places]{1.234}{\volt}$`,
     String.raw`$\SI{1.2(3)}{\volt}$`, String.raw`$\SI{5}{\customunit}$`,
     String.raw`$\si{\milli\kilo\ohm}$`, String.raw`$\si{\per\per\second}$`,
@@ -199,6 +236,11 @@ x·y=0×1+1×0=0 ⇒ cos(x,y)=0`],
     console.log(`PASS: ${name}`);
   }
   const { normalizeCourseLatex } = await import('../src/utils/courseLatex.ts');
+  for (const source of [String.raw`\text{Use \ce{NH4+} here}`, String.raw`\\ce{NH4+}`, String.raw`\ce{H2 ->[\SI{2}{\volt}] H2}`]) {
+    assert.equal(normalizeCourseLatex(source), source, 'unknown chemistry and literal contexts stay opaque');
+  }
+  const hugeChemistry = String.raw`\ce{` + 'H2O'.repeat(1500) + '}';
+  assert.equal(normalizeCourseLatex(hugeChemistry), hugeChemistry, 'chemistry source budget preserves input');
   for (const source of [String.raw`\\SI{5}{\volt}`, String.raw`\text{Use \SI{5}{\volt} here}`, String.raw`\SI[round-mode=places]{1.2}{\volt}`]) {
     assert.equal(normalizeCourseLatex(source), source, 'literal command contexts are not unit conversions');
   }

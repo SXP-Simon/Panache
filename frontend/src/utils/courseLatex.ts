@@ -124,24 +124,103 @@ function groupAt(source: string, offset: number): { body: string; end: number } 
   return null;
 }
 
-function chemicalFormulaLatex(source: string): string | null {
-  // Convert standard mhchem \ce{...} formula into standard math LaTeX with correct sub/superscripts
-  // Example: 'H2O' -> '\mathrm{H_2O}', 'Fe^{3+} + 3OH^- -> Fe(OH)3 v'
-  let s = source.trim();
-  if (!s) return null;
-  // Handle reaction arrows and states
-  s = s.replace(/<->|<=>/g, ' \\rightleftharpoons ');
-  s = s.replace(/->/g, ' \\rightarrow ');
-  s = s.replace(/\s+v(?=\s|$)/g, '\\downarrow');
-  s = s.replace(/\s+\^(?=\s|$)/g, '\\uparrow');
-  // Handle ion charges like ^2+, ^-, ^+, or bare trailing - and +: e.g. H+, CH3COO-, Fe3+
-  s = s.replace(/\^([0-9]*[+-])/g, '^{$1}');
-  s = s.replace(/([A-Za-z)\]])(\d*[+-])(?=\s|$)/g, '$1^{$2}');
-  // Subscript numbers immediately following an element or parenthesis: e.g. H2 -> H_2, (OH)3 -> (OH)_3
-  s = s.replace(/([A-Za-z)])(\d+)/g, '$1_{$2}');
-  // Wrap non-math symbols in \mathrm for clean upright chemical representation
+// A bounded mhchem subset: unfamiliar syntax is preserved as a whole formula.
+// Counts and charges are separate: NH4+ is NH₄⁺, Fe^3+ is Fe³⁺.
+function chemicalSpecies(source: string): string | null {
+  let value = source.trim(),
+    suffix = '';
+  const gas = /\s+([v^])$/.exec(value);
+  if (gas) {
+    suffix = gas[1] === 'v' ? '\\downarrow' : '\\uparrow';
+    value = value.slice(0, gas.index).trim();
+  }
+  const state = /\((aq|s|l|g)\)$/.exec(value);
+  if (state) {
+    suffix = `\\mathrm{${state[0]}}${suffix}`;
+    value = value.slice(0, state.index);
+  }
+  let charge = '';
+  const ion = /(?:\^(?:\{(\d{0,3}[+-])\}|(\d{0,3}[+-]))|([+-]))$/.exec(value);
+  if (ion) {
+    charge = `^{${ion[1] ?? ion[2] ?? ion[3]}}`;
+    value = value.slice(0, ion.index);
+  }
+  const coefficient = /^(\d+\/\d+|\d+(?:\.\d+)?)\s*/.exec(value);
+  let result = coefficient?.[1] ?? '';
+  if (result.includes('/')) {
+    const [top, bottom] = result.split('/');
+    if (Number(bottom) === 0) return null;
+    result = `\\frac{${top}}{${bottom}}\\,`;
+  }
+  if (coefficient) value = value.slice(coefficient[0].length);
+  const stack: string[] = [];
+  let atoms = 0,
+    previous = false;
+  for (let cursor = 0; cursor < value.length;) {
+    const rest = value.slice(cursor);
+    const element = /^(?:[A-Z][a-z]?|e)/.exec(rest);
+    if (element) {
+      result += element[0];
+      atoms++;
+      previous = true;
+      cursor += element[0].length;
+      continue;
+    }
+    const count = /^\d+/.exec(rest);
+    if (count && previous) {
+      if (count[0].length > 3) return null;
+      result += `_{${count[0]}}`;
+      previous = true;
+      cursor += count[0].length;
+      continue;
+    }
+    const char = value[cursor] ?? '';
+    if (char === '(' || char === '[') {
+      if (stack.length >= 8) return null;
+      stack.push(char);
+      result += char;
+      previous = false;
+    } else if (char === ')' || char === ']') {
+      if (!previous || stack.pop() !== (char === ')' ? '(' : '[')) return null;
+      result += char;
+      previous = true;
+    } else return null;
+    cursor++;
+  }
+  if (!atoms || stack.length) return null;
+  return `\\mathrm{${result}${charge}}${suffix}`;
+}
 
-  return `\\mathrm{${s}}`;
+function chemicalFormulaLatex(source: string): string | null {
+  if (source.length > 4096 || !source.trim()) return null;
+  const arrows: Record<string, string> = {
+    '->': '\\rightarrow',
+    '<-': '\\leftarrow',
+    '<->': '\\leftrightarrow',
+    '<=>': '\\rightleftharpoons',
+  };
+  const parts = source
+    .trim()
+    .split(/\s*(<=>|<->|->|<-)\s*|\s+(\+)\s+/)
+    .filter((part) => part !== undefined && part !== '');
+  if (parts.length > 127 || parts.length % 2 !== 1) return null;
+  const result: string[] = [];
+  for (let index = 0; index < parts.length; index++) {
+    const part = parts[index] ?? '';
+    if (index % 2 === 1) {
+      const op = part === '+' ? '+' : arrows[part];
+      if (!op) return null;
+      result.push(op);
+    } else {
+      const hydrate = part.split(/\s*[*.·]\s*/);
+      // A decimal stoichiometric coefficient is not a hydrate separator.
+      const pieces = /^\d+\.\d+\s*[A-Z]/.test(part) ? [part] : hydrate;
+      const converted = pieces.map(chemicalSpecies);
+      if (converted.some((piece) => piece === null)) return null;
+      result.push(converted.join('\\cdot '));
+    }
+  }
+  return result.join(' ');
 }
 
 export function normalizeCourseLatex(source: string): string {
@@ -149,7 +228,8 @@ export function normalizeCourseLatex(source: string): string {
   let result = '',
     cursor = 0;
   for (let match = commands.exec(source); match; match = commands.exec(source)) {
-    const name = match[1] ?? '';
+    const rawName = match[1] ?? '';
+    const name = rawName === 'qty' ? 'SI' : rawName === 'unit' ? 'si' : rawName;
     // Text mentions and escaped slashes do not invoke mathematical macros.
     if (['text', 'textrm', 'textbf', 'textit', 'texttt'].includes(name)) {
       const text = groupAt(source, commands.lastIndex);
@@ -160,12 +240,11 @@ export function normalizeCourseLatex(source: string): string {
       const group = groupAt(source, commands.lastIndex);
       if (group) {
         const chem = chemicalFormulaLatex(group.body);
-        if (chem !== null) {
-          result += source.slice(cursor, match.index) + chem;
-          cursor = group.end;
-          commands.lastIndex = group.end;
-          continue;
-        }
+        result +=
+          source.slice(cursor, match.index) + (chem ?? source.slice(match.index, group.end));
+        cursor = group.end;
+        commands.lastIndex = group.end;
+        continue;
       }
     }
     if (!['SI', 'si', 'num'].includes(name)) continue;

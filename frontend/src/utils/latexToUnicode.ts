@@ -811,9 +811,11 @@ function convertBareText(text: string) {
             cursor = end;
             continue;
           }
-          const arity = /^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset|SI)$/.test(name)
+          const arity = /^(?:frac|dfrac|tfrac|binom|dbinom|tbinom|overset|underset|SI|qty)$/.test(
+            name,
+          )
             ? 2
-            : /^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|overrightarrow|overleftarrow|tilde|widetilde|dot|ddot|underbrace|overbrace|xrightarrow|xleftarrow|xleftrightarrow|xRightarrow|xLeftarrow|xLeftrightarrow|xmapsto|xrightleftharpoons|xleftrightharpoons|pmod|si|num)$/.test(
+            : /^(?:sqrt|boxed|fbox|text|mathrm|mathbb|mathcal|mathfrak|mathbf|mathit|mathsf|mathtt|operatorname|bar|overline|underline|hat|widehat|vec|overrightarrow|overleftarrow|tilde|widetilde|dot|ddot|underbrace|overbrace|xrightarrow|xleftarrow|xleftrightarrow|xRightarrow|xLeftarrow|xLeftrightarrow|xmapsto|xrightleftharpoons|xleftrightharpoons|pmod|ce|si|unit|num)$/.test(
                   name,
                 )
               ? 1
