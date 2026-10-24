@@ -12,6 +12,12 @@ import 'workspace_storage.dart';
 import 'uploaded_font_storage.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
 
+class _GenerationOperation {
+  final submitted = Completer<String?>();
+  bool cancelled = false;
+  Future<void>? stopping;
+}
+
 class Workspace extends ChangeNotifier {
   Workspace({
     HandwritingApi? api,
@@ -63,6 +69,8 @@ class Workspace extends ChangeNotifier {
   Future<void> _writes = Future<void>.value();
   int _generation = 0, _connection = 0, _editRevision = 0;
   bool _initializing = false;
+  _GenerationOperation? _operation;
+  bool get stopping => _operation?.stopping != null;
   Timer? saveTimer;
   int? legacyFontIndex;
 
@@ -162,6 +170,7 @@ class Workspace extends ChangeNotifier {
         final info = await activeApi.getJson('/api/version');
         if (disposed || connection != _connection) return;
         version = '${info['version'] ?? ''}';
+        activeApi.configureCapabilities(info);
       } catch (_) {
         if (disposed || connection != _connection) return;
         version = '';
@@ -272,16 +281,23 @@ class Workspace extends ChangeNotifier {
       return false;
     }
     final generation = ++_generation;
-    bool current() => !disposed && generation == _generation;
+    final operation = _GenerationOperation();
+    _operation = operation;
+    bool current() =>
+        !disposed && generation == _generation && !operation.cancelled;
     var succeeded = false;
     busy = true;
     taskId = '';
     error = '';
     progress = 0;
     phase = 'pending';
-    exportBytes = null;
     emit();
     final activeApi = api;
+    final requestedId = activeApi.createTaskId();
+    if (requestedId != null) {
+      taskId = requestedId;
+      operation.submitted.complete(requestedId);
+    }
     try {
       final fields = settings.form(
         expandImages(text, images),
@@ -295,11 +311,11 @@ class Workspace extends ChangeNotifier {
       final submittedId = await activeApi.submit(fields, {
         'font_file': ?fontFile,
         'background_image': ?background,
-      });
-      if (!current()) {
-        if (activeApi.supportsCancel) await activeApi.cancelTask(submittedId);
-        return false;
+      }, taskId: requestedId);
+      if (!operation.submitted.isCompleted) {
+        operation.submitted.complete(submittedId);
       }
+      if (!current()) return false;
       taskId = submittedId;
       await persist();
       if (!current()) return false;
@@ -347,31 +363,59 @@ class Workspace extends ChangeNotifier {
       if (!current()) return false;
       error = '$e';
     } finally {
+      if (!operation.submitted.isCompleted) operation.submitted.complete(null);
+      if (!succeeded &&
+          current() &&
+          taskId.isNotEmpty &&
+          activeApi.supportsCancel &&
+          !['completed', 'failed', 'error', 'cancelled'].contains(phase)) {
+        final failure = error;
+        await cancel();
+        if (!disposed && !busy) {
+          error = failure;
+          emit();
+        }
+      }
       if (current()) {
         busy = false;
+        _operation = null;
         emit();
       }
     }
     return current() && succeeded;
   }
 
-  Future<void> cancel() async {
-    if (!busy || !api.supportsCancel || disposed) return;
+  Future<void> cancel() {
+    final operation = _operation;
+    if (!busy || !api.supportsCancel || disposed || operation == null) {
+      return Future.value();
+    }
+    if (operation.stopping != null) return operation.stopping!;
     final activeApi = api;
-    final activeId = taskId;
-    final cancellation = ++_generation;
-    busy = false;
-    phase = 'cancelled';
-    emit();
-    if (activeId.isNotEmpty) {
+    operation.cancelled = true;
+    phase = 'cancelling';
+    error = '';
+    final stopped = () async {
       try {
-        await activeApi.cancelTask(activeId);
+        final id = await operation.submitted.future;
+        if (id != null) await activeApi.cancelTask(id);
+        if (disposed || !identical(operation, _operation)) return;
+        ++_generation;
+        busy = false;
+        phase = 'cancelled';
+        _operation = null;
       } catch (e) {
-        if (disposed || cancellation != _generation) return;
+        if (disposed || !identical(operation, _operation)) return;
+        // Keep the slot locked until termination is confirmed; retry is safe.
         error = '$e';
+      } finally {
+        operation.stopping = null;
         emit();
       }
-    }
+    }();
+    operation.stopping = stopped;
+    emit();
+    return stopped;
   }
 
   void emit() {
@@ -385,7 +429,23 @@ class Workspace extends ChangeNotifier {
     saveTimer?.cancel();
     unawaited(persist());
     disposed = true;
-    api.close();
+    final operation = _operation;
+    final activeApi = api;
+    if (operation != null && activeApi.supportsCancel) {
+      operation.cancelled = true;
+      unawaited(() async {
+        try {
+          final id = await operation.submitted.future;
+          if (id != null) await activeApi.cancelTask(id);
+        } catch (_) {
+          // Closing cannot update an already disposed screen.
+        } finally {
+          activeApi.close();
+        }
+      }());
+    } else {
+      activeApi.close();
+    }
     pages = [];
     images = {};
     fontFile = null;

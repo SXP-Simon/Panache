@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,106 @@ import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 
 void main() {
+  test(
+    'known request ID cancels lost submission response and ignores late result',
+    () async {
+      final firstResponse = Completer<http.Response>();
+      final submitted = <String>[];
+      final cancelled = <String>[];
+      final api = HandwritingApi(
+        'http://localhost:5006',
+        client: MockClient((request) async {
+          if (request.url.path == '/api/generate_handwriting') {
+            final id =
+                request.headers['X-Panache-Task-Id'] ??
+                request.headers['x-panache-task-id'];
+            expect(
+              id,
+              matches(
+                RegExp(
+                  r'^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$',
+                ),
+              ),
+            );
+            submitted.add(id!);
+            if (submitted.length == 1) return firstResponse.future;
+            return http.Response(jsonEncode({'task_id': id}), 200);
+          }
+          final id = request.url.pathSegments[3];
+          if (request.url.path.endsWith('/cancel')) {
+            cancelled.add(id);
+            return http.Response('{"task_status":"cancelled"}', 200);
+          }
+          if (request.url.path.endsWith('/result')) {
+            return http.Response.bytes([2], 200);
+          }
+          return http.Response(
+            jsonEncode({
+              'task_status': cancelled.contains(id) ? 'cancelled' : 'completed',
+            }),
+            200,
+          );
+        }),
+      );
+      api.configureCapabilities({
+        'capabilities': {'task_cancellation': true, 'task_submission_id': true},
+      });
+      final w = Workspace(api: api)..text = 'draft';
+      w.settings.font = 'test.ttf';
+      final old = w.generate();
+      await Future<void>.delayed(Duration.zero);
+      expect(submitted, hasLength(1));
+      await w.cancel();
+      expect(cancelled, [submitted.first]);
+      expect(w.busy, isFalse);
+      expect(await w.generate(), isTrue);
+      expect(submitted.toSet(), hasLength(2));
+      firstResponse.completeError(TimeoutException('response lost'));
+      expect(await old, isFalse);
+      expect(w.pages.single, [2]);
+      expect(w.error, isEmpty);
+      w.dispose();
+    },
+  );
+
+  test(
+    'HTTP cancellation requires capability and waits for actual terminal state',
+    () async {
+      var polls = 0;
+      var posted = false;
+      final api = HandwritingApi(
+        'http://localhost:5006',
+        accessToken: 'token',
+        client: MockClient((request) async {
+          expect(request.headers['authorization'], 'Bearer token');
+          if (request.url.path.endsWith('/cancel')) {
+            expect(request.method, 'POST');
+            posted = true;
+            return http.Response('{"task_status":"cancelling"}', 200);
+          }
+          polls++;
+          return http.Response(
+            jsonEncode({'task_status': polls < 3 ? 'cancelling' : 'cancelled'}),
+            200,
+          );
+        }),
+      );
+      expect(api.supportsCancel, isFalse);
+      api.configureCapabilities({'version': 'old-python'});
+      expect(api.supportsCancel, isFalse);
+      await expectLater(api.cancelTask('task'), throwsUnsupportedError);
+      expect(posted, isFalse);
+      api.configureCapabilities({
+        'capabilities': {'task_cancellation': true},
+      });
+      expect(api.supportsCancel, isTrue);
+      await api.cancelTask('task');
+      expect(posted, isTrue);
+      expect(polls, 3);
+      api.close();
+    },
+  );
+
   test('multipart 提交、任务查询、多页预览与插图展开兼容 Python API', () async {
     final client = MockClient((request) async {
       if (request.url.path == '/api/generate_handwriting') {

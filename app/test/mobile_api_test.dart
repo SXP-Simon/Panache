@@ -33,6 +33,22 @@ void main() {
       expect(await Directory('${root.path}/uploads').list().length, 0);
       await expectLater(api.call('unknown'), throwsA(isA<ApiException>()));
       await expectLater(api.status('missing'), throwsA(isA<ApiException>()));
+      for (var attempt = 0; attempt < 2; attempt++) {
+        final cancelled = await api.submit({
+          'text': '停止后重新生成'.padRight(20000, '字'),
+          'width': '1600',
+          'height': '2200',
+          'font_size': '70',
+          'line_spacing': '120',
+        }, {});
+        await api.cancelTask(cancelled);
+        expect((await api.status(cancelled))['task_status'], 'cancelled');
+        expect(
+          await Directory('${root.path}/tasks/$cancelled').exists(),
+          false,
+        );
+        await expectLater(api.preview(cancelled), throwsA(isA<ApiException>()));
+      }
       final id = await api.submit({
         'text': '离线生成',
         'width': '420',

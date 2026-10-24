@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/main.dart';
@@ -13,8 +15,8 @@ void main() {
     final api = CancelApi();
     final w = Workspace(api: api)..fonts = ['test.ttf'];
     w.settings.font = 'test.ttf';
-    w.busy = true;
-    w.taskId = 'active';
+    w.text = 'draft';
+    unawaited(w.generate());
     addTearDown(w.dispose);
     await tester.pumpWidget(HandwritingApp(workspace: w));
     await tester.pump();
@@ -80,10 +82,20 @@ void main() {
 class CancelApi extends HandwritingApi {
   CancelApi() : super('local://handwriting');
   String? cancelled;
+  final terminal = Completer<Map<String, dynamic>>();
+  @override
+  Future<String> submit(
+    Map<String, String> fields,
+    Map<String, Upload> files, {
+    String? taskId,
+  }) async => 'active';
+  @override
+  Future<Map<String, dynamic>> status(String id) => terminal.future;
   @override
   bool get supportsCancel => true;
   @override
   Future<void> cancelTask(String id) async {
     cancelled = id;
+    if (!terminal.isCompleted) terminal.complete({'task_status': 'cancelled'});
   }
 }

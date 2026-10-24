@@ -76,13 +76,14 @@ class WorkbenchLayout extends StatelessWidget {
                     key: const ValueKey('cancel-generation'),
                     onPressed: onCancel,
                     icon: const Icon(Icons.cancel_outlined),
-                    label: Text(l.cancel),
+                    label: Text(l.stopGeneration),
                   ),
                 Text(
                   generating
                       ? '${switch (phase) {
                           'pending' => l.pending,
                           'completed' => l.completed,
+                          'cancelling' => l.stoppingTask,
                           _ => l.processing,
                         }} · $progress%'
                       : l.processing,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
@@ -8,10 +10,24 @@ import 'package:handwriting_app/services/workspace.dart';
 class MobileTestApi extends HandwritingApi {
   MobileTestApi() : super('local://test-engine');
   String? cancelled;
+  final terminal = Completer<Map<String, dynamic>>();
+  Completer<void>? stoppingGate;
+  @override
+  Future<String> submit(
+    Map<String, String> fields,
+    Map<String, Upload> files, {
+    String? taskId,
+  }) async => 'mobile-task';
+  @override
+  Future<Map<String, dynamic>> status(String id) => terminal.future;
   @override
   bool get supportsCancel => true;
   @override
-  Future<void> cancelTask(String id) async => cancelled = id;
+  Future<void> cancelTask(String id) async {
+    cancelled = id;
+    await stoppingGate?.future;
+    if (!terminal.isCompleted) terminal.complete({'task_status': 'cancelled'});
+  }
 }
 
 void main() {
@@ -31,10 +47,9 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     final workspace = Workspace(api: MobileTestApi())
       ..fonts = ['test.ttf']
-      ..busy = generating
-      ..taskId = generating ? 'mobile-task' : ''
-      ..phase = generating ? 'pending' : '';
+      ..text = generating ? 'draft' : '';
     workspace.settings.font = 'test.ttf';
+    if (generating) unawaited(workspace.generate());
     addTearDown(workspace.dispose);
     await tester.pumpWidget(
       HandwritingApp(locale: locale, workspace: workspace),
@@ -315,7 +330,14 @@ void main() {
     final cancel = find.byKey(const ValueKey('cancel-generation'));
     expect(cancel, findsOneWidget);
     expect(find.byKey(const ValueKey('text-editor')), findsOneWidget);
+    final api = workspace.api as MobileTestApi;
+    api.stoppingGate = Completer<void>();
     await tester.tap(cancel);
+    await tester.pump();
+    expect(workspace.busy, isTrue);
+    expect(find.textContaining(labels(tester).stoppingTask), findsOneWidget);
+    expect(find.byKey(const ValueKey('cancel-generation')), findsNothing);
+    api.stoppingGate!.complete();
     await tester.pumpAndSettle();
     expect((workspace.api as MobileTestApi).cancelled, 'mobile-task');
     expect(workspace.busy, isFalse);

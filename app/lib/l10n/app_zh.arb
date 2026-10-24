@@ -57,6 +57,8 @@
   "retry": "重试",
   "sameOrigin": "Web 默认连接同源 /api；开发时可连接独立 Rust 服务。桌面和移动端使用随包内置的 Rust 引擎。",
   "save": "保存",
+  "stopGeneration": "停止生成",
+  "stoppingTask": "正在停止",
   "cancel": "取消",
   "close": "关闭",
   "apply": "应用",
