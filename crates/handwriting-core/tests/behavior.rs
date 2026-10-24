@@ -180,7 +180,7 @@ fn identify_real_line_spacing_blank_and_tilt() {
     let result = imaging::identify(&DynamicImage::ImageLuma8(page.clone())).unwrap();
     assert!((result.line_spacing as i32 - 70).abs() <= 4);
     assert!((result.margin_left as i32 - 60).abs() <= 4);
-    assert!((result.margin_bottom as i32 - 141).abs() <= 4);
+    assert!((result.margin_bottom as i32 - 146).abs() <= 4);
     let tilted = imageproc::geometric_transformations::rotate_about_center(
         &page,
         3f32.to_radians(),

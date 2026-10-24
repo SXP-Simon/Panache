@@ -1185,6 +1185,31 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK, "{data}");
         assert_eq!(data["lineSpacing"], 40);
+        let tilted = image::RgbaImage::from_fn(400, 500, |x, y| {
+            let line = (50..420)
+                .step_by(60)
+                .any(|row| y >= row + x / 20 && y < row + x / 20 + 4);
+            let shade = if line && (30..370).contains(&x) {
+                220
+            } else {
+                245
+            };
+            image::Rgba([shade, shade, shade, 255])
+        });
+        let bytes = export::png(&tilted).unwrap();
+        let expected = imaging::identify(&image::DynamicImage::ImageRgba8(tilted)).unwrap();
+        let (status, data) = send(
+            &s,
+            "/api/imagefileprocess",
+            &[],
+            Some(("file", "tilted.png", &bytes)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let wire_expected: serde_json::Value =
+            serde_json::from_slice(&serde_json::to_vec(&expected).unwrap()).unwrap();
+        assert_eq!(data, wire_expected);
+        assert!(data["correctedBackground"].as_str().unwrap().len() > 100);
         image.fill(255);
         let bytes = export::png(&image).unwrap();
         let (status, data) = send(
