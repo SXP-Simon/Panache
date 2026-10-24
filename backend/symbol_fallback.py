@@ -1282,6 +1282,7 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
         stem_width = max(10, round(size * 0.46))
         pen = font_pen(font, size)
         offset = 0
+        index_right = None
         children: list[BoxChild] = []
         if index:
             # 根指数先还原普通字符再缩小，不能对上标字形重复缩放。
@@ -1291,18 +1292,13 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
             index_bottom = top + round(height * 0.34)
             children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
             offset = max(0, idx.bbox[2] - idx.bbox[0] - round(size * 0.16))
+            index_right = idx.bbox[2] - idx.bbox[0]
         body_x = offset + stem_width + max(1, round(size * 0.04)) - body.bbox[0]
         children.append((body, body_x, 0))
         right = body_x + body.bbox[2] + gap
-        # 一条连贯笔画从根钩到封顶横线，随被开方式真实高度伸展。
-        points = (
-            (offset + 1, top + round(height * 0.63)),
-            (offset + round(stem_width * 0.20), top + round(height * 0.55)),
-            (offset + round(stem_width * 0.43), bottom - 1),
-            (offset + stem_width - 2, top),
-            (right, top),
-        )
-        return _compose_box(right + gap, children, (pen.path(points),))
+        # 2026-10-24：根钩复用主字体轮廓；文字、指数及封顶宽度仍由原盒模型定位。
+        path = pen.radical_path((offset, top, stem_width, height), right, index_right=index_right)
+        return _compose_box(right + gap, children, (path,))
     if char in SYMBOLS:
         advance, paths = symbol_paths(char, font_pen(font, size), _math_axis(font, font_path))
         drawn = _compose_box(advance, paths=paths)

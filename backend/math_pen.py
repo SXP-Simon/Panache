@@ -18,10 +18,14 @@ from PIL import ImageFont
 type Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 type Points = tuple[tuple[int, int], ...]
 type PenPath = tuple[Points, int]
+type RootProfile = tuple[tuple[float, float], ...]
 
 SYMBOLS = frozenset("¬→←↔⇒⇐⇔≤≥≠")
 _NATURALNESS: ContextVar[float] = ContextVar("math_pen_naturalness", default=0)
 _INK_THRESHOLD = 127
+_ROOT_SAMPLE_SIZE = 96
+_MIN_ROOT_COLUMNS = 8
+_VALLEY_X_RANGE = (0.15, 0.8)
 
 
 class _Mask(Protocol):
@@ -43,6 +47,7 @@ class Pen:
     size: int
     width: int
     slant: float
+    root_profile: RootProfile = ()
 
     @property
     def naturalness(self) -> float:
@@ -66,6 +71,37 @@ class Pen:
                 if not result or result[-1] != point:
                     result.append(point)
         return tuple(result), self.width
+
+    def radical_path(
+        self, hook: tuple[int, int, int, int], right: int, index_right: int | None = None
+    ) -> PenPath:
+        """2026-10-24：仅适配主字体根钩轮廓，封顶端点和被开方数布局保持固定."""
+        offset, top, stem_width, height = hook
+        if self.root_profile:
+            points = tuple(
+                (
+                    offset + 1 + round(x * (stem_width - 3)),
+                    top + round(y * (height - 1)),
+                )
+                for x, y in self.root_profile
+            )
+        else:
+            points = (
+                (offset + 1, top + round(height * 0.63)),
+                (offset + round(stem_width * 0.20), top + round(height * 0.55)),
+                (offset + round(stem_width * 0.43), top + height - 1),
+                (offset + stem_width - 2, top),
+            )
+        if index_right is not None:
+            # 2026-10-24：起笔较高的勾形根号仍须避开既有根指数，不移动指数本身。
+            clearance = self.width + max(2, round(self.size * 0.04))
+            floor = top + round(height * 0.34) + clearance
+            points = tuple(
+                (x, max(y, floor) if x <= index_right + clearance else y) for x, y in points
+            )
+        # 2026-10-24：最后一段始终从原封顶起点接出，不将原生字形横向拉长。
+        points = (*points[:-1], (offset + stem_width - 2, top), (right, top))
+        return self.path(points)
 
 
 _PEN_CACHE: WeakKeyDictionary[Font, dict[int, Pen]] = WeakKeyDictionary()
@@ -112,7 +148,60 @@ def _sample_font_pen(font: Font, size: int) -> Pen:
         ]
         if upper and lower:
             slant = max(-0.18, min(0.18, (median(upper) - median(lower)) / max(1, bottom - top)))
-    return Pen(size, width, slant)
+    return Pen(size, width, slant, _sample_root_profile(font))
+
+
+def _sample_root_profile(font: Font) -> RootProfile:
+    """2026-10-24：从原生根号列中心采样起笔、谷底和上升臂，空白/占位框安全回退."""
+    if not isinstance(font, ImageFont.FreeTypeFont):
+        return ()
+    try:
+        # 2026-10-24：固定小画布采样，避免小字号失真或超大字号产生二次方开销。
+        native = font.font_variant(size=_ROOT_SAMPLE_SIZE)
+        mask = cast("_MaskFont", native).getmask("√")
+        return _root_profile_from_mask(mask)
+    except (OSError, ValueError, UnicodeError):
+        return ()
+
+
+def _root_profile_from_mask(mask: _Mask) -> RootProfile:
+    """2026-10-24：提取列中心与最低转折，拒绝占位框和缺少上升臂的异常字形."""
+    bounds = mask.getbbox()
+    if bounds is None:
+        return ()
+    width, _ = mask.size
+    columns = [
+        [y for y in range(bounds[1], bounds[3]) if mask[y * width + x] > _INK_THRESHOLD]
+        for x in range(bounds[0], bounds[2])
+    ]
+    centers = [(x, float(median(ys))) for x, ys in enumerate(columns) if ys]
+    if len(centers) < _MIN_ROOT_COLUMNS:
+        return ()
+    ys = [y for _, y in centers]
+    low, high = min(ys), max(ys)
+    if high - low < (bounds[3] - bounds[1]) * 0.45:
+        return ()
+    valley = max(range(len(centers)), key=lambda index: centers[index][1])
+    if not _VALLEY_X_RANGE[0] < valley / (len(centers) - 1) < _VALLEY_X_RANGE[1]:
+        return ()
+    end = next(
+        (
+            index
+            for index in range(valley + 1, len(centers))
+            if ys[index] <= low + (high - low) * 0.1
+        ),
+        len(centers) - 1,
+    )
+    start_x, _ = centers[0]
+    end_x, end_y = centers[end]
+    if high - end_y < (high - low) * 0.6 or end_x <= start_x:
+        return ()
+    positions = sorted({round(end * step / 8) for step in range(9)} | {valley})
+    profile = tuple(
+        ((centers[index][0] - start_x) / (end_x - start_x), (ys[index] - low) / (high - low))
+        for index in positions
+    )
+    return (*profile[:-1], (1.0, 0.0))
 
 
 @contextmanager
