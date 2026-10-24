@@ -253,7 +253,7 @@ impl MathPen {
         Ok(Some(self.draw(size, width + size * 0.08, &paths)?))
     }
 
-    fn draw(&self, size: f32, advance: f32, paths: &[Vec<(f32, f32)>]) -> Result<Glyph> {
+    pub(super) fn draw(&self, size: f32, advance: f32, paths: &[Vec<(f32, f32)>]) -> Result<Glyph> {
         // 2026-10-24：超长公式仍遵守原栅格预算，不因抗锯齿四倍采样提前拒绝。
         let bounds = paths
             .iter()

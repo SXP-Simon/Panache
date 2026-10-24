@@ -85,6 +85,20 @@ fn grid_keeps_formulas_natural_and_chinese_cell_rhythm() {
     );
 }
 #[test]
+fn narrow_grid_paper_uses_actual_width_for_double_digit_circles() {
+    let mut normal = request("⑩⑳㉑㊿⑩⑳㉑㊿");
+    normal.params.width = Some(220);
+    normal.params.height = Some(520);
+    let mut grid = request(&normal.text);
+    grid.params.width = normal.params.width;
+    grid.params.height = normal.params.height;
+    grid.params.grid_layout = true;
+    assert!(
+        page(&normal) == page(&grid),
+        "circled digits must wrap with their true advance, including CJK code points"
+    );
+}
+#[test]
 fn nonzero_translation_moves_whole_formula_without_detaching_ink_components() {
     for source in [
         "    xₙ²",
