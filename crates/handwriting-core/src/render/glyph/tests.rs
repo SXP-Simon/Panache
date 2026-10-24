@@ -16,6 +16,57 @@ fn books() -> &'static [FontBook] {
     })
 }
 #[test]
+fn logical_negation_is_a_continuous_bar_and_right_leg_in_handwritten_fonts() {
+    for book in books() {
+        for size in [18., 36., 72., 124.] {
+            let mut gs = Glyphs::new(book);
+            let glyph = gs.glyph('¬', size).unwrap();
+            let mask = &glyph.mask;
+            assert!(glyph.top < 0 && glyph.bottom() < 0);
+            assert!((0..mask.height()).any(|y| {
+                (0..mask.width()).filter(|x| mask[(*x, y)][0] > 0).count()
+                    >= mask.width() as usize * 9 / 10
+            }));
+            assert!(
+                (mask.width() / 2..mask.width())
+                    .any(|x| (0..mask.height()).all(|y| mask[(x, y)][0] > 0))
+            );
+            let ink: Vec<_> = mask
+                .enumerate_pixels()
+                .filter(|(_, _, p)| p[0] > 0)
+                .map(|(x, y, _)| (x, y))
+                .collect();
+            let mut seen = std::collections::HashSet::from([ink[0]]);
+            let mut queue = VecDeque::from([ink[0]]);
+            while let Some((x, y)) = queue.pop_front() {
+                for (nx, ny) in [
+                    (x as i32 - 1, y as i32),
+                    (x as i32 + 1, y as i32),
+                    (x as i32, y as i32 - 1),
+                    (x as i32, y as i32 + 1),
+                ] {
+                    if nx >= 0
+                        && ny >= 0
+                        && nx < mask.width() as i32
+                        && ny < mask.height() as i32
+                        && mask[(nx as u32, ny as u32)][0] > 0
+                        && seen.insert((nx as u32, ny as u32))
+                    {
+                        queue.push_back((nx as u32, ny as u32));
+                    }
+                }
+            }
+            assert_eq!(
+                seen.len(),
+                ink.len(),
+                "negation must remain one connected stroke"
+            );
+            assert_eq!(gs.glyph('¬', size).unwrap().mask, *mask);
+            assert!(glyph.advance >= glyph.right() as f32);
+        }
+    }
+}
+#[test]
 fn distribution_table_has_two_dimensional_handwritten_ink_and_continuous_rules() {
     for book in books() {
         for size in [24., 40., 64.] {

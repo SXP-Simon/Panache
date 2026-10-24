@@ -110,6 +110,18 @@ impl<'a> Glyphs<'a> {
         if glyph.ink {
             glyph = Self::trim(glyph);
         }
+        // 2026-10-24：部分手写字体把否定符映射成双点，使用同数学笔画粗细的连续折线保留逻辑含义。
+        if c == '¬' {
+            let width = (size * 0.5).round().max(2.) as i32;
+            let top = -(size * 0.36).round() as i32;
+            let leg = (size * 0.19).round().max(1.) as i32;
+            let thickness = (size / 28.).round().max(1.) as i32;
+            glyph = Self::compose(
+                width as f32 + (size * 0.08).max(1.),
+                vec![],
+                vec![(vec![(0, top), (width, top), (width, top + leg)], thickness)],
+            )?;
+        }
         if self.cache.len() >= 1024 || self.cache_bytes + glyph.mask.len() > 8 * 1024 * 1024 {
             self.cache.clear();
             self.cache_bytes = 0;
