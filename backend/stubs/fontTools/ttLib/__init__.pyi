@@ -2,6 +2,8 @@
 from io import BytesIO
 from os import PathLike
 
+class TTLibError(Exception): ...
+
 class TTFont:
     def __init__(
         self,

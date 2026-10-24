@@ -1,7 +1,9 @@
 # Copyright (c) 2026 Simon and Panache contributors.
 """2026-10-24：圈号使用所选手写数字，外圈不碰墨迹，行首和引用保持原字符."""
 
+import gc
 import io
+import weakref
 from pathlib import Path
 
 import app
@@ -9,7 +11,7 @@ import cv2
 import numpy as np
 import pytest
 import symbol_fallback as symbols
-from circled_number import circled_number
+from circled_number import circled_number, native_circled_available
 from math_pen import template_pen
 from PIL import Image, ImageDraw, ImageFont
 from test_generation_parameters import parameters
@@ -35,8 +37,9 @@ def test_all_number_ranges_preserve_original_values():
 @pytest.mark.parametrize("size", [18, 36, 72, 124])
 @pytest.mark.parametrize("naturalness", [0, 100])
 def test_handwritten_digits_are_enclosed_with_clearance_and_one_closed_loop(
-    name, size, naturalness
+    name, size, naturalness, monkeypatch
 ):
+    monkeypatch.setattr(symbols, "native_circled_available", lambda *_: False)
     font = ImageFont.truetype(str(FONTS / f"{name}.ttf"), size)
     tpl = app._template_for(
         parameters(perturb_x_sigma=str(naturalness)).model_dump(),
@@ -77,10 +80,52 @@ def test_handwritten_digits_are_enclosed_with_clearance_and_one_closed_loop(
 
 def test_uploaded_font_digits_are_not_replaced_by_a_file_based_fallback():
     font = ImageFont.truetype(io.BytesIO((FONTS / "云烟体.ttf").read_bytes()), 72)
-    box = symbols._layout_math_text("⑳", font).children[0][0]
+    box = symbols._layout_math_text("㉑", font).children[0][0]
     child = box.children[0][0]
-    expected = symbols._primary_mask("20", font.font_variant(size=48))
+    expected = symbols._primary_mask("21", font.font_variant(size=48))
     assert child.bitmap.tobytes() == expected.tobytes()
+
+
+@pytest.mark.parametrize("name", ["云烟体", "华阳手写体", "李国夫手写体", "霞鹜文楷"])
+@pytest.mark.parametrize("size", [18, 72, 124])
+def test_primary_native_circles_remain_pixel_identical(name, size):
+    font = ImageFont.truetype(str(FONTS / f"{name}.ttf"), size)
+    for marker in "①②③④⑤⑥":
+        box = symbols._layout_math_text(marker, font).children[0][0]
+        assert box.glyph == marker
+        assert box.font is font
+        assert not box.paths
+        assert not box.children
+        actual = Image.new("1", (size * 4, size * 4))
+        expected = actual.copy()
+        symbols._paint_math_box(ImageDraw.Draw(actual), box, (size, size))
+        ImageDraw.Draw(expected).text((size, size), marker, font=font, fill=1)
+        assert actual.tobytes() == expected.tobytes()
+
+
+def test_primary_font_without_circled_glyphs_uses_fallback():
+    font = ImageFont.truetype(str(FONTS / "志莽行书.ttf"), 72)
+    assert not native_circled_available(font, "①")
+    box = symbols._layout_math_text("①", font).children[0][0]
+    assert box.glyph is None
+    assert box.children
+    assert box.paths
+    assert box.semantic == "①"
+
+
+def test_real_missing_circle_uses_fallback_and_upload_lookup_does_not_hold_font():
+    font = ImageFont.truetype(io.BytesIO((FONTS / "云烟体.ttf").read_bytes()), 72)
+    assert native_circled_available(font, "①")
+    assert not native_circled_available(font, "㉑")
+    box = symbols._layout_math_text("㉑", font).children[0][0]
+    assert box.glyph is None
+    assert box.children
+    assert box.paths
+    assert box.bbox[3] <= 72
+    ref = weakref.ref(font)
+    del font
+    gc.collect()
+    assert ref() is None
 
 
 def test_inline_references_have_the_same_semantics_as_the_leading_marker():
