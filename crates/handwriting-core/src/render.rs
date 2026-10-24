@@ -1,5 +1,5 @@
 use crate::{
-    Error, Limits, Parameters, Result, imaging,
+    Error, LayoutStyle, Limits, Parameters, Result, imaging,
     text::{self, Node},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -34,6 +34,7 @@ pub struct RenderRequest {
     pub limits: Limits,
 }
 mod glyph;
+mod homework;
 mod ink;
 mod units;
 use glyph::{Glyph, Glyphs};
@@ -45,6 +46,7 @@ struct LineUnit {
     rigid: bool,
     x: i32,
     dy: i32,
+    break_after: bool,
 }
 struct Pages<'a, F>
 where
@@ -59,6 +61,7 @@ where
     x: f32,
     y: f32,
     previous_bottom: f32,
+    written_lines: usize,
     line: Vec<LineUnit>,
     dirty: bool,
     count: usize,
@@ -212,10 +215,36 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
                 paste_mask(&mut self.mask, &u.glyph.mask, origin.0, origin.1);
             }
         }
+        self.written_lines += 1;
         self.previous_bottom = anchor + max_y as f32;
         self.y = anchor + self.p.line_spacing;
         self.x = self.p.left_margin;
         self.dirty = true;
+        Ok(())
+    }
+    // 2026-10-24：将末尾短语整体移至续行，已渲染的结构化公式保持原子性。
+    fn homework_wrap(&mut self, continuation: f32, right: f32) -> Result<()> {
+        let cutoff = self.p.left_margin + (right - self.p.left_margin) * 0.4;
+        let split = self
+            .line
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(i, u)| u.break_after && *i + 1 < self.line.len() && u.x as f32 >= cutoff)
+            .map(|(i, _)| i + 1);
+        let mut tail = split.map(|at| self.line.split_off(at)).unwrap_or_default();
+        let old_cursor = self.x;
+        self.finish_line()?;
+        if let Some(first) = tail.first() {
+            let shift = continuation - first.x as f32;
+            for unit in &mut tail {
+                unit.x += shift.round() as i32;
+            }
+            self.x = old_cursor + shift;
+            self.line = tail;
+        } else {
+            self.x = continuation;
+        }
         Ok(())
     }
     fn flush(&mut self, force: bool) -> Result<()> {
@@ -262,8 +291,20 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     };
     let (w, h) = background.dimensions();
     p.validate(w, h, &r.limits)?;
+    let homework_mode = p.layout_style == LayoutStyle::Homework;
+    let layout = if homework_mode {
+        homework::parameters(p, w, h)
+    } else {
+        p.clone()
+    };
+    let p = &layout;
+    p.validate(w, h, &r.limits)?;
     let nodes = text::parse(&text::normalize(&r.text, p.english_spacing));
-    let units = layout_units(&nodes);
+    let units = if homework_mode {
+        homework::units(&nodes)
+    } else {
+        layout_units(&nodes)
+    };
     let mut glyphs = Glyphs::new(&r.fonts);
     let mut pages = Pages {
         canvas: background.clone(),
@@ -275,6 +316,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
         x: p.left_margin,
         y: p.top_margin + p.line_spacing,
         previous_bottom: p.top_margin,
+        written_lines: 0,
         line: Vec::new(),
         dirty: false,
         count: 0,
@@ -284,11 +326,50 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     };
     let right = w as f32 - p.effective_right_margin();
     let mut i = 0;
+    let mut paragraph_start = true;
+    let mut section_line_start = 0;
+    let mut continuation = p.left_margin;
     while i < units.len() && !pages.stopped {
         cancel.check()?;
+        if homework_mode && paragraph_start && !matches!(units[i][0], Node::Newline | Node::Break) {
+            let style = homework::paragraph(&units[i..], p.font_size);
+            let available = right - p.left_margin;
+            let indent = style.indent.min(available * 0.15);
+            let prefix: Vec<_> = units[i..]
+                .iter()
+                .flat_map(|u| u.iter())
+                .take(style.prefix_chars)
+                .cloned()
+                .collect();
+            let hanging = if prefix.is_empty() {
+                0.
+            } else {
+                glyphs.unit(&prefix, p.font_size)?.advance + p.word_spacing
+            };
+            continuation = p.left_margin + indent + hanging.min(available * 0.25);
+            pages.x = p.left_margin + indent;
+            if style.gap_before
+                && (style.title || pages.written_lines - section_line_start >= 3)
+                && pages.dirty
+                && i >= 2
+                && !matches!(units[i - 2][0], Node::Newline | Node::Break)
+            {
+                pages.y += p.line_spacing;
+            }
+            if style.gap_before {
+                section_line_start = pages.written_lines;
+            }
+            paragraph_start = false;
+        }
         match &units[i][0] {
-            Node::Break => pages.flush(false)?,
-            Node::Newline => pages.newline()?,
+            Node::Break => {
+                pages.flush(false)?;
+                paragraph_start = true;
+            }
+            Node::Newline => {
+                pages.newline()?;
+                paragraph_start = true;
+            }
             Node::RightAlign => {
                 let rest = units[i + 1..]
                     .iter()
@@ -413,7 +494,18 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                         compound = true;
                     }
                 }
-                let usable_width = right - p.left_margin;
+                if homework_mode
+                    && homework::break_before(units[i])
+                    && let Some(previous) = pages.line.last_mut()
+                {
+                    previous.break_after = true;
+                }
+                let usable_width = right
+                    - if homework_mode {
+                        continuation
+                    } else {
+                        p.left_margin
+                    };
                 let usable_height = h as f32 - p.top_margin - p.bottom_margin;
                 g = g.fit(usable_width, usable_height);
                 let jitter_x = if p.grid_layout && keeps_grid_cell(units[i]) {
@@ -425,7 +517,15 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                     .round()
                     .max(p.left_margin - g.left as f32);
                 if !pages.line.is_empty() && x + g.right() as f32 > right {
-                    pages.newline()?;
+                    if homework_mode {
+                        pages.homework_wrap(continuation, right)?;
+                        if !pages.line.is_empty() && pages.x + g.right() as f32 > right {
+                            pages.finish_line()?;
+                            pages.x = continuation;
+                        }
+                    } else {
+                        pages.newline()?;
+                    }
                     if pages.stopped {
                         break;
                     }
@@ -452,6 +552,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                     rigid: compound,
                     x: x.round() as i32,
                     dy,
+                    break_after: homework_mode && homework::break_after(units[i]),
                 });
             }
         }
@@ -480,6 +581,7 @@ mod ruled_tests {
             rigid: false,
             x: 10,
             dy: 0,
+            break_after: false,
         }]
     }
 
@@ -519,6 +621,7 @@ mod ruled_tests {
                 x: 10.,
                 y: 10. + spacing,
                 previous_bottom: 10.,
+                written_lines: 0,
                 line: vec![],
                 dirty: false,
                 count: 0,
