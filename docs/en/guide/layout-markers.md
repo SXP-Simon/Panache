@@ -17,7 +17,7 @@ Content of the first page
 The second page starts here
 ```
 
-**Clean Markdown** removes standalone separators and blank lines only when clicked. Normal editing and rendering keep your page breaks and spacing; add `---` or blank lines after cleaning when needed.
+**Prepare text** removes standalone separators and blank lines only when clicked. Normal editing and rendering keep your page breaks and spacing; add `---` or blank lines after cleaning when needed.
 
 ## `>>>` right-aligns a line
 

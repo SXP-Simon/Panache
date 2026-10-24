@@ -38,12 +38,12 @@ Phones omit the top brand header. The compact workspace action row provides the 
 
 - Text, settings, and uploaded assets are saved on this device. Check the save status; clearing site data or storage failures can affect recovery.
 - Uploading a document only **fills the text box** — you can keep editing afterwards.
-- Markdown cleanup preserves formula source; use the LaTeX conversion button to transcribe it. Arrays, probability tables, and augmented matrices with explicit separator rules remain editable structured text and render as two-dimensional cells using the selected handwriting font and ink. Wide tables scale as a whole and cells stay together across page breaks. Unsupported syntax preserves the source.
+- Prepare text cleans Markdown before transcribing formulas, preserves code contents, and offers Undo cleanup to restore the original. Arrays, probability tables, and augmented matrices with explicit separator rules remain editable structured text and render as two-dimensional cells using the selected handwriting font and ink. Wide tables scale as a whole and cells stay together across page breaks. Unsupported syntax preserves the source.
 - This fork has no fixed 10-page truncation. Long documents remain subject to hardware and [server limits](../self-hosting/fonts-and-limits.md).
 
 ## Engineering coursework and formulas
 
-Clean Markdown, convert LaTeX, then generate a preview. Matrices, determinants and piecewise functions use two-dimensional layouts with scalable delimiters; conditions are left-aligned. Table cells use the same font fallback and fraction layout as ordinary formulas.
+Click Prepare text, then generate a preview. Matrices, determinants and piecewise functions use two-dimensional layouts with scalable delimiters; conditions are left-aligned. Table cells use the same font fallback and fraction layout as ordinary formulas.
 
 Common inputs include `\mathcal{L}`, `\oiint`, `\SI{4.7}{\kilo\ohm}`, `\si{\metre\per\second\squared}` and `\num{1.2e-3}`. Unsupported options, custom macros and expressions that cannot be parsed reliably remain as source text. Check the preview before exporting.
 
@@ -115,7 +115,7 @@ The backend only renders a limited number of jobs at a time. When it is busy you
 Progress is pushed over a WebSocket; if that connection cannot be established the client
 falls back to polling, and the interface looks the same either way.
 
-Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other text modes. Click LaTeX conversion, then generate the preview. Handwriting tables include an outer border and every row/column boundary, with uniform stroke widths and visually centered contents.
+Markdown cleanup defaults to LaTeX grid tables; the table menu retains the other text modes. Click Prepare text to clean markup and transcribe formulas, then generate the preview. Handwriting tables include an outer border and every row/column boundary, with uniform stroke widths and visually centered contents.
 
 
 ## Checking for updates
