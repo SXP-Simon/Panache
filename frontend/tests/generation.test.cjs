@@ -275,3 +275,87 @@ test('POST snapshots release uploaded files and illustration data on success, fa
   assert.equal(aborted.payload, null);
   assert.equal(transport.mock.callCount(), 2);
 });
+
+test('server cancellation is confirmed only after a terminal task, with escaped task IDs', async (t) => {
+  const api = await modules();
+  const { GenerationCancellation } = await import('../src/features/generation/cancellation.ts');
+  const client = new api.QueryClient();
+  t.after(() => client.clear());
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push([url, options.method]);
+    return Response.json({task_id:'job /x', task_status: calls.length === 1 ? 'cancelling' : 'cancelled'});
+  });
+  const updates = [];
+  const cancel = new GenerationCancellation(client, new AbortController().signal, (...args) => updates.push(args));
+  const stop = cancel.request();
+  assert.equal(cancel.observation.signal.aborted, true);
+  assert.equal(calls.length, 0, 'must wait for POST create to return an id');
+  cancel.created('job /x');
+  await stop;
+  await assert.rejects(cancel.wait(), {code:'cancelled'});
+  assert.deepEqual(calls, [['/api/generate_handwriting/task/job%20%2Fx/cancel','POST'],['/api/generate_handwriting/task/job%20%2Fx',undefined]]);
+  assert.equal(client.getQueryData(api.generationKeys.task('job /x')).task_status,'cancelled');
+});
+
+test('failed cancellation retains the barrier, retry confirms completed races without fetching a result', async (t) => {
+  const api = await modules();
+  const { GenerationCancellation } = await import('../src/features/generation/cancellation.ts');
+  const client = new api.QueryClient();
+  t.after(() => client.clear());
+  let attempts = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(url, /\/cancel$/);
+    if (++attempts === 1) throw new TypeError('offline');
+    return Response.json({task_status:'completed'});
+  });
+  const updates=[];
+  const cancel=new GenerationCancellation(client,new AbortController().signal,(...args)=>updates.push(args));
+  cancel.created('job');
+  await assert.rejects(cancel.request(),{code:'networkError'});
+  let finished=false;
+  const waiting=cancel.wait().catch(error=> {finished=true;assert.equal(error.code,'cancelled');});
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(finished,false);
+  assert.equal(updates.at(-1)[0],false);
+  await cancel.request();
+  await waiting;
+  assert.equal(attempts,2);
+});
+
+test('cancelled socket task is terminal and never downloads a result', async (t) => {
+  const api = await setup(t, socket=>socket.message({task_status:'cancelled'}));
+  t.mock.method(globalThis,'fetch',()=> {throw new Error('Unexpected fetch');});
+  await assert.rejects(api.observeGenerationTask(api.client,'job',new AbortController().signal),{code:'cancelled'});
+  assert.equal(api.sockets[0].closed,true);
+});
+
+
+for (const code of ['networkError', 'timeout']) {
+  test(`automatic stop retains original ${code} after failed cancellation and manual retry`, async (t) => {
+    const api = await modules();
+    const { GenerationCancellation, GenerationStoppedError } = await import('../src/features/generation/cancellation.ts');
+    const client = new api.QueryClient();
+    t.after(() => client.clear());
+    let attempts = 0;
+    t.mock.method(globalThis, 'fetch', async () => {
+      if (++attempts === 1) throw new TypeError('cancel endpoint offline');
+      return Response.json({ task_status: 'cancelled' });
+    });
+    const cancellation = new GenerationCancellation(client, new AbortController().signal, () => {});
+    cancellation.created('job');
+    const reason = new api.ApiError(code, { status: 503, serverMessage: 'original failure' });
+    await assert.rejects(cancellation.request(reason), { code: 'networkError' });
+    await cancellation.request();
+    for (const wait of [() => cancellation.wait(), () => cancellation.confirmedStop()]) {
+      await assert.rejects(wait(), error => {
+        assert.ok(error instanceof GenerationStoppedError);
+        assert.equal(error.code, code);
+        assert.equal(error.status, 503);
+        assert.equal(error.serverMessage, 'original failure');
+        assert.equal(error.cause, reason);
+        return true;
+      });
+    }
+  });
+}

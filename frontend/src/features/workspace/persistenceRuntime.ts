@@ -27,6 +27,7 @@ export const generationRecordSchema = v.object({
   version: v.literal(1),
   taskId: v.string(),
   mode: v.picklist(['preview', 'zip', 'pdf']),
+  cancelling: v.optional(v.boolean(), false),
 });
 export type GenerationRecord = v.InferOutput<typeof generationRecordSchema>;
 const preferencesSchema = v.object({

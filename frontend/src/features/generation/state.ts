@@ -10,11 +10,17 @@ export interface ActiveGeneration {
   taskId: string | null;
   mode: GenerationMode;
   token: number;
+  cancelling?: boolean;
+  cancelPending?: boolean;
+  cancelError?: ApiError | null;
 }
 export interface GenerationState {
   taskId: string | null;
   mode: GenerationMode;
   busy: boolean;
+  cancelling: boolean;
+  cancelPending: boolean;
+  cancelError: ApiError | null;
   progress: number;
   task: GenerationTask | null;
   error: ApiError | null;
@@ -52,6 +58,9 @@ export function readGenerationState(client: QueryClient): GenerationState {
     taskId,
     mode,
     busy: mutation?.state.status === 'pending',
+    cancelling: mutation?.state.status === 'pending' && Boolean(active?.cancelling),
+    cancelPending: Boolean(active?.cancelPending),
+    cancelError: active?.cancelError ?? null,
     progress: task?.task_progress ?? 0,
     task,
     error,
@@ -65,6 +74,9 @@ export function readGenerationState(client: QueryClient): GenerationState {
     previous.taskId === state.taskId &&
     previous.mode === state.mode &&
     previous.busy === state.busy &&
+    previous.cancelling === state.cancelling &&
+    previous.cancelPending === state.cancelPending &&
+    previous.cancelError === state.cancelError &&
     previous.task === state.task &&
     previous.error === state.error &&
     previous.retrySeconds === state.retrySeconds &&

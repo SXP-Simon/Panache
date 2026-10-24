@@ -1,3 +1,4 @@
+import { GenerationStoppedError } from './cancellation.ts';
 import type { QueryClient } from '@tanstack/react-query';
 import { ApiError, normalizeApiError } from '../../api/client.ts';
 import {
@@ -9,6 +10,7 @@ import {
 import type { GenerationTask } from '../../api/generation.ts';
 
 function terminal(task: GenerationTask): boolean {
+  if (task.task_status === 'cancelled') throw new GenerationStoppedError();
   if (task.task_status === 'failed') {
     const message = task.error_message || task.task_message;
     throw new ApiError('taskFailed', message ? { serverMessage: message } : {});

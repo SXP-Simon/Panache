@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
+import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import { useGenerationState } from '@/features/generation/state';
 import { useNotificationStore } from '@/features/notifications/store';
 import type { Notice } from '@/features/notifications/store';
@@ -17,6 +18,7 @@ function noticeText(notice: Notice | null, translate: (key: MessageKey) => strin
 }
 export default function WorkspaceStatus() {
   const { t } = useI18n();
+  const { cancelGeneration } = useWorkspaceActions();
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
   const { notice, error } = useNotificationStore(
     useShallow((state) => ({ notice: state.notice, error: state.error })),
@@ -49,7 +51,9 @@ export default function WorkspaceStatus() {
     (generation.retrySeconds > 0
       ? `${t('queueBusy')} ${generation.retrySeconds} ${t('queueSuffix')}`
       : generation.busy
-        ? [task?.task_message || t('working'), ...details].join(' · ')
+        ? generation.cancelling
+          ? t(generation.cancelError ? 'generationStopFailed' : 'generationStopping')
+          : [task?.task_message || t('working'), ...details].join(' · ')
         : noticeText(notice, t) || serverFailure);
   const failed = Boolean(error || (!generation.busy && !notice && serverFailure));
   return (
@@ -79,6 +83,17 @@ export default function WorkspaceStatus() {
                 <Check size={17} />
               )}
               <span>{status}</span>
+              {generation.busy && (
+                <Button
+                  size="small"
+                  variant="ghost"
+                  data-testid="cancel-generation-btn"
+                  disabled={generation.cancelPending}
+                  onClick={() => void cancelGeneration()}
+                >
+                  {t(generation.cancelError ? 'generationStopRetry' : 'generationStop')}
+                </Button>
+              )}
             </div>
           </AnimatedReveal>
         )}

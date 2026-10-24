@@ -6,13 +6,22 @@ export interface GenerationRequest {
   payload: GenerationSnapshot | null;
   mode: GenerationMode;
   controller: AbortController;
+  taskId?: string;
 }
 
-export async function createTask(request: GenerationRequest): Promise<string> {
+export async function createTask(
+  request: GenerationRequest,
+  signal = request.controller.signal,
+): Promise<string> {
   try {
-    request.controller.signal.throwIfAborted();
+    signal.throwIfAborted();
     if (!request.payload) throw new ApiError('invalidResponse');
-    return await createGeneration(request.payload, request.mode, request.controller.signal);
+    return await createGeneration(
+      request.payload,
+      request.mode,
+      AbortSignal.any([signal, AbortSignal.timeout(90_000)]),
+      request.taskId,
+    );
   } finally {
     request.payload = null;
   }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGeneration } from '@/features/generation/useGeneration';
+import { GenerationStoppedError } from '@/features/generation/cancellation';
 import { readGenerationState } from '@/features/generation/state';
 import { useDocumentStore } from '@/features/document/store';
 import { useSettingsStore } from '@/features/settings/store';
@@ -16,7 +17,7 @@ import { validateGeneration } from './validation';
 import { reportFailure } from './reportFailure';
 
 export function useGenerationActions() {
-  const { generate: create, resume } = useGeneration();
+  const { generate: create, resume, cancel } = useGeneration();
   const client = useQueryClient();
   const downloads = useRef(new Set<() => void>());
   const mounted = useRef(true);
@@ -42,12 +43,26 @@ export function useGenerationActions() {
       await removeRecord('studio.generation');
     } catch (cause) {
       if (!mounted.current || token !== sequence.current) return;
+      if (cause instanceof GenerationStoppedError) {
+        try {
+          await removeRecord('studio.generation');
+        } catch {
+          useNotificationStore.getState().fail('storageUnavailable');
+        }
+        if (cause.code === 'cancelled') useNotificationStore.getState().inform('generationStopped');
+        return;
+      }
       if (cause instanceof ApiError && cause.code === 'cancelled') return;
       // Transport/task failures already live in the shared query cache.
       if (!(cause instanceof ApiError)) reportFailure(cause);
       if (
         cause instanceof ApiError &&
-        (cause.code === 'taskFailed' || cause.status === 404 || cause.status === 410)
+        (cause.code === 'taskFailed' ||
+          cause.code === 'queueFull' ||
+          (cause.status !== undefined &&
+            cause.status >= 400 &&
+            cause.status < 500 &&
+            cause.status !== 408))
       ) {
         try {
           await removeRecord('studio.generation');
@@ -62,7 +77,19 @@ export function useGenerationActions() {
     const saved = takeRestoredGeneration();
     if (saved) {
       useNotificationStore.getState().clear();
-      void complete(resume(saved.taskId, saved.mode), ++sequence.current);
+      void complete(
+        resume(saved.taskId, saved.mode, saved.cancelling, async (taskId) => {
+          try {
+            await writeRecord(
+              'studio.generation',
+              JSON.stringify({ version: 1, taskId, mode: saved.mode, cancelling: true }),
+            );
+          } catch {
+            useNotificationStore.getState().fail('storageUnavailable');
+          }
+        }),
+        ++sequence.current,
+      );
     }
     const activeDownloads = downloads.current;
     const unsubscribe = window.handwritingDesktop?.onDownloadFinished((payload) => {
@@ -91,6 +118,16 @@ export function useGenerationActions() {
       useNotificationStore.getState().clear();
       await complete(
         create(snapshot, mode, {
+          onStopping: async (taskId) => {
+            try {
+              await writeRecord(
+                'studio.generation',
+                JSON.stringify({ version: 1, taskId, mode, cancelling: true }),
+              );
+            } catch {
+              useNotificationStore.getState().fail('storageUnavailable');
+            }
+          },
           onCreated: async (taskId) => {
             try {
               await writeRecord('studio.generation', JSON.stringify({ version: 1, taskId, mode }));
@@ -104,5 +141,13 @@ export function useGenerationActions() {
     },
     [client, complete, create],
   );
-  return generate;
+  const cancelGeneration = useCallback(async () => {
+    useNotificationStore.getState().clear();
+    try {
+      await cancel();
+    } catch {
+      /* Cancellation failure stays visible with the retry action in shared state. */
+    }
+  }, [cancel]);
+  return { generate, cancelGeneration };
 }

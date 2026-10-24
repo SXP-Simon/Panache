@@ -8,7 +8,8 @@ import { reconcileFontSelection } from './persistenceRuntime';
 import { reportFailure } from './reportFailure';
 
 type WorkspaceActions = ReturnType<typeof useDocumentActions> &
-  ReturnType<typeof useSettingsActions> & { generate: ReturnType<typeof useGenerationActions> };
+  ReturnType<typeof useSettingsActions> &
+  ReturnType<typeof useGenerationActions>;
 const ActionsContext = createContext<WorkspaceActions | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -23,7 +24,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     uploadBackground,
     removeBackground,
   } = useSettingsActions();
-  const generate = useGenerationActions();
+  const { generate, cancelGeneration } = useGenerationActions();
   useEffect(() => {
     if (catalog.data) reconcileFontSelection(catalog.data);
   }, [catalog.data]);
@@ -42,6 +43,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       uploadBackground,
       removeBackground,
       generate,
+      cancelGeneration,
     }),
     [
       importText,
@@ -54,6 +56,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       uploadBackground,
       removeBackground,
       generate,
+      cancelGeneration,
     ],
   );
   return <ActionsContext.Provider value={actions}>{children}</ActionsContext.Provider>;

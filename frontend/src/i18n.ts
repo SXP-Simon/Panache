@@ -188,6 +188,17 @@ const words = {
     '整理失败，原文已保留，请重试。',
     'Could not prepare the text. Your original text is preserved; please retry.',
   ],
+  generationStop: ['停止生成', 'Stop generating'],
+  generationStopping: ['正在停止，请稍候…', 'Stopping…'],
+  generationStopFailed: [
+    '尚未确认任务停止，请重试。',
+    'Could not confirm the task has stopped. Please retry.',
+  ],
+  generationStopRetry: ['重试停止', 'Retry stopping'],
+  generationStopped: [
+    '已停止生成，原有预览已保留。',
+    'Generation stopped. Your previous preview is preserved.',
+  ],
   textPreparationCancelled: [
     '已停止整理，原文保持不变。',
     'Text preparation stopped. Your original text is unchanged.',

@@ -7,7 +7,14 @@ import type { GenerationMode, GenerationResult, GenerationSnapshot } from './typ
 const nullableCount = v.optional(v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))));
 export const taskSchema = v.object({
   task_id: v.optional(v.string()),
-  task_status: v.picklist(['pending', 'processing', 'completed', 'failed']),
+  task_status: v.picklist([
+    'pending',
+    'processing',
+    'completed',
+    'failed',
+    'cancelling',
+    'cancelled',
+  ]),
   task_stage: v.optional(v.string()),
   task_message: v.optional(v.string()),
   task_progress: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100))),
@@ -47,9 +54,11 @@ export async function createGeneration(
   snapshot: GenerationSnapshot,
   mode: GenerationMode,
   signal?: AbortSignal,
+  taskId?: string,
 ): Promise<string> {
   const response = await fetchApi('/api/generate_handwriting', {
     method: 'POST',
+    ...(taskId ? { headers: { 'X-Panache-Task-Id': taskId } } : {}),
     body: generationFormData(snapshot, mode),
     signal: signal ?? null,
   });
@@ -58,6 +67,22 @@ export async function createGeneration(
     await readJson(response),
   ).task_id;
 }
+/** Older servers may ignore the client ID header; only advertise early cancellation when proven. */
+export async function supportsTaskIdentity(signal: AbortSignal): Promise<boolean> {
+  try {
+    const data = parsePayload(
+      v.object({
+        capabilities: v.optional(v.object({ task_submission_id: v.optional(v.boolean()) })),
+      }),
+      await readJson(await fetchApi('/api/version', { signal })),
+    );
+    return data.capabilities?.task_submission_id === true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return false;
+    throw error;
+  }
+}
+
 export function parseTask(value: unknown, expectedId: string): GenerationTask {
   const task = parsePayload(taskSchema, value);
   if (task.task_id !== undefined && task.task_id !== expectedId)
@@ -74,8 +99,22 @@ export async function getGenerationTask(id: string, signal?: AbortSignal): Promi
     id,
   );
 }
+export async function cancelGenerationTask(
+  id: string,
+  signal?: AbortSignal,
+): Promise<GenerationTask> {
+  return parseTask(
+    await readJson(
+      await fetchApi(`/api/generate_handwriting/task/${encodeURIComponent(id)}/cancel`, {
+        method: 'POST',
+        signal: signal ?? null,
+      }),
+    ),
+    id,
+  );
+}
 export function isTerminalTask(task: GenerationTask): boolean {
-  return task.task_status === 'completed' || task.task_status === 'failed';
+  return ['completed', 'failed', 'cancelled'].includes(task.task_status);
 }
 export async function getGenerationResult(
   id: string,
