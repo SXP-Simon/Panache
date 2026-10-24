@@ -305,7 +305,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     } else {
         layout_units(&nodes)
     };
-    let mut glyphs = Glyphs::new(&r.fonts);
+    let mut glyphs = Glyphs::with_parameters(&r.fonts, p);
     let mut pages = Pages {
         canvas: background.clone(),
         background,

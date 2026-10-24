@@ -303,10 +303,66 @@ fn fraction_bar_uses_handwritten_axis_and_clear_ink_gaps() {
                     .count()
             };
             assert!(ink_count(row) > size as usize);
-            assert_eq!(ink_count(row - 2), 0);
-            assert_eq!(ink_count(row + 2), 0);
+            // 2026-10-24：笔宽来自主字体，包含抗锯齿边缘后仍须与上下数字分离。
+            let clear = (gs.pen.thickness(size) / 2.).ceil() as u32 + 2;
+            assert_eq!(ink_count(row - clear), 0);
+            assert_eq!(ink_count(row + clear), 0);
             assert!(g.top < axis - size as i32 / 3);
             assert!(g.bottom() > axis + size as i32 / 3);
+        }
+    }
+}
+#[test]
+fn natural_math_paths_do_not_move_numerators_denominators_or_radicands() {
+    let pixel = |g: &Glyph, x: i32, y: i32| {
+        if x < g.left || y < g.top || x >= g.right() || y >= g.bottom() {
+            0
+        } else {
+            g.mask[((x - g.left) as u32, (y - g.top) as u32)][0]
+        }
+    };
+    for book in books() {
+        for size in [24., 40., 72.] {
+            let mut quiet = Glyphs::new(book);
+            let mut natural = Glyphs::with_parameters(
+                book,
+                &Parameters {
+                    perturb_x_sigma: 100.,
+                    perturb_y_sigma: 100.,
+                    perturb_theta_sigma: 100.,
+                    ..Parameters::default()
+                },
+            );
+            let x = quiet.glyph('x', size).unwrap();
+            let axis = (x.top + x.bottom()) / 2;
+            let fraction = Node::Fraction(text::parse("AB²"), text::parse("CDₙ"));
+            let a = quiet.node(&fraction, size).unwrap();
+            let b = natural.node(&fraction, size).unwrap();
+            let pen_area = (quiet.pen.thickness(size) / 2.).ceil() as i32 + 3;
+            for y in a.top.min(b.top)..a.bottom().max(b.bottom()) {
+                if (y - axis).abs() <= pen_area {
+                    continue;
+                }
+                for x in a.left.min(b.left)..a.right().max(b.right()) {
+                    assert_eq!(
+                        pixel(&a, x, y),
+                        pixel(&b, x, y),
+                        "numerator/denominator moved at {size}"
+                    );
+                }
+            }
+            let body = text::parse("a²+b²");
+            let body_glyph = quiet.sequence(&body, size).unwrap();
+            let radical = Node::Radical(body, vec![]);
+            let a = quiet.node(&radical, size).unwrap();
+            let b = natural.node(&radical, size).unwrap();
+            let body_x =
+                (size * 0.46).round().max(10.) as i32 + (size * 0.04).round().max(1.) as i32;
+            for y in body_glyph.top..body_glyph.bottom() {
+                for x in body_x..body_x + body_glyph.mask.width() as i32 {
+                    assert_eq!(pixel(&a, x, y), pixel(&b, x, y), "radicand moved at {size}");
+                }
+            }
         }
     }
 }
