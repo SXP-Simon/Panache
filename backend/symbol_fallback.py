@@ -38,6 +38,7 @@ if __package__:
     from .math_page_layout import install_math_page_layout
     from .math_pen import SYMBOLS, font_pen, symbol_paths
     from .math_table import Table, parse_table, table_spans
+    from .radical_ink import fit_hook, hook_join, index_clearance, native_root, roof_mask
 else:
     from circled_number import circle_path, circled_number, native_circled_available
     from circuit import Circuit, parse_circuit
@@ -51,6 +52,7 @@ else:
     from math_page_layout import install_math_page_layout
     from math_pen import SYMBOLS, font_pen, symbol_paths
     from math_table import Table, parse_table, table_spans
+    from radical_ink import fit_hook, hook_join, index_clearance, native_root, roof_mask
 
 
 type Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
@@ -1234,6 +1236,92 @@ def _layout_circuit(
     )
 
 
+def _layout_fallback_radical(
+    radical: tuple[str, str | None], font: Font, font_path: str | None, memo: _LayoutMemo
+) -> _MathBox:
+    """2026-10-24：仅在主字体缺失根号时补绘，维持根指数和被开方式的安全间隙."""
+    radicand, index = radical
+    size = font_size_of(font)
+    body = _layout_math_text(radicand, font, font_path, memo)
+    gap = max(2, round(size * 0.09))
+    top = body.bbox[1] - gap
+    bottom = max(body.bbox[3], top + round(size * 0.58))
+    height = bottom - top
+    stem_width = max(10, round(size * 0.46))
+    pen = font_pen(font, size)
+    offset = 0
+    index_right = None
+    children: list[BoxChild] = []
+    if index:
+        # 根指数先还原普通字符再缩小，不能对上标字形重复缩放。
+        index_text = index.translate(_SUPER_TO_TEXT)
+        small = _get_cached_image_font(font_path, max(8, round(size * 0.46)))
+        idx = _layout_math_text(index_text, small, font_path, memo)
+        index_bottom = top + round(height * 0.34)
+        children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
+        offset = max(0, idx.bbox[2] - idx.bbox[0] - round(size * 0.16))
+        index_right = idx.bbox[2] - idx.bbox[0]
+    body_x = offset + stem_width + max(1, round(size * 0.04)) - body.bbox[0]
+    children.append((body, body_x, 0))
+    right = body_x + body.bbox[2] + gap
+    # 2026-10-24：主字体缺字时才补绘根钩，正文与指数继续按安全间隙定位。
+    path = pen.radical_path((offset, top, stem_width, height), right, index_right=index_right)
+    return _compose_box(right + gap, children, (path,))
+
+
+def _layout_native_radical(
+    radical: tuple[str, str | None], font: Font, font_path: str | None, memo: _LayoutMemo
+) -> _MathBox | None:
+    """2026-10-24：原生根钩保留真实笔触，正文与指数按实际墨迹让位."""
+    ink = native_root(font)
+    if ink is None:
+        return None
+    radicand, index = radical
+    size = font_size_of(font)
+    pen = font_pen(font, size)
+    body = _layout_math_text(radicand, font, font_path, memo)
+    roof_height = round(ink.bar.height * size / ink.size) if ink.bar else pen.width
+    gap = max(2, round(size * 0.09), roof_height + math.ceil(size * 0.016) + 2)
+    top = body.bbox[1] - gap
+    bottom = max(body.bbox[3], top + round(size * 0.58))
+    hook = fit_hook(ink, size, bottom - top)
+    if hook is None:
+        return None
+    join_x, join_y = hook_join(hook)
+    hook_top = top - join_y
+    offset = 0
+    children: list[BoxChild] = []
+    if index:
+        small = _get_cached_image_font(font_path, max(8, round(size * 0.46)))
+        idx = _layout_math_text(index.translate(_SUPER_TO_TEXT), small, font_path, memo)
+        index_bottom = top + round((bottom - top) * 0.34)
+        children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
+        index_right = idx.bbox[2] - idx.bbox[0]
+        offset = max(
+            0,
+            index_right - round(size * 0.16),
+            index_clearance(hook, index_bottom - hook_top, index_right, max(2, pen.width)),
+        )
+    # 2026-10-24：宽根钩不能被挤扁；公式内容仅按原生实际宽度向右避让。
+    stem_width = max(10, round(size * 0.46), hook.width + 2)
+    body_x = offset + stem_width + max(1, round(size * 0.04)) - body.bbox[0]
+    children.append((body, body_x, 0))
+    right = body_x + body.bbox[2] + gap
+    glyph = _MathBox(hook.width, (0, 0, hook.width, hook.height), bitmap=hook)
+    children.append((glyph, offset, hook_top))
+    roof = roof_mask(ink, right - offset - join_x + 1, pen)
+    paths: tuple[BoxPath, ...] = ()
+    if roof:
+        mask, first_ink = roof
+        rule = _MathBox(mask.width, (0, 0, mask.width, mask.height), bitmap=mask)
+        children.append((rule, offset + join_x, top - first_ink))
+    else:
+        # 2026-10-24：超长封顶不分配无限宽位图，改为保留原生根钩的有界补线。
+        paths = (pen.path(((offset + join_x, top), (right, top))),)
+    box = _compose_box(right + gap, children, paths)
+    return _MathBox(box.advance, box.bbox, children=box.children, paths=box.paths, semantic="√")
+
+
 def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _LayoutMemo) -> _MathBox:
     size = font_size_of(font)
     if char in _CIRCUIT_MAP or char in _TABLE_MAP:
@@ -1273,32 +1361,10 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
             (pen.path(((1, axis), (line_width - 1, axis))),),
         )
     if char in _RADICAL_MAP:
-        radicand, index = _RADICAL_MAP[char]
-        body = _layout_math_text(radicand, font, font_path, memo)
-        gap = max(2, round(size * 0.09))
-        top = body.bbox[1] - gap
-        bottom = max(body.bbox[3], top + round(size * 0.58))
-        height = bottom - top
-        stem_width = max(10, round(size * 0.46))
-        pen = font_pen(font, size)
-        offset = 0
-        index_right = None
-        children: list[BoxChild] = []
-        if index:
-            # 根指数先还原普通字符再缩小，不能对上标字形重复缩放。
-            index_text = index.translate(_SUPER_TO_TEXT)
-            small = _get_cached_image_font(font_path, max(8, round(size * 0.46)))
-            idx = _layout_math_text(index_text, small, font_path, memo)
-            index_bottom = top + round(height * 0.34)
-            children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
-            offset = max(0, idx.bbox[2] - idx.bbox[0] - round(size * 0.16))
-            index_right = idx.bbox[2] - idx.bbox[0]
-        body_x = offset + stem_width + max(1, round(size * 0.04)) - body.bbox[0]
-        children.append((body, body_x, 0))
-        right = body_x + body.bbox[2] + gap
-        # 2026-10-24：根钩复用主字体轮廓；文字、指数及封顶宽度仍由原盒模型定位。
-        path = pen.radical_path((offset, top, stem_width, height), right, index_right=index_right)
-        return _compose_box(right + gap, children, (path,))
+        radical = _RADICAL_MAP[char]
+        return _layout_native_radical(radical, font, font_path, memo) or _layout_fallback_radical(
+            radical, font, font_path, memo
+        )
     if char in SYMBOLS:
         advance, paths = symbol_paths(char, font_pen(font, size), _math_axis(font, font_path))
         drawn = _compose_box(advance, paths=paths)
