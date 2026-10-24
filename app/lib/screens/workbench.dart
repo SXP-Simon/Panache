@@ -524,8 +524,14 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       }
     }),
     onDetectBackground: () => action(() async {
-      await documents.detectBackground();
-      settingsRevision++;
+      try {
+        if (await documents.detectBackground()) {
+          settingsRevision++;
+          notify(l.paperIdentificationDone);
+        }
+      } catch (_) {
+        notify(l.paperIdentificationFailed);
+      }
     }),
     onRemoveBackground: () {
       w.background = null;

@@ -133,9 +133,11 @@ class WorkbenchSettings extends StatelessWidget {
           if (background != null)
             Wrap(
               children: [
-                TextButton(
+                TextButton.icon(
+                  key: const ValueKey('identify-paper'),
                   onPressed: locked ? null : onDetectBackground,
-                  child: Text(l.detectBackground),
+                  icon: const Icon(Icons.format_line_spacing),
+                  label: Text(l.detectBackground),
                 ),
                 TextButton(
                   onPressed: locked ? null : onRemoveBackground,
