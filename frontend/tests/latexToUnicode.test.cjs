@@ -2,6 +2,16 @@ const assert = require('assert').strict;
 
 async function run() {
   const { convertLatexToUnicode: convert, hasLatexMarkup } = await import('../src/utils/latexToUnicode.ts');
+  const { cleanMarkdown } = await import('../src/utils/cleanMarkdown.ts');
+  for (const [name, body, expected] of require('./fixtures/automata-latex.json')) {
+    for (const [open, close] of [['$', '$'], ['$$', '$$'], ['\\(', '\\)'], ['\\[', '\\]']]) {
+      const formula = open + body + close;
+      const converted = expected ?? formula;
+      assert.equal(convert(formula), converted, name);
+      assert.equal(convert(cleanMarkdown(formula)), converted, `${name}: clean then convert`);
+      assert.equal(convert('`' + formula + '`'), '`' + formula + '`', `${name}: literal code`);
+    }
+  }
   const cases = [
     ['mixed prose coefficient powers', String.raw`导数：3x^2 + 12y_1，标识符 abc3x^2 不变。`, String.raw`导数：3x² + 12y₁，标识符 abc3x^2 不变。`],
     ['mixed prose evaluation limits', String.raw`左边：\int_{-1}^{1} x^2 dx = \left. \frac{1}{3}x^3 \right\vert{}_{-1}^{1} = \frac{2}{3}`, '左边：∫₋₁¹ x² dx = ⅓x³|₋₁¹ = ⅔'],

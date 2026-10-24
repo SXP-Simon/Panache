@@ -462,7 +462,8 @@ function astNodeToUnicode(value: unknown, depth = 0, arrayMode: ArrayMode = 'sta
     case 'mathord':
     case 'textord':
     case 'atom':
-      return symbol(textField(node['text']) || '');
+      // KaTeX expands \cdots and context-sensitive \dots to this private atom.
+      return symbol(node['text'] === '\\@cdots' ? '\\cdots' : textField(node['text']) || '');
     case 'op':
       return textField(node['name'])
         ? LATEX_SYMBOL_MAP[textField(node['name'])] ||

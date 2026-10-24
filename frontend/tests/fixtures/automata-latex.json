@@ -1,0 +1,82 @@
+[
+  [
+    "automata alternatives with Chinese explanation",
+    "0 \\mid [1-9][0-9]^*(0 \\mid 5) \\quad \\text{或简记为：} \\quad (0 \\mid 1 \\mid 2 \\mid \\dots \\mid 9)^*(0 \\mid 5)",
+    "0|[1-9][0-9]^(*)(0|5) 或简记为： (0|1|2|···|9)^(*)(0|5)"
+  ],
+  [
+    "sum continuation",
+    "a_1+\\dots+a_n",
+    "a₁+···+aₙ"
+  ],
+  [
+    "relation continuation",
+    "a=\\dots=b",
+    "a=···=b"
+  ],
+  [
+    "alternative continuation",
+    "a\\mid\\dots\\mid b",
+    "a|···|b"
+  ],
+  [
+    "explicit center dots",
+    "a\\cdots b",
+    "a···b"
+  ],
+  [
+    "binary dots macro",
+    "\\dotsb",
+    "···"
+  ],
+  [
+    "multiplication dots macro",
+    "\\dotsm",
+    "···"
+  ],
+  [
+    "integral dots macro",
+    "\\dotsi",
+    "···"
+  ],
+  [
+    "other dots macro",
+    "\\dotso",
+    "..."
+  ],
+  [
+    "comma dots macro",
+    "\\dotsc",
+    "..."
+  ],
+  [
+    "comma list",
+    "a,\\dots,b",
+    "a,...,b"
+  ],
+  [
+    "standalone dots",
+    "\\dots",
+    "..."
+  ],
+  [
+    "inequality",
+    "a_1\\le\\dots\\le a_n",
+    "a₁≤···≤aₙ"
+  ],
+  [
+    "product",
+    "a_1\\times\\dots\\times a_n",
+    "a₁×···×aₙ"
+  ],
+  [
+    "fraction",
+    "\\frac{a_1+\\cdots+a_n}{n}",
+    "(a₁+···+aₙ)/(n)"
+  ],
+  [
+    "unmapped macro keeps entire formula",
+    "\\unknown{x}+\\dots+y",
+    null
+  ]
+]
