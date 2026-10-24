@@ -3,6 +3,7 @@ use super::{FontBook, paste_mask};
 use crate::{Error, Parameters, Result, text::Node};
 use image::{GrayImage, Luma};
 use std::collections::HashMap;
+mod pen;
 
 #[derive(Clone)]
 pub(super) struct Glyph {
@@ -76,6 +77,7 @@ pub(super) struct Glyphs<'a> {
     pub book: &'a FontBook,
     cache: HashMap<(char, u32), Glyph>,
     cache_bytes: usize,
+    pen: pen::MathPen,
 }
 type Path = (Vec<(i32, i32)>, i32);
 impl<'a> Glyphs<'a> {
@@ -84,7 +86,16 @@ impl<'a> Glyphs<'a> {
             book,
             cache: HashMap::new(),
             cache_bytes: 0,
+            pen: pen::MathPen::sample(book.primary()),
         }
+    }
+    pub fn with_parameters(book: &'a FontBook, p: &Parameters) -> Self {
+        let mut glyphs = Self::new(book);
+        glyphs.pen.naturalness =
+            ((p.perturb_theta_sigma / 0.05 + (p.perturb_x_sigma + p.perturb_y_sigma) / 6.) / 2.)
+                .clamp(0., 1.);
+        glyphs.pen.seed = p.seed;
+        glyphs
     }
     pub fn glyph(&mut self, c: char, size: f32) -> Result<Glyph> {
         let size = size.clamp(1., 2048.).round();
@@ -110,17 +121,8 @@ impl<'a> Glyphs<'a> {
         if glyph.ink {
             glyph = Self::trim(glyph);
         }
-        // 2026-10-24：部分手写字体把否定符映射成双点，使用同数学笔画粗细的连续折线保留逻辑含义。
-        if c == '¬' {
-            let width = (size * 0.5).round().max(2.) as i32;
-            let top = -(size * 0.36).round() as i32;
-            let leg = (size * 0.19).round().max(1.) as i32;
-            let thickness = (size / 28.).round().max(1.) as i32;
-            glyph = Self::compose(
-                width as f32 + (size * 0.08).max(1.),
-                vec![],
-                vec![(vec![(0, top), (width, top), (width, top + leg)], thickness)],
-            )?;
+        if let Some(symbol) = self.pen.symbol(c, size)? {
+            glyph = symbol;
         }
         if self.cache.len() >= 1024 || self.cache_bytes + glyph.mask.len() > 8 * 1024 * 1024 {
             self.cache.clear();
@@ -268,6 +270,7 @@ impl<'a> Glyphs<'a> {
             Node::Table(table) => self.table(table, size, depth + 1),
             Node::Circuit(circuit) => self.circuit(circuit, size, depth + 1),
             Node::Fraction(num, den) => {
+                let thickness = self.pen.thickness(size).ceil() as i32;
                 let a = self.sequence_at(num, small, depth + 1)?;
                 let b = self.sequence_at(den, small, depth + 1)?;
                 let x = self.glyph('x', size)?;
@@ -278,7 +281,8 @@ impl<'a> Glyphs<'a> {
                 let bx = (width - b.mask.width() as i32) / 2 - b.left;
                 let ay = axis - (thickness + 1) / 2 - gap - a.bottom();
                 let by = axis + (thickness + 1) / 2 + gap + 1 - b.top;
-                Self::compose(
+                self.math_compose(
+                    size,
                     (width + padding) as f32,
                     vec![(a, ax, ay), (b, bx, by)],
                     vec![(vec![(1, axis), (width - 1, axis)], thickness)],
@@ -317,7 +321,12 @@ impl<'a> Glyphs<'a> {
                     (offset + stem - 2, top),
                     (right, top),
                 ];
-                Self::compose((right + gap) as f32, children, vec![(points, thickness)])
+                self.math_compose(
+                    size,
+                    (right + gap) as f32,
+                    children,
+                    vec![(points, thickness)],
+                )
             }
             Node::Scripts { upper, lower } => {
                 let base = self.glyph('x', size)?;

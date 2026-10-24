@@ -190,6 +190,9 @@ impl FontBook {
             .find(|f| visible_glyph(f, c))
             .unwrap_or(&self.fonts[0])
     }
+    pub(crate) fn primary(&self) -> &Font {
+        &self.fonts[0]
+    }
 }
 
 #[cfg(test)]

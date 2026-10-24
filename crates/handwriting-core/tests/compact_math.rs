@@ -101,10 +101,32 @@ fn nonzero_translation_moves_whole_formula_without_detaching_ink_components() {
             shifted.params.perturb_x_sigma = 2.;
             shifted.params.perturb_y_sigma = 3.;
             shifted.params.seed = seed;
-            assert!(
-                ink_crop(&page(&shifted)) == baseline,
-                "{source}/{seed}: formula components moved independently"
-            );
+            let actual = ink_crop(&page(&shifted));
+            if source.contains('√') || source.contains(")/(") {
+                // 2026-10-24：分数线与根顶允许两像素内的自然曲线，不能让结构或字形独立漂移。
+                assert!(actual.width().abs_diff(baseline.width()) <= 2);
+                assert!(actual.height().abs_diff(baseline.height()) <= 2);
+                for (a, b) in [(&baseline, &actual), (&actual, &baseline)] {
+                    for (x, y, _) in a.enumerate_pixels().filter(|(_, _, p)| p[0] < 128) {
+                        assert!(
+                            (-2..=2).any(|dx| (-2..=2).any(|dy| {
+                                let (xx, yy) = (x as i32 + dx, y as i32 + dy);
+                                xx >= 0
+                                    && yy >= 0
+                                    && xx < b.width() as i32
+                                    && yy < b.height() as i32
+                                    && b[(xx as u32, yy as u32)][0] < 128
+                            })),
+                            "{source}/{seed}: formula components moved independently"
+                        );
+                    }
+                }
+            } else {
+                assert!(
+                    actual == baseline,
+                    "{source}/{seed}: non-math frames must remain rigid"
+                );
+            }
         }
     }
 }
