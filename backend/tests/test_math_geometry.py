@@ -79,10 +79,13 @@ def test_fraction_has_clear_space_above_and_below_the_bar():
     rows = pixels.sum(axis=1)
     bar_y = int(rows.argmax())
     assert rows[bar_y] > 20
-    assert rows[bar_y - 1] == rows[bar_y - 2] == 0
-    assert rows[bar_y + 1] == rows[bar_y + 2] == 0
-    assert rows[: bar_y - 2].sum() > 0
-    assert rows[bar_y + 3 :].sum() > 0
+    # 2026-10-24：笔宽随所选字体变化，以完整横画范围检查两侧空隙，而非假定恒为一像素。
+    bar_rows = np.flatnonzero(rows > rows.max() * 0.8)
+    top, bottom = int(bar_rows.min()), int(bar_rows.max())
+    assert rows[top - 1] == rows[top - 2] == 0
+    assert rows[bottom + 1] == rows[bottom + 2] == 0
+    assert rows[: top - 2].sum() > 0
+    assert rows[bottom + 3 :].sum() > 0
 
 
 def test_paired_scripts_share_one_column_and_use_handwriting_letters():

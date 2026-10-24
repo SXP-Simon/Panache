@@ -43,7 +43,7 @@ COURSEWORK = (
 
 
 def _leaf_glyphs(box):
-    result = box.glyph or ""
+    result = box.glyph or box.semantic or ""
     return result + "".join(_leaf_glyphs(child) for child, _, _ in box.children)
 
 

@@ -7,7 +7,7 @@ from multiprocessing import get_context
 import pytest
 import symbol_fallback as symbols
 from handright import handwrite
-from PIL import Image, ImageChops, ImageFont
+from PIL import Image, ImageChops, ImageFilter, ImageFont, ImageOps
 from test_math_page_layout import draft, real_core, template
 from test_math_table import FONT, X
 
@@ -53,11 +53,18 @@ def test_final_structures_preserve_all_cells_and_rules_under_strong_perturbation
         )
     )
     assert len(actual) == len(reference) == 1
-    assert actual[0].tobytes() == reference[0].tobytes()
+    if source in (SNN, SOURCES[4], SOURCES[5]):
+        assert actual[0].tobytes() == reference[0].tobytes()
+    else:
+        # 2026-10-24：分数线和根钩允许有界弧度；文字/格线不能被拆散、旋转或平移。
+        before = ImageOps.invert(reference[0].convert("L"))
+        after = ImageOps.invert(actual[0].convert("L"))
+        assert ImageChops.subtract(before, after.filter(ImageFilter.MaxFilter(5))).getbbox() is None
+        assert ImageChops.subtract(after, before.filter(ImageFilter.MaxFilter(5))).getbbox() is None
     data = io.BytesIO()
     actual[0].save(data, format="PNG")
     data.seek(0)
-    assert Image.open(data).tobytes() == reference[0].tobytes()
+    assert Image.open(data).tobytes() == actual[0].tobytes()
 
 
 def test_mixed_prose_keeps_handwriting_variation_and_tables_stay_intact():

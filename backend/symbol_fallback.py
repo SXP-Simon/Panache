@@ -34,6 +34,7 @@ if __package__:
     from .math_ink import install_math_ink
     from .math_matrix import matrix_delimiters
     from .math_page_layout import install_math_page_layout
+    from .math_pen import SYMBOLS, font_pen, symbol_paths
     from .math_table import Table, parse_table, table_spans
 else:
     from circuit import Circuit, parse_circuit
@@ -45,6 +46,7 @@ else:
     from math_ink import install_math_ink
     from math_matrix import matrix_delimiters
     from math_page_layout import install_math_page_layout
+    from math_pen import SYMBOLS, font_pen, symbol_paths
     from math_table import Table, parse_table, table_spans
 
 
@@ -409,7 +411,8 @@ def convert_tables_to_drawn(text: str, _depth: int = 0) -> str:
 def is_math_glyph(char: str) -> bool:
     """Check whether a registered glyph requires mathematical layout."""
     return (
-        char in _CIRCUIT_MAP
+        char in SYMBOLS
+        or char in _CIRCUIT_MAP
         or char in _TABLE_MAP
         or char in _VULGAR_FRACTION_MAP
         or char in _RADICAL_MAP
@@ -933,6 +936,7 @@ class _MathBox:
     paths: tuple[BoxPath, ...] = ()
     glyph: str | None = None
     font: Font | None = None
+    semantic: str | None = None
 
 
 @dataclass
@@ -1248,7 +1252,8 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
         padding = max(3, round(size * 0.12))
         line_width = max(num.bbox[2] - num.bbox[0], den.bbox[2] - den.bbox[0], 1) + 2 * padding
         axis = _math_axis(font, font_path)
-        thickness, gap = max(1, round(size * 0.035)), max(2, round(size * 0.08))
+        pen = font_pen(font, size)
+        thickness, gap = pen.width, max(2, round(size * 0.08))
         nx = (line_width - (num.bbox[2] - num.bbox[0])) // 2 - num.bbox[0]
         dx = (line_width - (den.bbox[2] - den.bbox[0])) // 2 - den.bbox[0]
         ny = axis - (thickness + 1) // 2 - gap - num.bbox[3]
@@ -1256,7 +1261,7 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
         return _compose_box(
             line_width + max(3, round(size * 0.1)),
             ((num, nx, ny), (den, dx, dy)),
-            ((((1, axis), (line_width - 1, axis)), thickness),),
+            (pen.path(((1, axis), (line_width - 1, axis))),),
         )
     if char in _RADICAL_MAP:
         radicand, index = _RADICAL_MAP[char]
@@ -1266,7 +1271,7 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
         bottom = max(body.bbox[3], top + round(size * 0.58))
         height = bottom - top
         stem_width = max(10, round(size * 0.46))
-        thickness = max(1, round(size * 0.035))
+        pen = font_pen(font, size)
         offset = 0
         children: list[BoxChild] = []
         if index:
@@ -1288,9 +1293,15 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
             (offset + stem_width - 2, top),
             (right, top),
         )
-        return _compose_box(right + gap, children, ((points, thickness),))
-    chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
-    return _MathBox(advance, bbox, glyph=char, font=chosen)
+        return _compose_box(right + gap, children, (pen.path(points),))
+    if char in SYMBOLS:
+        advance, paths = symbol_paths(char, font_pen(font, size), _math_axis(font, font_path))
+        drawn = _compose_box(advance, paths=paths)
+        result = _MathBox(drawn.advance, drawn.bbox, paths=drawn.paths, semantic=char)
+    else:
+        chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
+        result = _MathBox(advance, bbox, glyph=char, font=chosen)
+    return result
 
 
 def _layout_math_text(

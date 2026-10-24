@@ -21,11 +21,13 @@ if __package__:
     from .homework_layout import ParagraphStyle, bracket_depth, paragraph_style, preferred_break
     from .library_boundary import install_member, member
     from .math_ink import remember_math_ink
+    from .math_pen import template_pen
 else:
     from generation_cancellation import check_cancelled
     from homework_layout import ParagraphStyle, bracket_depth, paragraph_style, preferred_break
     from library_boundary import install_member, member
     from math_ink import remember_math_ink
+    from math_pen import template_pen
 
 
 type Font = FreeTypeFont | ImageFont
@@ -582,7 +584,8 @@ def install_math_page_layout(
                 tpl = copy.copy(tpl)
                 tpl.set_strikethrough_probability(0)
             return original(page, text, start, tpl, rand)
-        return _PageRenderer(layout, page, text, tpl, rand).render(start)
+        with template_pen(tpl):
+            return _PageRenderer(layout, page, text, tpl, rand).render(start)
 
     install_member(draw_page, "_math_page_layout", value=True)
     install_member(core, "_draw_page", draw_page)
