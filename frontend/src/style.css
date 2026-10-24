@@ -899,8 +899,8 @@ input[type='color'] {
 }
 .layout-preset {
   border-top: 1px solid var(--border);
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
 }
 .layout-preset-help {
   margin: 6px 0 0;
