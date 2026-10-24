@@ -4,7 +4,7 @@ import '../../l10n/app_localizations.dart';
 
 typedef LetterInputs = ({String body, String signature, String date});
 
-Future<String?> showMarkdownDialog(
+Future<String?> showPrepareTextDialog(
   BuildContext context, {
   required String initialMode,
 }) async {
@@ -14,22 +14,30 @@ Future<String?> showMarkdownDialog(
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, update) => AlertDialog(
-        title: Text(l.markdown),
-        content: DropdownButtonFormField<String>(
-          isExpanded: true,
-          initialValue: selected,
-          decoration: InputDecoration(labelText: l.tableMode),
-          items: [
-            for (final option in [
-              ('latex', l.latexTableMode),
-              ('list', l.listMode),
-              ('aligned', l.alignedMode),
-              ('raw_pipe', l.pipeMode),
-              ('clean', l.cleanMode),
-            ])
-              DropdownMenuItem(value: option.$1, child: Text(option.$2)),
+        title: Text(l.prepareText),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l.prepareTextHelp),
+            const SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: selected,
+              decoration: InputDecoration(labelText: l.tableMode),
+              items: [
+                for (final option in [
+                  ('latex', l.latexTableMode),
+                  ('list', l.listMode),
+                  ('aligned', l.alignedMode),
+                  ('raw_pipe', l.pipeMode),
+                  ('clean', l.cleanMode),
+                ])
+                  DropdownMenuItem(value: option.$1, child: Text(option.$2)),
+              ],
+              onChanged: (v) => update(() => selected = v!),
+            ),
           ],
-          onChanged: (v) => update(() => selected = v!),
         ),
         actions: [
           TextButton(

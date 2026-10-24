@@ -91,7 +91,7 @@ void main() {
           size: const Size(375, 800),
           locale: locale,
         );
-        const manual = '第一段\n\n---\n\n第二段';
+        const manual = '### 第一段\n\n---\n\n第二段 \$x^2\$；代码 `x^2`';
         final input = find.byKey(const ValueKey('text-editor'));
         await tester.enterText(input, manual);
         await tester.pumpAndSettle();
@@ -101,7 +101,9 @@ void main() {
         Future<void> openCleanup() async {
           await tester.tap(find.byKey(const ValueKey('editor-tools')));
           await tester.pumpAndSettle();
-          final cleanup = find.widgetWithText(ListTile, l.markdown);
+          final cleanup = find.widgetWithText(ListTile, l.prepareText);
+          expect(find.widgetWithText(ListTile, l.latex), findsNothing);
+          expect(find.widgetWithText(ListTile, l.markdown), findsNothing);
           await tester.ensureVisible(cleanup);
           await tester.pumpAndSettle();
           await tester.tap(cleanup);
@@ -115,7 +117,25 @@ void main() {
         await openCleanup();
         await tester.tap(find.widgetWithText(FilledButton, l.apply));
         await tester.pumpAndSettle();
-        expect(workspace.text, '第一段\n第二段');
+        const prepared = '第一段\n第二段 x²；代码 x^2';
+        expect(workspace.text, prepared);
+        await openCleanup();
+        await tester.tap(find.widgetWithText(FilledButton, l.apply));
+        await tester.pumpAndSettle();
+        expect(workspace.text, prepared);
+        final undoButton = find.widgetWithText(TextButton, l.undo);
+        await tester.ensureVisible(undoButton);
+        await tester.tap(undoButton);
+        await tester.pumpAndSettle();
+        expect(workspace.text, manual);
+        await tester.tap(find.widgetWithText(TextButton, l.redo));
+        await tester.pumpAndSettle();
+        expect(workspace.text, prepared);
+        await tester.enterText(input, '新内容');
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, l.redo));
+        await tester.pumpAndSettle();
+        expect(workspace.text, '新内容');
         expect(tester.takeException(), isNull);
       },
     );
@@ -148,6 +168,53 @@ void main() {
           .brightness,
       Brightness.dark,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('changing table mode prepares the original and preserves code', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(1440, 1000));
+    final l = labels(tester);
+    const original = '代码 `x^2`\n| 变量 | 值 |\n| --- | --- |\n| a | \$x^2\$ |';
+    final input = find.byKey(const ValueKey('text-editor'));
+    await tester.enterText(input, original);
+    await tester.pumpAndSettle();
+    Future<void> openPrepare() async {
+      final more = find.byKey(const ValueKey('editor-tools'));
+      if (more.evaluate().isNotEmpty) {
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ListTile, l.prepareText));
+      } else {
+        await tester.tap(find.widgetWithText(TextButton, l.prepareText));
+      }
+      await tester.pumpAndSettle();
+    }
+
+    await openPrepare();
+    await tester.tap(find.widgetWithText(FilledButton, l.apply));
+    await tester.pumpAndSettle();
+    expect(workspace.text, contains('⟦'));
+    expect(workspace.text, startsWith('代码 x^2'));
+    await openPrepare();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(DropdownButtonFormField<String>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l.listMode).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, l.apply));
+    await tester.pumpAndSettle();
+    expect(workspace.text, startsWith('代码 x^2'));
+    expect(workspace.text, isNot(contains('⟦')));
+    expect(workspace.text, contains('x²'));
+    await tester.tap(find.widgetWithText(TextButton, l.undo));
+    await tester.pumpAndSettle();
+    expect(workspace.text, original);
     expect(tester.takeException(), isNull);
   });
 
