@@ -44,6 +44,9 @@ The default paper has approximately A4 proportions. Pixel dimensions do not pres
 | Perturb Theta Sigma | `0.05` | Variation in each character's rotation, in radians. |
 | Ink depth sigma | `30` | Variation in ink darkness, simulating heavier and lighter strokes. |
 
+Negation, arrows, inequalities, fraction bars, and radicals follow the selected font's pen style. `≤` and `≥` prefer its own `<` and `>` shapes.
+Perturb X, Y, and Theta also control subtle curves in drawn strokes. Set all three to `0` to disable this curvature; formula structure and symbol meanings stay unchanged.
+
 ## Strikethroughs
 
 Use these to leave a few "crossed out" marks on the page.
