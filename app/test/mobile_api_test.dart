@@ -34,15 +34,25 @@ void main() {
       await expectLater(api.call('unknown'), throwsA(isA<ApiException>()));
       await expectLater(api.status('missing'), throwsA(isA<ApiException>()));
       for (var attempt = 0; attempt < 2; attempt++) {
-        final cancelled = await api.submit({
-          'text': '停止后重新生成'.padRight(20000, '字'),
-          'width': '1600',
-          'height': '2200',
-          'font_size': '70',
-          'line_spacing': '120',
-        }, {});
+        final cancelled = await api.submit(
+          {
+            'text': '停止后重新生成'.padRight(20000, '字'),
+            'width': '1600',
+            'height': '2200',
+            'font_size': '70',
+            'line_spacing': '120',
+          },
+          {
+            if (attempt == 0)
+              'font_file': Upload(
+                'handwriting.ttf',
+                await File('../assets/font_assets/神韵英子楷书.ttf').readAsBytes(),
+              ),
+          },
+        );
         await api.cancelTask(cancelled);
         expect((await api.status(cancelled))['task_status'], 'cancelled');
+        expect(await Directory('${root.path}/uploads').list().length, 0);
         expect(
           await Directory('${root.path}/tasks/$cancelled').exists(),
           false,
