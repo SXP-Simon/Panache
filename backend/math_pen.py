@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Simon and Panache contributors.
 """2026-10-24：从当前字体采样数学笔触，只改变笔画而不扰动公式布局."""
 
-import functools
 import itertools
 import math
 from collections.abc import Generator, Iterator
@@ -9,7 +8,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from statistics import median
+from threading import RLock
 from typing import Protocol, cast
+from weakref import WeakKeyDictionary
 
 from handright import Template
 from PIL import ImageFont
@@ -62,8 +63,23 @@ class Pen:
         return tuple(result), self.width
 
 
-@functools.lru_cache(maxsize=256)
+_PEN_CACHE: WeakKeyDictionary[Font, dict[int, Pen]] = WeakKeyDictionary()
+_PEN_CACHE_LOCK = RLock()
+
+
 def font_pen(font: Font, size: int) -> Pen:
+    """2026-10-24：弱引用缓存采样结果，上传字体可在请求结束后正常释放."""
+    with _PEN_CACHE_LOCK:
+        samples = _PEN_CACHE.get(font)
+        if samples is None:
+            samples = {}
+            _PEN_CACHE[font] = samples
+        if size not in samples:
+            samples[size] = _sample_font_pen(font, size)
+        return samples[size]
+
+
+def _sample_font_pen(font: Font, size: int) -> Pen:
     """2026-10-24：横画估计笔宽，竖画上下墨迹估计斜度，不读取备用字体的风格."""
     width = max(1, round(size * 0.03))
     sampler = cast("_MaskFont", font)
