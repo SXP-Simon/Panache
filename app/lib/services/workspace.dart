@@ -46,7 +46,14 @@ class Workspace extends ChangeNotifier {
   List<String> fonts = [];
   List<Uint8List> pages = [];
   Map<String, String> images = {};
-  Upload? background;
+  Upload? _background;
+  bool backgroundRuled = false;
+  Upload? get background => _background;
+  set background(Upload? value) {
+    if (!identical(value, _background)) backgroundRuled = false;
+    _background = value;
+  }
+
   Upload? _fontFile;
   // Draft edits must not cancel an in-flight font restore; font choices must.
   int _fontRevision = 0;
@@ -307,6 +314,7 @@ class Workspace extends ChangeNotifier {
       if (background != null) {
         fields.remove('width');
         fields.remove('height');
+        fields['background_ruled'] = '$backgroundRuled';
       }
       final submittedId = await activeApi.submit(fields, {
         'font_file': ?fontFile,

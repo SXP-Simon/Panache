@@ -189,5 +189,7 @@
   "updateAnotherInstance": "请先关闭其他 Panache 窗口，然后重试更新。",
   "preparingText": "正在整理文本…",
   "stopTextPreparation": "停止整理",
-  "prepareTextFailed": "整理未完成，请重试。原文已保留。"
+  "prepareTextFailed": "整理未完成，请重试。原文已保留。",
+  "paperIdentificationFailed": "无法可靠识别纸张，已保留原有背景与设置。请使用平整、横线清晰的纸张图片，或手动调整。",
+  "paperIdentificationDone": "已按横线对齐边距和行距，校正倾斜背景，并缩小超出行距的字号。请生成预览查看效果。"
 }
