@@ -40,9 +40,8 @@ for (const [index, source] of pages.entries()) {
     await expect(page.getByTestId('modal')).toHaveCount(0);
     const input = page.getByTestId('text-input');
     await input.fill(source);
-    await page.getByTestId('clean-markdown-btn').click();
+    await page.getByTestId('prepare-text-btn').click();
     await expect(input).toHaveValue(new RegExp('^' + source.split('\n')[0].slice(2)));
-    await page.getByTestId('convert-latex-btn').click();
     await expect(input).not.toHaveValue(/\\(?:ce|qty|SI|frac|begin\{(?:aligned|pmatrix|array))\b/);
     if (index === 6) await expect(input).not.toHaveValue(/\\(?:dv|pdv|abs|norm)\b/);
     const converted = await input.inputValue();

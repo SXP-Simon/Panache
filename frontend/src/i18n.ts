@@ -182,6 +182,12 @@ const words = {
   insertImage: ['插入图片', 'Insert image'],
   latex: ['转换 LaTeX', 'Convert LaTeX'],
   markdown: ['清理 Markdown', 'Clean Markdown'],
+  prepareText: ['整理文本', 'Prepare text'],
+  prepareTextHint: [
+    '先清理 Markdown，再转写公式；保留代码内容，可撤销。',
+    'Clean Markdown, then transcribe formulas. Keeps code intact; undo is available.',
+  ],
+  undoText: ['撤销整理', 'Undo cleanup'],
   markdownHint: [
     '清理格式，同时移除独立分隔线和空白行',
     'Clean formatting, standalone separators and blank lines',
@@ -336,8 +342,8 @@ const words = {
   insertedImages: ['正文插图', 'Inline images'],
   guideTitle: ['在这里，让文字变成笔迹', 'Turn your words into handwriting'],
   guideText: [
-    '输入正文或导入 TXT、DOCX、PDF。数学公式先用「转换 LaTeX」转写；常见 CircuiTikZ 电路可直接生成预览。使用 --- 独占一行分页，使用 >>> 开头将一行右对齐。',
-    'Enter text or import TXT, DOCX or PDF. Convert LaTeX formulas first; common CircuiTikZ circuits render directly in Preview. A line with --- creates a page break; a line starting with >>> is right-aligned.',
+    '输入正文或导入 TXT、DOCX、PDF。使用「整理文本」清理 Markdown 并转写公式；常见 CircuiTikZ 电路可直接生成预览。使用 --- 独占一行分页，使用 >>> 开头将一行右对齐。',
+    'Enter text or import TXT, DOCX or PDF. Use Prepare text to clean Markdown and transcribe formulas; common CircuiTikZ circuits render directly in Preview. A line with --- creates a page break; a line starting with >>> is right-aligned.',
   ],
   privacy: [
     '本地草稿和预设留在此浏览器中。生成时，正文、字体与背景会发送给当前后端服务。',

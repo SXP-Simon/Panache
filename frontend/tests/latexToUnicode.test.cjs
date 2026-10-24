@@ -13,6 +13,10 @@ async function run() {
     }
   }
   const cases = [
+    ['prepared closure is not TeX single-token power', '(0|1)^(*)01', '(0|1)^(*)01'],
+    ['prepared compound closures remain intact', '1^(*)01^(*)(01^(*)01^(*))^(*)|0^(*)10^(*)(10^(*)10^(*))^(*)', '1^(*)01^(*)(01^(*)01^(*))^(*)|0^(*)10^(*)(10^(*)10^(*))^(*)'],
+    ['prepared alphabet closures remain intact', 'a^(*)b^(*)c^(*)...x^(*)y^(*)z^(*)', 'a^(*)b^(*)c^(*)...x^(*)y^(*)z^(*)'],
+    ['prepared scripts coexist with fresh latex', String.raw`x_(A)+y^(n+1)+\alpha+z^2`, 'x_(A)+y^(n+1)+α+z²'],
     ['mixed prose coefficient powers', String.raw`导数：3x^2 + 12y_1，标识符 abc3x^2 不变。`, String.raw`导数：3x² + 12y₁，标识符 abc3x^2 不变。`],
     ['mixed prose evaluation limits', String.raw`左边：\int_{-1}^{1} x^2 dx = \left. \frac{1}{3}x^3 \right\vert{}_{-1}^{1} = \frac{2}{3}`, '左边：∫₋₁¹ x² dx = ⅓x³|₋₁¹ = ⅔'],
     ['mixed prose paired bracket and powers', String.raw`右边：\frac{1}{2}\left[ (\frac{1}{2}-\frac{1}{2\sqrt{3}})^3 + (\frac{1}{2}+\frac{1}{2\sqrt{3}})^3 \right]`, '右边：½[(½-(1)/(2√(3)))³+(½+(1)/(2√(3)))³]'],

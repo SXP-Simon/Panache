@@ -8,7 +8,6 @@ import { useNotificationStore } from '@/features/notifications/store';
 import { reportFailure } from '@/features/workspace/reportFailure';
 import { updateResources } from '@/features/workspace/resourceUpdates';
 import { useI18n } from '../i18n';
-import { cleanMarkdown } from '@/utils/cleanMarkdown';
 import {
   extractLetterEnding,
   formatChineseLetter,
@@ -27,7 +26,6 @@ import {
   FileText,
   Upload,
   ImagePlus,
-  Sigma,
   AlignLeft,
   LetterText,
   Undo2,
@@ -55,7 +53,13 @@ export default function EditorPanel() {
     date: string;
     detectedEnding: boolean;
   } | null>(null);
-  const [backup, setBackup] = useState<{ original: string; formatted: string } | null>(null);
+  const [backup, setBackup] = useState<{
+    original: string;
+    formatted: string;
+    kind: 'text' | 'letter';
+  } | null>(null);
+  const prepared = useRef<{ original: string; text: string; tableMode: TableMode } | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -72,6 +76,34 @@ export default function EditorPanel() {
   function editText(value: string) {
     setBackup(null);
     setText(value);
+  }
+  async function prepareText() {
+    const current = useDocumentStore.getState().text;
+    if (
+      preparing ||
+      (prepared.current?.text === current && prepared.current.tableMode === tableMode)
+    )
+      return;
+    const original = prepared.current?.text === current ? prepared.current.original : current;
+    setPreparing(true);
+    try {
+      const { prepareHandwritingText } = await import('@/utils/prepareHandwritingText');
+      if (
+        !mounted.current ||
+        useDocumentStore.getState().text !== current ||
+        usePreferencesStore.getState().tableMode !== tableMode
+      )
+        return;
+      const formatted = prepareHandwritingText(original, tableMode);
+      prepared.current = { original, text: formatted, tableMode };
+      if (formatted === current) return;
+      setBackup({ original, formatted, kind: 'text' });
+      setText(formatted);
+    } catch (cause) {
+      reportFailure(cause);
+    } finally {
+      if (mounted.current) setPreparing(false);
+    }
   }
   function insert(value: string) {
     const current = useDocumentStore.getState();
@@ -204,27 +236,13 @@ export default function EditorPanel() {
         <Button
           size="small"
           variant="ghost"
-          data-testid="convert-latex-btn"
-          onClick={() => {
-            void import('@/utils/latexToUnicode')
-              .then((module) =>
-                editText(module.convertLatexToUnicode(useDocumentStore.getState().text)),
-              )
-              .catch(reportFailure);
-          }}
-        >
-          <Sigma size={15} />
-          LaTeX
-        </Button>
-        <Button
-          size="small"
-          variant="ghost"
-          data-testid="clean-markdown-btn"
-          title={t('markdownHint')}
-          onClick={() => editText(cleanMarkdown(text, { tableMode }))}
+          data-testid="prepare-text-btn"
+          title={t('prepareTextHint')}
+          disabled={preparing || !text.trim()}
+          onClick={() => void prepareText()}
         >
           <AlignLeft size={15} />
-          {t('markdown')}
+          {t('prepareText')}
         </Button>
         <Button size="small" variant="ghost" data-testid="letter-format-btn" onClick={openLetter}>
           <LetterText size={15} />
@@ -275,14 +293,14 @@ export default function EditorPanel() {
           <Button
             size="small"
             variant="ghost"
-            data-testid="letter-undo-btn"
+            data-testid={backup.kind === 'text' ? 'prepare-text-undo' : 'letter-undo-btn'}
             onClick={() => {
               setText(backup.original);
               setBackup(null);
             }}
           >
             <Undo2 size={14} />
-            {t('undo')}
+            {t(backup.kind === 'text' ? 'undoText' : 'undo')}
           </Button>
         )}
       </div>
@@ -489,8 +507,12 @@ export default function EditorPanel() {
                 disabled={!letter.body.trim()}
                 onClick={() => {
                   setBackup((previous) => ({
-                    original: previous?.formatted === text ? previous.original : text,
+                    original:
+                      previous?.kind === 'letter' && previous.formatted === text
+                        ? previous.original
+                        : text,
                     formatted: letterPreview,
+                    kind: 'letter',
                   }));
                   setText(letterPreview);
                   setLetter(null);

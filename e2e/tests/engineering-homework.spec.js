@@ -37,9 +37,7 @@ for (const style of ['neat', 'casual']) {
     await page.getByTestId('height-input').fill('2200');
     const input = page.getByTestId('text-input');
     await input.fill(homework);
-    await page.getByTestId('clean-markdown-btn').click();
-    await expect(input).toHaveValue(/\\begin\{array\}/);
-    await page.getByTestId('convert-latex-btn').click();
+    await page.getByTestId('prepare-text-btn').click();
     await expect(input).toHaveValue(/⟦/);
     const converted = await input.inputValue();
     expect(converted).not.toMatch(/\\(?:SI|si|mathcal|oiint|begin|end|dot|ddot|vartheta|varphi|varrho|varepsilon)\b/);
@@ -67,6 +65,6 @@ test('programming examples and reference links survive the cleanup button', asyn
   await openHome(page);
   const source = '# 程序\n```cpp\n#include <stdio.h>\n    *p = a * b;\n```\n[说明](https://example.invalid/RC_(filter))';
   await page.getByTestId('text-input').fill(source);
-  await page.getByTestId('clean-markdown-btn').click();
+  await page.getByTestId('prepare-text-btn').click();
   await expect(page.getByTestId('text-input')).toHaveValue('程序\n#include <stdio.h>\n    *p = a * b;\n说明');
 });

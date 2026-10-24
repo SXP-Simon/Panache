@@ -1,6 +1,8 @@
 export type TableMode = 'latex' | 'list' | 'aligned' | 'raw_pipe' | 'clean';
 export interface MarkdownOptions {
   tableMode?: TableMode;
+  /** Transform math while literal code is still protected. */
+  transformMath?: (source: string) => string;
 }
 import { mapMathSegments } from './mathSegments.ts';
 import { markdownTablesToLatex } from './markdownTableLatex.ts';
@@ -290,12 +292,11 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
     (raw: string, index: string) => mathSources[Number(index)] ?? raw,
   );
   // 2026-10-16：仅显式清洗删除分隔线与空行，保留有内容行的缩进及单个换行。
-  const cleaned = code.restore(
-    s
-      .split('\n')
-      .filter((line) => line.trim() !== '' && line.trim() !== '---')
-      .join('\n'),
-  );
+  const prose = s
+    .split('\n')
+    .filter((line) => line.trim() !== '' && line.trim() !== '---')
+    .join('\n');
+  const cleaned = code.restore(options.transformMath ? options.transformMath(prose) : prose);
   return cleaned.replace(
     new RegExp(`${circuitPrefix}(\\d+)\ue121`, 'g'),
     (raw: string, index: string) => circuits[Number(index)] ?? raw,

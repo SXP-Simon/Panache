@@ -224,7 +224,7 @@ for (const script of ["service-worker.js", "sw.js"]) {
       assert.equal(await page.getByTestId('text-input').inputValue(), '离线草稿 $x^2$');
       await page.getByTestId('text-input').fill('离线仍可编辑 $x^2$');
       // The dynamically imported converter is a hashed build asset and must also work offline.
-      await page.getByTestId('convert-latex-btn').click();
+      await page.getByTestId('prepare-text-btn').click();
       await page.waitForFunction(() => document.querySelector('[data-testid="text-input"]').value.includes('x²'));
       const offlineApi = await page.evaluate(async () => {
         try { await fetch('/api/generate_handwriting/task/old'); return 'unexpected-success'; }
@@ -240,7 +240,7 @@ for (const script of ["service-worker.js", "sw.js"]) {
           if (name.startsWith('handwriting-studio-shell:')) result.push(...(await (await caches.open(name)).keys()).map((request) => request.url));
         return result;
       });
-      assert.ok(cachedRequests.some((url) => /\/assets\/latexToUnicode-/.test(url)));
+      assert.ok(cachedRequests.some((url) => /\/assets\/prepareHandwritingText-/.test(url)));
       for (const url of fontUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
       for (const url of iconUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
       assert.ok(cachedRequests.every((url) => !new URL(url).pathname.startsWith('/api/')));

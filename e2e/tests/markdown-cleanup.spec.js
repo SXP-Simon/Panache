@@ -13,7 +13,7 @@ test('manual page breaks and blank lines remain until explicit Markdown cleanup'
   await expect(input).toHaveValue(manual);
   await page.reload();
   await expect(input).toHaveValue(manual);
-  await page.getByTestId('clean-markdown-btn').click();
+  await page.getByTestId('prepare-text-btn').click();
   await expect(input).toHaveValue('第一段\n第二段\n前---后\n-1\n![插图 1|50%]');
   await input.press('End');
   await input.press('Enter');

@@ -787,7 +787,9 @@ function convertBareText(text: string): string {
         const normalized = normalizePhysicsLatex(line);
         return normalized === line ? line : convertBareText(normalized);
       }
-      if (isBareFormula(line.trim())) {
+      // Parenthesized scripts are our editable output, not TeX's single-token ^(.
+      // Keep them intact on subsequent passes; individual new macros still convert below.
+      if (!/[_^]\(/.test(line) && isBareFormula(line.trim())) {
         const converted = tryConvertFormulaViaKatex(line.trim());
         if (converted !== null) {
           const output =

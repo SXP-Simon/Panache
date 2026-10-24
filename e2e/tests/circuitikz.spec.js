@@ -30,9 +30,8 @@ for (const style of ['neat', 'casual']) {
     await page.getByTestId('margin-top-input').fill('70');
     const input = page.getByTestId('text-input');
     await input.fill(source);
-    await page.getByTestId('clean-markdown-btn').click();
+    await page.getByTestId('prepare-text-btn').click();
     await expect(input).toHaveValue(/^常见作业电路/);
-    await page.getByTestId('convert-latex-btn').click();
     await expect(input).toHaveValue(/阻抗：Z=R\+jωL/);
     const converted = await input.inputValue();
     for (const id of ['rc-lowpass','rlc-ac','diode-bridge']) {
