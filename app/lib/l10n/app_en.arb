@@ -191,5 +191,9 @@
   "stopTextPreparation": "Stop preparing",
   "prepareTextFailed": "Text preparation failed. Please retry. Your original text is preserved.",
   "paperIdentificationFailed": "Could not reliably identify the paper. Your background and settings were kept. Try a flat image with clear lines, or adjust manually.",
-  "paperIdentificationDone": "Margins and spacing are aligned to the lines, tilted paper is straightened, and oversized text is reduced to fit. Generate a preview to check the result."
+  "paperIdentificationDone": "Margins and spacing are aligned to the lines, tilted paper is straightened, and oversized text is reduced to fit. Generate a preview to check the result.",
+  "layoutPreset": "Layout preset",
+  "layoutStandard": "Standard",
+  "layoutHomework": "Homework notes",
+  "layoutPresetHint": "Adds writing margins and list indentation; long formulas prefer breaks at relation signs. Keeps your text, font, and background."
 }
