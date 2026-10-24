@@ -22,8 +22,7 @@ LIGHT_PAPER = (235, 235, 235)
 LIGHT_INK = (200, 200, 200)
 
 
-# identify_distance 依赖 HoughLinesP 的直方图投票（threshold=100, minLineLength=100），
-# 笔画必须连成足够长的水平线才会被认出来，所以合成图用整条通栏的长横，而不是零散的字块。
+# 2026-10-24：使用整条横线带验证边距，线带中心而非双边缘决定行距。
 def synthetic_page(path, paper="white", ink=INK):
     image = Image.new("RGB", (PAGE_WIDTH, PAGE_HEIGHT), paper)
     draw = ImageDraw.Draw(image)
@@ -70,12 +69,8 @@ class IdentifyDistanceTest(unittest.TestCase):
             self.assertIsInstance(value, int)
             self.assertGreaterEqual(value, 0)
 
-    @unittest.expectedFailure
     def test_line_spacing_is_the_walk_distance_not_the_stroke_thickness(self):
-        # 已知缺陷：一横画在 Canny 后是上下两条边缘，相距约等于笔画高度（这里 9px），
-        # 而 DBSCAN 取的是「最常见」的簇 —— 笔画厚度，不是 LINE_SPACING。
-        # 前端拿它当 line_spacing 用，所以这个返回值偏小得离谱。
-        # 修好了就把这条 expectedFailure 去掉。
+        # 2026-10-24：粗线的上下边缘属于同一条线带，不能再被当成相邻书写行。
         *_, line_spacing = identify(self.page)
         self.assertAlmostEqual(line_spacing, LINE_SPACING, delta=4)
 

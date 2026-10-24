@@ -830,7 +830,8 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
         raise HTTPException(status_code=400, detail="Strikethrough probability must be in 0..1")
     template_type = (
         RuledTemplate
-        if data.get("isUnderlined") == "true" and "width" in data and "height" in data
+        if (data.get("isUnderlined") == "true" and "width" in data and "height" in data)
+        or (data.get("background_ruled") == "true" and "width" not in data)
         else Template
     )
     template = template_type(
@@ -1421,20 +1422,12 @@ def _process_image_upload(filename: str, content: bytes) -> Response:
     identification_error = cast("type[Exception]", member(identifier, "ImageIdentificationError"))
     try:
         path.write_bytes(content)
-        detector = cast(
-            "Callable[[str], tuple[float, float, float, float, float]]",
-            member(identifier, "identify_distance"),
+        detector = cast("Callable[[str], object]", member(identifier, "identify_paper"))
+        measurement = detector(str(path))
+        response = cast(
+            "Callable[[], dict[str, int | float | str]]", member(measurement, "response")
         )
-        left, right, top, bottom, spacing = detector(str(path))
-        return JSONResponse(
-            {
-                "marginLeft": left,
-                "marginRight": right,
-                "marginTop": top,
-                "marginBottom": bottom,
-                "lineSpacing": spacing,
-            }
-        )
+        return JSONResponse(response())
     except identification_error as error:
         return JSONResponse(
             {"error": str(error), "code": "backgroundDetectionFailed"}, status_code=422

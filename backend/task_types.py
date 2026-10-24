@@ -57,6 +57,7 @@ class GenerateHandwritingParams(BaseModel):
     width: str | None = None
     height: str | None = None
     is_underlined: str = Field("false", alias="isUnderlined")
+    background_ruled: str = "false"
     enable_english_spacing: str = Field("false", alias="enableEnglishSpacing")
     font_option: str | None = None
     pdf_save: str = "false"
