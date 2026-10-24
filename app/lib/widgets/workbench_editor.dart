@@ -20,11 +20,16 @@ class WorkbenchEditor extends StatelessWidget {
     this.onEditImage,
     this.onUndo,
     this.onRedo,
+    this.preparing = false,
+    this.preparationStopping = false,
+    this.onStopPreparation,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
   final UndoHistoryController undo;
   final bool locked;
+  final bool preparing, preparationStopping;
+  final VoidCallback? onStopPreparation;
   final Widget toolbar;
   final Map<String, String> images;
   final ValueChanged<String> onChanged;
@@ -46,6 +51,28 @@ class WorkbenchEditor extends StatelessWidget {
             ),
             child: Column(
               children: [
+                if (preparing) ...[
+                  const LinearProgressIndicator(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          preparationStopping
+                              ? l.stoppingTask
+                              : l.preparingText,
+                        ),
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('stop-text-preparation'),
+                        onPressed: preparationStopping
+                            ? null
+                            : onStopPreparation,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                        label: Text(l.stopTextPreparation),
+                      ),
+                    ],
+                  ),
+                ],
                 toolbar,
                 const SizedBox(height: 12),
                 Expanded(

@@ -63,6 +63,23 @@ void main() {
     tester.element(find.byKey(const ValueKey('text-editor'))),
   )!;
 
+  Future<void> waitPreparation(WidgetTester tester) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    await tester.pump();
+    while (find
+        .byKey(const ValueKey('stop-text-preparation'))
+        .evaluate()
+        .isNotEmpty) {
+      if (DateTime.now().isAfter(deadline)) fail('Text worker did not finish');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+  }
+
   for (final width in [320.0, 375.0]) {
     for (final locale in [const Locale('zh'), const Locale('en')]) {
       testWidgets(
@@ -131,12 +148,12 @@ void main() {
         expect(workspace.text, manual);
         await openCleanup();
         await tester.tap(find.widgetWithText(FilledButton, l.apply));
-        await tester.pumpAndSettle();
+        await waitPreparation(tester);
         const prepared = '第一段\n第二段 x²；代码 x^2';
         expect(workspace.text, prepared);
         await openCleanup();
         await tester.tap(find.widgetWithText(FilledButton, l.apply));
-        await tester.pumpAndSettle();
+        await waitPreparation(tester);
         expect(workspace.text, prepared);
         final undoButton = find.widgetWithText(TextButton, l.undo);
         await tester.ensureVisible(undoButton);
@@ -155,6 +172,47 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'long text preparation can stop and retry without overwriting a changed source',
+    (tester) async {
+      final workspace = await openWorkbench(tester, size: const Size(375, 800));
+      final l = labels(tester);
+      final input = find.byKey(const ValueKey('text-editor'));
+      final original = List.filled(
+        12000,
+        r'$\frac{1}{x^2}+\sqrt{3}$',
+      ).join('\n');
+      Future<void> start() async {
+        await tester.tap(find.byKey(const ValueKey('editor-tools')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ListTile, l.prepareText));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, l.apply));
+        await tester.pump();
+      }
+
+      await tester.enterText(input, original);
+      await start();
+      expect(
+        find.byKey(const ValueKey('stop-text-preparation')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('stop-text-preparation')));
+      await waitPreparation(tester);
+      expect(workspace.text, original);
+      await start();
+      workspace.text = 'New source';
+      workspace.emit();
+      await waitPreparation(tester);
+      expect(workspace.text, 'New source');
+      await tester.enterText(input, r'**Retry** $x^2$');
+      await start();
+      await waitPreparation(tester);
+      expect(workspace.text, 'Retry x²');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('mobile app settings name language and theme actions', (
     tester,
@@ -209,7 +267,7 @@ void main() {
 
     await openPrepare();
     await tester.tap(find.widgetWithText(FilledButton, l.apply));
-    await tester.pumpAndSettle();
+    await waitPreparation(tester);
     expect(workspace.text, contains('⟦'));
     expect(workspace.text, startsWith('代码 x^2'));
     await openPrepare();
@@ -223,7 +281,7 @@ void main() {
     await tester.tap(find.text(l.listMode).last);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, l.apply));
-    await tester.pumpAndSettle();
+    await waitPreparation(tester);
     expect(workspace.text, startsWith('代码 x^2'));
     expect(workspace.text, isNot(contains('⟦')));
     expect(workspace.text, contains('x²'));
