@@ -11,7 +11,7 @@ from threading import Lock
 from typing import Unpack
 
 from pydantic import TypeAdapter
-from task_types import GenerationTask
+from task_types import GenerationTask, TaskStatus
 
 if __package__:
     from .logging_setup import get_logger
@@ -160,11 +160,14 @@ def _remove_result_dir(task_id: str) -> None:
     shutil.rmtree(_RESULT_DIR / task_id, ignore_errors=True)
 
 
-def set_task(task_id: str, **updates: Unpack[GenerationTask]) -> GenerationTask:
+def set_task(
+    task_id: str,
+    *,
+    expected_status: tuple[TaskStatus, ...] | None = None,
+    **updates: Unpack[GenerationTask],
+) -> GenerationTask:
     """写入任务字段，响应字节单独落盘，并返回已验证的持久化快照."""
     response_body = updates.pop("response_body", None)
-    if response_body is not None:
-        updates["result_file_path"] = _write_result_file(task_id, response_body)
     updates["updated_at"] = updates.get("updated_at") or time.time()
     stored = _serialize_updates(updates)
     params: dict[str, SqlValue] = {
@@ -186,10 +189,22 @@ def set_task(task_id: str, **updates: Unpack[GenerationTask]) -> GenerationTask:
     with _WRITE_LOCK:
         connection = _connect()
         try:
-            existing: object = connection.execute(
-                "SELECT task_id FROM generation_tasks WHERE task_id = ?",
-                (task_id,),
-            ).fetchone()
+            # 2026-10-24：跨 worker 原子竞争取消、启动和完成，迟到的进度不能覆盖终态。
+            connection.execute("BEGIN IMMEDIATE")
+            existing = _row_to_task(
+                connection.execute(
+                    "SELECT * FROM generation_tasks WHERE task_id = ?", (task_id,)
+                ).fetchone()
+            )
+            if (
+                expected_status is not None
+                and existing is not None
+                and existing.get("status") not in expected_status
+            ):
+                return existing
+            if response_body is not None:
+                params["result_file_path"] = _write_result_file(task_id, response_body)
+                params["has_result_file_path"] = 1
             connection.execute(_UPDATE_SQL if existing is not None else _INSERT_SQL, params)
             connection.commit()
             task = _row_to_task(
@@ -218,6 +233,59 @@ def get_task(task_id: str) -> GenerationTask | None:
         )
     finally:
         connection.close()
+
+
+def create_task(task_id: str, *, cancelled: bool = False) -> bool:
+    """2026-10-24：客户端 UUID 幂等占位，重复提交及先取消后提交只创建一次."""
+    now = time.time()
+    status = "cancelled" if cancelled else "pending"
+    with _WRITE_LOCK:
+        connection = _connect()
+        try:
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO generation_tasks "
+                "(task_id, status, stage, message, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    task_id,
+                    status,
+                    "cancelled" if cancelled else "queued",
+                    "任务已停止" if cancelled else "任务排队中",
+                    now,
+                    now,
+                ),
+            )
+            connection.commit()
+            return cursor.rowcount == 1
+        finally:
+            connection.close()
+
+
+def request_cancellation(task_id: str, *, create_if_missing: bool = False) -> GenerationTask | None:
+    """2026-10-24：排队任务直接退出，运行中的任务必须由工作线程确认结束."""
+    task = get_task(task_id)
+    if task is None and create_if_missing:
+        create_task(task_id, cancelled=True)
+        task = get_task(task_id)
+    if task is None:
+        return None
+    if task.get("status") == "pending":
+        task = set_task(
+            task_id,
+            expected_status=("pending",),
+            status="cancelled",
+            stage="cancelled",
+            message="任务已停止",
+        )
+    if task.get("status") == "processing":
+        task = set_task(
+            task_id,
+            expected_status=("processing",),
+            status="cancelling",
+            stage="cancelling",
+            message="正在停止任务",
+        )
+    return task
 
 
 def pop_task(task_id: str) -> GenerationTask | None:
@@ -262,7 +330,10 @@ def cleanup_expired() -> None:
                 (cutoff,),
             ):
                 _remove_result_dir(_row_task_id(row))
-            connection.execute("DELETE FROM generation_tasks WHERE updated_at < ?", (cutoff,))
+            connection.execute(
+                "DELETE FROM generation_tasks WHERE updated_at < ?",
+                (cutoff,),
+            )
             connection.commit()
         finally:
             connection.close()
@@ -306,7 +377,8 @@ def get_queue_metrics(task_id: str) -> dict[str, int]:
         )
         processing = _count(
             connection.execute(
-                "SELECT COUNT(*) FROM generation_tasks WHERE status = 'processing'",
+                "SELECT COUNT(*) FROM generation_tasks "
+                "WHERE status IN ('processing', 'cancelling')",
             ).fetchone()
         )
         ahead = 0
@@ -335,7 +407,8 @@ def get_active_task_count() -> int:
     try:
         return _count(
             connection.execute(
-                "SELECT COUNT(*) FROM generation_tasks WHERE status IN ('pending', 'processing')",
+                "SELECT COUNT(*) FROM generation_tasks "
+                "WHERE status IN ('pending', 'processing', 'cancelling')",
             ).fetchone()
         )
     finally:

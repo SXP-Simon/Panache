@@ -138,6 +138,7 @@ def test_long_text_reaches_renderer_independently_of_request_host(host: str, sch
         patch("app.cleanup_expired_generation_tasks"),
         patch("app.get_generation_active_task_count", return_value=0),
         patch("app.set_generation_task"),
+        patch("app.create_generation_task", return_value=True),
         patch("app.run_generation_task", side_effect=execute),
         patch("app.psutil.cpu_percent", return_value=0),
         patch(

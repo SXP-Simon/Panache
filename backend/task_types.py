@@ -7,7 +7,7 @@ from typing import Literal, TypedDict, get_type_hints
 from fastapi import Form
 from pydantic import BaseModel, ConfigDict, Field
 
-type TaskStatus = Literal["pending", "processing", "completed", "failed"]
+type TaskStatus = Literal["pending", "processing", "cancelling", "cancelled", "completed", "failed"]
 
 
 class GenerationTask(TypedDict, total=False):

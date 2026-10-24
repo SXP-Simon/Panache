@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import TYPE_CHECKING, Protocol
 
+if __package__:
+    from .generation_cancellation import check_cancelled
+else:
+    from generation_cancellation import check_cancelled
+
 if TYPE_CHECKING:
     if __package__:
         from .circuit import Circuit, CircuitNode, CircuitSegment, Point
@@ -321,6 +326,7 @@ def _clip_path(path: tuple[Point, ...], disc: CircuitDisc) -> list[tuple[Point, 
     result: list[tuple[Point, ...]] = []
     current: list[Point] = []
     for start, end in pairwise(path):
+        check_cancelled()
         for low, high in _outside_intervals(start, end, disc):
             left = (start[0] + (end[0] - start[0]) * low, start[1] + (end[1] - start[1]) * low)
             right = (start[0] + (end[0] - start[0]) * high, start[1] + (end[1] - start[1]) * high)
@@ -340,6 +346,7 @@ def _pin_connections(path: tuple[Point, ...], anchors: tuple[Point, ...]) -> tup
     # 2026-10-23：没有实心圆点的 T 形支路也应精确相接，先固定长导线内部的电气节点。
     result: list[Point] = []
     for start, end in pairwise(path):
+        check_cancelled()
         dx, dy = end[0] - start[0], end[1] - start[1]
         square_length = dx * dx + dy * dy
         interior: list[tuple[float, Point]] = []
@@ -413,6 +420,7 @@ def handdrawn_stroke(points: tuple[Point, ...], unit: float) -> tuple[Point, ...
     res: list[Point] = []
     max_dev = min(1.7, unit * 0.015)
     for idx in range(len(points) - 1):
+        check_cancelled()
         p1 = points[idx]
         p2 = points[idx + 1]
         dx = p2[0] - p1[0]
@@ -458,8 +466,10 @@ def layout_circuit(circuit: Circuit, unit: float = 100.0) -> CircuitLayout:
         raise ValueError(message)
     geometry = _Geometry()
     for segment in circuit.segments:
+        check_cancelled()
         _segment(geometry, segment, american=circuit.american)
     for node in circuit.nodes:
+        check_cancelled()
         geometry.node(node)
     anchors = tuple(
         dict.fromkeys(
@@ -494,6 +504,7 @@ def layout_circuit(circuit: Circuit, unit: float = 100.0) -> CircuitLayout:
         handdrawn_stroke(tuple(transform(point) for point in path), unit) for path in geometry.paths
     ]
     for disc in discs:
+        check_cancelled()
         if not disc.filled:
             paths = [part for path in paths for part in _clip_path(path, disc)]
     return CircuitLayout(

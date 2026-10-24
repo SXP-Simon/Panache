@@ -22,9 +22,11 @@ from numpy.typing import NDArray
 from PIL import Image, ImageOps
 
 if __package__:
+    from .generation_cancellation import check_cancelled
     from .logging_setup import get_logger
     from .math_page_layout import RuledTemplate
 else:
+    from generation_cancellation import check_cancelled
     from logging_setup import get_logger
     from math_page_layout import RuledTemplate
 
@@ -111,6 +113,7 @@ def process_image_to_handdrawn(
     :param noise_ratio: 墨水飞溅/细微噪点比例
     :return: 具有透明背景的 PIL.Image (RGBA)
     """
+    check_cancelled()
     rng = np.random.default_rng()
     # 1. 统一转换为 OpenCV BGR 格式
     if isinstance(image_input, bytes):
@@ -141,6 +144,7 @@ def process_image_to_handdrawn(
         C=5,
     )
 
+    check_cancelled()
     # 3. 模拟手绘笔触的微弱几何形变与抖动 (Elastic/Jitter Distortion)
     if jitter_intensity > 0:
         # 构造低频随机位移场
@@ -157,6 +161,7 @@ def process_image_to_handdrawn(
 
         binary = cv2.remap(binary, map_x, map_y, interpolation=cv2.INTER_LINEAR)
 
+    check_cancelled()
     # 4. 模拟墨水深度不均 (Ink depth shading)
     # 通过微弱的高斯噪声扰动线条的透明度/粗细
     ink_mask = binary.astype(np.float32) / 255.0
@@ -173,6 +178,7 @@ def process_image_to_handdrawn(
             100, 200, size=np.count_nonzero(splatter_zone), dtype=np.uint8
         )
 
+    check_cancelled()
     # 6. 合成 RGBA 图像
     r_val, g_val, b_val = ink_color
     r_channel = np.full((h, w), r_val, dtype=np.uint8)
@@ -296,6 +302,7 @@ class _InlineRenderer:
             scale,
         )
         image = process_image_to_handdrawn(fitted)
+        check_cancelled()
         image_width, image_height = image.size
         if self.top + image_height > height - bottom:
             if self.dirty:
@@ -324,6 +331,7 @@ def render_inline_markdown_images(
     renderer = _InlineRenderer(template, handwrite_fn)
     end = 0
     for match in MARKDOWN_IMAGE_RE.finditer(text):
+        check_cancelled()
         renderer.text(text[end : match.start()])
         renderer.image(match.group(2).strip(), _parse_image_scale(match.group(1).strip()))
         end = match.end()

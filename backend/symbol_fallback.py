@@ -28,6 +28,7 @@ if __package__:
     from .circuit import Circuit, parse_circuit
     from .circuit_document import map_circuit_document
     from .circuit_layout import layout_circuit
+    from .generation_cancellation import check_cancelled, install_cancellation_checks
     from .library_boundary import install_member, member
     from .logging_setup import get_logger
     from .math_ink import install_math_ink
@@ -38,6 +39,7 @@ else:
     from circuit import Circuit, parse_circuit
     from circuit_document import map_circuit_document
     from circuit_layout import layout_circuit
+    from generation_cancellation import check_cancelled, install_cancellation_checks
     from library_boundary import install_member, member
     from logging_setup import get_logger
     from math_ink import install_math_ink
@@ -538,6 +540,7 @@ def convert_scripts_to_drawn(text: str) -> str:
     output: list[str] = []
     index = 0
     while index < len(text):
+        check_cancelled()
         token = _script_token(text, index)
         if token:
             content, superscript, index = token
@@ -731,6 +734,7 @@ def _resolve_balanced_fractions(text: str, _depth: int, p_single: re.Pattern[str
     while changed:
         changed = False
         for slash in range(len(text) - 1, -1, -1):
+            check_cancelled()
             if text[slash] != "/" or not _has_compound_fraction_side(text, slash):
                 continue
             left, right = _fraction_left(text, slash), _fraction_right(text, slash)
@@ -1292,6 +1296,7 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
 def _layout_math_text(
     text: str, font: Font, font_path: str | None = None, memo: _LayoutMemo | None = None
 ) -> _MathBox:
+    check_cancelled()
     if memo is None:
         memo = _LayoutMemo()
     # 2026-10-15：分式/根式注册时保留的基底文本也可包含前端组合附加符。
@@ -1314,6 +1319,7 @@ def _layout_math_text(
     x, index = 0, 0
     children: list[BoxChild] = []
     while index < len(text):
+        check_cancelled()
         token = _script_token(text, index)
         if token:
             content, superscript, index = token
@@ -1342,8 +1348,10 @@ def _paint_math_box(draw: ImageDraw.ImageDraw, box: _MathBox, xy: tuple[int, int
     if box.glyph is not None:
         cast("MathDrawer", draw).text((x, y), box.glyph, fill=MONOCHROME_WHITE, font=box.font)
     for child, dx, dy in box.children:
+        check_cancelled()
         _paint_math_box(draw, child, (x + dx, y + dy))
     for points, thickness in box.paths:
+        check_cancelled()
         draw.line(
             [(x + px, y + py) for px, py in points],
             fill=MONOCHROME_WHITE,
@@ -1377,6 +1385,7 @@ def _fallback_draw_char(
     def fallback_draw_char(
         draw: ImageDraw.ImageDraw, char: str, xy: tuple[int, int], font: Font
     ) -> int:
+        check_cancelled()
         if char in (" ", "\t", "\n"):
             return original(draw, char, xy, font)
 
@@ -1397,6 +1406,7 @@ def _fallback_draw_char(
 
 
 def _cached_get_font(template: Template, rand: Random) -> Font:
+    check_cancelled()
     font = template.get_font()
     sigma = template.get_font_size_sigma()
     if not sigma or not isinstance(font, ImageFont.FreeTypeFont):
@@ -1448,6 +1458,7 @@ def init_glyph_fallback_engine() -> None:
         # 2026-10-15：只对含复合数学字形的文本按实际墨迹调整换行与行距。
         install_math_page_layout(core, is_math_glyph, _get_rendered_text_bbox)
         install_math_ink(core)
+        install_cancellation_checks(core)
         logger.info(
             "真实字形 Fallback 引擎挂载成功，已加载 %s 款备用字库", len(_FALLBACK_FONTS_POOL)
         )
@@ -1468,6 +1479,7 @@ def clean_invisible_and_special_characters(text: str) -> str:
 
     chars: list[str] = []
     for ch in text:
+        check_cancelled()
         if ch in _INVISIBLE_AND_SPECIAL_SPACES:
             chars.append(_INVISIBLE_AND_SPECIAL_SPACES[ch])
         elif ch in _UNIVERSAL_CANONICAL_MAP:

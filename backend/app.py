@@ -22,7 +22,8 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from typing import Annotated, BinaryIO, Protocol, TypedDict, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import psutil
 import pypandoc
@@ -45,6 +46,13 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
+from generation_cancellation import (
+    CancellationProbe,
+    GenerationCancelledError,
+    active_probe,
+    check_cancelled,
+    checked_items,
+)
 from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
 from library_boundary import member
@@ -68,11 +76,12 @@ from symbol_fallback import (
     normalize_text_for_font,
 )
 from task_store import cleanup_expired as cleanup_expired_generation_tasks
+from task_store import create_task as create_generation_task
 from task_store import get_active_task_count as get_generation_active_task_count
 from task_store import get_queue_metrics as get_generation_queue_metrics
 from task_store import get_task as get_generation_task
 from task_store import pop_task as pop_generation_task
-from task_store import read_result_file
+from task_store import read_result_file, request_cancellation
 from task_store import set_task as set_generation_task
 from task_types import GenerateHandwritingParams, GenerationTask, form_dependency_from_model
 from werkzeug.utils import secure_filename
@@ -363,7 +372,7 @@ app.state.limiter = limiter
 
 
 def rate_limit_error_handler(request: Request, exception: Exception) -> Response:
-    """2026-10-15：在框架通用异常接口处校验具体限流类型。."""
+    """2026-10-15：在框架通用异常接口处校验具体限流类型."""
     if not isinstance(exception, RateLimitExceeded):
         raise exception
     return _rate_limit_exceeded_handler(request, exception)
@@ -870,8 +879,10 @@ def _english_spacing(text: str) -> str:
 
 
 def _png_bytes(image: Image.Image) -> bytes:
+    check_cancelled()
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", compress_level=1)
+    check_cancelled()
     return buffer.getvalue()
 
 
@@ -903,8 +914,16 @@ def _zip_response(images: Iterable[Image.Image], report: ReportProgress) -> Resp
             report("rendering", f"正在处理第 {index + 1} 页", min(90, 60 + min(index, 30)))
             image.save(pages / f"{index}.png")
         report("packaging", "正在打包ZIP文件", 92)
-        archive = shutil.make_archive(str(directory / "images"), "zip", pages)
-        data = Path(archive).read_bytes()
+        archive = directory / "images.zip"
+        # 2026-10-24：流式压缩保留检查点，取消时 TemporaryDirectory 清理半成品。
+        with ZipFile(archive, "w", compression=ZIP_DEFLATED) as output:
+            for page in checked_items(sorted(pages.iterdir())):
+                with page.open("rb") as source, output.open(page.name, "w") as target:
+                    while chunk := source.read(1024 * 1024):
+                        check_cancelled()
+                        target.write(chunk)
+        check_cancelled()
+        data = archive.read_bytes()
     report("finalizing", "正在返回ZIP结果", 100)
     return Response(
         content=data,
@@ -942,6 +961,7 @@ def _render_handwriting(
     progress_hook: ProgressHook | None,
 ) -> Response:
     def report(stage: str, message: str, progress: int) -> None:
+        check_cancelled(force=True)
         if progress_hook is not None:
             progress_hook(stage=stage, message=message, progress=progress)
 
@@ -965,8 +985,10 @@ def _render_handwriting(
         preview, pdf = data["preview"] == "true", data.get("pdf_save") == "true"
         single = preview and data.get("full_preview") == "false" and not pdf
         report("rendering", "正在生成手写图像", 45)
-        images = handwrite_with_page_breaks(
-            text, template, font_path=path, is_single_page_preview=single
+        images = checked_items(
+            handwrite_with_page_breaks(
+                text, template, font_path=path, is_single_page_preview=single
+            )
         )
         if pdf:
             return _pdf_response(images, report)
@@ -993,21 +1015,65 @@ async def generate_handwriting_impl(
     """2026-10-15：异步读取上传文件，在线程完整消费惰性渲染结果与导出文件."""
     background = await _upload_bytes(background_image)
     font = await _upload_bytes(font_file)
-    return await asyncio.to_thread(_render_handwriting, params, background, font, progress_hook)
+    worker = asyncio.create_task(
+        asyncio.to_thread(_render_handwriting, params, background, font, progress_hook)
+    )
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        # 2026-10-24：取消协程不能遗留后台线程；等线程安全退出后才向上释放执行槽。
+        probe = active_probe.get()
+        if probe is not None:
+            request_cancellation(probe.task_id)
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+            except GenerationCancelledError:
+                break
+        if not worker.cancelled():
+            worker.exception()
+        raise
+
+
+async def _acquire_generation_slot() -> None:
+    # 2026-10-24：排队取消及时丢弃输入，不占着内存等待执行槽。
+    while True:
+        check_cancelled(force=True)
+        try:
+            await asyncio.wait_for(_generation_semaphore.acquire(), timeout=0.1)
+        except TimeoutError:
+            continue
+        return
+
+
+def _complete_generation(task_id: str, response: Response) -> None:
+    response_headers: dict[str, str] = {}
+    if "content-disposition" in response.headers:
+        response_headers["Content-Disposition"] = response.headers["content-disposition"]
+    task = set_generation_task(
+        task_id,
+        expected_status=("processing",),
+        status="completed",
+        response_status_code=response.status_code,
+        response_content_type=response.headers.get("content-type")
+        or response.media_type
+        or "application/octet-stream",
+        response_headers=response_headers,
+        response_body=bytes(response.body),
+        stage="completed",
+        message="任务处理完成",
+        progress=100,
+    )
+    if task.get("status") == "cancelling":
+        raise GenerationCancelledError
 
 
 async def run_generation_task(task_id: str, payload: GenerationPayload) -> None:
-    """通过并发信号量执行任务并持久化进度和结果."""
+    """2026-10-24：保持排队状态，线程退出后再确认取消及释放并发槽."""
     started_at = time.perf_counter()
     logger.info("Generation task started, task_id=%s elapsed=0.000s", task_id)
-    set_generation_task(
-        task_id,
-        status="processing",
-        stage="started",
-        message="任务已开始",
-        progress=1,
-    )
-    await push_task_status_update(task_id)
     loop = asyncio.get_running_loop()
 
     def schedule_notification() -> None:
@@ -1015,59 +1081,92 @@ async def run_generation_task(task_id: str, payload: GenerationPayload) -> None:
         _notification_tasks.add(notification)
         notification.add_done_callback(_notification_tasks.discard)
 
+    def progress_notify(*, stage: str, message: str, progress: int) -> None:
+        check_cancelled(force=True)
+        set_generation_task(
+            task_id,
+            expected_status=("processing",),
+            stage=stage,
+            message=message,
+            progress=progress,
+        )
+        loop.call_soon_threadsafe(schedule_notification)
+
+    if get_generation_task(task_id) is None:
+        set_generation_task(task_id, status="pending")
+    acquired = False
+    token = active_probe.set(CancellationProbe(task_id))
     try:
-
-        def progress_notify(*, stage: str, message: str, progress: int) -> None:
-            set_generation_task(task_id, stage=stage, message=message, progress=progress)
-            loop.call_soon_threadsafe(schedule_notification)
-
-        async with _generation_semaphore:
-            # 拿到信号量后，将阶段更新为"正在执行" 由于这里是协程，所以并不会占据很多资源 4.17.2026
-            set_generation_task(task_id, stage="executing", message="正在生成中")
-            await push_task_status_update(task_id)
-
-            response = await generate_handwriting_impl(
-                progress_hook=progress_notify,
-                **payload,
-            )
-        response_body = bytes(response.body)
-        response_headers: dict[str, str] = {}
-        if "content-disposition" in response.headers:
-            response_headers["Content-Disposition"] = response.headers["content-disposition"]
-        set_generation_task(
+        await _acquire_generation_slot()
+        acquired = True
+        task = set_generation_task(
             task_id,
-            status="completed",
-            response_status_code=response.status_code,
-            response_content_type=response.headers.get("content-type")
-            or response.media_type
-            or "application/octet-stream",
-            response_headers=response_headers,
-            response_body=response_body,
-            stage="completed",
-            message="任务处理完成",
-            progress=100,
+            expected_status=("pending",),
+            status="processing",
+            stage="executing",
+            message="正在生成中",
+            progress=1,
         )
+        if task.get("status") != "processing":
+            return
         await push_task_status_update(task_id)
-    except Exception as e:
-        logger.exception(
-            "Generation task failed, task_id=%s elapsed=%.3fs",
-            task_id,
-            time.perf_counter() - started_at,
-        )
-        set_generation_task(
-            task_id,
-            status="failed",
-            error_message=str(e),
-            stage="failed",
-            message="任务处理失败",
-        )
-        await push_task_status_update(task_id)
-    else:
+        response = await generate_handwriting_impl(progress_hook=progress_notify, **payload)
+        check_cancelled(force=True)
+        _complete_generation(task_id, response)
         logger.info(
             "Generation task completed, task_id=%s elapsed=%.3fs",
             task_id,
             time.perf_counter() - started_at,
         )
+    except (GenerationCancelledError, asyncio.CancelledError):
+        set_generation_task(
+            task_id,
+            expected_status=("pending", "processing", "cancelling"),
+            status="cancelled",
+            stage="cancelled",
+            message="任务已停止",
+        )
+        logger.info(
+            "Generation task cancelled, task_id=%s elapsed=%.3fs",
+            task_id,
+            time.perf_counter() - started_at,
+        )
+    except Exception as error:
+        task = set_generation_task(
+            task_id,
+            expected_status=("processing",),
+            status="failed",
+            error_message=str(error),
+            stage="failed",
+            message="任务处理失败",
+        )
+        if task.get("status") == "cancelling":
+            set_generation_task(
+                task_id,
+                expected_status=("cancelling",),
+                status="cancelled",
+                stage="cancelled",
+                message="任务已停止",
+            )
+        else:
+            logger.exception(
+                "Generation task failed, task_id=%s elapsed=%.3fs",
+                task_id,
+                time.perf_counter() - started_at,
+            )
+    finally:
+        active_probe.reset(token)
+        if acquired:
+            _generation_semaphore.release()
+        await push_task_status_update(task_id)
+
+
+def _valid_client_task_id(task_id: str) -> bool:
+    # 2026-10-24：只接受标准 UUID 文本，不允许客户端控制结果目录路径。
+    try:
+        return str(UUID(task_id)) == task_id
+    except ValueError:
+        return False
 
 
 @app.post("/api/generate_handwriting")
@@ -1084,8 +1183,13 @@ async def generate_handwriting(
 ) -> JSONResponse:
     """接收生成请求并返回可轮询的持久化任务 ID."""
     # 2026-10-15：保留请求参数供限流装饰器使用，业务入队不依赖部署域名。
-    del request
     cleanup_expired_generation_tasks()
+    requested_id = request.headers.get("x-panache-task-id")
+    if requested_id is not None and not _valid_client_task_id(requested_id):
+        return JSONResponse({"status": "error", "message": "Invalid task ID"}, status_code=400)
+    task_id = requested_id or uuid4().hex
+    if get_generation_task(task_id) is not None:
+        return JSONResponse({"status": "accepted", "task_id": task_id})
 
     # ── 并发上限检查 ────────────────────────────────────────────────────
     max_active_tasks = 8  # pending + processing 总数上限，根据服务器配置调整
@@ -1123,22 +1227,9 @@ async def generate_handwriting(
         "font_file": font_file_bytes,
     }
 
-    task_id = uuid4().hex
-    now = time.time()
-    set_generation_task(
-        task_id,
-        status="pending",
-        stage="queued",
-        message="任务排队中",
-        progress=0,
-        created_at=now,
-        updated_at=now,
-        response_status_code=None,
-        response_content_type=None,
-        response_headers={},
-        error_message="",
-    )
-    background_tasks.add_task(run_generation_task, task_id, payload)
+    # 2026-10-24：即使原始响应丢失，预分配 ID 也能取消；迟到/重复提交不重新执行。
+    if create_generation_task(task_id):
+        background_tasks.add_task(run_generation_task, task_id, payload)
 
     return JSONResponse({"status": "accepted", "task_id": task_id})
 
@@ -1190,6 +1281,19 @@ async def get_generate_handwriting_task_status(request: Request, task_id: str) -
     return JSONResponse(build_task_status_payload(task_id, task=task))
 
 
+@app.post("/api/generate_handwriting/task/{task_id}/cancel")
+@limiter.limit("600 per 5 minute")
+@handle_exceptions
+async def cancel_generate_handwriting_task(request: Request, task_id: str) -> Response:
+    """2026-10-24：幂等请求停止，真正退出由工作线程确认；完成结果保留至 TTL."""
+    del request
+    task = request_cancellation(task_id, create_if_missing=_valid_client_task_id(task_id))
+    if task is None:
+        return JSONResponse({"status": "error", "message": "Task not found"}, status_code=404)
+    await push_task_status_update(task_id)
+    return JSONResponse(build_task_status_payload(task_id, task=task))
+
+
 @app.get("/api/generate_handwriting/task/{task_id}/result")
 @limiter.limit("600 per 5 minute")
 @handle_exceptions
@@ -1205,9 +1309,9 @@ async def get_generate_handwriting_task_result(request: Request, task_id: str) -
         )
 
     task_status = task.get("status")
-    if task_status in ("pending", "processing"):
+    if task_status in ("pending", "processing", "cancelling", "cancelled"):
         return JSONResponse(
-            {"status": "processing", "message": "Task is still running"},
+            {"status": task_status, "message": "Task has no available result"},
             status_code=409,
         )
     if task_status == "failed":
@@ -1332,7 +1436,12 @@ def get_fonts_info() -> JSONResponse:
 @app.get("/api/version")
 def get_version() -> JSONResponse:
     """给前端页面展示的版本号."""
-    return JSONResponse({"version": app_version})
+    return JSONResponse(
+        {
+            "version": app_version,
+            "capabilities": {"task_cancellation": True, "task_submission_id": True},
+        }
+    )
 
 
 @app.middleware("http")

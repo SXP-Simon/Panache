@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
 """含复合数学字形的 handright 页布局."""
 
+import copy
 import functools
 import math
 import os
@@ -522,6 +523,12 @@ def install_math_page_layout(
     @functools.wraps(original)
     def draw_page(page: Page, text: str, start: int, tpl: Template, rand: Random) -> int:
         if not any(is_math_glyph(char) for char in text[start:]):
+            # 2026-10-24：上游用随机重试选错字；全是排除字符时会永远到不了取消检查点。
+            if tpl.get_strikethrough_probability() and not any(
+                char not in tpl.get_end_chars() + " " for char in text
+            ):
+                tpl = copy.copy(tpl)
+                tpl.set_strikethrough_probability(0)
             return original(page, text, start, tpl, rand)
         return _PageRenderer(layout, page, text, tpl, rand).render(start)
 

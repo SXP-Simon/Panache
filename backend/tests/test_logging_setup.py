@@ -18,6 +18,7 @@ import desktop_main
 import gunicorn_config
 import logging_setup as logs
 import pytest
+import task_store
 from fastapi.responses import Response
 from task_types import GenerateHandwritingParams
 
@@ -191,11 +192,13 @@ def test_frozen_relative_source_paths_do_not_resolve_against_user_data(tmp_path,
 
 @pytest.mark.usefixtures("isolated_logging")
 @pytest.mark.parametrize("fail", [False, True])
-def test_generation_lifecycle_logs_task_and_duration_without_payload(monkeypatch, fail):
+def test_generation_lifecycle_logs_task_and_duration_without_payload(monkeypatch, fail, tmp_path):
     stderr = io.StringIO()
     monkeypatch.setattr(logs.sys, "stderr", stderr)
     logs.configure_logging()
-    monkeypatch.setattr(app, "set_generation_task", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(task_store, "_DB_PATH", tmp_path / "tasks.db")
+    monkeypatch.setattr(task_store, "_RESULT_DIR", tmp_path / "results")
+    task_store.init()
     monkeypatch.setattr(app, "_generation_semaphore", asyncio.Semaphore(1))
 
     async def notify(_task_id: str) -> None:
