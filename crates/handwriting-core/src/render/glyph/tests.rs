@@ -367,7 +367,7 @@ fn natural_math_paths_do_not_move_numerators_denominators_or_radicands() {
     }
 }
 #[test]
-fn root_hook_and_roof_stay_four_connected_at_all_sizes() {
+fn native_root_hook_and_roof_stay_connected_at_all_sizes() {
     for book in books() {
         for size in [24., 40., 64.] {
             let mut gs = Glyphs::new(book);
@@ -376,7 +376,7 @@ fn root_hook_and_roof_stay_four_connected_at_all_sizes() {
             let mut largest = (0, 0);
             for (x, y, p) in g.mask.enumerate_pixels() {
                 let index = (y * g.mask.width() + x) as usize;
-                if p[0] < 128 || seen[index] {
+                if p[0] < 32 || seen[index] {
                     continue;
                 }
                 let mut queue = VecDeque::from([(x, y)]);
@@ -392,6 +392,10 @@ fn root_hook_and_roof_stay_four_connected_at_all_sizes() {
                         (xx as i32 + 1, yy as i32),
                         (xx as i32, yy as i32 - 1),
                         (xx as i32, yy as i32 + 1),
+                        (xx as i32 - 1, yy as i32 - 1),
+                        (xx as i32 - 1, yy as i32 + 1),
+                        (xx as i32 + 1, yy as i32 - 1),
+                        (xx as i32 + 1, yy as i32 + 1),
                     ] {
                         if nx < 0
                             || ny < 0
@@ -401,7 +405,7 @@ fn root_hook_and_roof_stay_four_connected_at_all_sizes() {
                             continue;
                         }
                         let index = ny as usize * g.mask.width() as usize + nx as usize;
-                        if !seen[index] && g.mask[(nx as u32, ny as u32)][0] >= 128 {
+                        if !seen[index] && g.mask[(nx as u32, ny as u32)][0] >= 32 {
                             seen[index] = true;
                             queue.push_back((nx as u32, ny as u32));
                         }
