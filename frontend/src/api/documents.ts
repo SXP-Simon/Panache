@@ -3,11 +3,11 @@ import { fetchApi, parsePayload, readJson } from './client.ts';
 import type { BackgroundMargins } from './types.ts';
 
 const marginsSchema = v.object({
-  marginLeft: v.pipe(v.number(), v.finite()),
-  marginRight: v.pipe(v.number(), v.finite()),
-  marginTop: v.pipe(v.number(), v.finite()),
-  marginBottom: v.pipe(v.number(), v.finite()),
-  lineSpacing: v.pipe(v.number(), v.finite()),
+  marginLeft: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  marginRight: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  marginTop: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  marginBottom: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  lineSpacing: v.pipe(v.number(), v.finite(), v.minValue(Number.MIN_VALUE)),
 });
 export async function importDocument(file: File, signal?: AbortSignal): Promise<{ text: string }> {
   const body = new FormData();

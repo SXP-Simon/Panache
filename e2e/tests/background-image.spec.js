@@ -115,3 +115,51 @@ test('背景图作为真实生成文件发送，纸张尺寸由图片决定', as
     .evaluate((image) => [image.naturalWidth, image.naturalHeight]);
   expect(size).toEqual([800, 1000]);
 });
+
+for (const language of ['cn', 'en']) {
+  test(`识别空白背景失败时保留参数并提供操作提示：${language}`, async ({ page }) => {
+    await page.addInitScript((locale) => localStorage.setItem('studio.locale', locale), language);
+    await openHome(page);
+    await openPaperSettings(page);
+    const fields = ['margin-left-input', 'margin-right-input', 'margin-top-input', 'margin-bottom-input', 'line-spacing-input'];
+    const original = await Promise.all(fields.map((id) => page.getByTestId(id).inputValue()));
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 1000;
+      const context = canvas.getContext('2d');
+      context.fillStyle = 'white';
+      context.fillRect(0, 0, 800, 1000);
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+    await page.getByTestId('background-image-input').setInputFiles({
+      name: 'blank.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64'),
+    });
+    const responsePromise = page.waitForResponse((response) => response.url().includes('/api/imagefileprocess'));
+    await page.getByTestId('detect-background-confirm').click();
+    expect((await responsePromise).status()).toBe(422);
+    await expect(page.getByTestId('message-info')).toContainText(
+      language === 'cn' ? '请手动填写边距和行距' : 'Set margins and line spacing manually',
+    );
+    for (const [index, id] of fields.entries()) {
+      await expect(page.getByTestId(id)).toHaveValue(original[index]);
+    }
+    await expect(page.getByTestId('remove-background-btn')).toBeVisible();
+  });
+}
+
+for (const lineSpacing of [0, -5]) {
+  test(`无效识别结果不会覆盖参数：行距 ${lineSpacing}`, async ({ page }) => {
+    await openHome(page);
+    await openPaperSettings(page);
+    const spacing = page.getByTestId('line-spacing-input');
+    const previous = await spacing.inputValue();
+    await page.route('**/api/imagefileprocess', (route) => route.fulfill({
+      json: { marginLeft: 0, marginRight: 0, marginTop: 0, marginBottom: 0, lineSpacing },
+    }));
+    await page.getByTestId('background-image-input').setInputFiles(SAMPLE_PAGE);
+    await page.getByTestId('detect-background-confirm').click();
+    await expect(page.getByTestId('message-info')).toHaveClass(/status-message--error/);
+    await expect(spacing).toHaveValue(previous);
+  });
+}

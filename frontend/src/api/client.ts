@@ -6,6 +6,7 @@ export type ApiErrorCode =
   | 'taskFailed'
   | 'timeout'
   | 'cancelled'
+  | 'backgroundDetectionFailed'
   | 'queueFull';
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
@@ -26,6 +27,7 @@ export class ApiError extends Error {
 }
 
 const errorSchema = v.object({
+  code: v.optional(v.string()),
   message: v.optional(v.string()),
   error: v.optional(v.string()),
   detail: v.optional(v.string()),
@@ -79,6 +81,13 @@ export async function fetchApi(path: string, options: RequestInit = {}): Promise
     ? (parsed.output.message ?? parsed.output.error ?? parsed.output.detail)
     : undefined;
   const queued = parsed.success && parsed.output.status === 'queue_full';
+  if (
+    response.status === 422 &&
+    parsed.success &&
+    parsed.output.code === 'backgroundDetectionFailed'
+  ) {
+    throw new ApiError('backgroundDetectionFailed', { status: response.status });
+  }
   throw new ApiError(queued ? 'queueFull' : 'networkError', {
     status: response.status,
     ...(message === undefined ? {} : { serverMessage: message }),

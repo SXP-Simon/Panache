@@ -1,5 +1,9 @@
 import { createContext, useContext } from 'react';
 const words = {
+  backgroundDetectionFailed: [
+    '无法识别纸张横线，已保留原有设置。请手动填写边距和行距。',
+    'Could not detect the paper ruling. Your settings are unchanged. Set margins and line spacing manually.',
+  ],
   updates: ['应用更新', 'App updates'],
   updatePromptTitle: ['发现新版本', 'A new version is available'],
   updateWebPromptTitle: ['网页已更新', 'Website updated'],
