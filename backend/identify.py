@@ -23,6 +23,10 @@ type Coordinates = tuple[int, int, int, int]
 type GrayImage = NDArray[np.uint8]
 
 
+class ImageIdentificationError(ValueError):
+    """The image does not provide measurable notebook ruling lines."""
+
+
 def _coordinates(values: NDArray[np.int32]) -> list[Coordinates]:
     rows = values.reshape(-1, 4)
     return [
@@ -33,6 +37,8 @@ def _coordinates(values: NDArray[np.int32]) -> list[Coordinates]:
 
 def get_avg_distance(distances: Sequence[float]) -> float:
     """Average the most populous non-noise DBSCAN spacing cluster."""
+    if not distances:
+        return 0.0
     points = np.array(distances, dtype=np.float64).reshape(-1, 1)
     clustering = DBSCAN(eps=5, min_samples=3).fit(points)
     labels, counts = np.unique(clustering.labels_, return_counts=True)
@@ -43,7 +49,7 @@ def get_avg_distance(distances: Sequence[float]) -> float:
 
 def _binary(image: GrayImage) -> GrayImage:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(gray, 150, PIXEL_WHITE, cv2.THRESH_BINARY_INV)
+    _, binary = cv2.threshold(gray, 0, PIXEL_WHITE, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
     return np.asarray(binary, dtype=np.uint8)
 
 
@@ -99,9 +105,12 @@ def identify_distance(filename: str) -> tuple[int, int, int, int, int]:
     image = cv2.imread(filename)
     if image is None:
         message = "Unable to decode notebook image"
-        raise ValueError(message)
+        raise ImageIdentificationError(message)
     binary = _binary(_deskew(np.asarray(image, dtype=np.uint8)))
     lines = _ruling_lines(binary)
+    if not lines:
+        message = "No ruling lines detected. Please set margins and line spacing manually."
+        raise ImageIdentificationError(message)
     left, right = _horizontal_margins(binary, lines)
     top, bottom = _vertical_margins(binary)
     distances = [
@@ -109,6 +118,9 @@ def identify_distance(filename: str) -> tuple[int, int, int, int, int]:
         for previous, current in pairwise(lines)
         if current[1] - previous[1] > MIN_RULING_DISTANCE
     ]
+    if not distances:
+        message = "Unable to measure ruling spacing. Please set it manually."
+        raise ImageIdentificationError(message)
     spacing = get_avg_distance(distances)
     logger.debug("Notebook margins=%s, ruling distance=%s", (left, right, top, bottom), spacing)
     return round(left), round(right), round(top), round(bottom), round(spacing)

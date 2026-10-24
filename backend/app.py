@@ -1417,11 +1417,13 @@ def _process_image_upload(filename: str, content: bytes) -> Response:
     if Path(filename).suffix.lower() not in {".jpf", ".png", ".jpg", ".jpeg"}:
         return JSONResponse({"error": "Invalid file type"}, status_code=400)
     path = Path("imagefileprocess") / f"{uuid4().hex}-{secure_filename(filename)}"
+    identifier = importlib.import_module("identify")
+    identification_error = cast("type[Exception]", member(identifier, "ImageIdentificationError"))
     try:
         path.write_bytes(content)
         detector = cast(
             "Callable[[str], tuple[float, float, float, float, float]]",
-            member(importlib.import_module("identify"), "identify_distance"),
+            member(identifier, "identify_distance"),
         )
         left, right, top, bottom, spacing = detector(str(path))
         return JSONResponse(
@@ -1432,6 +1434,10 @@ def _process_image_upload(filename: str, content: bytes) -> Response:
                 "marginBottom": bottom,
                 "lineSpacing": spacing,
             }
+        )
+    except identification_error as error:
+        return JSONResponse(
+            {"error": str(error), "code": "backgroundDetectionFailed"}, status_code=422
         )
     finally:
         safe_remove_file(str(path))
