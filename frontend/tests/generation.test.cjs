@@ -224,6 +224,29 @@ test('FormData expands illustrations, binds the selected upload, and lets backgr
   assert.equal(body.get('full_preview'), 'true');
   assert.equal(body.get('isUnderlined'), 'true');
   assert.equal(body.get('enableEnglishSpacing'), 'false');
+  assert.equal(body.get('layout_style'), 'standard');
+});
+
+test('homework layout is explicit request metadata and never rewrites the source text or background', async () => {
+  const api = await modules();
+  const source = '1. 推理：从前提出发。\n(1) (A→B)∧(B→C)⇒(A→C)';
+  const paper = new File(['paper'], 'notebook.png');
+  const snapshot = {
+    text: source, imageStore: {}, numbers: { width: 800, height: 1100, font_size: 36 },
+    selectedFont: '云烟体.ttf', fontFile: null, background: paper, backgroundRuled: true,
+    layoutStyle: 'homework', underlined: true, englishSpacing: false, fullPreview: true, ink: '#26322a',
+  };
+  for (const mode of ['preview', 'zip', 'pdf']) {
+    const body = api.generationFormData(snapshot, mode);
+    assert.equal(body.get('layout_style'), 'homework');
+    assert.equal(body.get('background_ruled'), 'true');
+    assert.equal(body.get('text'), source);
+    assert.equal(body.get('background_image').name, paper.name);
+    assert.equal(body.get('font_option'), '云烟体.ttf');
+    assert.equal(body.get('font_size'), '36');
+  }
+  assert.equal(snapshot.text, source);
+  assert.equal(snapshot.background, paper);
 });
 
 test('malformed task and result responses cannot become successful UI state', async (t) => {

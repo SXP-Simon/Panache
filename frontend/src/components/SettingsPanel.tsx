@@ -31,6 +31,7 @@ export default function SettingsPanel() {
       englishSpacing: state.englishSpacing,
       ink: state.ink,
       selectedPreset: state.selectedPreset,
+      layoutStyle: state.layoutStyle,
       patch: state.patch,
     })),
   );
@@ -93,6 +94,31 @@ export default function SettingsPanel() {
           />
         </label>
         {settings.fontFile && <p className="file-name">{settings.fontFile.name}</p>}
+        <div className="layout-preset">
+          <label className="field-label">
+            {t('layoutPreset')}
+            <select
+              value={settings.layoutStyle}
+              data-testid="layout-style-select"
+              aria-describedby="layout-preset-help"
+              onChange={(event) =>
+                settings.patch({
+                  layoutStyle: event.currentTarget.value === 'homework' ? 'homework' : 'standard',
+                })
+              }
+            >
+              <option value="standard">{t('layoutStandard')}</option>
+              <option value="homework">{t('layoutHomework')}</option>
+            </select>
+          </label>
+          <p
+            id="layout-preset-help"
+            className="layout-preset-help"
+            data-testid="layout-preset-help"
+          >
+            {t(settings.layoutStyle === 'homework' ? 'layoutHomeworkHelp' : 'layoutStandardHelp')}
+          </p>
+        </div>
         <div className="field-grid">
           {mainFields.map((field) => (
             <ParameterField key={field.key} field={field} />

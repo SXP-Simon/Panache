@@ -11,6 +11,7 @@ export interface GenerationSnapshot {
   fontFile: File | null;
   background: File | null;
   backgroundRuled?: boolean;
+  layoutStyle?: 'standard' | 'homework';
   underlined: boolean;
   englishSpacing: boolean;
   fullPreview: boolean;

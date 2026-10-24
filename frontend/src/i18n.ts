@@ -296,6 +296,17 @@ const words = {
   strikeWidthSigma: ['粗细变化', 'Width variation'],
   strikeAngle: ['角度变化', 'Angle variation'],
   presets: ['我的预设', 'Presets'],
+  layoutPreset: ['排版预设', 'Layout preset'],
+  layoutStandard: ['标准排版', 'Standard'],
+  layoutHomework: ['作业笔记', 'Homework notes'],
+  layoutStandardHelp: [
+    '按当前边距排版，保留原有换行。',
+    'Use the current margins and preserve your line breaks.',
+  ],
+  layoutHomeworkHelp: [
+    '正文多留白，条目自动缩进，长公式优先在关系符处换行。不改原文、字体或背景。',
+    'Add breathing room and item indents; wrap long formulas at relation signs where possible. Text, font and background stay as chosen.',
+  ],
   presetChoose: ['选择预设', 'Choose a preset'],
   presetSmall: ['小字横线 · 云烟体', 'Small ruled · Yunyan'],
   presetNatural: ['自然手写', 'Natural handwriting'],

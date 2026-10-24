@@ -16,6 +16,12 @@ export function parseConfiguration(
   const parsed = v.parse(schema, JSON.parse(raw));
   const settings = { ...previous, numbers: { ...previous.numbers } };
   settings.backgroundRuled = parsed['backgroundRuled'] === true;
+  if (
+    parsed['layoutStyle'] !== undefined &&
+    !['standard', 'homework'].includes(String(parsed['layoutStyle']))
+  )
+    throw new Error('Invalid layout style');
+  settings.layoutStyle = parsed['layoutStyle'] === 'homework' ? 'homework' : 'standard';
   for (const field of allFields) {
     const value = parsed[field.key];
     if (value !== undefined) {
@@ -49,6 +55,7 @@ export function serializeConfiguration(settings: SettingsData, textFileName: str
     font: settings.selectedFont,
     underlined: settings.underlined,
     backgroundRuled: settings.backgroundRuled,
+    layoutStyle: settings.layoutStyle,
     englishSpacing: settings.englishSpacing,
     ink: settings.ink,
     fullPreview: settings.fullPreview,

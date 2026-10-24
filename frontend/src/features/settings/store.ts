@@ -9,6 +9,7 @@ export interface SettingsData {
   background: File | null;
   backgroundRuled: boolean;
   backgroundUrl: string;
+  layoutStyle: 'standard' | 'homework';
   underlined: boolean;
   englishSpacing: boolean;
   fullPreview: boolean;
@@ -28,6 +29,7 @@ export const initialSettings: SettingsData = {
   background: null,
   backgroundRuled: false,
   backgroundUrl: '',
+  layoutStyle: 'standard',
   underlined: true,
   englishSpacing: false,
   fullPreview: false,

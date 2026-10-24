@@ -897,6 +897,17 @@ input[type='color'] {
   margin-top: 12px;
   padding-top: 12px;
 }
+.layout-preset {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.layout-preset-help {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
 .preset-actions {
   display: flex;
   align-items: center;
