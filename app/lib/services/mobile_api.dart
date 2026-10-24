@@ -196,8 +196,9 @@ class MobileHandwritingApi extends HandwritingApi {
   @override
   Future<String> submit(
     Map<String, String> fields,
-    Map<String, Upload> files,
-  ) async {
+    Map<String, Upload> files, {
+    String? taskId,
+  }) async {
     final paths = files.isEmpty ? <String, dynamic>{} : await stage(files);
     try {
       final result = await call('submit', fields: fields, files: paths) as Map;
@@ -249,6 +250,7 @@ class MobileHandwritingApi extends HandwritingApi {
   @override
   Future<void> cancelTask(String id) async {
     await call('cancel', id: id);
+    await waitForTaskExit(id);
   }
 
   Future<void> cancelAll() async {

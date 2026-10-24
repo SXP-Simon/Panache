@@ -17,10 +17,14 @@ class _RecordingApi extends HandwritingApi {
   final requests = <Map<String, String>>[];
 
   @override
-  Future<String> submit(Map<String, String> fields, Map<String, Upload> files) {
+  Future<String> submit(
+    Map<String, String> fields,
+    Map<String, Upload> files, {
+    String? taskId,
+  }) {
     requests.add(Map.of(fields));
     expect(files, isEmpty);
-    return super.submit(fields, files);
+    return super.submit(fields, files, taskId: taskId);
   }
 }
 

@@ -370,7 +370,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     onPreview: generate,
     onPdf: () => generate(preview: false, pdf: true),
     onZip: () => generate(preview: false),
-    onCancel: w.busy && w.api.supportsCancel
+    onCancel: w.busy && !w.stopping && w.api.supportsCancel
         ? () => action(w.cancel, allowBusy: true)
         : null,
   );

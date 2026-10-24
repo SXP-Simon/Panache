@@ -57,6 +57,8 @@
   "retry": "Retry",
   "sameOrigin": "Web uses same-origin /api or a standalone Rust service during development. Desktop and mobile use the bundled Rust engine.",
   "save": "Save",
+  "stopGeneration": "Stop generation",
+  "stoppingTask": "Stopping",
   "cancel": "Cancel",
   "close": "Close",
   "apply": "Apply",

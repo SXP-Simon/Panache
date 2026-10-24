@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -65,11 +66,13 @@ class HandwritingApi {
   Future<http.Response> multipart(
     String path,
     Map<String, String> fields,
-    Map<String, Upload> files,
-  ) async {
+    Map<String, Upload> files, {
+    String? taskId,
+  }) async {
     final request = http.MultipartRequest('POST', uri(path))
       ..fields.addAll(fields)
       ..headers.addAll(headers);
+    if (taskId != null) request.headers['X-Panache-Task-Id'] = taskId;
     for (final entry in files.entries) {
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -89,15 +92,20 @@ class HandwritingApi {
 
   Future<String> submit(
     Map<String, String> fields,
-    Map<String, Upload> files,
-  ) async {
+    Map<String, Upload> files, {
+    String? taskId,
+  }) async {
     final response = await multipart(
       '/api/generate_handwriting',
       fields,
       files,
+      taskId: taskId,
     );
     final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
     if (data['task_id'] is! String) throw ApiException('Missing task_id');
+    if (taskId != null && data['task_id'] != taskId) {
+      throw ApiException('Task identity mismatch');
+    }
     return data['task_id'];
   }
 
@@ -110,9 +118,51 @@ class HandwritingApi {
       headers: headers,
     ),
   );
-  bool get supportsCancel => false;
+  bool _supportsCancel = false;
+  bool _supportsSubmissionId = false;
+  String? createTaskId() {
+    if (!_supportsSubmissionId) return null;
+    final random = Random.secure();
+    final bytes = List.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  bool get supportsCancel => _supportsCancel;
+  void configureCapabilities(dynamic info) {
+    _supportsCancel =
+        info is Map &&
+        info['capabilities'] is Map &&
+        info['capabilities']['task_cancellation'] == true;
+    _supportsSubmissionId =
+        _supportsCancel && info['capabilities']['task_submission_id'] == true;
+  }
+
   Future<void> cancelTask(String id) async {
-    throw UnsupportedError('Cancellation unavailable');
+    if (!supportsCancel) throw UnsupportedError('Cancellation unavailable');
+    await checked(
+      client.post(
+        uri('/api/generate_handwriting/task/$id/cancel'),
+        headers: headers,
+      ),
+    );
+    await waitForTaskExit(id);
+  }
+
+  /// A cancellation acknowledgement is not proof that the renderer has exited.
+  Future<void> waitForTaskExit(String id) async {
+    final deadline = DateTime.now().add(const Duration(minutes: 2));
+    while (true) {
+      final data = await status(id);
+      final phase = data['task_status'] ?? data['status'];
+      if (['completed', 'failed', 'error', 'cancelled'].contains(phase)) return;
+      if (DateTime.now().isAfter(deadline)) {
+        throw TimeoutException('Task cancellation has not been confirmed');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
   }
 
   Future<List<Uint8List>> preview(String id) async {
