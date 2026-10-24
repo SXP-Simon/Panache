@@ -63,16 +63,26 @@ def circled_number(char: str) -> str | None:
 def circle_path(
     width: int, height: int, pen: Pen, phase: float = 0
 ) -> tuple[tuple[tuple[int, int], ...], int]:
-    """2026-10-24：轻微椭圆、倾斜和连贯不规则度模拟一笔画圈，末端明确闭合."""
+    """2026-10-24：用不等长弧段画偏斜、上窄下宽的手绘圈，避免近似正圆."""
     points: list[tuple[int, int]] = []
-    steps = max(80, min(4096, 4 * (width + height)))
-    for step in range(steps + 1):
-        angle = math.tau * step / steps
-        radius = 1 + 0.025 * math.sin(2 * angle + pen.slant * 8 + phase)
-        radius += pen.naturalness * 0.035 * math.sin(3 * angle + 0.7 + phase)
-        x = width / 2 + width / 2 * math.cos(angle) * radius
-        x += height * (pen.slant * 0.25 + 0.045) * math.sin(angle)
-        y = height / 2 + height / 2 * math.sin(angle) * radius
-        points.append((round(x), round(y)))
-    points[-1] = points[0]
+    curves = (
+        ((0.30, 0.02), (0.60, -0.045), (0.94, 0.015), (1.00, 0.34)),
+        ((1.00, 0.34), (1.045, 0.63), (0.88, 0.98), (0.60, 1.00)),
+        ((0.60, 1.00), (0.29, 1.015), (0.06, 0.88), (0.02, 0.60)),
+        ((0.02, 0.60), (-0.04, 0.35), (0.07, 0.105), (0.30, 0.02)),
+    )
+    steps = max(20, min(1024, width + height))
+    shear = 0.14 + 0.04 * math.sin(phase) + pen.slant * 0.25
+    for segment, curve in enumerate(curves):
+        for step in range(steps):
+            t = step / steps
+            weights = ((1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t**3)
+            x = sum(weight * point[0] for weight, point in zip(weights, curve, strict=True))
+            y = sum(weight * point[1] for weight, point in zip(weights, curve, strict=True))
+            angle = math.tau * (segment + t) / 4
+            x = 0.5 + (x - 0.5) * (1 + 0.025 * math.sin(phase))
+            x += pen.naturalness * 0.01 * math.sin(2 * angle)
+            y += pen.naturalness * 0.008 * math.sin(angle)
+            points.append((round(width * x + height * shear * (0.5 - y)), round(height * y)))
+    points.append(points[0])
     return tuple(points), pen.width

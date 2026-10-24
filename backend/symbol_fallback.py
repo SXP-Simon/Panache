@@ -1402,7 +1402,7 @@ def _handwritten_circled_number(char: str, font: Font, _font_path: str | None) -
     height = max(
         round(size * 0.82), math.ceil(math.hypot(digits.width / 0.96, digits.height)) + 2 * padding
     )
-    width = max(round(height * 1.13), digits.width + 2 * padding)
+    width = max(round(height * 1.20), digits.width + 2 * padding)
     top = size - height - pen.width - max(1, math.ceil(height * 0.035))
     mask = _MathBox(digits.width, (0, 0, digits.width, digits.height), bitmap=digits)
     points, thickness = circle_path(width, height, pen, phase=int(number) * 0.71)

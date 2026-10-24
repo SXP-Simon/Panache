@@ -86,6 +86,16 @@ def test_uploaded_font_digits_are_not_replaced_by_a_file_based_fallback():
     assert child.bitmap.tobytes() == expected.tobytes()
 
 
+def test_missing_circles_have_a_visibly_oval_silhouette_without_naturalness():
+    font = ImageFont.truetype(str(FONTS / "华阳手写体.ttf"), 72)
+    for marker in "⓪㉑㉟㊱㊿":
+        box = symbols._layout_math_text(marker, font).children[0][0]
+        points = np.asarray(box.paths[0][0], dtype=float)
+        axes = np.linalg.eigvalsh(np.cov(points.T))
+        assert (axes[-1] / axes[0]) ** 0.5 > 1.18
+        assert tuple(points[0]) == tuple(points[-1])
+
+
 @pytest.mark.parametrize("name", ["云烟体", "华阳手写体", "李国夫手写体", "霞鹜文楷"])
 @pytest.mark.parametrize("size", [18, 72, 124])
 def test_primary_native_circles_remain_pixel_identical(name, size):
