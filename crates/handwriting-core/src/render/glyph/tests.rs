@@ -17,9 +17,12 @@ fn books() -> &'static [FontBook] {
 }
 #[test]
 fn logical_negation_is_a_continuous_bar_and_right_leg_in_handwritten_fonts() {
-    for book in books() {
+    for name in ["云烟体", "华阳手写体", "李国夫手写体", "霞鹜文楷"] {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("../../assets/font_assets/{name}.ttf"));
+        let book = FontBook::new(&std::fs::read(path).unwrap(), &[]).unwrap();
         for size in [18., 36., 72., 124.] {
-            let mut gs = Glyphs::new(book);
+            let mut gs = Glyphs::new(&book);
             let glyph = gs.glyph('¬', size).unwrap();
             let mask = &glyph.mask;
             assert!(glyph.top < 0 && glyph.bottom() < 0);
