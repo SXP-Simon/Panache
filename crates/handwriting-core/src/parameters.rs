@@ -21,8 +21,17 @@ impl Default for Limits {
         }
     }
 }
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutStyle {
+    #[default]
+    Standard,
+    Homework,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameters {
+    #[serde(default)]
+    pub layout_style: LayoutStyle,
     pub font_size: f32,
     pub line_spacing: f32,
     pub word_spacing: f32,
@@ -57,6 +66,7 @@ pub struct Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Self {
+            layout_style: LayoutStyle::Standard,
             font_size: 124.,
             line_spacing: 200.,
             word_spacing: 1.,
@@ -124,6 +134,11 @@ impl Parameters {
                 _ => Err(Error::new("invalid_parameter", key)),
             }
         }
+        p.layout_style = match f.get("layout_style").map(String::as_str) {
+            None | Some("standard") => LayoutStyle::Standard,
+            Some("homework") => LayoutStyle::Homework,
+            _ => return Err(Error::new("invalid_parameter", "layout_style")),
+        };
         p.underlined = boolean(f, "isUnderlined", false)?;
         p.background_ruled = boolean(f, "background_ruled", false)?;
         p.english_spacing = boolean(f, "enableEnglishSpacing", false)?;
