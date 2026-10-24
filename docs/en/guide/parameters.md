@@ -56,6 +56,25 @@ Use these to leave a few "crossed out" marks on the page.
 | Standard deviation of the strikethrough width | `2` | Variation in line thickness. |
 | Standard deviation of the strikethrough angle | `2` | Variation in line tilt. |
 
+## Uploading and aligning ruled paper
+
+Upload a background under Paper settings and confirm paper detection. The app measures spacing
+between line centres, straightens detectable tilt, and applies the corrected background and layout
+margins together. Use **Re-detect paper** below the filename to repeat the measurement on the current
+background; repeated detection does not accumulate rotation.
+
+The detected top margin positions the first text baseline on a rule; it is not simply the distance
+from the image edge to the first rule. If the first rule is too close to the edge, writing starts at
+the next usable one. An oversized font is reduced to fit; smaller sizes remain unchanged.
+The corrected background and settings are saved with the draft. Text after tall formulas returns
+to the ruling grid.
+
+Blank images, too few lines or irregular spacing require manual settings and leave existing
+parameters unchanged. Replacing the background or editing parameters during detection discards the
+outdated result. Use a flat, clearly cropped page: perspective distortion, curved paper and major
+occlusions are outside automatic rotation correction. Generate a preview to check the result;
+reduce Line Spacing Sigma and Perturb Y Sigma for closer alignment.
+
 ## Built-in preset
 
 The presets dropdown offers "Small ruled · Yunyan", "Natural handwriting", and "Neat handwriting".
