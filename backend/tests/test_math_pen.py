@@ -57,7 +57,7 @@ def test_symbols_keep_direction_and_separate_semantic_strokes(name, size, streng
             if char in "→←↔⇒⇐⇔":
                 assert len(box.paths) == (2 if char in "→←" else 4 if char == "⇔" else 3)
             if char in "≤≥":
-                assert len(box.paths) == 2
+                assert len(box.paths) == 2 or len(box.children) == 2
             if char == "¬":
                 points = box.paths[0][0]
                 assert points[-1][1] > points[0][1]
@@ -70,6 +70,32 @@ def test_font_stroke_samples_change_weight_and_slant_without_fallback():
     ]
     assert len({(pen.width, pen.slant) for pen in pens}) > 1
     assert all(1 <= pen.width <= 7 and abs(pen.slant) <= 0.18 for pen in pens)
+
+
+@pytest.mark.parametrize("name", ["云烟体", "华阳手写体", "李国夫手写体", "霞鹜文楷"])
+@pytest.mark.parametrize("char", ["≤", "≥"])
+def test_inequality_preserves_primary_font_chevron_and_pen_endings(name, char):
+    font = selected(name, 72)
+    mark = "<" if char == "≤" else ">"
+    native = symbols._primary_mask(mark, font)
+    assert native is not None
+    assert symbols._valid_chevron(native, mark)
+    assert not symbols._valid_chevron(native, ">" if mark == "<" else "<")
+    box = symbols._layout_math_text(char, font).children[0][0]
+    assert box.semantic == char
+    chevron, _, top = box.children[0]
+    bar, _, bar_y = box.children[1]
+    assert chevron.bitmap.tobytes() == native.tobytes()
+    assert bar.bitmap is not None
+    assert bar_y > top + chevron.bbox[3] + 1
+
+
+def test_empty_and_box_placeholders_are_not_accepted_as_inequality_strokes():
+    assert not symbols._valid_chevron(Image.new("1", (20, 20)), "<")
+    square = Image.new("1", (20, 20))
+    ImageDraw.Draw(square).rectangle((1, 1, 18, 18), outline=1)
+    assert not symbols._valid_chevron(square, "<")
+    assert not symbols._valid_chevron(square, ">")
 
 
 def test_naturalness_is_bounded_repeatable_and_request_local():

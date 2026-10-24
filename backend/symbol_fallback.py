@@ -10,6 +10,7 @@
 
 import functools
 import io
+import itertools
 import math
 import os
 import re
@@ -79,6 +80,10 @@ class _GlyphMask(Protocol):
 
 class _FontMask(Protocol):
     def getmask(self, text: str) -> _GlyphMask: ...
+
+
+class _PixelBytes(Protocol):
+    def tobytes(self) -> bytes: ...
 
 
 class MathDrawer(Protocol):
@@ -937,6 +942,7 @@ class _MathBox:
     glyph: str | None = None
     font: Font | None = None
     semantic: str | None = None
+    bitmap: Image.Image | None = None
 
 
 @dataclass
@@ -1297,11 +1303,78 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
     if char in SYMBOLS:
         advance, paths = symbol_paths(char, font_pen(font, size), _math_axis(font, font_path))
         drawn = _compose_box(advance, paths=paths)
-        result = _MathBox(drawn.advance, drawn.bbox, paths=drawn.paths, semantic=char)
+        result = _handwritten_inequality(char, font, font_path) or _MathBox(
+            drawn.advance, drawn.bbox, paths=drawn.paths, semantic=char
+        )
     else:
         chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
         result = _MathBox(advance, bbox, glyph=char, font=chosen)
     return result
+
+
+def _primary_mask(char: str, font: Font) -> Image.Image | None:
+    # 2026-10-24：保留主字体原生笔画与收笔；真实裁边排除字体度量中的透明 padding。
+    left, top, right, bottom = font_bbox_of(font, char)
+    image = Image.new("1", (max(1, right - left), max(1, bottom - top)))
+    cast("MathDrawer", ImageDraw.Draw(image)).text(
+        (-left, -top), char, fill=MONOCHROME_WHITE, font=font
+    )
+    bounds = image.getbbox()
+    return image.crop(bounds) if bounds else None
+
+
+def _valid_chevron(mask: Image.Image, char: str) -> bool:
+    # 2026-10-24：中段墨迹应朝尖端突出，拒绝空字、方框或双点占位。
+    width, height = mask.size
+    pixels = cast("_PixelBytes", mask.convert("L")).tobytes()
+    bands = (
+        (0, max(1, height // 4)),
+        (height // 3, max(1, height * 2 // 3)),
+        (height * 3 // 4, height),
+    )
+    centers: list[float] = []
+    for top, bottom in bands:
+        xs = [x for y in range(top, bottom) for x in range(width) if pixels[y * width + x]]
+        if not xs:
+            return False
+        centers.append(sum(xs) / len(xs))
+    difference = (centers[0] + centers[2]) / 2 - centers[1]
+    return difference * (1 if char == "<" else -1) > width * 0.08
+
+
+def _handwritten_inequality(char: str, font: Font, font_path: str | None) -> _MathBox | None:
+    if char not in "≤≥":
+        return None
+    mark = "<" if char == "≤" else ">"
+    chevron = _primary_mask(mark, font)
+    if chevron is None or not _valid_chevron(chevron, mark):
+        return None
+    size = font_size_of(font)
+    pen = font_pen(font, size)
+    width, height = chevron.size
+    gap = max(pen.width + 2, round(size * 0.09))
+    bar = _primary_mask("-", font)
+    if bar is None or bar.height > size * 0.22:
+        bar = Image.new("1", (width, pen.width), 1)
+    else:
+        bar = bar.resize((width, bar.height), Image.Resampling.NEAREST)
+    # 2026-10-24：横画沿原字形轻弯，保留真实收笔，不把折角替换为理想对称几何。
+    points, _ = pen.path(((0, 0), (max(1, width - 1), 0)))
+    offsets = [0] * width
+    for (x0, y0), (x1, y1) in itertools.pairwise(points):
+        for x in range(max(0, x0), min(width, x1 + 1)):
+            offsets[x] = round(y0 + (y1 - y0) * (x - x0) / max(1, x1 - x0))
+    bent = Image.new("1", (width, bar.height + max(offsets)))
+    for x, offset in enumerate(offsets):
+        bent.paste(bar.crop((x, 0, x + 1, bar.height)), (x, offset))
+    reserved_height = bar.height + math.ceil(size * 0.016)
+    top = _math_axis(font, font_path) - (height + gap + reserved_height) // 2
+    glyph = _MathBox(width, (0, 0, width, height), bitmap=chevron)
+    rule = _MathBox(width, (0, 0, width, bent.height), bitmap=bent)
+    box = _compose_box(
+        width + max(2, round(size * 0.09)), ((glyph, 0, top), (rule, 0, top + height + gap))
+    )
+    return _MathBox(box.advance, box.bbox, children=box.children, semantic=char)
 
 
 def _layout_math_text(
@@ -1356,6 +1429,8 @@ def _layout_math_text(
 def _paint_math_box(draw: ImageDraw.ImageDraw, box: _MathBox, xy: tuple[int, int]) -> None:
 
     x, y = xy
+    if box.bitmap is not None:
+        draw.bitmap((x + box.bbox[0], y + box.bbox[1]), box.bitmap, fill=MONOCHROME_WHITE)
     if box.glyph is not None:
         cast("MathDrawer", draw).text((x, y), box.glyph, fill=MONOCHROME_WHITE, font=box.font)
     for child, dx, dy in box.children:
