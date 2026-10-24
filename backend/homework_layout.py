@@ -50,6 +50,11 @@ def _marker(line: str) -> tuple[str, bool, bool, bool]:
     content = line[len(leading) :]
     top = _TOP_ITEM.match(content)
     sub = _SUB_ITEM.match(content)
+    # 2026-10-24：括号后的运算符表明这是表达式，不能把 (x) = 1 误认为条目。
+    if sub and content.startswith(("(", "（")):
+        remainder = content[sub.end() :].lstrip()
+        if remainder.startswith(tuple("=+-*/∈≤≥≠≈⇒→↔⇔")):
+            sub = None
     match = top or sub
     return (
         leading + match.group() if match else "",

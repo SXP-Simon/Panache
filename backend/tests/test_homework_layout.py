@@ -85,6 +85,15 @@ def test_explicit_continuation_keeps_indent_but_new_heading_and_blank_line_reset
     assert paragraph_style(text, text.index("另一段"), 500, 30, measure_width).indent == 0
 
 
+@pytest.mark.parametrize(
+    "source", ["3.5 m/s", "0.25 = 1/4", "(x) = x²", "(1) + (2) = 3", "（A） ⇒ B"]
+)
+def test_decimal_values_and_parenthesized_equations_are_not_item_markers(source):
+    style = paragraph_style(source, 0, 500, 30, lambda value: len(value) * 12)
+    assert style.indent == 0
+    assert not style.separate
+
+
 def test_short_numbered_items_do_not_add_a_blank_between_every_row():
     template = homework_template()
     pages, consumed = draft(synthetic_core(), "1. A\n2. B\n3. C\n4. D", template)
