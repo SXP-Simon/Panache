@@ -183,6 +183,15 @@ const words = {
   latex: ['转换 LaTeX', 'Convert LaTeX'],
   markdown: ['清理 Markdown', 'Clean Markdown'],
   prepareText: ['整理文本', 'Prepare text'],
+  stopTextPreparation: ['停止整理', 'Stop preparing'],
+  textPreparationFailed: [
+    '整理失败，原文已保留，请重试。',
+    'Could not prepare the text. Your original text is preserved; please retry.',
+  ],
+  textPreparationCancelled: [
+    '已停止整理，原文保持不变。',
+    'Text preparation stopped. Your original text is unchanged.',
+  ],
   prepareTextHint: [
     '先清理 Markdown，再转写公式；保留代码内容，可撤销。',
     'Clean Markdown, then transcribe formulas. Keeps code intact; undo is available.',

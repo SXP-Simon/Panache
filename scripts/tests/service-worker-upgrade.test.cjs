@@ -240,7 +240,7 @@ for (const script of ["service-worker.js", "sw.js"]) {
           if (name.startsWith('handwriting-studio-shell:')) result.push(...(await (await caches.open(name)).keys()).map((request) => request.url));
         return result;
       });
-      assert.ok(cachedRequests.some((url) => /\/assets\/prepareHandwritingText-/.test(url)));
+      assert.ok(cachedRequests.some((url) => /\/assets\/prepare-text-/.test(url)));
       for (const url of fontUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
       for (const url of iconUrls) assert.ok(cachedRequests.includes(url), `${url} must be in the offline shell cache`);
       assert.ok(cachedRequests.every((url) => !new URL(url).pathname.startsWith('/api/')));

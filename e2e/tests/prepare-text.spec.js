@@ -29,11 +29,11 @@ for (const width of [390, 1440]) {
   });
 }
 
-test('lazy text preparation cannot overwrite an edit made during loading', async ({ page }) => {
+test('text preparation cannot overwrite an edit made during worker loading', async ({ page, context }) => {
   await openHome(page);
   let resume;
   const gate = new Promise(resolve => { resume = resolve; });
-  await page.route('**/src/utils/prepareHandwritingText.ts*', async route => {
+  await context.route('**/workers/prepare-text.ts*', async route => {
     await gate;
     await route.continue();
   });
@@ -61,6 +61,74 @@ test('changing table mode reuses original markup and keeps code literal', async 
   await expect(input).toHaveValue(/⅓.*\nx\^2/s);
   await page.getByTestId('prepare-text-undo').click();
   await expect(input).toHaveValue(source);
+});
+
+test('worker loading failure preserves source, reports a localized error and permits retry', async ({ page, context }) => {
+  await openHome(page);
+  let fail = true;
+  await context.route('**/workers/prepare-text.ts*', route => {
+    if (fail) { fail = false; return route.abort(); }
+    return route.continue();
+  });
+  const input = page.getByTestId('text-input');
+  await input.fill('**新的作业**');
+  await page.getByTestId('prepare-text-btn').click();
+  await expect(page.getByTestId('message-info')).toContainText('整理失败，原文已保留');
+  await expect(input).toHaveValue('**新的作业**');
+  await page.getByTestId('prepare-text-btn').click();
+  await expect(input).toHaveValue('新的作业');
+  await expect(page.getByTestId('cancel-text-preparation')).toHaveCount(0);
+});
+
+test('stopping a busy real worker preserves source and permits an independent restart', async ({ page }) => {
+  await openHome(page);
+  const input = page.getByTestId('text-input');
+  const large = '# 多题作业\n$$\\frac{a+b}{c+d}+\\sqrt{x^2+y^2}$$\n'.repeat(12000);
+  // Populate a large pasted document without Chromium's slow per-line editing command.
+  await input.evaluate((element, value) => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  }, large);
+  const started = page.waitForEvent('worker');
+  await page.getByTestId('prepare-text-btn').click();
+  const worker = await started;
+  let closed = false;
+  worker.on('close', () => { closed = true; });
+  await expect(page.getByTestId('cancel-text-preparation')).toBeVisible();
+  await page.getByTestId('cancel-text-preparation').click();
+  await expect.poll(() => closed).toBe(true);
+  await expect(input).toHaveValue(large);
+  await expect(page.getByTestId('prepare-text-btn')).toBeEnabled();
+  await input.fill('# 新任务\n$x^2$');
+  await page.getByTestId('prepare-text-btn').click();
+  await expect(input).toHaveValue('新任务\nx²');
+  await expect(page.getByTestId('cancel-text-preparation')).toHaveCount(0);
+  await page.getByTestId('prepare-text-undo').click();
+  await expect(input).toHaveValue('# 新任务\n$x^2$');
+});
+
+test('stopping during worker loading never applies an old response after restart', async ({ page, context }) => {
+  await openHome(page);
+  let resume;
+  const gate = new Promise(resolve => { resume = resolve; });
+  let first = true;
+  await context.route('**/workers/prepare-text.ts*', async route => {
+    if (first) { first = false; await gate; }
+    await route.continue();
+  });
+  const input = page.getByTestId('text-input');
+  await input.fill(source);
+  await page.getByTestId('prepare-text-btn').click();
+  const directory = path.resolve(__dirname, '../../preview_outputs/prepare-text');
+  await fs.mkdir(directory, { recursive: true });
+  await page.getByTestId('text-panel').screenshot({ path: path.join(directory, 'stop-preparing.png') });
+  await page.getByTestId('cancel-text-preparation').click();
+  await input.fill('**最新内容**');
+  resume();
+  await page.getByTestId('prepare-text-btn').click();
+  await expect(input).toHaveValue('最新内容');
+  await page.getByTestId('prepare-text-undo').click();
+  await expect(input).toHaveValue('**最新内容**');
 });
 
 test('automata formula renders after one preparation action', async ({ page }) => {

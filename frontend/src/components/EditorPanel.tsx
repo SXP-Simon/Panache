@@ -5,7 +5,6 @@ import { useDocumentStore } from '@/features/document/store';
 import { usePreferencesStore } from '@/features/preferences/store';
 import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import { useNotificationStore } from '@/features/notifications/store';
-import { reportFailure } from '@/features/workspace/reportFailure';
 import { updateResources } from '@/features/workspace/resourceUpdates';
 import { useI18n } from '../i18n';
 import {
@@ -19,6 +18,7 @@ import {
   updateInlineImage,
 } from '@/utils/inlineImageManager';
 import { prepareInlineImage } from '@/utils/prepareInlineImage';
+import { prepareTextInWorker } from '@/utils/textPreparationJob';
 import type { TableMode } from '@/utils/cleanMarkdown';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
@@ -60,13 +60,27 @@ export default function EditorPanel() {
   } | null>(null);
   const prepared = useRef<{ original: string; text: string; tableMode: TableMode } | null>(null);
   const [preparing, setPreparing] = useState(false);
+  const preparation = useRef<{
+    controller: AbortController;
+    source: string;
+    mode: TableMode;
+  } | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      preparation.current?.controller.abort();
     };
   }, []);
+  useEffect(() => {
+    const pending = preparation.current;
+    if (pending && (pending.source !== text || pending.mode !== tableMode)) {
+      pending.controller.abort();
+      preparation.current = null;
+      setPreparing(false);
+    }
+  }, [text, tableMode]);
   const imagePending = useRef(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
@@ -80,29 +94,40 @@ export default function EditorPanel() {
   async function prepareText() {
     const current = useDocumentStore.getState().text;
     if (
-      preparing ||
+      preparation.current ||
       (prepared.current?.text === current && prepared.current.tableMode === tableMode)
     )
       return;
     const original = prepared.current?.text === current ? prepared.current.original : current;
+    const controller = new AbortController();
+    preparation.current = { controller, source: current, mode: tableMode };
+    useNotificationStore.getState().clear();
     setPreparing(true);
     try {
-      const { prepareHandwritingText } = await import('@/utils/prepareHandwritingText');
+      const formatted = await prepareTextInWorker(
+        { source: original, tableMode },
+        controller.signal,
+      );
       if (
         !mounted.current ||
+        preparation.current?.controller !== controller ||
+        controller.signal.aborted ||
         useDocumentStore.getState().text !== current ||
         usePreferencesStore.getState().tableMode !== tableMode
       )
         return;
-      const formatted = prepareHandwritingText(original, tableMode);
       prepared.current = { original, text: formatted, tableMode };
       if (formatted === current) return;
       setBackup({ original, formatted, kind: 'text' });
       setText(formatted);
-    } catch (cause) {
-      reportFailure(cause);
+    } catch {
+      if (!controller.signal.aborted && mounted.current)
+        useNotificationStore.getState().fail('textPreparationFailed');
     } finally {
-      if (mounted.current) setPreparing(false);
+      if (preparation.current?.controller === controller) {
+        preparation.current = null;
+        if (mounted.current) setPreparing(false);
+      }
     }
   }
   function insert(value: string) {
@@ -244,6 +269,22 @@ export default function EditorPanel() {
           <AlignLeft size={15} />
           {t('prepareText')}
         </Button>
+        {preparing && (
+          <Button
+            size="small"
+            variant="ghost"
+            data-testid="cancel-text-preparation"
+            onClick={() => {
+              preparation.current?.controller.abort();
+              preparation.current = null;
+              setPreparing(false);
+              useNotificationStore.getState().inform('textPreparationCancelled');
+            }}
+          >
+            <X size={15} />
+            {t('stopTextPreparation')}
+          </Button>
+        )}
         <Button size="small" variant="ghost" data-testid="letter-format-btn" onClick={openLetter}>
           <LetterText size={15} />
           {t('letter')}
