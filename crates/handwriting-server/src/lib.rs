@@ -191,8 +191,13 @@ impl Server {
         for id in ids {
             store.tasks[&id].cancellation.cancel();
             if let Err(e) = store.update(&id, |t| {
-                t.task_status = "cancelled".into();
-                t.task_stage = "cancelled".into();
+                t.task_status = if t.task_status == "pending" {
+                    "cancelled"
+                } else {
+                    "cancelling"
+                }
+                .into();
+                t.task_stage = t.task_status.clone();
                 t.error_code = Some("cancelled".into());
                 t.task_message = "服务关闭，任务已取消".into();
             }) {
@@ -275,7 +280,7 @@ impl Server {
             limits: self.0.config.limits.clone(),
         };
         self.update(id, |t| {
-            if !t.active() {
+            if t.task_status != "processing" {
                 return;
             }
             t.task_status = "processing".into();
@@ -381,7 +386,7 @@ impl Server {
     }
     fn progress(&self, id: &str, index: usize) -> Result<()> {
         self.update(id, |t| {
-            if t.active() {
+            if t.task_status == "processing" {
                 t.task_progress = (10 + index * 3).min(90) as u8;
                 t.task_message = format!("正在处理第 {} 页", index + 1);
             }
@@ -397,7 +402,9 @@ async fn fonts(State(s): State<Server>) -> Json<Vec<String>> {
     Json(s.0.fonts.clone())
 }
 async fn version(State(s): State<Server>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({"version":s.0.config.version}))
+    Json(
+        serde_json::json!({"version":s.0.config.version,"capabilities":{"task_cancellation":true}}),
+    )
 }
 struct Upload {
     name: String,
@@ -502,12 +509,27 @@ async fn submit(
         if permit.is_err() {
             return;
         }
+        {
+            // 2026-10-24：启动与取消共用锁；pending 取消后不会启动阻塞工作线程。
+            let mut store = s.0.store.lock().unwrap();
+            if token.check().is_err() {
+                return;
+            }
+            if store
+                .update(&task_id, |t| t.task_status = "processing".into())
+                .is_err()
+            {
+                return;
+            }
+        }
         let worker = s.clone();
         let worker_id = task_id.clone();
         let result =
             tokio::task::spawn_blocking(move || worker.run(&worker_id, fields, files, token))
                 .await
                 .unwrap_or_else(|e| Err(Error::new("worker_failed", e.to_string())));
+        // 2026-10-24：阻塞任务退出并释放工作槽后，才发布取消终态。
+        drop(permit);
         if let Err(error) = result {
             let _ = s.update(&task_id, |t| {
                 if t.active() {
@@ -524,7 +546,6 @@ async fn submit(
                 }
             });
         }
-        drop(permit);
     });
     Ok(Json(serde_json::json!({"status":"accepted","task_id":id})))
 }
@@ -550,9 +571,15 @@ async fn cancel(
     if runtime.task.active() {
         runtime.cancellation.cancel();
         store.update(&id, |t| {
-            t.task_status = "cancelled".into();
-            t.task_stage = "cancelled".into();
-            t.task_message = "任务已取消".into();
+            let pending = t.task_status == "pending";
+            t.task_status = if pending { "cancelled" } else { "cancelling" }.into();
+            t.task_stage = t.task_status.clone();
+            t.task_message = if pending {
+                "任务已取消"
+            } else {
+                "正在停止任务"
+            }
+            .into();
             t.error_code = Some("cancelled".into());
         })?;
     }
@@ -1195,6 +1222,39 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
     #[tokio::test]
+    async fn stopping_task_keeps_queue_capacity_and_survives_cleanup() {
+        let (_dir, s) = setup();
+        {
+            let mut store = s.0.store.lock().unwrap();
+            store.insert("running".into(), 1).unwrap();
+            store
+                .update("running", |t| t.task_status = "processing".into())
+                .unwrap();
+        }
+        for _ in 0..2 {
+            let (code, data) = send(
+                &s,
+                "/api/generate_handwriting/task/running/cancel",
+                &[],
+                None,
+            )
+            .await;
+            assert_eq!(code, StatusCode::OK);
+            assert_eq!(data["task_status"], "cancelling");
+            assert_eq!(data["active_task_count"], 1);
+        }
+        let mut store = s.0.store.lock().unwrap();
+        store.ttl = 0.;
+        store.cleanup().unwrap();
+        assert!(store.tasks.contains_key("running"));
+        assert_eq!(
+            store.insert("next".into(), 1).unwrap_err().code,
+            "queue_full"
+        );
+        assert!(store.tasks["running"].cancellation.check().is_err());
+    }
+
+    #[tokio::test]
     async fn queue_cancel_failure_restart_and_expiry() {
         let (_dir, s) = setup();
         {
@@ -1316,7 +1376,20 @@ mod tests {
             None,
         )
         .await;
-        assert_eq!(data["task_status"], "cancelled");
+        assert_eq!(data["task_status"], "cancelling");
+        for _ in 0..300 {
+            let state = s.0.store.lock().unwrap().tasks[id].task.task_status.clone();
+            if state == "cancelled" {
+                break;
+            }
+            assert_eq!(state, "cancelling");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(
+            s.0.store.lock().unwrap().tasks[id].task.task_status,
+            "cancelled"
+        );
+        assert_eq!(s.0.semaphore.available_permits(), 2);
         let permits = tokio::time::timeout(
             Duration::from_secs(3),
             s.0.semaphore.clone().acquire_many_owned(2),
