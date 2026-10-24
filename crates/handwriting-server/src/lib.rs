@@ -403,7 +403,7 @@ async fn fonts(State(s): State<Server>) -> Json<Vec<String>> {
 }
 async fn version(State(s): State<Server>) -> Json<serde_json::Value> {
     Json(
-        serde_json::json!({"version":s.0.config.version,"capabilities":{"task_cancellation":true}}),
+        serde_json::json!({"version":s.0.config.version,"capabilities":{"task_cancellation":true,"task_submission_id":true}}),
     )
 }
 struct Upload {
@@ -481,19 +481,42 @@ impl FromRequest<Server> for Input {
 }
 async fn submit(
     State(s): State<Server>,
+    headers: HeaderMap,
     Input(fields, files): Input,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let id = match headers.get("X-Panache-Task-Id") {
+        Some(value) => {
+            let value = value
+                .to_str()
+                .map_err(|_| Error::new("invalid_parameter", "任务 ID 无效"))?;
+            if !canonical_task_id(value) {
+                return Err(Error::new("invalid_parameter", "任务 ID 无效").into());
+            }
+            value.to_owned()
+        }
+        None => uuid::Uuid::new_v4().simple().to_string(),
+    };
+    let response = || Json(serde_json::json!({"status":"accepted","task_id":id}));
+    {
+        let mut store = s.0.store.lock().unwrap();
+        store.cleanup()?;
+        if store.tasks.contains_key(&id) {
+            return Ok(response());
+        }
+    }
     Parameters::from_form(&fields)?;
     let text = fields
         .get("text")
         .ok_or_else(|| Error::new("invalid_parameter", "缺少 text"))?;
     handwriting_core::validate_document(text, &s.0.config.limits)?;
-    let id = uuid::Uuid::new_v4().simple().to_string();
-    let token =
-        s.0.store
-            .lock()
-            .unwrap()
-            .insert(id.clone(), s.0.config.max_active)?;
+    let token = {
+        // 2026-10-24：上传期间的取消墓碑与并发重试都不能重新启动同一任务。
+        let mut store = s.0.store.lock().unwrap();
+        if store.tasks.contains_key(&id) {
+            return Ok(response());
+        }
+        store.insert(id.clone(), s.0.config.max_active)?
+    };
     let task_id = id.clone();
     tokio::spawn(async move {
         let acquire = s.0.semaphore.clone().acquire_owned();
@@ -559,11 +582,19 @@ async fn status(
         Error::new("task_not_found", "任务不存在")
     })?))
 }
+fn canonical_task_id(value: &str) -> bool {
+    uuid::Uuid::parse_str(value).is_ok_and(|id| id.to_string() == value)
+}
+
 async fn cancel(
     State(s): State<Server>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let mut store = s.0.store.lock().unwrap();
+    if !store.tasks.contains_key(&id) && canonical_task_id(&id) {
+        // 2026-10-24：客户端已知 ID 时可先取消，阻止迟到上传在后台开始渲染。
+        store.insert(id.clone(), usize::MAX)?;
+    }
     let runtime = store
         .tasks
         .get(&id)
@@ -854,7 +885,7 @@ fn cors_headers(response: &mut Response, origin: Option<&str>) {
         );
         h.insert(
             "access-control-allow-headers",
-            HeaderValue::from_static("Authorization, Content-Type"),
+            HeaderValue::from_static("Authorization, Content-Type, X-Panache-Task-Id"),
         );
     }
 }
@@ -1221,6 +1252,49 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
     }
+    #[tokio::test]
+    async fn cancellation_tombstone_blocks_late_and_duplicate_submissions() {
+        let (_dir, s) = setup();
+        let id = uuid::Uuid::new_v4().to_string();
+        let (_, data) = send(
+            &s,
+            &format!("/api/generate_handwriting/task/{id}/cancel"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(data["task_status"], "cancelled");
+        for _ in 0..2 {
+            let (content_type, body) = form(&[("text", "迟到上传")], None);
+            let response = s
+                .router()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/generate_handwriting")
+                        .header("content-type", content_type)
+                        .header("X-Panache-Task-Id", &id)
+                        .body(Body::from(body))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let payload: serde_json::Value = serde_json::from_slice(
+                &axum::body::to_bytes(response.into_body(), 4096)
+                    .await
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(payload["task_id"], id);
+        }
+        let store = s.0.store.lock().unwrap();
+        assert_eq!(store.tasks.len(), 1);
+        assert_eq!(store.tasks[&id].task.task_status, "cancelled");
+        assert_eq!(s.0.semaphore.available_permits(), 2);
+        assert!(store.tasks[&id].task.result_file.is_none());
+    }
+
     #[tokio::test]
     async fn stopping_task_keeps_queue_capacity_and_survives_cleanup() {
         let (_dir, s) = setup();
