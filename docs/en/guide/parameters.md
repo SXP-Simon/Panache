@@ -77,6 +77,16 @@ reduce Line Spacing Sigma and Perturb Y Sigma for closer alignment.
 
 ## Built-in preset
 
+Choose **Standard** or **Homework notes** under **Layout preset**. Homework notes adds writing-room
+inside the existing margins, indents numbered items and their continuation lines, and prefers
+suitable boundaries such as relation signs when wrapping long formulas. Paper rules and baseline
+alignment stay in place. Fractions, scripts, tables and circuits remain intact; oversized content
+is still constrained by the page size.
+
+Switching changes generated layout without rewriting the input, resetting the font or removing
+the background. Detected uploaded ruled paper is supported. The choice is saved with drafts and
+presets. Select **Standard** to return to the current margins, then generate a new preview.
+
 The presets dropdown offers "Small ruled · Yunyan", "Natural handwriting", and "Neat handwriting".
 
 **Small with underlines (Yunyan)** — small text in the Yunyan font, generous line spacing and
