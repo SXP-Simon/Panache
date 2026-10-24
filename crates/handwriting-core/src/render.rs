@@ -447,7 +447,9 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                 let size =
                     (p.font_size + normal(&mut pages.rng, p.font_size_sigma)).clamp(1., 2048.);
                 let mut g = glyphs.unit(units[i], size)?;
-                let mut compound = units[i].len() > 1 || !matches!(node, Node::Char(_));
+                let mut compound = units[i].len() > 1
+                    || !matches!(node, Node::Char(_))
+                    || matches!(node,Node::Char(c) if glyph::is_circled(*c));
                 if pages.rng.random::<f32>() < p.strikethrough_probability
                     && !matches!(node,Node::Char(c) if c.is_whitespace())
                 {

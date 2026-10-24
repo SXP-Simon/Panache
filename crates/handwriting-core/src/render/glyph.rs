@@ -3,7 +3,11 @@ use super::{FontBook, paste_mask};
 use crate::{Error, Parameters, Result, text::Node};
 use image::{GrayImage, Luma};
 use std::collections::HashMap;
+mod circled;
 mod pen;
+pub(super) fn is_circled(c: char) -> bool {
+    circled::number(c).is_some()
+}
 
 #[derive(Clone)]
 pub(super) struct Glyph {
@@ -121,7 +125,9 @@ impl<'a> Glyphs<'a> {
         if glyph.ink {
             glyph = Self::trim(glyph);
         }
-        if let Some(symbol) = self.pen.symbol(c, size)? {
+        if let Some(symbol) = self.circled(c, size)? {
+            glyph = symbol;
+        } else if let Some(symbol) = self.pen.symbol(c, size)? {
             glyph = symbol;
         }
         if self.cache.len() >= 1024 || self.cache_bytes + glyph.mask.len() > 8 * 1024 * 1024 {

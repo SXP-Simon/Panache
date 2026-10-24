@@ -23,6 +23,6 @@ pub(super) fn layout_units(nodes: &[Node]) -> Vec<&[Node]> {
 
 // 2026-10-15：汉字、假名、韩文与全角标点维持正文整格；拉丁/希腊字母、数字和公式符号自然行进。
 pub(super) fn keeps_grid_cell(nodes: &[Node]) -> bool {
-    matches!(nodes, [Node::Char(c)] if matches!(*c as u32,
+    matches!(nodes, [Node::Char(c)] if !super::glyph::is_circled(*c) && matches!(*c as u32,
         0x2e80..=0xa4cf | 0xac00..=0xd7af | 0xf900..=0xfaff | 0xff00..=0xffef | 0x20000..=0x323af))
 }
