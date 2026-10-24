@@ -130,12 +130,14 @@ class Settings {
     for (final p in parameters) p.key: '${p.value}',
   };
   String fill = '(0, 0, 0, 255)';
+  String layoutStyle = 'standard';
   String? font;
   bool underlined = true, englishSpacing = false, fullPreview = false;
 
   Map<String, dynamic> toJson() => {
     ...values,
     'fill': fill,
+    'layoutStyle': layoutStyle,
     'font_option': font,
     'isUnderlined': underlined,
     'enableEnglishSpacing': englishSpacing,
@@ -157,6 +159,9 @@ class Settings {
         values[p.key] = p.integer ? '${value.toInt()}' : '$value';
       }
     }
+    layoutStyle = (json['layoutStyle'] ?? json['layout_style']) == 'homework'
+        ? 'homework'
+        : 'standard';
     if (json['fill'] is String) fill = json['fill'];
     if (json['font_option'] is String) font = json['font_option'];
     if (json.containsKey('isUnderlined')) {
@@ -190,6 +195,7 @@ class Settings {
     'preview': '$preview',
     'pdf_save': '$pdf',
     'full_preview': '$fullPreview',
+    'layout_style': layoutStyle,
     'isUnderlined': '$underlined',
     'enableEnglishSpacing': '$englishSpacing',
   };

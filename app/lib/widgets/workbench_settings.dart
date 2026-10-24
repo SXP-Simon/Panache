@@ -150,7 +150,39 @@ class WorkbenchSettings extends StatelessWidget {
             title: Text(l.layout),
             initiallyExpanded: true,
             tilePadding: EdgeInsets.zero,
-            children: [parameterGrid(context, parameters.take(9).toList())],
+            children: [
+              SettingsFieldLabel(
+                label: l.layoutPreset,
+                child: SegmentedButton<String>(
+                  key: const ValueKey('layout-style'),
+                  segments: [
+                    ButtonSegment(
+                      value: 'standard',
+                      label: Text(l.layoutStandard),
+                    ),
+                    ButtonSegment(
+                      value: 'homework',
+                      label: Text(l.layoutHomework),
+                    ),
+                  ],
+                  selected: {settings.layoutStyle},
+                  onSelectionChanged: locked
+                      ? null
+                      : (selection) {
+                          settings.layoutStyle = selection.single;
+                          onEdited();
+                        },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                child: Text(
+                  l.layoutPresetHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              parameterGrid(context, parameters.take(9).toList()),
+            ],
           ),
           ExpansionTile(
             title: Text(l.variation),
