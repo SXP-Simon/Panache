@@ -159,9 +159,7 @@ pub fn execute(mut request: Request) -> Result<Value> {
                 Ok(json!({"text":document::extract(&upload.name, &bytes, &limits())?}))
             } else {
                 let detected = imaging::identify(&imaging::decode(&bytes, &limits())?)?;
-                Ok(
-                    json!({"marginLeft":detected.margin_left,"marginRight":detected.margin_right,"marginTop":detected.margin_top,"marginBottom":detected.margin_bottom,"lineSpacing":detected.line_spacing}),
-                )
+                serde_json::to_value(detected).map_err(io_error)
             }
         }
         "status" | "result" => {

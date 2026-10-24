@@ -158,11 +158,64 @@ pub struct Identification {
     pub margin_top: u32,
     pub margin_bottom: u32,
     pub line_spacing: u32,
+    pub layout_top_margin: u32,
+    pub layout_bottom_margin: u32,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub deskew_angle_degrees: f32,
     pub confidence: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub corrected_background: Option<String>,
 }
-// 2026-10-12：在降采样图上搜索倾斜角度，按横线带中心测量行距，避免把双边缘当两行。
+
+// 2026-10-24：局部纵向亮度差可识别浅灰线，也不会把渐变阴影当成整片墨迹。
+fn ruling_points(gray: &GrayImage) -> Vec<(f32, f32)> {
+    let (w, h) = gray.dimensions();
+    let radius = (h / 30).clamp(12, 40);
+    let mut points = Vec::new();
+    for x in 0..w {
+        let mut sums = vec![0u32; h as usize + 1];
+        for y in 0..h {
+            sums[y as usize + 1] = sums[y as usize] + u32::from(gray[(x, y)][0]);
+        }
+        for y in 0..h {
+            let a = y.saturating_sub(radius);
+            let b = (y + radius + 1).min(h);
+            let mean = (sums[b as usize] - sums[a as usize]) as f32 / (b - a) as f32;
+            if f32::from(gray[(x, y)][0]) + 3. < mean {
+                points.push((x as f32 - w as f32 / 2., y as f32 - h as f32 / 2.));
+            }
+        }
+    }
+    points
+}
+fn projected_rows(points: &[(f32, f32)], h: u32, angle: f32) -> (f64, Vec<u32>) {
+    let mut rows = vec![0u32; h as usize];
+    let (sin, cos) = angle.sin_cos();
+    for &(x, y) in points {
+        let row = (y * cos - x * sin + h as f32 / 2.).round() as i32;
+        if row >= 0 && row < h as i32 {
+            rows[row as usize] += 1;
+        }
+    }
+    let score = rows.iter().map(|n| f64::from(*n).powi(2)).sum();
+    (score, rows)
+}
+// 2026-10-24：分析坐标和返回的实际背景使用相同旋转，粗线按整条线带中心计距。
 pub fn identify(image: &DynamicImage) -> Result<Identification> {
-    let original = image.to_luma8();
+    use base64::Engine;
+    use imageproc::geometric_transformations::{
+        Border, Interpolation, rotate_about_center_no_crop,
+    };
+    let mut opaque = image.to_rgba8();
+    for pixel in opaque.pixels_mut() {
+        let alpha = u16::from(pixel[3]);
+        for channel in &mut pixel.0[..3] {
+            *channel = ((u16::from(*channel) * alpha + 255 * (255 - alpha) + 127) / 255) as u8;
+        }
+        pixel[3] = 255;
+    }
+    let original = DynamicImage::ImageRgba8(opaque.clone()).to_luma8();
     let (ow, oh) = original.dimensions();
     let ratio = (1200. / ow.max(oh) as f32).min(1.);
     let gray = image::imageops::resize(
@@ -172,29 +225,24 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
         image::imageops::FilterType::Triangle,
     );
     let (w, h) = gray.dimensions();
-    let mut best = (0f64, 0f32, Vec::new());
+    let points = ruling_points(&gray);
+    let mut best = (0f64, 0f32, vec![0; h as usize]);
     for step in -24..=24 {
         let angle = (step as f32 * 0.5).to_radians();
-        let mut rows = vec![0u32; h as usize];
-        for y in 0..h {
-            for x in 0..w {
-                if gray[(x, y)][0] < 150 {
-                    let yy = ((y as f32 - h as f32 / 2.) * angle.cos()
-                        - (x as f32 - w as f32 / 2.) * angle.sin()
-                        + h as f32 / 2.)
-                        .round() as i32;
-                    if yy >= 0 && yy < h as i32 {
-                        rows[yy as usize] += 1;
-                    }
-                }
-            }
-        }
-        let score = rows.iter().map(|n| f64::from(*n).powi(2)).sum::<f64>();
+        let (score, rows) = projected_rows(&points, h, angle);
         if score > best.0 {
             best = (score, angle, rows);
         }
     }
-    let threshold = (w as f32 * 0.2).max(20.) as u32;
+    let coarse = best.1;
+    for step in -9..=9 {
+        let angle = coarse + (step as f32 * 0.05).to_radians();
+        let (score, rows) = projected_rows(&points, h, angle);
+        if score > best.0 {
+            best = (score, angle, rows);
+        }
+    }
+    let threshold = (w as f32 * 0.3).max(20.) as u32;
     let mut bands = Vec::<(u32, u32)>::new();
     let mut start = None;
     for (y, count) in best.2.iter().enumerate() {
@@ -207,12 +255,16 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
     if let Some(s) = start {
         bands.push((s, h - 1));
     }
-    if bands.len() < 2 {
+    if bands.len() < 3 {
         return Err(Error::new(
             "identification_unreliable",
             "无法可靠识别行距，请手动设置",
         ));
     }
+    let mut widths: Vec<_> = bands.iter().map(|(a, b)| b - a + 1).collect();
+    widths.sort_unstable();
+    let typical_width = widths[widths.len() / 2];
+    bands.retain(|(a, b)| b - a < (typical_width * 3).max(6));
     let centers: Vec<_> = bands.iter().map(|(a, b)| (*a + *b) as f32 / 2.).collect();
     let mut gaps: Vec<_> = centers
         .windows(2)
@@ -226,7 +278,7 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
     let spacing = gaps[gaps.len() / 2];
     let stable = gaps
         .iter()
-        .filter(|v| (**v - spacing).abs() < spacing * 0.15)
+        .filter(|v| (**v - spacing).abs() < spacing * 0.08)
         .count() as f32
         / gaps.len() as f32;
     if stable < 0.6 {
@@ -235,39 +287,86 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
             "线条间距不稳定，请手动设置",
         ));
     }
-    let mut left = w;
-    let mut right = 0;
-    let mut top = h;
-    let mut bottom = 0;
-    let angle = best.1;
-    for y in 0..h {
-        for x in 0..w {
-            if gray[(x, y)][0] < 150 {
-                let xx = ((x as f32 - w as f32 / 2.) * angle.cos()
-                    + (y as f32 - h as f32 / 2.) * angle.sin()
-                    + w as f32 / 2.)
-                    .round()
-                    .clamp(0., (w - 1) as f32) as u32;
-                let yy = ((y as f32 - h as f32 / 2.) * angle.cos()
-                    - (x as f32 - w as f32 / 2.) * angle.sin()
-                    + h as f32 / 2.)
-                    .round()
-                    .clamp(0., (h - 1) as f32) as u32;
-                if bands.iter().any(|(a, b)| yy >= *a && yy <= *b) {
-                    left = left.min(xx);
-                    right = right.max(xx);
-                    top = top.min(yy);
-                    bottom = bottom.max(yy);
-                }
-            }
+    // 2026-10-24：照片边缘和阴影可能形成长条，只保留等距横线的最长连续序列。
+    let mut best_run = (0, 1);
+    let mut run_start = 0;
+    for i in 1..centers.len() {
+        if (centers[i] - centers[i - 1] - spacing).abs() >= spacing * 0.08 {
+            run_start = i;
+        }
+        if i + 1 - run_start > best_run.1 - best_run.0 {
+            best_run = (run_start, i + 1);
         }
     }
+    bands = bands[best_run.0..best_run.1].to_vec();
+    let centers = &centers[best_run.0..best_run.1];
+    if bands.len() < 3 || bands.iter().any(|(a, b)| (b - a) as f32 > spacing * 0.4) {
+        return Err(Error::new(
+            "identification_unreliable",
+            "没有足够连续等距的横线",
+        ));
+    }
+    let mut left = w;
+    let mut right = 0;
+    let (sin, cos) = best.1.sin_cos();
+    for &(x, y) in &points {
+        let xx = (x * cos + y * sin + w as f32 / 2.)
+            .round()
+            .clamp(0., (w - 1) as f32) as u32;
+        let yy = (y * cos - x * sin + h as f32 / 2.).round() as i32;
+        if bands
+            .iter()
+            .any(|(a, b)| yy >= *a as i32 && yy <= *b as i32)
+        {
+            left = left.min(xx);
+            right = right.max(xx);
+        }
+    }
+    let angle = best.1.to_degrees();
+    let (image_width, image_height, corrected_background) = if angle.abs() >= 0.1 {
+        let fill = opaque[(0, 0)];
+        let rotated_width = (oh as f32 * sin.abs() + ow as f32 * cos.abs()).ceil() as u32;
+        let rotated_height = (oh as f32 * cos.abs() + ow as f32 * sin.abs()).ceil() as u32;
+        if u64::from(rotated_width) * u64::from(rotated_height) > Limits::default().max_pixels {
+            return Err(Error::new("image_limit", "校正后的纸张尺寸超出限制"));
+        }
+        let corrected = rotate_about_center_no_crop(
+            &opaque,
+            -best.1,
+            Interpolation::Bilinear,
+            Border::Constant(fill),
+        );
+        (
+            corrected.width(),
+            corrected.height(),
+            Some(base64::engine::general_purpose::STANDARD.encode(crate::export::png(&corrected)?)),
+        )
+    } else {
+        (ow, oh, None)
+    };
+    let offset_x = (image_width - ow) as f32 / 2.;
+    let offset_y = (image_height - oh) as f32 / 2.;
+    let first = centers[0] / ratio + offset_y;
+    let line_spacing = (spacing / ratio).round() as u32;
+    let first_writable = centers
+        .iter()
+        .map(|y| y / ratio + offset_y)
+        .find(|y| *y >= line_spacing as f32)
+        .ok_or_else(|| Error::new("identification_unreliable", "纸张没有足够书写空间"))?;
+    let margin_bottom = (oh as f32 - centers.last().unwrap() / ratio + offset_y).round() as u32;
     Ok(Identification {
-        margin_left: (left as f32 / ratio).round() as u32,
-        margin_right: ((w - 1 - right) as f32 / ratio).round() as u32,
-        margin_top: (top as f32 / ratio).round() as u32,
-        margin_bottom: ((h - 1 - bottom) as f32 / ratio).round() as u32,
-        line_spacing: (spacing / ratio).round() as u32,
+        margin_left: (left as f32 / ratio + offset_x).round() as u32,
+        margin_right: ((w - 1 - right) as f32 / ratio + offset_x).round() as u32,
+        margin_top: first.round() as u32,
+        margin_bottom,
+        layout_bottom_margin: margin_bottom
+            .saturating_sub((line_spacing as f32 * 0.25).ceil() as u32),
+        line_spacing,
+        layout_top_margin: (first_writable.round() as u32).saturating_sub(line_spacing),
+        image_width,
+        image_height,
+        deskew_angle_degrees: angle,
         confidence: stable,
+        corrected_background,
     })
 }

@@ -49,6 +49,38 @@ fn local_engine_lifecycle_and_abi() {
         call("import", HashMap::new(), files, "").unwrap_err().code,
         "invalid_upload"
     );
+    // 2026-10-24：移动 ABI 必须返回与 HTTP 同源的完整校正图片和排版坐标。
+    let paper = image::RgbaImage::from_fn(400, 500, |x, y| {
+        let line = (50..420)
+            .step_by(60)
+            .any(|row| y >= row + x / 20 && y < row + x / 20 + 4);
+        let shade = if line && (30..370).contains(&x) {
+            220
+        } else {
+            245
+        };
+        image::Rgba([shade, shade, shade, 255])
+    });
+    let paper_path = root.path().join("paper.png");
+    paper.save(&paper_path).unwrap();
+    let expected =
+        handwriting_core::imaging::identify(&image::DynamicImage::ImageRgba8(paper)).unwrap();
+    let identified = call(
+        "identify",
+        HashMap::new(),
+        HashMap::from([(
+            "file".into(),
+            Upload {
+                name: "paper.png".into(),
+                path: paper_path,
+            },
+        )]),
+        "",
+    )
+    .unwrap();
+    assert_eq!(identified, serde_json::to_value(&expected).unwrap());
+    assert!(identified["correctedBackground"].as_str().unwrap().len() > 100);
+    assert_eq!(identified["lineSpacing"], 60);
     let fields: HashMap<String, String> = [
         (
             "text",
