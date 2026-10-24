@@ -58,7 +58,7 @@ void main() {
   ) async {
     String? result;
     await host(tester, (context) async {
-      result = await showMarkdownDialog(context, initialMode: 'aligned');
+      result = await showPrepareTextDialog(context, initialMode: 'aligned');
     });
     await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
@@ -70,7 +70,7 @@ void main() {
   ) async {
     String? result;
     await host(tester, (context) async {
-      result = await showMarkdownDialog(context, initialMode: 'latex');
+      result = await showPrepareTextDialog(context, initialMode: 'latex');
     });
     expect(find.text('Handwritten table (LaTeX)'), findsOneWidget);
     await tester.tap(find.byType(FilledButton));

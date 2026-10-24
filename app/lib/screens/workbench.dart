@@ -19,7 +19,7 @@ import '../services/workspace.dart';
 import '../services/desktop_exit.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
-import '../utils/latex.dart';
+import '../utils/prepare_text.dart';
 import '../widgets/workbench_controls.dart';
 import '../widgets/workbench_editor.dart';
 import '../widgets/workbench_preview.dart';
@@ -67,6 +67,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   bool recoveryShown = false;
   UpdatePromptCoordinator? updatePrompts;
   String tableMode = 'latex';
+  ({String original, String formatted, String mode})? preparedText;
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';
@@ -144,6 +145,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       settingsRevision++;
     }
     if (editor.text != w.text) {
+      preparedText = null;
       editor.value = TextEditingValue(
         text: w.text,
         selection: TextSelection.collapsed(offset: w.text.length),
@@ -237,7 +239,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     editorFocus.requestFocus();
   }
 
-  void replace(String value) {
+  void replace(String value, {bool keepPreparation = false}) {
+    if (!keepPreparation) preparedText = null;
     editor.text = value;
     w.text = value;
     w.edit();
@@ -379,7 +382,24 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     locked: locked,
     images: w.images,
     onEditImage: editImage,
+    onUndo: () {
+      final prepared = preparedText;
+      if (prepared != null && editor.text == prepared.formatted) {
+        replace(prepared.original, keepPreparation: true);
+      } else {
+        undo.undo();
+      }
+    },
+    onRedo: () {
+      final prepared = preparedText;
+      if (prepared != null && editor.text == prepared.original) {
+        replace(prepared.formatted, keepPreparation: true);
+      } else {
+        undo.redo();
+      }
+    },
     onChanged: (value) {
+      preparedText = null;
       w.text = collapseImages(value, w.images);
       w.edit();
     },
@@ -407,16 +427,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
           description: l.pageBreakHelp,
         ),
         EditorAction(
-          l.markdown,
+          l.prepareText,
           Icons.format_clear,
-          locked ? null : markdownDialog,
-          description: l.markdownHelp,
-        ),
-        EditorAction(
-          l.latex,
-          Icons.functions,
-          locked ? null : () => replace(convertLatex(editor.text)),
-          description: l.latexHelp,
+          locked ? null : prepareTextDialog,
+          identifier: 'prepare-text',
+          description: l.prepareTextHelp,
         ),
         EditorAction(
           l.letter,
@@ -531,11 +546,27 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     if (mounted && base != null) await action(() => w.setBase(base));
   }
 
-  Future<void> markdownDialog() async {
-    final mode = await showMarkdownDialog(context, initialMode: tableMode);
+  Future<void> prepareTextDialog() async {
+    final mode = await showPrepareTextDialog(context, initialMode: tableMode);
     if (!mounted || mode == null) return;
     tableMode = mode;
-    replace(cleanMarkdown(editor.text, tableMode: mode, english: english));
+    final previous = preparedText;
+    if (previous != null &&
+        editor.text == previous.formatted &&
+        mode == previous.mode) {
+      return;
+    }
+    final original = previous != null && editor.text == previous.formatted
+        ? previous.original
+        : editor.text;
+    final formatted = prepareHandwritingText(
+      original,
+      tableMode: mode,
+      english: english,
+    );
+    if (formatted == editor.text) return;
+    preparedText = (original: original, formatted: formatted, mode: mode);
+    replace(formatted, keepPreparation: true);
   }
 
   Future<void> letterDialog() async {

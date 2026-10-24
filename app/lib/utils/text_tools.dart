@@ -33,11 +33,13 @@ String cleanMarkdown(
   String text, {
   String tableMode = 'latex',
   bool english = false,
+  String Function(String)? transformMath,
 }) {
   var s = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   final code = protectMarkdownCode(s, inline: false);
   s = code.text;
   final protected = <String>[];
+  final scriptStars = <String>[];
   var tokenPrefix = '\uE100HW';
   while (s.contains(tokenPrefix)) {
     tokenPrefix += '\uE100';
@@ -86,10 +88,10 @@ String cleanMarkdown(
   final bodyCode = protectMarkdownCode(math.toString());
   s = bodyCode.text;
   // Converted script stars must not become Markdown emphasis on a second cleanup.
-  s = s.replaceAllMapped(
-    RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'),
-    (match) => protect(match[0]!),
-  );
+  s = s.replaceAllMapped(RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'), (match) {
+    scriptStars.add(match[0]!);
+    return '${tokenPrefix}STAR${scriptStars.length - 1}\uE101';
+  });
   final bareMath = StringBuffer();
   cursor = 0;
   for (final match in RegExp(r'\\left\b').allMatches(s)) {
@@ -233,15 +235,18 @@ String cleanMarkdown(
     RegExp('${RegExp.escape(tokenPrefix)}(\\d+)\uE101'),
     (m) => protected[int.parse(m[1]!)],
   );
-  return code.restore(
-    bodyCode.restore(
-      s
-          .split('\n')
-          .where((line) => line.trim().isNotEmpty && line.trim() != '---')
-          .join('\n')
-          .trim(),
-    ),
+  s = s
+      .split('\n')
+      .where((line) => line.trim().isNotEmpty && line.trim() != '---')
+      .join('\n')
+      .trim();
+  // Keep literal code masked until both cleanup stages have finished.
+  s = transformMath?.call(s) ?? s;
+  s = s.replaceAllMapped(
+    RegExp('${RegExp.escape(tokenPrefix)}STAR(\\d+)\uE101'),
+    (match) => scriptStars[int.parse(match[1]!)],
   );
+  return code.restore(bodyCode.restore(s));
 }
 
 // Markdown 表格仅在完整分隔行后识别；不完整或超宽数据保持原文。

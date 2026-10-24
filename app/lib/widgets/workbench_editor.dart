@@ -18,6 +18,8 @@ class WorkbenchEditor extends StatelessWidget {
     required this.images,
     required this.onChanged,
     this.onEditImage,
+    this.onUndo,
+    this.onRedo,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -27,6 +29,7 @@ class WorkbenchEditor extends StatelessWidget {
   final Map<String, String> images;
   final ValueChanged<String> onChanged;
   final ValueChanged<IllustrationMarker>? onEditImage;
+  final VoidCallback? onUndo, onRedo;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -76,12 +79,12 @@ class WorkbenchEditor extends StatelessWidget {
                     Text('${controller.text.runes.length} ${l.characters}'),
                     TextButton.icon(
                       label: Text(l.undo),
-                      onPressed: locked ? null : undo.undo,
+                      onPressed: locked ? null : (onUndo ?? undo.undo),
                       icon: const Icon(Icons.undo),
                     ),
                     TextButton.icon(
                       label: Text(l.redo),
-                      onPressed: locked ? null : undo.redo,
+                      onPressed: locked ? null : (onRedo ?? undo.redo),
                       icon: const Icon(Icons.redo),
                     ),
                   ],
