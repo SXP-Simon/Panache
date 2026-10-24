@@ -57,9 +57,10 @@ from generation_cancellation import (
 )
 from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
+from homework_layout import inset_homework_body
 from library_boundary import member
 from logging_setup import get_logger
-from math_page_layout import RuledTemplate
+from math_page_layout import HomeworkTemplate, RuledTemplate
 from PIL import Image, ImageDraw, ImageFont
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -834,6 +835,8 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
         or (data.get("background_ruled") == "true" and "width" not in data)
         else Template
     )
+    if data.get("layout_style") == "homework":
+        template_type = HomeworkTemplate
     template = template_type(
         background=background,
         font=font,
@@ -859,6 +862,8 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
     )
     if isinstance(template, RuledTemplate):
         template.ruled_origin = int(data["top_margin"])
+    if isinstance(template, HomeworkTemplate):
+        inset_homework_body(template)
     return template
 
 

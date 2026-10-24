@@ -17,9 +17,13 @@ from PIL import Image, ImageDraw
 from PIL.ImageFont import FreeTypeFont, ImageFont
 
 if __package__:
+    from .generation_cancellation import check_cancelled
+    from .homework_layout import ParagraphStyle, bracket_depth, paragraph_style, preferred_break
     from .library_boundary import install_member, member
     from .math_ink import remember_math_ink
 else:
+    from generation_cancellation import check_cancelled
+    from homework_layout import ParagraphStyle, bracket_depth, paragraph_style, preferred_break
     from library_boundary import install_member, member
     from math_ink import remember_math_ink
 
@@ -38,6 +42,12 @@ class RuledTemplate(Template):
     __slots__ = ("ruled_origin",)
 
     ruled_origin: int
+
+
+class HomeworkTemplate(RuledTemplate):
+    """2026-10-24：作业笔记复用字形排版器，并保留实际或虚拟横线网格."""
+
+    __slots__ = ()
 
 
 class StrokeDrawer(Protocol):
@@ -115,6 +125,7 @@ def _font_size(font: Font) -> int:
 
 
 _MIN_FONT_SIZE = 8
+_SECTION_SEPARATION_LINES = 3
 
 type Stroke = tuple[tuple[float, ...], int, int]
 
@@ -344,6 +355,7 @@ class _PageRenderer:
     candidates: tuple[str, ...] = field(init=False)
     previous_y: int | None = field(init=False, default=None)
     previous_bottom: int = field(init=False)
+    section_lines: int = field(init=False, default=0)
 
     def __post_init__(self) -> None:
         self.metrics = _Metrics.create(self.page, self.tpl, self.layout.api)
@@ -418,22 +430,52 @@ class _PageRenderer:
 
     def _line(self, start: int) -> tuple[list[Unit], int]:
         units: list[Unit] = []
-        cursor: float = self.metrics.left
+        homework = isinstance(self.tpl, HomeworkTemplate)
+        indent = self._paragraph(start).indent if homework else 0
+        cursor: float = self.metrics.left + indent
+        depth = 0
+        boundary: tuple[int, int, object] | None = None
         while start < len(self.text) and self.text[start] != "\n":
+            check_cancelled()
             char = self.text[start]
             char_state = self.rand.getstate()
+            if (
+                homework
+                and units
+                and cursor - self.metrics.left >= self.metrics.area.width * 0.2
+                and preferred_break(self.text, start, depth)
+            ):
+                boundary = len(units), start, char_state
             glyph = self._prepare(char, cursor)
             if self._would_wrap(glyph, start, has_units=bool(units)) or self._correct(
                 glyph, cursor, has_units=bool(units)
             ):
                 self.rand.setstate(char_state)
+                if boundary is not None:
+                    count, start, state = boundary
+                    units = units[:count]
+                    self.rand.setstate(state)
                 break
             units.append(glyph.unit(rigid=self.layout.is_math_glyph(char) or glyph.corrected))
             cursor = self._advance(glyph, char)
+            depth = bracket_depth(char, depth)
             start += 1
         if start < len(self.text) and self.text[start] == "\n":
             start += 1
         return units, start
+
+    def _paragraph(self, start: int) -> ParagraphStyle:
+        return paragraph_style(
+            self.text, start, self.metrics.area.width, self.metrics.font_size, self._prefix_width
+        )
+
+    def _prefix_width(self, text: str) -> float:
+        font = self.tpl.get_font()
+        return sum(
+            max(1, self.layout.measure_bbox(char, font, _font_path(font))[2])
+            + max(0, self.tpl.get_word_spacing())
+            for char in text
+        )
 
     def _fit_line(
         self, units: list[Unit], max_height: int | None = None
@@ -479,10 +521,17 @@ class _PageRenderer:
 
     def render(self, start: int) -> int:
         while start < len(self.text):
+            check_cancelled()
             line_start, line_state = start, self.rand.getstate()
+            if isinstance(self.tpl, HomeworkTemplate) and self._paragraph(start).separate:
+                # 2026-10-24：只有上一题至少占三行时才额外分隔，短条目不机械插入空行。
+                if self.previous_y is not None and self.section_lines >= _SECTION_SEPARATION_LINES:
+                    self._blank_line()
+                self.section_lines = 0
             units, start = self._line(start)
             if not units:
                 self._blank_line()
+                self.section_lines = 0
                 continue
             units, min_y, max_y = self._fit_line(units)
             baseline = self._baseline(min_y)
@@ -505,6 +554,7 @@ class _PageRenderer:
                     (x + bbox[0], baseline + dy + bbox[1]), image, fill=self.layout.api.white
                 )
             self.previous_y, self.previous_bottom = baseline, baseline + max_y
+            self.section_lines += 1
         return start
 
 
@@ -522,7 +572,9 @@ def install_math_page_layout(
 
     @functools.wraps(original)
     def draw_page(page: Page, text: str, start: int, tpl: Template, rand: Random) -> int:
-        if not any(is_math_glyph(char) for char in text[start:]):
+        if not isinstance(tpl, HomeworkTemplate) and not any(
+            is_math_glyph(char) for char in text[start:]
+        ):
             # 2026-10-24：上游用随机重试选错字；全是排除字符时会永远到不了取消检查点。
             if tpl.get_strikethrough_probability() and not any(
                 char not in tpl.get_end_chars() + " " for char in text
