@@ -131,7 +131,7 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
             (min_y, max_y) = bounds(&units);
         }
         // 2026-10-17：公式可占多格，后续基线仍须落在原纸张横线上。
-        let ruled = self.p.underlined && self.p.width.is_some();
+        let ruled = (self.p.underlined && self.p.width.is_some()) || self.p.background_ruled;
         let align = |anchor: f32| {
             if ruled {
                 top + (((anchor - top) / self.p.line_spacing) - 0.00001)
@@ -485,7 +485,10 @@ mod ruled_tests {
 
     #[test]
     fn tall_lines_keep_the_ruled_phase_across_pages_and_image_offsets() {
-        for spacing in [32., 32.3, 42.] {
+        for (spacing, uploaded) in [32., 32.3, 42.]
+            .into_iter()
+            .flat_map(|spacing| [(spacing, false), (spacing, true)])
+        {
             let p = Parameters {
                 font_size: 24.,
                 line_spacing: spacing,
@@ -493,9 +496,10 @@ mod ruled_tests {
                 bottom_margin: 13.,
                 left_margin: 10.,
                 right_margin: 10.,
-                width: Some(180),
-                height: Some(193),
-                underlined: true,
+                width: if uploaded { None } else { Some(180) },
+                height: if uploaded { None } else { Some(193) },
+                underlined: !uploaded,
+                background_ruled: uploaded,
                 preview: false,
                 perturb_x_sigma: 0.,
                 perturb_y_sigma: 0.,
