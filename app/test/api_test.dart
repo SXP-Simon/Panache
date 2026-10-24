@@ -72,6 +72,50 @@ void main() {
   );
 
   test(
+    'lost submit response automatically cancels; HTTP 404 never confirms exit',
+    () async {
+      var allowCancel = false;
+      var stopCalls = 0;
+      final api = HandwritingApi(
+        'http://localhost:5006',
+        client: MockClient((request) async {
+          if (request.url.path == '/api/generate_handwriting') {
+            throw http.ClientException('response lost');
+          }
+          if (request.url.path.endsWith('/cancel')) {
+            stopCalls++;
+            return http.Response(
+              allowCancel
+                  ? '{"task_status":"cancelled"}'
+                  : '{"message":"unknown endpoint"}',
+              allowCancel ? 200 : 404,
+            );
+          }
+          return http.Response('{"task_status":"cancelled"}', 200);
+        }),
+      );
+      api.configureCapabilities({
+        'capabilities': {'task_cancellation': true, 'task_submission_id': true},
+      });
+      final w = Workspace(api: api)..text = 'keep my draft';
+      w.settings.font = 'test.ttf';
+      expect(await w.generate(), isFalse);
+      expect(stopCalls, 1);
+      expect(w.busy, isTrue);
+      expect(w.phase, 'cancelling');
+      expect(w.error, 'unknown endpoint');
+      expect(await w.generate(), isFalse);
+      allowCancel = true;
+      await w.cancel();
+      expect(stopCalls, 2);
+      expect(w.busy, isFalse);
+      expect(w.phase, 'cancelled');
+      expect(w.text, 'keep my draft');
+      w.dispose();
+    },
+  );
+
+  test(
     'HTTP cancellation requires capability and waits for actual terminal state',
     () async {
       var polls = 0;
