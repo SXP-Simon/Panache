@@ -1,6 +1,7 @@
 //! 2026-10-24：圈号内部数字沿用主手写字体，圈与数字始终作为一个完整字形。
 use super::{Glyph, Glyphs};
 use crate::{Result, text::Node};
+use image::GrayImage;
 
 pub(super) fn number(c: char) -> Option<u32> {
     match c as u32 {
@@ -17,40 +18,55 @@ impl Glyphs<'_> {
         let Some(value) = number(c) else {
             return Ok(None);
         };
+        let font = self.book.primary();
+        if font.lookup_glyph_index(c) != 0 {
+            let (m, data) = font.rasterize(c, size);
+            // 2026-10-24：原生圈号优先；只有空字形或与缺字占位相同的墨迹才补绘。
+            let (_, missing) = font.rasterize_indexed(0, size);
+            if data.iter().any(|alpha| *alpha >= 128) && data != missing {
+                return Ok(Some(Self::trim(Glyph {
+                    mask: GrayImage::from_raw(m.width as u32, m.height as u32, data).unwrap(),
+                    advance: m.advance_width.max((m.xmin + m.width as i32) as f32),
+                    left: m.xmin,
+                    top: -(m.height as i32) - m.ymin,
+                    ink: true,
+                })));
+            }
+        }
+        self.fallback_circled(value, size).map(Some)
+    }
+    fn fallback_circled(&mut self, value: u32, size: f32) -> Result<Glyph> {
         let reference = self.glyph('0', size)?;
         let height = (size * 0.80)
             .max(reference.mask.height() as f32 * 1.16)
             .min(size * 0.94)
             .max(12.);
-        let width = height * 1.045;
+        let width = height * 0.96;
         let (rx, ry) = (width / 2., height / 2.);
         let center = (rx, (reference.top + reference.bottom()) as f32 / 2.);
         let inner_size = size * if value < 10 { 0.64 } else { 0.52 };
         let nodes: Vec<_> = value.to_string().chars().map(Node::Char).collect();
         let digits = self
             .sequence(&nodes, inner_size.max(32.))?
-            .fit(width * 0.58, height * 0.60);
+            .fit(width * 0.52, height * 0.55);
         let x = (center.0 - digits.mask.width() as f32 / 2.).round() as i32 - digits.left;
         let y = (center.1 - digits.mask.height() as f32 / 2.).round() as i32 - digits.top;
         let phase = value as f32 * 0.71 + (self.pen.seed % 13) as f32 * 0.17;
         let mut ring = Vec::with_capacity(97);
         for i in 0..96 {
             let angle = i as f32 / 96. * std::f32::consts::TAU;
-            let wobble = self.pen.naturalness
-                * (0.014 * (angle * 3. + phase).sin() + 0.008 * (angle * 2. - phase).cos());
+            // 非正圆来自轻微倾斜、左右不对称与宽高差；不使用多瓣波纹模拟手写。
+            let wobble = 0.025 * angle.cos()
+                + (0.008 + self.pen.naturalness * 0.012) * (angle * 2. + phase).sin();
             ring.push((
-                center.0 + rx * angle.cos() * (1. + wobble),
+                center.0 + rx * angle.cos() * (1. + wobble) - ry * angle.sin() * 0.11,
                 center.1 + ry * angle.sin() * (1. + wobble),
             ));
         }
         ring.push(ring[0]);
         let advance = width + size * 0.09;
         let outline = self.pen.draw(size, advance, &[ring])?;
-        Ok(Some(Self::compose(
-            advance,
-            vec![(outline, 0, 0), (digits, x, y)],
-            vec![],
-        )?))
+        Self::compose(advance, vec![(outline, 0, 0), (digits, x, y)], vec![])
     }
 }
 
@@ -107,6 +123,52 @@ mod tests {
         }
     }
     #[test]
+    fn primary_circle_ink_is_preserved_and_only_missing_characters_are_synthesized() {
+        for name in ["云烟体", "华阳手写体", "李国夫手写体", "霞鹜文楷"] {
+            let book = FontBook::new(
+                &std::fs::read(
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join(format!("../../assets/font_assets/{name}.ttf")),
+                )
+                .unwrap(),
+                &[],
+            )
+            .unwrap();
+            let mut gs = Glyphs::new(&book);
+            for size in [18., 36., 72., 124.] {
+                for c in '①'..='⑥' {
+                    let (m, data) = book.primary().rasterize(c, size);
+                    assert_ne!(book.primary().lookup_glyph_index(c), 0);
+                    let expected = Glyphs::trim(Glyph {
+                        mask: GrayImage::from_raw(m.width as u32, m.height as u32, data).unwrap(),
+                        advance: m.advance_width.max((m.xmin + m.width as i32) as f32),
+                        left: m.xmin,
+                        top: -(m.height as i32) - m.ymin,
+                        ink: true,
+                    });
+                    let actual = gs.glyph(c, size).unwrap();
+                    assert_eq!(
+                        actual.mask, expected.mask,
+                        "{name} {c}/{size}: native strokes changed"
+                    );
+                    assert_eq!(
+                        (actual.left, actual.top, actual.advance),
+                        (expected.left, expected.top, expected.advance)
+                    );
+                }
+                if ["云烟体", "华阳手写体"].contains(&name) {
+                    for c in ['⓪', '㉑', '㊿'] {
+                        assert_eq!(book.primary().lookup_glyph_index(c), 0);
+                        assert_eq!(
+                            gs.glyph(c, size).unwrap().mask,
+                            gs.fallback_circled(number(c).unwrap(), size).unwrap().mask
+                        );
+                    }
+                }
+            }
+        }
+    }
+    #[test]
     fn circled_digits_stay_separate_inside_closed_handwritten_rings() {
         for name in ["云烟体", "华阳手写体", "李国夫手写体", "霞鹜文楷"] {
             let book = FontBook::new(
@@ -129,7 +191,7 @@ mod tests {
                     let mut gs = Glyphs::with_parameters(&book, &p);
                     for c in ['⓪', '①', '⑧', '⑩', '⑪', '⑳', '㉑', '㉟', '㊱', '㊿']
                     {
-                        let g = gs.glyph(c, size).unwrap();
+                        let g = gs.fallback_circled(number(c).unwrap(), size).unwrap();
                         assert!(g.advance >= g.right() as f32);
                         assert!((g.mask.width() as f32) < size * 1.15);
                         let edge = g
@@ -166,7 +228,10 @@ mod tests {
                             !outside.contains(&internal_air),
                             "{name} {c}/{size}: circle has a gap"
                         );
-                        assert_eq!(g.mask, gs.glyph(c, size).unwrap().mask);
+                        assert_eq!(
+                            g.mask,
+                            gs.fallback_circled(number(c).unwrap(), size).unwrap().mask
+                        );
                     }
                 }
             }

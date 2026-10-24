@@ -5,13 +5,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(env::args_os().nth(1).ok_or("output directory required")?);
     fs::create_dir_all(&output)?;
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/font_assets");
-    let text = "（1）证明：\n① ¬(p∧¬q)　前提\n② q→¬r　前提\n③ r　前提\n④ ¬q　②③拒取式、双重否定律\n⑤ ¬p∨q　①德摩根律、双重否定律\n⑥ ¬p　⑤④析取三段论\n编号：⓪ ⑩ ⑪ ⑳ ㉑ ㉟ ㊱ ㊿\n引用：由①③得到④，再由⑤④得到⑥。";
+    let fallback = env::args().nth(2).as_deref() == Some("fallback");
+    let text = if fallback {
+        "缺字补绘：所选字体没有这些圈号\n⓪ 初始状态与边界条件\n㉑ 检查连续函数的可导条件\n㉟ 代入初值，求出通解中的常数\n㊱ 计算积分并检验结果\n㊿ 由前述条件得出结论\n正文引用：根据㉑㉟，再利用㊱㊿。"
+    } else {
+        "原生圈号：保留字体本身笔触\n① ¬(p∧¬q)　前提\n② q→¬r　前提\n③ r　前提\n④ ¬q　②③拒取式、双重否定律\n⑤ ¬p∨q　①德摩根律、双重否定律\n⑥ ¬p　⑤④析取三段论\n引用：由①③得到④，再由⑤④得到⑥。"
+    };
     for (key, name) in [
         ("yunyan", "云烟体"),
         ("huayang", "华阳手写体"),
         ("liguofu", "李国夫手写体"),
         ("wenkai", "霞鹜文楷"),
     ] {
+        if fallback && !["yunyan", "huayang"].contains(&key) {
+            continue;
+        }
         let primary = FontBook::load(&fs::read(dir.join(format!("{name}.ttf")))?)?;
         let fonts = FontBook::with_text_fallbacks(primary, text, |name| {
             Ok(Some(FontBook::load(&fs::read(dir.join(name)).unwrap())?))
