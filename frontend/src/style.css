@@ -453,6 +453,46 @@ h2 svg {
 .editor-toolbar .button--ghost {
   color: var(--green-ink);
 }
+.action-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.action-hint .action-hint-trigger {
+  padding-inline: 6px;
+  min-width: 30px;
+}
+.action-hint-popup {
+  position: absolute;
+  inset: 100% auto auto 0;
+  z-index: 10;
+  width: min(300px, calc(100vw - 64px));
+  padding-top: 5px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-3px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 150ms;
+}
+.action-hint-popup[data-open='true'] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.action-hint-bubble {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--green-border);
+  border-radius: 10px;
+  background: var(--surface-heading);
+  color: var(--foreground);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.7;
+  font-weight: 400;
+}
 .editor-options {
   background: var(--surface-footer);
   display: flex;

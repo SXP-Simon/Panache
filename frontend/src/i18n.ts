@@ -203,9 +203,10 @@ const words = {
     '已停止整理，原文保持不变。',
     'Text preparation stopped. Your original text is unchanged.',
   ],
+  prepareTextHelp: ['整理文本的作用', 'What does Prepare text do?'],
   prepareTextHint: [
-    '先清理 Markdown，再转写公式；保留代码内容，可撤销。',
-    'Clean Markdown, then transcribe formulas. Keeps code intact; undo is available.',
+    '先去掉 Markdown 格式标记、分隔线和空白行，再转写 LaTeX 公式。保留代码内容，表格按所选方式处理；可撤销。',
+    'Remove Markdown formatting, separators and blank lines, then transcribe LaTeX formulas for handwriting. Code contents are kept; tables use your selected mode. You can undo the changes.',
   ],
   undoText: ['撤销整理', 'Undo cleanup'],
   markdownHint: [

@@ -21,6 +21,7 @@ import { prepareInlineImage } from '@/utils/prepareInlineImage';
 import { prepareTextInWorker } from '@/utils/textPreparationJob';
 import type { TableMode } from '@/utils/cleanMarkdown';
 import Button from '../shared/ui/Button';
+import ActionHint from '../shared/ui/ActionHint';
 import Modal from '../shared/ui/Modal';
 import {
   FileText,
@@ -258,17 +259,19 @@ export default function EditorPanel() {
         </label>
       </header>
       <div className="editor-toolbar">
-        <Button
-          size="small"
-          variant="ghost"
-          data-testid="prepare-text-btn"
-          title={t('prepareTextHint')}
-          disabled={preparing || !text.trim()}
-          onClick={() => void prepareText()}
-        >
-          <AlignLeft size={15} />
-          {t('prepareText')}
-        </Button>
+        <ActionHint id="prepare-text-hint" text={t('prepareTextHint')} label={t('prepareTextHelp')}>
+          <Button
+            size="small"
+            variant="ghost"
+            data-testid="prepare-text-btn"
+            aria-describedby="prepare-text-hint"
+            disabled={preparing || !text.trim()}
+            onClick={() => void prepareText()}
+          >
+            <AlignLeft size={15} />
+            {t('prepareText')}
+          </Button>
+        </ActionHint>
         {preparing && (
           <Button
             size="small"
