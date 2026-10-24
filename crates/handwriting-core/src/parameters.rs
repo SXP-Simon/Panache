@@ -44,6 +44,7 @@ pub struct Parameters {
     pub ink_depth_sigma: f32,
     pub fill: [u8; 4],
     pub underlined: bool,
+    pub background_ruled: bool,
     pub english_spacing: bool,
     pub grid_layout: bool,
     pub width: Option<u32>,
@@ -77,6 +78,7 @@ impl Default for Parameters {
             ink_depth_sigma: 30.,
             fill: [0, 0, 0, 255],
             underlined: false,
+            background_ruled: false,
             english_spacing: false,
             grid_layout: false,
             width: Some(2481),
@@ -123,6 +125,7 @@ impl Parameters {
             }
         }
         p.underlined = boolean(f, "isUnderlined", false)?;
+        p.background_ruled = boolean(f, "background_ruled", false)?;
         p.english_spacing = boolean(f, "enableEnglishSpacing", false)?;
         p.grid_layout = boolean(f, "grid_layout", false)?;
         p.preview = boolean(f, "preview", true)?;
