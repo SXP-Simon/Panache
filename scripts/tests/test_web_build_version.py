@@ -23,6 +23,8 @@ class WebBuildTest(unittest.TestCase):
             metadata_path.write_text(json.dumps({'version': '2.3.4', 'build_number': '2003004', 'app_name': 'Panache'}))
             with patch.object(MODULE, 'ROOT', root), patch.object(MODULE.subprocess, 'run') as run, patch.dict(os.environ, {}, clear=True), patch('sys.argv', [str(SOURCE), '--version', '2.3.4', '--build-number', '2003004', '--build-id', 'source-123', '--base-href', '/panache/']):
                 MODULE.main()
+            worker_command = run.call_args_list[0].args[0]
+            self.assertEqual(Path(worker_command[1]).name, 'build-text-worker.py')
             command = run.call_args.args[0]
             self.assertIn('--build-name=2.3.4', command)
             self.assertIn('--dart-define=PANACHE_APP_VERSION=2.3.4', command)
@@ -62,6 +64,32 @@ class WebBuildTest(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     MODULE.main()
                 run.assert_not_called()
+
+
+class TextWorkerBuildTest(unittest.TestCase):
+    def test_worker_uses_same_sdk_platform_without_flutter_engine_bootstrap(self):
+        worker_spec = importlib.util.spec_from_file_location('text_worker_build', SOURCE.with_name('build-text-worker.py'))
+        worker = importlib.util.module_from_spec(worker_spec)
+        worker_spec.loader.exec_module(worker)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sdk = root / 'sdk with spaces'
+            flutter = sdk / 'bin' / ('flutter.bat' if os.name == 'nt' else 'flutter')
+            dart = sdk / 'bin/cache/dart-sdk/bin' / ('dart.exe' if os.name == 'nt' else 'dart')
+            dart.parent.mkdir(parents=True)
+            dart.touch()
+            platform = sdk / 'bin/cache/flutter_web_sdk/kernel'
+            platform.mkdir(parents=True)
+            with patch.object(worker, 'ROOT', root), patch.object(worker.shutil, 'which', return_value=str(flutter)), patch.object(worker.subprocess, 'run') as run, patch('sys.argv', ['build-text-worker.py']):
+                worker.main()
+            self.assertEqual(run.call_count, 2)
+            self.assertEqual(run.call_args_list[0].args[0], [str(flutter), 'pub', 'get'])
+            command = run.call_args.args[0]
+            self.assertEqual(command[0], str(dart))
+            self.assertIn(f'--platform-binaries={platform}', command)
+            self.assertEqual(command[-1], 'lib/workers/prepare_text_worker.dart')
+            self.assertIn('web/prepare-text-worker.js', command)
+            self.assertTrue(run.call_args.kwargs['check'])
 
 
 if __name__ == '__main__':

@@ -37,6 +37,7 @@ cargo run --locked -p handwriting-server
 # 另一个终端，Web 开发
 cd app
 flutter pub get
+python3 ../scripts/build-text-worker.py
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 flutter analyze
 flutter test

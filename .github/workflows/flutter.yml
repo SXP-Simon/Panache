@@ -6,9 +6,9 @@ permissions:
 on:
   push:
     branches: ["flutter"]
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   pull_request:
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
   workflow_dispatch:
 
 jobs:

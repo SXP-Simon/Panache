@@ -38,6 +38,7 @@ cargo run --locked -p handwriting-server
 ```bash
 cd app
 flutter pub get
+python3 ../scripts/build-text-worker.py
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 # macOS 原生开发：自动构建并嵌入 Rust sidecar
 flutter run -d macos
