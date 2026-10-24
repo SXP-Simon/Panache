@@ -148,6 +148,12 @@ export function cleanMarkdown(text: string, options: MarkdownOptions = {}): stri
   );
   const code = protectMarkdownCode(s);
   s = code.text;
+  // A transcribed Kleene star is a script token, not one half of Markdown emphasis.
+  s = s.replace(/[_^](?:\(\*\)|\{\*\}|\*)/g, (source) => {
+    const token = `${mathPrefix}${mathSources.length}\ue101`;
+    mathSources.push(source);
+    return token;
+  });
   s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // 1. 移除文档顶部的 YAML / TOML Front Matter

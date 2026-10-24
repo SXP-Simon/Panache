@@ -7,6 +7,23 @@ function test(name, run) {
 
 const cleanModule = import("../src/utils/cleanMarkdown.ts");
 
+test("converted automata formulas retain closure stars during repeated cleanup", async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const { convertLatexToUnicode: convert } = await import('../src/utils/latexToUnicode.ts');
+  for (const [name, source, expected] of require('./fixtures/automata-latex.json')) {
+    const formula = '$$' + source + '$$';
+    const result = expected ?? formula;
+    assert.equal(cleanMarkdown(convert(formula)), result, name);
+    assert.equal(cleanMarkdown(cleanMarkdown(convert(formula))), result, name + ': repeated');
+  }
+  for (const source of ['(01)^(*) (10)^(*)', 'a^*b^*', 'a^{*} b^{*}', 'x_(*) y_(*)', 'x_* y_*']) {
+    assert.equal(cleanMarkdown(source), source);
+    assert.equal(cleanMarkdown('`' + source + '`'), source);
+    assert.equal(cleanMarkdown('```text\n' + source + '\n```'), source);
+  }
+  assert.equal(cleanMarkdown('**闭包**：(01)^(*)，*说明*'), '闭包：(01)^(*)，说明');
+});
+
 test("distribution arrays preserve rows and rules in either cleanup order", async () => {
   const { cleanMarkdown } = await cleanModule;
   const { convertLatexToUnicode: convert } = await import('../src/utils/latexToUnicode.ts');
