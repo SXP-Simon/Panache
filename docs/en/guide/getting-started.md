@@ -2,7 +2,7 @@
 
 ## The whole flow
 
-1. **Enter text** — type in "Text & formulas", or import a document. Use "Convert LaTeX" before rendering formulas.
+1. **Enter text** — type in "Text & formulas", or import a document. Use "Prepare text" to clean Markdown and transcribe LaTeX.
 2. **Pick a font** — choose a server font or upload one in "Handwriting & paper". Interface typography does not affect the paper font.
 3. **Set the paper** — either give a width and height (the app generates ruled paper), or upload a background image.
 4. **Tune parameters** — the defaults are fine to start with; see [Parameters](parameters.md) to fine-tune.
@@ -45,9 +45,11 @@ Phones omit the top brand header. The compact workspace action row provides the 
 
 Click Prepare text, then generate a preview. Matrices, determinants and piecewise functions use two-dimensional layouts with scalable delimiters; conditions are left-aligned. Table cells use the same font fallback and fraction layout as ordinary formulas.
 
+Use **Stop preparing** to interrupt long text cleanup without changing the original. While generating a preview, PDF or ZIP, use **Stop generating** beside the progress indicator. A new generation becomes available after the backend has stopped and cleaned up the task. If a connection failure prevents confirmation, use **Retry stopping**. Your text, settings and existing preview are preserved. Rendering stops at safe checkpoints; an image currently being encoded may take a moment to finish that step.
+
 Common inputs include `\mathcal{L}`, `\oiint`, `\SI{4.7}{\kilo\ohm}`, `\si{\metre\per\second\squared}` and `\num{1.2e-3}`. Unsupported options, custom macros and expressions that cannot be parsed reliably remain as source text. Check the preview before exporting.
 
-Markdown cleanup removes code fences and backticks while preserving their contents, including pointers, underscores, comparisons and indentation. This is a text conversion: once those boundaries are removed, a subsequent cleanup or formula conversion cannot recover the original code context.
+Markdown cleanup removes code fences and backticks while preserving their contents, including pointers, underscores, comparisons and indentation. Until the text is manually edited, repeated preparation leaves code intact and changing table mode uses the retained original. After manual edits or reopening the app, keep code fences if you need to prepare code again.
 
 Paste a common CircuiTikZ circuit directly into the editor and generate a preview. Cleanup and formula conversion preserve its source; rendering draws the connections and handwritten labels. For example:
 

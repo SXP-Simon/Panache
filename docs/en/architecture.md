@@ -75,8 +75,9 @@ provides server-data caching.
 
 1. Workspace actions read a document / settings snapshot and validate it. Image placeholders are
    expanded when building the request payload.
-2. The API submits a task. The backend persists it in SQLite and returns a task ID.
-3. The client saves the ID and export mode, then observes progress through WebSocket with HTTP
+2. The client allocates and saves a task ID and export mode before submission. The backend
+   persists the task idempotently in SQLite.
+3. The client observes progress through WebSocket with HTTP
    polling as fallback.
 4. Both transports update the same Query task cache. On completion, the client fetches images,
    ZIP, or PDF and passes them to preview / download adapters.
@@ -84,10 +85,16 @@ provides server-data caching.
    remains available on the server.
 
 Generation POSTs are not retried automatically. A full queue disables submission until the returned
-retry deadline. Cancellation, unmounting, or leaving the page aborts client requests and releases
-observation connections; it does not delete the backend task. Temporary network errors and timeouts
-retain task identity. Success, explicit task failure, or an unavailable task clears it. The uploaded
-snapshot reference is released when the POST finishes.
+retry deadline. Stopping persists the cancellation intent and requests server cancellation. A new run
+is allowed only after the renderer exits at a safe checkpoint and removes partial output. Failed stop
+requests retain the task identity and can be retried. Preallocated IDs support cancellation even when
+the submission response is lost; a late submission cannot revive a cancelled task. Leaving the page
+only disconnects observation. Refresh resumes the task or its outstanding cancellation request.
+The uploaded snapshot reference is released when the POST finishes.
+
+Text preparation runs in a dedicated Web Worker for each operation. Stopping, editing the source,
+changing table mode, or unmounting terminates that Worker. Only the current operation can write its
+result back; the editor owns the original text and undo record.
 
 ## Local persistence
 
