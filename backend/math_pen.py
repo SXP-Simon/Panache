@@ -44,6 +44,11 @@ class Pen:
     width: int
     slant: float
 
+    @property
+    def naturalness(self) -> float:
+        """2026-10-24：读取当前请求的有界自然度，不在字库采样结果中保存请求状态."""
+        return _NATURALNESS.get()
+
     def path(self, points: Points) -> PenPath:
         """2026-10-24：固定连接端点，小幅弧线由已有自然度控制并限制在安全间隙内."""
         result: list[tuple[int, int]] = []

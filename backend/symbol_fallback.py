@@ -26,6 +26,7 @@ from handright import Template
 from PIL import Image, ImageDraw, ImageFont
 
 if __package__:
+    from .circled_number import circle_path, circled_number
     from .circuit import Circuit, parse_circuit
     from .circuit_document import map_circuit_document
     from .circuit_layout import layout_circuit
@@ -38,6 +39,7 @@ if __package__:
     from .math_pen import SYMBOLS, font_pen, symbol_paths
     from .math_table import Table, parse_table, table_spans
 else:
+    from circled_number import circle_path, circled_number
     from circuit import Circuit, parse_circuit
     from circuit_document import map_circuit_document
     from circuit_layout import layout_circuit
@@ -417,6 +419,7 @@ def is_math_glyph(char: str) -> bool:
     """Check whether a registered glyph requires mathematical layout."""
     return (
         char in SYMBOLS
+        or circled_number(char) is not None
         or char in _CIRCUIT_MAP
         or char in _TABLE_MAP
         or char in _VULGAR_FRACTION_MAP
@@ -1308,8 +1311,40 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
         )
     else:
         chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
-        result = _MathBox(advance, bbox, glyph=char, font=chosen)
+        result = _handwritten_circled_number(char, font, font_path) or _MathBox(
+            advance, bbox, glyph=char, font=chosen
+        )
     return result
+
+
+def _handwritten_circled_number(char: str, font: Font, font_path: str | None) -> _MathBox | None:
+    number = circled_number(char)
+    if number is None:
+        return None
+    size = font_size_of(font)
+    small = (
+        font.font_variant(size=max(1, round(size * 0.66)))
+        if isinstance(font, ImageFont.FreeTypeFont)
+        else font
+    )
+    digits = _primary_mask(number, small)
+    if digits is None:
+        return None
+    pen = font_pen(font, size)
+    padding = max(2, pen.width * 2 + 1, round(size * 0.09))
+    height = max(
+        round(size * 0.82), math.ceil(math.hypot(digits.width / 0.96, digits.height)) + 2 * padding
+    )
+    width = max(round(height * 0.96), digits.width + 2 * padding)
+    top = _math_axis(font, font_path) - height // 2
+    mask = _MathBox(digits.width, (0, 0, digits.width, digits.height), bitmap=digits)
+    points, thickness = circle_path(width, height, pen)
+    box = _compose_box(
+        width + pen.width + max(2, round(size * 0.08)),
+        ((mask, (width - digits.width) // 2, top + (height - digits.height) // 2),),
+        ((tuple((x, y + top) for x, y in points), thickness),),
+    )
+    return _MathBox(box.advance, box.bbox, children=box.children, paths=box.paths, semantic=char)
 
 
 def _primary_mask(char: str, font: Font) -> Image.Image | None:
