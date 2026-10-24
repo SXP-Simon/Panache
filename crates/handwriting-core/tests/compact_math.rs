@@ -86,7 +86,15 @@ fn grid_keeps_formulas_natural_and_chinese_cell_rhythm() {
 }
 #[test]
 fn nonzero_translation_moves_whole_formula_without_detaching_ink_components() {
-    for source in ["    xₙ²", "    √(a²+b²)", "    (a)/(b)", "    (AB)⃗"] {
+    for source in [
+        "    xₙ²",
+        "    √(a²+b²)",
+        "    (a)/(b)",
+        "    (AB)⃗",
+        "⟦ 点对 | SNN ; ── ; (1,2) | 0 ; ── ; (1,4) | 1 ; ── ; (3,4) | 0 ⟧",
+        "⟦ X | 0  1 ; ── ; P | (8)/(15)  (7)/(15) ⟧",
+        "⟦ a ┆ b ; ╌╌ ; c ┆ d ⟧",
+    ] {
         let baseline = ink_crop(&page(&request(source)));
         for seed in 1..=8 {
             let mut shifted = request(source);
@@ -103,7 +111,15 @@ fn nonzero_translation_moves_whole_formula_without_detaching_ink_components() {
 
 #[test]
 fn rotated_compound_ink_stays_inside_paper_margins() {
-    for source in ["xₙ²", "√(a²+b²+c²+d²+e²)", "(a+b+c)/(x+y+z)", "(AB)⃗"] {
+    for source in [
+        "xₙ²",
+        "√(a²+b²+c²+d²+e²)",
+        "(a+b+c)/(x+y+z)",
+        "(AB)⃗",
+        "⟦ 点对 | SNN ; ── ; (1,2) | 0 ; ── ; (1,4) | 1 ; ── ; (3,4) | 0 ⟧",
+        "⟦ X | 0  1 ; ── ; P | (8)/(15)  (7)/(15) ⟧",
+        "⟦ a ┆ b ; ╌╌ ; c ┆ d ⟧",
+    ] {
         for seed in 1..=8 {
             let mut varied = request(source);
             varied.params.perturb_x_sigma = 2.;
