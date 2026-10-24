@@ -35,7 +35,10 @@ pub struct Task {
 }
 impl Task {
     pub fn active(&self) -> bool {
-        matches!(self.task_status.as_str(), "pending" | "processing")
+        matches!(
+            self.task_status.as_str(),
+            "pending" | "processing" | "cancelling"
+        )
     }
 }
 pub struct Runtime {
@@ -169,7 +172,7 @@ impl Store {
         let processing = self
             .tasks
             .values()
-            .filter(|r| r.task.task_status == "processing")
+            .filter(|r| matches!(r.task.task_status.as_str(), "processing" | "cancelling"))
             .count();
         let ahead = if target.task_status == "pending" {
             self.tasks
