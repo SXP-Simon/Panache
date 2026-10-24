@@ -3,6 +3,50 @@ use super::{Glyph, Glyphs};
 use crate::{Result, text::Node};
 use image::GrayImage;
 
+// 2026-10-24：不等长弧段构成歪椭圆，保留连贯外圈而非正圆或花瓣波纹。
+fn handwritten_ring(
+    center: (f32, f32),
+    width: f32,
+    height: f32,
+    phase: f32,
+    strength: f32,
+) -> Vec<(f32, f32)> {
+    let curves = [
+        [(0.30, 0.02), (0.60, -0.045), (0.94, 0.015), (1.00, 0.34)],
+        [(1.00, 0.34), (1.045, 0.63), (0.88, 0.98), (0.60, 1.00)],
+        [(0.60, 1.00), (0.29, 1.015), (0.06, 0.88), (0.02, 0.60)],
+        [(0.02, 0.60), (-0.04, 0.35), (0.07, 0.105), (0.30, 0.02)],
+    ];
+    let mut ring = Vec::with_capacity(129);
+    let shear = 0.14 + 0.04 * phase.sin();
+    for (segment, curve) in curves.into_iter().enumerate() {
+        for step in 0..32 {
+            let t = step as f32 / 32.;
+            let weights = [
+                (1. - t).powi(3),
+                3. * (1. - t).powi(2) * t,
+                3. * (1. - t) * t * t,
+                t.powi(3),
+            ];
+            let (mut x, mut y) = (0., 0.);
+            for (weight, point) in weights.into_iter().zip(curve) {
+                x += weight * point.0;
+                y += weight * point.1;
+            }
+            let angle = std::f32::consts::TAU * (segment as f32 + t) / 4.;
+            x = 0.5 + (x - 0.5) * (1. + 0.025 * phase.sin());
+            x += strength * 0.01 * (2. * angle).sin();
+            y += strength * 0.008 * angle.sin();
+            ring.push((
+                center.0 + width * (x - 0.5) + height * shear * (0.5 - y),
+                center.1 + height * (y - 0.5),
+            ));
+        }
+    }
+    ring.push(ring[0]);
+    ring
+}
+
 pub(super) fn number(c: char) -> Option<u32> {
     match c as u32 {
         0x24ea => Some(0),
@@ -41,9 +85,8 @@ impl Glyphs<'_> {
             .max(reference.mask.height() as f32 * 1.16)
             .min(size * 0.94)
             .max(12.);
-        let width = height * 0.96;
-        let (rx, ry) = (width / 2., height / 2.);
-        let center = (rx, (reference.top + reference.bottom()) as f32 / 2.);
+        let width = height * 1.20;
+        let center = (width / 2., (reference.top + reference.bottom()) as f32 / 2.);
         let inner_size = size * if value < 10 { 0.64 } else { 0.52 };
         let nodes: Vec<_> = value.to_string().chars().map(Node::Char).collect();
         let digits = self
@@ -52,18 +95,7 @@ impl Glyphs<'_> {
         let x = (center.0 - digits.mask.width() as f32 / 2.).round() as i32 - digits.left;
         let y = (center.1 - digits.mask.height() as f32 / 2.).round() as i32 - digits.top;
         let phase = value as f32 * 0.71 + (self.pen.seed % 13) as f32 * 0.17;
-        let mut ring = Vec::with_capacity(97);
-        for i in 0..96 {
-            let angle = i as f32 / 96. * std::f32::consts::TAU;
-            // 非正圆来自轻微倾斜、左右不对称与宽高差；不使用多瓣波纹模拟手写。
-            let wobble = 0.025 * angle.cos()
-                + (0.008 + self.pen.naturalness * 0.012) * (angle * 2. + phase).sin();
-            ring.push((
-                center.0 + rx * angle.cos() * (1. + wobble) - ry * angle.sin() * 0.11,
-                center.1 + ry * angle.sin() * (1. + wobble),
-            ));
-        }
-        ring.push(ring[0]);
+        let ring = handwritten_ring(center, width, height, phase, self.pen.naturalness);
         let advance = width + size * 0.09;
         let outline = self.pen.draw(size, advance, &[ring])?;
         Self::compose(advance, vec![(outline, 0, 0), (digits, x, y)], vec![])
@@ -83,6 +115,22 @@ mod tests {
             .into_iter()
             .chain(('①'..='⑳').chain('㉑'..='㉟').chain('㊱'..='㊿'))
             .collect()
+    }
+    #[test]
+    fn fallback_outline_remains_visibly_oval_without_naturalness() {
+        for value in 0..=50 {
+            let ring = handwritten_ring((60., 50.), 120., 100., value as f32 * 0.71, 0.);
+            assert_eq!(ring.first(), ring.last());
+            let n = ring.len() as f32;
+            let cx = ring.iter().map(|p| p.0).sum::<f32>() / n;
+            let cy = ring.iter().map(|p| p.1).sum::<f32>() / n;
+            let xx = ring.iter().map(|p| (p.0 - cx).powi(2)).sum::<f32>() / n;
+            let yy = ring.iter().map(|p| (p.1 - cy).powi(2)).sum::<f32>() / n;
+            let xy = ring.iter().map(|p| (p.0 - cx) * (p.1 - cy)).sum::<f32>() / n;
+            let difference = ((xx - yy).powi(2) + 4. * xy * xy).sqrt();
+            let ratio = ((xx + yy + difference) / (xx + yy - difference)).sqrt();
+            assert!(ratio > 1.18, "{value}: outline is too circular ({ratio})");
+        }
     }
     fn region(g: &Glyph, start: (u32, u32), ink: bool) -> HashSet<(u32, u32)> {
         let mut seen = HashSet::from([start]);
@@ -193,7 +241,10 @@ mod tests {
                     {
                         let g = gs.fallback_circled(number(c).unwrap(), size).unwrap();
                         assert!(g.advance >= g.right() as f32);
-                        assert!((g.mask.width() as f32) < size * 1.15);
+                        assert!(
+                            (g.mask.width() as f32) < size * 1.30,
+                            "{name} {c}/{size}: oversized ring"
+                        );
                         let edge = g
                             .mask
                             .enumerate_pixels()
