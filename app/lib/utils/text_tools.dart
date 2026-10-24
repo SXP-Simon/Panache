@@ -85,6 +85,11 @@ String cleanMarkdown(
   math.write(s.substring(cursor));
   final bodyCode = protectMarkdownCode(math.toString());
   s = bodyCode.text;
+  // Converted script stars must not become Markdown emphasis on a second cleanup.
+  s = s.replaceAllMapped(
+    RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'),
+    (match) => protect(match[0]!),
+  );
   final bareMath = StringBuffer();
   cursor = 0;
   for (final match in RegExp(r'\\left\b').allMatches(s)) {
