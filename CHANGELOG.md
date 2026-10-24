@@ -1,3 +1,39 @@
+# [1.9.0](https://github.com/SXP-Simon/Panache/compare/v1.8.0...v1.9.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **be:** 优先保留根号原生墨迹与手写收笔 ([11e4aea](https://github.com/SXP-Simon/Panache/commit/11e4aea356c318bc1d2c2dcf8035d2228cdd36a4))
+* **be:** 保持表格与复合公式最终出图的整体几何 ([dab5a01](https://github.com/SXP-Simon/Panache/commit/dab5a017327e39c086fdc224f5cabe927b251a39))
+* **be:** 保留不等号的原生手写笔形 ([c5b34d6](https://github.com/SXP-Simon/Panache/commit/c5b34d667234f7dfd38f3cb0d582592d8391bdc2))
+* **be:** 保留字体原生圈号并放松缺字外圈 ([3779896](https://github.com/SXP-Simon/Panache/commit/37798962e080bb4bd5c471c56df0918d4fb322de))
+* **be:** 区分作业条目与括号数学表达式 ([fae60b9](https://github.com/SXP-Simon/Panache/commit/fae60b928e913143d88ffd1e388d7505e0b5e166))
+* **be:** 吸收浅色横线识别与失败保护 ([a428fd9](https://github.com/SXP-Simon/Panache/commit/a428fd9edabfe360e69e9814b9097b43f09aafbf))
+* **be:** 将缺字圈号外圈改为不对称歪椭圆 ([1a77075](https://github.com/SXP-Simon/Panache/commit/1a7707590145b042bf22bb8e84c7d3bd7ae39a38))
+* **be:** 按文档顺序提取 Word 表格与正文 ([0f71bbb](https://github.com/SXP-Simon/Panache/commit/0f71bbb0fe8439a02e2c447cd681cb446a7190c6))
+* **be:** 校正纸张背景并按横线中心对齐排版 ([d3cf75e](https://github.com/SXP-Simon/Panache/commit/d3cf75e0a732f4c5168b3c3fbffcad8d20e53ce2))
+* **be:** 正确记录生成任务的业务失败 ([1229574](https://github.com/SXP-Simon/Panache/commit/1229574e73a06c140998376adad4542e21dcaaae))
+* **be:** 用当前手写数字重绘圈号序号 ([4694401](https://github.com/SXP-Simon/Panache/commit/469440181723333714e89793362de7f2a8f3b8c4))
+* **be:** 释放请求结束后的上传字体采样缓存 ([fd60e4e](https://github.com/SXP-Simon/Panache/commit/fd60e4ed91b100b5bde09b76cf8c5ed2e7284d65))
+* **fe/src/utils:** 清理 Markdown 时保护数学脚标星号 ([b0db8b1](https://github.com/SXP-Simon/Panache/commit/b0db8b1c70745c9eb37d4a43dba305f9aa2f9dfd))
+* **fe/src/utils:** 识别省略号展开后的 KaTeX 内部符号 ([28c54eb](https://github.com/SXP-Simon/Panache/commit/28c54eba923e5c9a7f851356197bba41d3e8530f))
+* **fe/src:** 收紧排版预设留白以保留桌面操作入口 ([359f026](https://github.com/SXP-Simon/Panache/commit/359f0264d646839cf542f8409d645e12ec32f2c0))
+* **fe/src:** 明确纸张识别失败提示并保护参数 ([bebfba0](https://github.com/SXP-Simon/Panache/commit/bebfba00758332e72923eb54d94d76a184dd4bd0))
+* **fe/src:** 说明整理文本按钮的用途 ([eeaa093](https://github.com/SXP-Simon/Panache/commit/eeaa093548cbf61814d838cf28f178627cc16cb2))
+* **fe:** 对齐背景纸张并提供重新识别入口 ([868e28f](https://github.com/SXP-Simon/Panache/commit/868e28f3235d082e01f594963d14419918786f87))
+
+
+### Features
+
+* **be:** 提供保持横线对齐的作业笔记排版 ([4105c80](https://github.com/SXP-Simon/Panache/commit/4105c80343df7bd493a747518f591faeadb3c5b2))
+* **be:** 支持生成任务安全停止与取消确认 ([a59c879](https://github.com/SXP-Simon/Panache/commit/a59c8794da044b4e8520320fd5657fbbf5c17b96))
+* **be:** 让数学笔画跟随字体与手写自然度 ([a002141](https://github.com/SXP-Simon/Panache/commit/a00214111bdd3751d824e9746ede0090b28ba3b5))
+* **be:** 让根钩继承所选手写字体的轮廓 ([c98b370](https://github.com/SXP-Simon/Panache/commit/c98b370cd8564887144bc150c387c052a515ea02))
+* **fe/src/features:** 确认后台停止并隔离生成结果 ([a4d2d06](https://github.com/SXP-Simon/Panache/commit/a4d2d068a429e0635ea51520e78bc1d1e51fdc26))
+* **fe/src:** 合并文本整理与公式转写入口 ([b4115d4](https://github.com/SXP-Simon/Panache/commit/b4115d4512ca16808eeb30dc20d62a53578caa93))
+* **fe/src:** 支持中止独立执行的文本整理 ([565276e](https://github.com/SXP-Simon/Panache/commit/565276e43603cd523537c98470e98f773d0128b6))
+* **fe:** 增加可保存的作业笔记排版预设 ([333424b](https://github.com/SXP-Simon/Panache/commit/333424b036f9db52f9101c9e5e34421c5f6462ae))
+
 # [1.8.0](https://github.com/SXP-Simon/Panache/compare/v1.7.1...v1.8.0) (2026-10-23)
 
 
