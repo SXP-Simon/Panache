@@ -27,6 +27,7 @@ cargo run --locked -p handwriting-server
 # Another terminal
 cd app
 flutter pub get
+python3 ../scripts/build-text-worker.py
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 ```
 

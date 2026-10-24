@@ -49,3 +49,6 @@ app.*.map.json
 
 # Flutter 自动生成的翻译文件
 /lib/l10n/app_localizations*.dart
+
+# 独立文本整理 Web Worker，由 scripts/build-text-worker.py 生成
+/web/prepare-text-worker.js*

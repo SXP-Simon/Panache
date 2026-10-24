@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +62,7 @@ def main():
                f'--base-href={args.base_href}']
     if args.build_number:
         command.append(f'--build-number={args.build_number}')
+    subprocess.run([sys.executable, str(ROOT / 'scripts/build-text-worker.py'), '--flutter', args.flutter], cwd=ROOT, check=True)
     subprocess.run(command, cwd=ROOT / 'app', check=True)
     metadata_path = ROOT / 'app/build/web/version.json'
     metadata = json.loads(metadata_path.read_text(encoding='utf-8'))

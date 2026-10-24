@@ -49,6 +49,7 @@ Rust sidecar 的架构取决于构建机。打包时必须匹配目标 CPU，arm
 ```bash
 cd app
 flutter pub get
+python3 ../scripts/build-text-worker.py
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 ```
 

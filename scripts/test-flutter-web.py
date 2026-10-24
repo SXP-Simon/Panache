@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """运行真实 Chrome 测试，兼容固定 Flutter SDK 的 Windows CanvasKit 路由。"""
 import argparse
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import threading
 import os
 from pathlib import Path
 import shutil
@@ -47,8 +50,24 @@ def main() -> int:
         'test/uploaded_font_browser_test.dart',
         'test/uploaded_font_storage_test.dart',
         'test/workspace_test.dart',
+        'test/text_preparation_browser_test.dart',
     ]
-    return subprocess.run([flutter, 'test', '--platform', 'chrome', *tests, *extra], cwd=ROOT / 'app').returncode
+    server = None
+    if any('text_preparation_browser_test.dart' in test for test in tests):
+        subprocess.run([sys.executable, str(ROOT / 'scripts/build-text-worker.py'), '--flutter', flutter], check=True)
+        class WorkerHandler(SimpleHTTPRequestHandler):
+            def end_headers(self):
+                self.send_header('Access-Control-Allow-Origin', '*')
+                super().end_headers()
+        server = ThreadingHTTPServer(('127.0.0.1', 0), partial(WorkerHandler, directory=str(ROOT / 'app/web')))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        extra.append(f'--dart-define=TEXT_WORKER_TEST_URL=http://127.0.0.1:{server.server_port}/prepare-text-worker.js')
+    try:
+        return subprocess.run([flutter, 'test', '--platform', 'chrome', *tests, *extra], cwd=ROOT / 'app').returncode
+    finally:
+        if server:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == '__main__':
