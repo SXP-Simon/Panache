@@ -10,6 +10,7 @@ import gc
 import importlib
 import io
 import itertools
+import json
 import math
 import mimetypes
 import re
@@ -20,6 +21,7 @@ import time
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import wraps
+from http import HTTPStatus
 from pathlib import Path
 from typing import Annotated, BinaryIO, Protocol, TypedDict, cast
 from uuid import UUID, uuid4
@@ -1048,7 +1050,34 @@ async def _acquire_generation_slot() -> None:
         return
 
 
-def _complete_generation(task_id: str, response: Response) -> None:
+def _response_error(response: Response) -> str:
+    # 2026-10-24：业务拒绝也可能正常返回响应；只提取可直接展示的文本原因。
+    try:
+        body: object = json.loads(bytes(response.body))
+    except (ValueError, UnicodeDecodeError):
+        body = None
+    if isinstance(body, dict):
+        for key in ("message", "error", "detail"):
+            value = cast("dict[str, object]", body).get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return f"Generation failed (HTTP {response.status_code})"
+
+
+def _complete_generation(task_id: str, response: Response) -> bool:
+    if response.status_code >= HTTPStatus.BAD_REQUEST:
+        task = set_generation_task(
+            task_id,
+            expected_status=("processing",),
+            status="failed",
+            stage="failed",
+            message="任务处理失败",
+            error_message=_response_error(response),
+            response_status_code=response.status_code,
+        )
+        if task.get("status") == "cancelling":
+            raise GenerationCancelledError
+        return False
     response_headers: dict[str, str] = {}
     if "content-disposition" in response.headers:
         response_headers["Content-Disposition"] = response.headers["content-disposition"]
@@ -1068,6 +1097,7 @@ def _complete_generation(task_id: str, response: Response) -> None:
     )
     if task.get("status") == "cancelling":
         raise GenerationCancelledError
+    return task.get("status") == "completed"
 
 
 async def run_generation_task(task_id: str, payload: GenerationPayload) -> None:
@@ -1112,9 +1142,10 @@ async def run_generation_task(task_id: str, payload: GenerationPayload) -> None:
         await push_task_status_update(task_id)
         response = await generate_handwriting_impl(progress_hook=progress_notify, **payload)
         check_cancelled(force=True)
-        _complete_generation(task_id, response)
+        completed = _complete_generation(task_id, response)
         logger.info(
-            "Generation task completed, task_id=%s elapsed=%.3fs",
+            "Generation task %s, task_id=%s elapsed=%.3fs",
+            "completed" if completed else "failed",
             task_id,
             time.perf_counter() - started_at,
         )
