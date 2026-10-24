@@ -30,6 +30,7 @@ if __package__:
     from .circuit_layout import layout_circuit
     from .library_boundary import install_member, member
     from .logging_setup import get_logger
+    from .math_ink import install_math_ink
     from .math_matrix import matrix_delimiters
     from .math_page_layout import install_math_page_layout
     from .math_table import Table, parse_table, table_spans
@@ -39,6 +40,7 @@ else:
     from circuit_layout import layout_circuit
     from library_boundary import install_member, member
     from logging_setup import get_logger
+    from math_ink import install_math_ink
     from math_matrix import matrix_delimiters
     from math_page_layout import install_math_page_layout
     from math_table import Table, parse_table, table_spans
@@ -1445,6 +1447,7 @@ def init_glyph_fallback_engine() -> None:
         install_member(core, "_get_font", _cached_get_font)
         # 2026-10-15：只对含复合数学字形的文本按实际墨迹调整换行与行距。
         install_math_page_layout(core, is_math_glyph, _get_rendered_text_bbox)
+        install_math_ink(core)
         logger.info(
             "真实字形 Fallback 引擎挂载成功，已加载 %s 款备用字库", len(_FALLBACK_FONTS_POOL)
         )

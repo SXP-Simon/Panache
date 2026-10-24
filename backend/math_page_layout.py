@@ -17,15 +17,17 @@ from PIL.ImageFont import FreeTypeFont, ImageFont
 
 if __package__:
     from .library_boundary import install_member, member
+    from .math_ink import remember_math_ink
 else:
     from library_boundary import install_member, member
+    from math_ink import remember_math_ink
 
 
 type Font = FreeTypeFont | ImageFont
 
 type BBox = tuple[int, int, int, int]
 type Raster = tuple[Image.Image, BBox, int]
-type Unit = tuple[Image.Image, BBox, int, int]
+type Unit = tuple[Image.Image, BBox, int, int, bool]
 type DrawPage = Callable[[Page, str, int, Template, Random], int]
 
 
@@ -323,9 +325,9 @@ class _Glyph:
     jitter_y: int
     corrected: bool = False
 
-    def unit(self) -> Unit:
+    def unit(self, *, rigid: bool) -> Unit:
         image, bbox, _ = self.raster
-        return image, bbox, self.x, self.jitter_y
+        return image, bbox, self.x, self.jitter_y, rigid
 
 
 @dataclass
@@ -425,7 +427,7 @@ class _PageRenderer:
             ):
                 self.rand.setstate(char_state)
                 break
-            units.append(glyph.unit())
+            units.append(glyph.unit(rigid=self.layout.is_math_glyph(char) or glyph.corrected))
             cursor = self._advance(glyph, char)
             start += 1
         if start < len(self.text) and self.text[start] == "\n":
@@ -435,21 +437,21 @@ class _PageRenderer:
     def _fit_line(
         self, units: list[Unit], max_height: int | None = None
     ) -> tuple[list[Unit], int, int]:
-        min_y = min(bbox[1] + dy for _, bbox, _, dy in units)
-        max_y = max(bbox[3] + dy for _, bbox, _, dy in units)
+        min_y = min(bbox[1] + dy for _, bbox, _, dy, _ in units)
+        max_y = max(bbox[3] + dy for _, bbox, _, dy, _ in units)
         # 2026-10-15：极端纵向抖动时整体缩放行字形，不裁掉墨迹。
         height = self.metrics.area.height if max_height is None else max_height
         if max_height is None and max_y - min_y <= height:
             return units, min_y, max_y
         factor = min(1, height / (max_y - min_y))
         adjusted: list[Unit] = []
-        for image, bbox, x, dy in units:
+        for image, bbox, x, dy, rigid in units:
             scaled = _resize(image, factor)
             y1 = math.floor((bbox[1] + dy - min_y) * factor)
             adjusted.append(
-                (scaled, (bbox[0], y1, bbox[0] + scaled.width, y1 + scaled.height), x, 0)
+                (scaled, (bbox[0], y1, bbox[0] + scaled.width, y1 + scaled.height), x, 0, rigid)
             )
-        return adjusted, 0, max(bbox[3] for _, bbox, _, _ in adjusted)
+        return adjusted, 0, max(bbox[3] for _, bbox, _, _, _ in adjusted)
 
     def _blank_line(self) -> None:
         # 2026-10-15：空行正常消耗输入和基础行距，避免循环卡在换行符。
@@ -495,7 +497,9 @@ class _PageRenderer:
                 else:
                     self.rand.setstate(line_state)
                     return line_start
-            for image, bbox, x, dy in units:
+            for image, bbox, x, dy, rigid in units:
+                if rigid:
+                    remember_math_ink(self.page, image, (x + bbox[0], baseline + dy + bbox[1]))
                 self.draw.bitmap(
                     (x + bbox[0], baseline + dy + bbox[1]), image, fill=self.layout.api.white
                 )
