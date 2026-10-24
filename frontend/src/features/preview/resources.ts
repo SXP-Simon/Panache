@@ -10,11 +10,13 @@ export function replacePreview(images: string[]): void {
   clearPreview();
   usePreviewStore.getState().setImages(images);
 }
-export function changeBackground(file: File | null): void {
+export function changeBackground(file: File | null, ruled = false): void {
   const previous = useSettingsStore.getState().backgroundUrl;
   if (previous) URL.revokeObjectURL(previous);
-  useSettingsStore
-    .getState()
-    .patch({ background: file, backgroundUrl: file ? URL.createObjectURL(file) : '' });
+  useSettingsStore.getState().patch({
+    background: file,
+    backgroundRuled: Boolean(file && ruled),
+    backgroundUrl: file ? URL.createObjectURL(file) : '',
+  });
   clearPreview();
 }

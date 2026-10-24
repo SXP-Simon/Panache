@@ -15,6 +15,7 @@ export function parseConfiguration(
 ): RestoredConfiguration {
   const parsed = v.parse(schema, JSON.parse(raw));
   const settings = { ...previous, numbers: { ...previous.numbers } };
+  settings.backgroundRuled = parsed['backgroundRuled'] === true;
   for (const field of allFields) {
     const value = parsed[field.key];
     if (value !== undefined) {
@@ -47,6 +48,7 @@ export function serializeConfiguration(settings: SettingsData, textFileName: str
     ...settings.numbers,
     font: settings.selectedFont,
     underlined: settings.underlined,
+    backgroundRuled: settings.backgroundRuled,
     englishSpacing: settings.englishSpacing,
     ink: settings.ink,
     fullPreview: settings.fullPreview,

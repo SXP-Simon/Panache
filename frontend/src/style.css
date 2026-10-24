@@ -883,6 +883,10 @@ input[type='color'] {
   overflow: hidden;
   white-space: nowrap;
 }
+.background-detect {
+  margin-top: 8px;
+  width: 100%;
+}
 .file-name {
   color: var(--muted-foreground);
   font-size: 12px;

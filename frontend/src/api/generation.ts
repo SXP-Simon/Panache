@@ -47,6 +47,7 @@ export function generationFormData(snapshot: GenerationSnapshot, mode: Generatio
   body.append('pdf_save', String(mode === 'pdf'));
   body.append('full_preview', String(mode === 'preview' && snapshot.fullPreview));
   body.append('isUnderlined', String(snapshot.underlined));
+  body.append('background_ruled', String(Boolean(snapshot.background && snapshot.backgroundRuled)));
   body.append('enableEnglishSpacing', String(snapshot.englishSpacing));
   return body;
 }

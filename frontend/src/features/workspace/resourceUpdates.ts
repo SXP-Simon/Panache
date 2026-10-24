@@ -37,7 +37,7 @@ export async function updateResources(
       if (change.document) document.replace(change.document);
       if (change.settings) {
         if ('background' in change.settings) {
-          changeBackground(change.settings.background ?? null);
+          changeBackground(change.settings.background ?? null, change.settings.backgroundRuled);
           change.settings.backgroundUrl = useSettingsStore.getState().backgroundUrl;
         }
         settings.patch(change.settings);

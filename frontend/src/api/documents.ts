@@ -8,6 +8,15 @@ const marginsSchema = v.object({
   marginTop: v.pipe(v.number(), v.finite(), v.minValue(0)),
   marginBottom: v.pipe(v.number(), v.finite(), v.minValue(0)),
   lineSpacing: v.pipe(v.number(), v.finite(), v.minValue(Number.MIN_VALUE)),
+  firstBaseline: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  layoutTopMargin: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  layoutBottomMargin: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  imageWidth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+  imageHeight: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+  deskewAngleDegrees: v.optional(v.pipe(v.number(), v.finite())),
+  correctedBackground: v.optional(
+    v.pipe(v.string(), v.minLength(1), v.maxLength(64 * 1024 * 1024)),
+  ),
 });
 export async function importDocument(file: File, signal?: AbortSignal): Promise<{ text: string }> {
   const body = new FormData();

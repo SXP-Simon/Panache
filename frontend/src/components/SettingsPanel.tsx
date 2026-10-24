@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
+import { useIsMutating } from '@tanstack/react-query';
 import { useShallow } from 'zustand/react/shallow';
 import { useFontsQuery } from '@/api/catalog';
 import { useSettingsStore } from '@/features/settings/store';
@@ -18,6 +19,7 @@ import {
   Save,
   FolderOpen,
   RotateCcw,
+  LoaderCircle,
 } from '../shared/icons';
 export default function SettingsPanel() {
   const settings = useSettingsStore(
@@ -49,6 +51,7 @@ export default function SettingsPanel() {
       : catalog;
   const { t } = useI18n();
   const [detectOpen, setDetectOpen] = useState(false);
+  const detecting = useIsMutating({ mutationKey: ['documents', 'detect-background'] }) > 0;
   return (
     <aside className="panel settings-panel" data-testid="settings-panel">
       <header className="panel-heading">
@@ -142,18 +145,31 @@ export default function SettingsPanel() {
             />
           </label>
           {settings.background && (
-            <div className="background-row">
-              <span>{settings.background.name}</span>
+            <>
+              <div className="background-row">
+                <span>{settings.background.name}</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={t('removeBackground')}
+                  data-testid="remove-background-btn"
+                  onClick={removeBackground}
+                >
+                  <X size={14} />
+                </Button>
+              </div>
               <Button
-                size="icon"
-                variant="ghost"
-                aria-label={t('removeBackground')}
-                data-testid="remove-background-btn"
-                onClick={removeBackground}
+                size="small"
+                className="background-detect"
+                data-testid="redetect-background-btn"
+                disabled={detecting}
+                title={t('detectHelp')}
+                onClick={() => void detectBackground()}
               >
-                <X size={14} />
+                {detecting ? <LoaderCircle size={15} className="spin" /> : <RotateCcw size={15} />}
+                {t(detecting ? 'detectingBackground' : 'redetectBackground')}
               </Button>
-            </div>
+            </>
           )}
           <div className="field-grid">
             {paperFields.map((field) => (
@@ -237,6 +253,7 @@ export default function SettingsPanel() {
               <Button
                 variant="primary"
                 data-testid="detect-background-confirm"
+                disabled={detecting}
                 onClick={() => {
                   setDetectOpen(false);
                   void detectBackground();

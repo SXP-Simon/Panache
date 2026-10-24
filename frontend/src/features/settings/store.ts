@@ -7,6 +7,7 @@ export interface SettingsData {
   selectedFont: string;
   fontFile: File | null;
   background: File | null;
+  backgroundRuled: boolean;
   backgroundUrl: string;
   underlined: boolean;
   englishSpacing: boolean;
@@ -25,6 +26,7 @@ export const initialSettings: SettingsData = {
   selectedFont: '',
   fontFile: null,
   background: null,
+  backgroundRuled: false,
   backgroundUrl: '',
   underlined: true,
   englishSpacing: false,

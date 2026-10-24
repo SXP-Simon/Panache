@@ -10,6 +10,7 @@ export interface GenerationSnapshot {
   selectedFont: string;
   fontFile: File | null;
   background: File | null;
+  backgroundRuled?: boolean;
   underlined: boolean;
   englishSpacing: boolean;
   fullPreview: boolean;
@@ -25,4 +26,11 @@ export interface BackgroundMargins {
   marginTop: number;
   marginBottom: number;
   lineSpacing: number;
+  firstBaseline?: number | undefined;
+  layoutTopMargin?: number | undefined;
+  layoutBottomMargin?: number | undefined;
+  imageWidth?: number | undefined;
+  imageHeight?: number | undefined;
+  deskewAngleDegrees?: number | undefined;
+  correctedBackground?: string | undefined;
 }

@@ -7,6 +7,7 @@ import { useNotificationStore } from '@/features/notifications/store';
 import { reportFailure } from './reportFailure';
 import { updateResources } from './resourceUpdates';
 import { collapseInlineImages } from '@/utils/inlineImageManager';
+import { correctedPaper, detectedLayout } from './backgroundDetection';
 
 export function useDocumentActions() {
   const imports = useRef<AbortController | null>(null);
@@ -71,28 +72,52 @@ export function useDocumentActions() {
     [readDocument, resetImport],
   );
   const detectPaper = useCallback(async () => {
-    const file = useSettingsStore.getState().background;
+    const initial = useSettingsStore.getState();
+    const file = initial.background;
     if (!file) return;
     detections.current?.abort();
     const controller = new AbortController();
     detections.current = controller;
+    const current = () => {
+      const settings = useSettingsStore.getState();
+      return (
+        !controller.signal.aborted &&
+        settings.background === file &&
+        settings.numbers === initial.numbers
+      );
+    };
     try {
       const margins = await detect({ file, controller });
-      const settings = useSettingsStore.getState();
-      if (controller.signal.aborted || settings.background !== file) return;
-      settings.patch({
-        numbers: {
-          ...settings.numbers,
-          left_margin: margins.marginLeft,
-          right_margin: margins.marginRight,
-          top_margin: Math.max(0, margins.marginTop - settings.numbers.line_spacing),
-          bottom_margin: margins.marginBottom,
-          line_spacing: margins.lineSpacing,
-        },
-      });
-      useNotificationStore.getState().inform('backgroundLoaded');
+      if (!current()) return;
+      const layout = detectedLayout(margins);
+      const fontAdjusted = initial.numbers.font_size >= layout.line_spacing;
+      const fontSize = fontAdjusted
+        ? Math.max(1, Math.floor(layout.line_spacing * 0.72))
+        : initial.numbers.font_size;
+      const background = await correctedPaper(file, margins);
+      if (!current()) return;
+      let publishedNumbers: typeof initial.numbers | undefined;
+      await updateResources((_document, settings) => {
+        publishedNumbers = { ...settings.numbers, ...layout, font_size: fontSize };
+        return {
+          settings: {
+            backgroundRuled: true,
+            ...(background === file ? {} : { background }),
+            numbers: publishedNumbers,
+          },
+        };
+      }, current);
+      const applied = useSettingsStore.getState();
+      if (
+        !controller.signal.aborted &&
+        applied.background === background &&
+        applied.numbers === publishedNumbers
+      )
+        useNotificationStore
+          .getState()
+          .inform(fontAdjusted ? 'backgroundAlignedFont' : 'backgroundAligned');
     } catch (cause) {
-      if (!controller.signal.aborted) reportFailure(cause);
+      if (current()) reportFailure(cause);
     } finally {
       if (detections.current === controller) {
         detections.current = null;

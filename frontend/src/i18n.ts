@@ -1,5 +1,19 @@
 import { createContext, useContext } from 'react';
 const words = {
+  redetectBackground: ['重新识别纸张', 'Re-detect paper'],
+  detectingBackground: ['正在识别…', 'Detecting…'],
+  detectHelp: [
+    '根据横线重新设置边距和行距，并校正倾斜背景。',
+    'Measure margins and line spacing from the ruling and straighten the background.',
+  ],
+  backgroundAligned: [
+    '纸张已识别对齐，请生成预览确认。',
+    'Paper aligned. Generate a preview to check the result.',
+  ],
+  backgroundAlignedFont: [
+    '纸张已识别对齐，过大的字号已缩小以适应横线，请生成预览确认。',
+    'Paper aligned. The font was reduced to fit the ruling. Generate a preview to check the result.',
+  ],
   backgroundDetectionFailed: [
     '无法识别纸张横线，已保留原有设置。请手动填写边距和行距。',
     'Could not detect the paper ruling. Your settings are unchanged. Set margins and line spacing manually.',
@@ -250,8 +264,8 @@ const words = {
   detect: ['识别边距与行距', 'Detect margins & spacing'],
   detectTitle: ['自动识别纸张', 'Detect your paper'],
   detectBody: [
-    '根据背景图片识别四周边距与行距？识别结果仍可手动调整。',
-    'Detect margins and line spacing from this image? You can adjust the results.',
+    '根据背景图片识别四周边距与行距，并校正倾斜背景？识别结果仍可手动调整。',
+    'Detect margins and line spacing, and straighten this background? You can adjust the results.',
   ],
   confirm: ['确定', 'Confirm'],
   cancel: ['取消', 'Cancel'],

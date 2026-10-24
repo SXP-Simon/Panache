@@ -89,7 +89,7 @@ async function hydrateCheckpoint(raw: string): Promise<void> {
     textFileName: configuration.textFileName ?? '',
   });
   useSettingsStore.getState().patch({ ...configuration.settings, fontFile: assets.fontFile });
-  changeBackground(assets.background);
+  changeBackground(assets.background, configuration.settings.backgroundRuled);
   usePreferencesStore.getState().patch(checkpoint.preferences);
   restoredAssets = checkpoint.assets;
   legacyFontIndex = checkpoint.legacyFontIndex;

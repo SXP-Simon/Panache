@@ -17,7 +17,7 @@ const {
 // 这条链路走的是真实上传接口（落盘 → identify_distance → 清理），
 // 能盖住单测直接调函数时跳过的那一段。
 const SAMPLE_PAGE = path.join(__dirname, '..', 'fixtures', 'sample-page.png');
-const FIXTURE_MARGINS = { marginLeft: 60, marginRight: 60, marginTop: 80, marginBottom: 142 };
+const FIXTURE_MARGINS = { marginLeft: 60, marginRight: 60, marginTop: 84, marginBottom: 146 };
 const TOLERANCE_PX = 4;
 
 test.describe('背景图片与边距识别', () => {
@@ -25,7 +25,6 @@ test.describe('背景图片与边距识别', () => {
     await openHome(page);
     await openPaperSettings(page);
     await page.getByTestId('line-spacing-input').fill('60');
-    const spacingBeforeUpload = 60;
 
     const responsePromise = page.waitForResponse(
       (response) =>
@@ -51,22 +50,15 @@ test.describe('背景图片与边距识别', () => {
       ).toBeLessThanOrEqual(TOLERANCE_PX);
     }
 
-    // 行距只要求是正数：它现在返回的是笔画厚度而非走行距离，属已知缺陷，
-    // 数值不可靠（见 backend/tests/test_identify.py 里的 expectedFailure）
-    expect(typeof margins.lineSpacing, 'lineSpacing 应当是数字').toBe('number');
-    expect(margins.lineSpacing, 'lineSpacing 应当为正').toBeGreaterThan(0);
+    expect(Math.abs(margins.lineSpacing - 70)).toBeLessThanOrEqual(2);
 
     const inputValue = async (testId) => Number(await page.getByTestId(testId).inputValue());
     expect(await inputValue('margin-left-input')).toBe(margins.marginLeft);
     expect(await inputValue('margin-right-input')).toBe(margins.marginRight);
-    expect(await inputValue('margin-bottom-input')).toBe(margins.marginBottom);
+    expect(await inputValue('margin-bottom-input')).toBe(margins.layoutBottomMargin);
     expect(await inputValue('line-spacing-input')).toBe(margins.lineSpacing);
-    // 上边距特殊：前端拿识别值减去**上传前**的行距（此时 lineSpacing 还没被覆盖）
-    expect(await inputValue('margin-top-input')).toBe(
-      Math.max(0, margins.marginTop - spacingBeforeUpload),
-    );
-
-    await expect(page.getByTestId('message-info')).toContainText('背景图片已加载。');
+    expect(await inputValue('margin-top-input')).toBe(margins.layoutTopMargin);
+    await expect(page.getByTestId('message-info')).toContainText('纸张已识别对齐');
 
     // 背景图生效后尺寸交给图片决定，宽高输入框禁用（isBackgroundImageSpecified）
     await expect(page.getByTestId('width-input')).toBeDisabled();
