@@ -9,6 +9,7 @@ pub(super) struct MathPen {
     height: f32,
     slant: f32,
     chevrons: [Option<GrayImage>; 2],
+    pub(super) root: super::radical::RootShape,
     pub naturalness: f32,
     pub seed: u64,
 }
@@ -85,6 +86,7 @@ impl MathPen {
             height,
             slant,
             chevrons: ['<', '>'].map(|c| Self::sample_chevron(font, c)),
+            root: super::radical::RootShape::sample(font),
             naturalness: 0.,
             seed: 0,
         }

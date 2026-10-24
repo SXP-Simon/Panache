@@ -5,6 +5,7 @@ use image::{GrayImage, Luma};
 use std::collections::HashMap;
 mod circled;
 mod pen;
+mod radical;
 pub(super) fn is_circled(c: char) -> bool {
     circled::number(c).is_some()
 }
@@ -317,22 +318,9 @@ impl<'a> Glyphs<'a> {
                 let body_x = offset + stem + (size * 0.04).round().max(1.) as i32 - body.left;
                 let right = body_x + body.right() + gap;
                 children.push((body, body_x, 0));
-                let points = vec![
-                    (offset + 1, top + (height as f32 * 0.63).round() as i32),
-                    (
-                        offset + (stem as f32 * 0.20).round() as i32,
-                        top + (height as f32 * 0.55).round() as i32,
-                    ),
-                    (offset + (stem as f32 * 0.43).round() as i32, bottom - 1),
-                    (offset + stem - 2, top),
-                    (right, top),
-                ];
-                self.math_compose(
-                    size,
-                    (right + gap) as f32,
-                    children,
-                    vec![(points, thickness)],
-                )
+                let stroke = self.radical_stroke(size, offset, stem, top, bottom, right)?;
+                children.push((stroke, 0, 0));
+                Self::compose((right + gap) as f32, children, vec![])
             }
             Node::Scripts { upper, lower } => {
                 let base = self.glyph('x', size)?;
