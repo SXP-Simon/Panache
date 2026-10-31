@@ -9,6 +9,28 @@ import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 
 void main() {
+  test('HTTP errors retain engine code alongside transport status', () async {
+    final api = HandwritingApi(
+      'http://test.invalid',
+      client: MockClient(
+        (_) async => http.Response(
+          '{"code":"queue_full","message":"busy","estimated_wait_seconds":12}',
+          429,
+        ),
+      ),
+    );
+    addTearDown(api.close);
+    await expectLater(
+      api.submit({}, {}),
+      throwsA(
+        isA<ApiException>()
+            .having((e) => e.code, 'code', 'queue_full')
+            .having((e) => e.status, 'status', 429)
+            .having((e) => e.retryAfterSeconds, 'retry delay', 12),
+      ),
+    );
+  });
+
   test(
     'known request ID cancels lost submission response and ignores late result',
     () async {
@@ -313,7 +335,8 @@ void main() {
     addTearDown(w.dispose);
     w.settings.font = 'test.ttf';
     await w.generate();
-    expect(w.error, 'queue:60');
+    expect(w.error, '503');
+    expect(w.generation.queueWaitSeconds, 60);
     expect(w.busy, isFalse);
     expect(w.retryAt, isNotNull);
   });

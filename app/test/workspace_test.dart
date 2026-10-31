@@ -84,6 +84,33 @@ class ConnectionApi extends ControlledApi {
 }
 
 void main() {
+  for (final editDuringGeneration in [false, true]) {
+    test(
+      'preview retains submitted revision (edited=$editDuringGeneration)',
+      () async {
+        final api = ControlledApi();
+        final w = Workspace(api: api)..text = 'submitted';
+        w.settings.font = 'test.ttf';
+        final generation = w.generate();
+        api.submission.complete('snapshot-task');
+        await api.previewRequested.future;
+        if (editDuringGeneration) {
+          w.text = 'new draft';
+          w.edit();
+        }
+        api.rendered.complete([
+          Uint8List.fromList([2]),
+        ]);
+        expect(await generation, isTrue);
+        expect(w.previewTaskId, 'snapshot-task');
+        expect(w.previewStale, editDuringGeneration);
+        w.edit();
+        expect(w.previewStale, isTrue);
+        w.dispose();
+      },
+    );
+  }
+
   test(
     'cancel holds generation slot until engine exits and preserves exports',
     () async {

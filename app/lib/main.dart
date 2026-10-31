@@ -72,6 +72,8 @@ class _HandwritingAppState extends State<HandwritingApp> {
       () => locale = Locale(locale?.languageCode == 'zh' ? 'en' : 'zh'),
     ),
     themeColor: themeColor,
+    reduceMotion: appearance.reduceMotion,
+    onReduceMotionChanged: appearance.setReduceMotion,
     onThemeColorChanged: appearance.setColor,
     toggleTheme: () => setState(
       () => mode = mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
@@ -88,6 +90,13 @@ class _HandwritingAppState extends State<HandwritingApp> {
     theme: handwritingTheme(Brightness.light, seedColor: themeColor),
     darkTheme: handwritingTheme(Brightness.dark, seedColor: themeColor),
     themeMode: mode,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        disableAnimations:
+            MediaQuery.disableAnimationsOf(context) || appearance.reduceMotion,
+      ),
+      child: child!,
+    ),
     home: workbench(),
     routes: {
       '/About': (_) => workbench(destination: 2),

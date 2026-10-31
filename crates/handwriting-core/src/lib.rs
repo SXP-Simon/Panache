@@ -2,6 +2,7 @@
 pub mod document;
 pub mod export;
 pub mod fonts;
+pub mod generation;
 pub mod imaging;
 mod inline_document;
 pub use inline_document::validate as validate_document;

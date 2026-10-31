@@ -114,7 +114,7 @@ void main() {
         HandwritingApp(locale: const Locale('en'), workspace: workspace),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(AppBar), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('app-preferences')));
       await tester.pumpAndSettle();
       final input = find.byKey(const ValueKey('theme-color-hex'));

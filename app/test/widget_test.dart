@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/services/api.dart';
+import 'package:handwriting_app/widgets/workbench_settings.dart';
 
 void main() {
   testWidgets('生成期间取消按钮可调用本地引擎', (tester) async {
@@ -37,10 +38,7 @@ void main() {
         await tester.pumpWidget(HandwritingApp(locale: locale, workspace: w));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('text-editor')), findsOneWidget);
-        expect(
-          find.text('Panache'),
-          width < 900 ? findsNothing : findsOneWidget,
-        );
+        expect(find.text('Panache'), findsNothing);
         expect(tester.widget<Title>(find.byType(Title).first).title, 'Panache');
         expect(tester.takeException(), isNull);
       }
@@ -60,6 +58,17 @@ void main() {
     await tester.pump();
     expect(w.text, '测试文字');
     final size = find.byKey(const ValueKey('font_size-0'));
+    await tester.scrollUntilVisible(
+      size,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(WorkbenchSettings),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
     await tester.enterText(size, '80');
     await tester.pump();
     final field = tester.widget<TextFormField>(size);

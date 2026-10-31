@@ -76,6 +76,9 @@ class EditorToolbar extends StatelessWidget {
   );
 
   Future<void> showTools(BuildContext context) => showModalBottomSheet<void>(
+    sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+        ? AnimationStyle.noAnimation
+        : null,
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

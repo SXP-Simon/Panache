@@ -1,13 +1,13 @@
 use handwriting_core::{
-    Cancellation, Error, FontBook, Limits, Parameters, RenderRequest, Result, document, export,
-    imaging, render,
+    Cancellation, Error, FontBook, Limits, Parameters, RenderRequest, Result, document,
+    generation::{self, Event, Output},
+    imaging,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
     fs,
-    io::Write,
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, OnceLock,
@@ -36,7 +36,10 @@ pub struct Upload {
 struct Task {
     task_status: String,
     task_progress: u32,
+    task_stage: String,
+    pages_completed: usize,
     error_message: Option<String>,
+    error_code: Option<String>,
     pages: Vec<PathBuf>,
     result: Option<PathBuf>,
     content_type: String,
@@ -215,7 +218,10 @@ fn submit(request: Request) -> Result<Value> {
     let task = Arc::new(Mutex::new(Task {
         task_status: "processing".into(),
         task_progress: 0,
+        task_stage: "preparing".into(),
+        pages_completed: 0,
         error_message: None,
+        error_code: None,
         pages: vec![],
         result: None,
         content_type: String::new(),
@@ -238,6 +244,7 @@ fn submit(request: Request) -> Result<Value> {
                     Ok(()) => {
                         state.task_status = "completed".into();
                         state.task_progress = 100;
+                        state.task_stage = "completed".into();
                     }
                     Err(error) => {
                         state.task_status = if error.code == "cancelled" {
@@ -246,6 +253,8 @@ fn submit(request: Request) -> Result<Value> {
                             "failed"
                         }
                         .into();
+                        state.task_stage = state.task_status.clone();
+                        state.error_code = Some(error.code.into());
                         state.error_message = Some(error.message);
                         state.pages.clear();
                         state.result = None;
@@ -310,35 +319,50 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
         fonts,
         limits: limits(),
     };
-    let mut pdf = export::PdfExport::new();
-    let archive = fs::File::create(directory.join("export.zip.partial")).map_err(io_error)?;
-    let mut zip = export::ZipExport::new(archive);
-    render(&render_request, &cancel, |index, image| {
-        cancel.check()?;
-        if params.preview && !params.pdf_save {
-            let path = directory.join(format!("{index}.png"));
-            fs::write(&path, export::png(&image)?).map_err(io_error)?;
-            task.lock().map_err(io_error)?.pages.push(path);
-        } else if params.pdf_save {
-            pdf.add(&image)?;
-        } else {
-            zip.add(index, &image)?;
+    let progress = |event| {
+        let mut state = task.lock().map_err(io_error)?;
+        match event {
+            Event::Rendering => state.task_stage = "rendering".into(),
+            Event::PageReady(pages) => {
+                state.pages_completed = pages;
+                state.task_progress = (pages * 5).min(95) as u32;
+            }
+            Event::Exporting => state.task_stage = "exporting".into(),
         }
-        task.lock().map_err(io_error)?.task_progress = ((index + 1) * 5).min(95) as u32;
         Ok(())
-    })?;
-    cancel.check()?;
-    let result = if params.pdf_save {
-        let path = directory.join("export.pdf");
-        let mut file = fs::File::create(&path).map_err(io_error)?;
-        file.write_all(&pdf.finish()).map_err(io_error)?;
-        Some((path, "application/pdf"))
-    } else if !params.preview {
-        zip.finish()?;
-        let path = directory.join("export.zip");
-        fs::rename(directory.join("export.zip.partial"), &path).map_err(io_error)?;
-        Some((path, "application/zip"))
+    };
+    let result = if params.pdf_save || !params.preview {
+        let (name, mime) = if params.pdf_save {
+            ("export.pdf", "application/pdf")
+        } else {
+            ("export.zip", "application/zip")
+        };
+        let path = directory.join(name);
+        let partial = path.with_extension("partial");
+        let mut file = fs::File::create(&partial).map_err(io_error)?;
+        let output = if params.pdf_save {
+            Output::Pdf(&mut file)
+        } else {
+            Output::Zip(&mut file)
+        };
+        generation::generate(&render_request, &cancel, output, progress)?;
+        file.sync_all().map_err(io_error)?;
+        drop(file);
+        cancel.check()?;
+        fs::rename(&partial, &path).map_err(io_error)?;
+        Some((path, mime))
     } else {
+        generation::generate(
+            &render_request,
+            &cancel,
+            Output::Preview(&mut |index, bytes| {
+                let path = directory.join(format!("{index}.png"));
+                fs::write(&path, bytes).map_err(io_error)?;
+                task.lock().map_err(io_error)?.pages.push(path);
+                Ok(())
+            }),
+            progress,
+        )?;
         None
     };
     let mut state = task.lock().map_err(io_error)?;
@@ -349,6 +373,5 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
     } else {
         state.content_type = "image/png".into();
     }
-    let _ = fs::remove_file(directory.join("export.zip.partial"));
     Ok(())
 }

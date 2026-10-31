@@ -85,6 +85,9 @@ Android release 当前沿用脚手架的 debug 签名，正式发布前需配置
 ```bash
 # 实际移动设备：覆盖随包加载、TXT 导入、两页 PNG、PDF/ZIP 和取消
 flutter test integration_test/mobile_engine_test.dart -d <设备ID>
+# 原生编辑流程：保留编辑状态、生成两页、手势翻页、全屏返回；截图默认保存在 build/workflow-screenshots
+flutter drive --driver=test_driver/workflow.dart --target=integration_test/editor_workflow_test.dart -d <设备ID>
+# 可通过 PANACHE_SCREENSHOTS 环境变量指定截图目录
 # macOS host 真实 FFI 回归测试
 # 先在仓库根目录 cargo build --release -p handwriting-bridge
 flutter test test/mobile_api_test.dart --dart-define=MOBILE_ENGINE_LIBRARY=<仓库绝对路径>/target/release/libhandwriting_bridge.dylib
@@ -93,6 +96,12 @@ flutter test test/mobile_api_test.dart --dart-define=MOBILE_ENGINE_LIBRARY=<仓�
 移动构建与模拟器集成测试 CI 见 `.github/workflows/flutter_mobile.yml`，在相关路径的 `flutter` 推送和 pull request 时执行，也可手动触发。Android 在 x86_64 模拟器运行随包引擎测试，iOS 在 macOS runner 的 iPhone 模拟器运行同一集成测试。系统文件选择和保存使用现有 Flutter 插件；需要真机检查系统授权、分享/保存目标和后台切换。
 
 ## 验证
+
+点击预览图片可进入全屏图片阅读器：滚轮或双指缩放、按住拖动、双击放大或还原，底部提供放大、缩小、适合窗口及翻页按钮。比例以适合窗口的尺寸为 100%，范围为 25%–800%；放大或移动后拖动只操作图片，适合窗口后触屏滑动翻页，Esc 返回。右键图片（触屏长按）打开复制菜单，全屏中同样可用。复制通过独立剪贴板服务传递内存中的 PNG，不调用文件导出；原有保存当前图片按钮仍用于保存到本地。系统拒绝剪贴板访问时显示失败提示。
+
+原生剪贴板集成测试会用测试图片覆盖系统剪贴板，不读写工作区草稿：`flutter test integration_test/preview_clipboard_test.dart -d windows`。插件使用 Cargokit 构建原生适配，可能自动安装 Rust stable；Android 的图片内容提供器在 manifest 注册。
+
+`super_native_extensions 0.9.1` 的 Windows Cargokit 路径解析会启动 PowerShell。若用户 profile 输出文字，需让依赖的 `cargokit/cmake/cargokit.cmake` 中 PowerShell 调用带上 `-NoProfile`，避免输出混入构建路径；不需要修改用户的全局 profile。
 
 ```bash
 cd app
@@ -112,6 +121,6 @@ python3 ../scripts/build-flutter-web.py
 
 固定 Flutter SDK 的 Windows 测试宿主存在 CanvasKit URL 路径分隔符问题。测试入口只修正 `_localCanvasKitHandler` 中已识别的旧实现，使其使用 URI 路径，并移除派生工具快照以便 Flutter 自动重建；已修正的实现不会重复修改，未知实现会报错并保持原样。资源仍从 SDK 本地加载，不使用 CDN，也不修改应用的构建与运行逻辑。
 
-任务进度通过 HTTP 轮询读取 `task_status` / `task_progress`；Rust 提供取消 API 和 cancelled 状态，客户端已将其作为终态处理；移动端 UI 提供取消按钮，生成期间禁用重复提交。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
+任务通过类型化引擎入口查询状态，HTTP 与 FFI 均提供执行阶段及已完成页数；界面不把兼容字段 `task_progress` 当成精确百分比。Rust 提供取消 API 和 cancelled 终态，客户端等待取消确认后释放任务位置。生成期间禁用重复提交，允许继续编辑；新编辑使上次预览显示待更新，完成通知不打断后续输入。任务过期、HTTP 错误和队列满均在界面显示。后端生成效果及原有算法限制沿用当前行为。
 
 内置进程集成测试可传入 `--dart-define=DESKTOP_BACKEND_EXECUTABLE=<打包后的服务绝对路径>`，覆盖自动启动、令牌、地址隔离、真实生成及退出。Rust 另有管道 EOF 退出测试。跨平台包需要在目标平台验收；模拟器测试不能替代真机上的文件授权、后台切换和低内存检查。

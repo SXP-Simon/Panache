@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import 'workbench_motion.dart';
 
 class WorkbenchLayout extends StatelessWidget {
   const WorkbenchLayout({
@@ -9,10 +10,13 @@ class WorkbenchLayout extends StatelessWidget {
     required this.keyboardVisible,
     required this.width,
     required this.error,
+    this.queueWaitSeconds,
     required this.busy,
     required this.generating,
     required this.progress,
     required this.phase,
+    this.stage = '',
+    this.pagesCompleted = 0,
     required this.mobileTab,
     required this.formKey,
     required this.editorView,
@@ -27,16 +31,96 @@ class WorkbenchLayout extends StatelessWidget {
   });
   final bool wide, busy, generating, keyboardVisible;
   final double width;
-  final String error, phase;
+  final String error, phase, stage;
+  final int? queueWaitSeconds;
+  final int pagesCompleted;
   final int progress, mobileTab;
   final GlobalKey<FormState> formKey;
   final Widget editorView, settingsView, previewView;
   final VoidCallback onDismissError, onPreview, onPdf, onZip;
   final VoidCallback? onCancel;
   final ValueChanged<int> onTabChanged;
+  Widget generateButton(BuildContext context) => Semantics(
+    identifier: 'preview-btn',
+    child: FilledButton.icon(
+      key: const ValueKey('generate-preview'),
+      onPressed: busy ? null : onPreview,
+      icon: const Icon(Icons.auto_awesome_outlined),
+      label: Text(AppLocalizations.of(context)!.generatePreview),
+    ),
+  );
+
+  List<Widget> exportButtons(BuildContext context, {VoidCallback? close}) {
+    final l = AppLocalizations.of(context)!;
+    return [
+      for (final action in [
+        (
+          'export-pdf',
+          'generate-pdf-btn',
+          l.exportPdf,
+          Icons.picture_as_pdf_outlined,
+          onPdf,
+        ),
+        (
+          'export-zip',
+          'generate-image-btn',
+          l.exportZip,
+          Icons.folder_zip_outlined,
+          onZip,
+        ),
+      ])
+        Semantics(
+          identifier: action.$2,
+          child: OutlinedButton.icon(
+            key: ValueKey(action.$1),
+            onPressed: busy
+                ? null
+                : () {
+                    close?.call();
+                    action.$5();
+                  },
+            icon: Icon(action.$4),
+            label: Text(action.$3),
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final taskStatus = generating
+        ? Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const LinearProgressIndicator(),
+                const SizedBox(height: 8),
+                if (onCancel != null)
+                  TextButton.icon(
+                    key: const ValueKey('cancel-generation'),
+                    onPressed: onCancel,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: Text(l.stopGeneration),
+                  ),
+                Text(
+                  generating
+                      ? switch (phase) {
+                          'pending' => l.pending,
+                          'completed' => l.completed,
+                          'cancelling' => l.stoppingTask,
+                          _ =>
+                            stage == 'exporting'
+                                ? l.exportingTask
+                                : l.processing,
+                        }
+                      : l.processing,
+                ),
+                if (pagesCompleted > 0) Text(l.generatedPages(pagesCompleted)),
+              ],
+            ),
+          )
+        : const SizedBox(width: double.infinity);
     final content = Column(
       children: [
         if (error.isNotEmpty)
@@ -50,8 +134,8 @@ class WorkbenchLayout extends StatelessWidget {
                 title: Text(
                   error == 'validation'
                       ? l.validation
-                      : error.startsWith('queue:')
-                      ? '${l.queueFull} ${error.split(':').last}s'
+                      : queueWaitSeconds != null
+                      ? '${l.queueFull} ${queueWaitSeconds}s'
                       : error,
                 ),
                 trailing: TextButton.icon(
@@ -62,70 +146,23 @@ class WorkbenchLayout extends StatelessWidget {
               ),
             ),
           ),
-        if (generating)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                LinearProgressIndicator(
-                  value: generating && progress > 0 ? progress / 100 : null,
-                ),
-                const SizedBox(height: 8),
-                if (onCancel != null)
-                  TextButton.icon(
-                    key: const ValueKey('cancel-generation'),
-                    onPressed: onCancel,
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: Text(l.stopGeneration),
-                  ),
-                Text(
-                  generating
-                      ? '${switch (phase) {
-                          'pending' => l.pending,
-                          'completed' => l.completed,
-                          'cancelling' => l.stoppingTask,
-                          _ => l.processing,
-                        }} · $progress%'
-                      : l.processing,
-                ),
-              ],
-            ),
+        if (MediaQuery.disableAnimationsOf(context))
+          taskStatus
+        else
+          AnimatedSize(
+            duration: WorkbenchMotion.pane,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: taskStatus,
           ),
-        if (!wide)
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<int>(
-                style: SegmentedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  iconSize: 18,
-                  minimumSize: const Size(0, 48),
-                ),
-                segments: [
-                  ButtonSegment(
-                    value: 0,
-                    label: Text(l.mobileEditor),
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                  ButtonSegment(
-                    value: 1,
-                    label: Text(l.mobilePaper),
-                    icon: const Icon(Icons.tune),
-                  ),
-                  ButtonSegment(
-                    value: 2,
-                    label: Text(l.mobilePreview),
-                    icon: const Icon(Icons.visibility_outlined),
-                  ),
-                ],
-                selected: {mobileTab},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) {
-                  FocusScope.of(context).unfocus();
-                  onTabChanged(s.first);
-                },
-              ),
+        if (!wide && mobileTab != 0)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const ValueKey('back-to-editor'),
+              onPressed: () => onTabChanged(0),
+              icon: const Icon(Icons.arrow_back),
+              label: Text(l.backToEditor),
             ),
           ),
         Expanded(
@@ -153,7 +190,7 @@ class WorkbenchLayout extends StatelessWidget {
                           height: area.maxHeight
                               .clamp(360.0, double.infinity)
                               .toDouble(),
-                          child: IndexedStack(
+                          child: RetainedPaneSwitcher(
                             index: mobileTab,
                             children: [editorView, settingsView, previewView],
                           ),
@@ -166,40 +203,68 @@ class WorkbenchLayout extends StatelessWidget {
         if (!keyboardVisible)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                Semantics(
-                  identifier: 'preview-btn',
-                  child: FilledButton.icon(
-                    key: const ValueKey('generate-preview'),
-                    onPressed: busy ? null : onPreview,
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                    label: Text(l.preview),
+            child: wide
+                ? Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      generateButton(context),
+                      ...exportButtons(context),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (mobileTab == 0)
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          children: [
+                            TextButton.icon(
+                              key: const ValueKey('open-paper'),
+                              onPressed: () => onTabChanged(1),
+                              icon: const Icon(Icons.tune),
+                              label: Text(l.paperSettings),
+                            ),
+                            TextButton.icon(
+                              key: const ValueKey('open-preview'),
+                              onPressed: () => onTabChanged(2),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: Text(l.viewPreview),
+                            ),
+                          ],
+                        ),
+                      generateButton(context),
+                      if (mobileTab == 2)
+                        TextButton.icon(
+                          key: const ValueKey('open-export'),
+                          onPressed: busy
+                              ? null
+                              : () => showModalBottomSheet<void>(
+                                  sheetAnimationStyle:
+                                      MediaQuery.disableAnimationsOf(context)
+                                      ? AnimationStyle.noAnimation
+                                      : null,
+                                  context: context,
+                                  showDragHandle: true,
+                                  useSafeArea: true,
+                                  builder: (sheet) => Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: exportButtons(
+                                        context,
+                                        close: () => Navigator.pop(sheet),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                          icon: const Icon(Icons.ios_share),
+                          label: Text(l.exportOptions),
+                        ),
+                    ],
                   ),
-                ),
-                Semantics(
-                  identifier: 'generate-pdf-btn',
-                  child: FilledButton.tonalIcon(
-                    key: const ValueKey('export-pdf'),
-                    onPressed: busy ? null : onPdf,
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    label: Text(l.exportPdf),
-                  ),
-                ),
-                Semantics(
-                  identifier: 'generate-image-btn',
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('export-zip'),
-                    onPressed: busy ? null : onZip,
-                    icon: const Icon(Icons.folder_zip_outlined),
-                    label: Text(l.exportZip),
-                  ),
-                ),
-              ],
-            ),
           ),
       ],
     );

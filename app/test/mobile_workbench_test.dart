@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +22,12 @@ class MobileTestApi extends HandwritingApi {
   }) async => 'mobile-task';
   @override
   Future<Map<String, dynamic>> status(String id) => terminal.future;
+  @override
+  Future<List<Uint8List>> preview(String id) async => [
+    base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+    ),
+  ];
   @override
   bool get supportsCancel => true;
   @override
@@ -79,6 +87,168 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('editor state survives paper, preview and guide navigation', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(375, 800));
+    final editor = find.byKey(const ValueKey('text-editor'));
+    await tester.enterText(editor, '保持编辑状态');
+    await tester.pumpAndSettle();
+    final field = tester.widget<TextField>(editor);
+    field.controller!.selection = const TextSelection.collapsed(offset: 2);
+    final editable = find.descendant(
+      of: editor,
+      matching: find.byType(EditableText),
+    );
+    final state = tester.state<EditableTextState>(editable);
+    for (final key in ['open-paper', 'open-preview']) {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      expect(editor, findsNothing);
+      await tester.tap(find.byKey(const ValueKey('back-to-editor')));
+      await tester.pumpAndSettle();
+      expect(tester.state<EditableTextState>(editable), same(state));
+      expect(field.controller!.selection.baseOffset, 2);
+    }
+    final l = labels(tester);
+    await tester.tap(find.byKey(const ValueKey('app-preferences')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, l.guide));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('back-to-workspace')));
+    await tester.pumpAndSettle();
+    expect(tester.state<EditableTextState>(editable), same(state));
+    expect(workspace.text, '保持编辑状态');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('generation completion respects navigation and newer edits', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(375, 800));
+    final editor = find.byKey(const ValueKey('text-editor'));
+    await tester.enterText(editor, 'submitted');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('generate-preview')));
+    await tester.pump();
+    expect(workspace.busy, isTrue);
+    expect(tester.widget<TextField>(editor).enabled, isTrue);
+    await tester.enterText(editor, 'new draft');
+    await tester.tap(find.byKey(const ValueKey('open-paper')));
+    await tester.pump(const Duration(milliseconds: 300));
+    (workspace.api as MobileTestApi).terminal.complete({
+      'task_status': 'completed',
+    });
+    await tester.pumpAndSettle();
+    expect(workspace.busy, isFalse);
+    expect(workspace.previewStale, isTrue);
+    expect(workspace.text, 'new draft');
+    expect(find.byKey(const ValueKey('open-export')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('back-to-editor')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-preview')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('preview-stale')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('changing layout preserves fields inside an expanded group', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(375, 800));
+    final l = labels(tester);
+    final before = Map<String, String>.of(workspace.settings.values);
+    await tester.tap(find.byKey(const ValueKey('open-paper')));
+    await tester.pumpAndSettle();
+    final group = find.byKey(const PageStorageKey('settings-layout'));
+    await tester.ensureVisible(group);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l.marginsLayout));
+    await tester.pumpAndSettle();
+    for (final label in [l.layoutHomework, l.layoutStandard]) {
+      final option = find.text(label);
+      await tester.ensureVisible(option);
+      await tester.pumpAndSettle();
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      expect(workspace.settings.values, before);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('system back preserves editor scrolling and undo history', (
+    tester,
+  ) async {
+    await openWorkbench(tester, size: const Size(375, 800));
+    final editor = find.byKey(const ValueKey('text-editor'));
+    final original = List.generate(80, (i) => '第 $i 行，保留滚动位置。').join('\n');
+    await tester.enterText(editor, original);
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.enterText(editor, '$original\n新增文字');
+    await tester.pump(const Duration(milliseconds: 600));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final scrolling = tester.state<ScrollableState>(
+      find.descendant(of: editor, matching: find.byType(Scrollable)),
+    );
+    scrolling.position.jumpTo(scrolling.position.maxScrollExtent / 2);
+    await tester.pumpAndSettle();
+    final offset = scrolling.position.pixels;
+    expect(offset, greaterThan(0));
+    await tester.tap(find.byKey(const ValueKey('open-paper')));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(editor, findsOneWidget);
+    expect(scrolling.position.pixels, closeTo(offset, .1));
+    await tester.tap(find.widgetWithText(TextButton, labels(tester).undo));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(editor).controller!.text, original);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'completion does not interrupt continued editing on the same page',
+    (tester) async {
+      final workspace = await openWorkbench(tester, size: const Size(375, 800));
+      final editor = find.byKey(const ValueKey('text-editor'));
+      await tester.enterText(editor, 'submitted');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('generate-preview')));
+      await tester.pump();
+      await tester.enterText(editor, 'still composing');
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'still composing中文',
+          selection: TextSelection.collapsed(offset: 17),
+          composing: TextRange(start: 15, end: 17),
+        ),
+      );
+      await tester.pump();
+      final state = tester.state<EditableTextState>(
+        find.byType(EditableText).first,
+      );
+      (workspace.api as MobileTestApi).terminal.complete({
+        'task_status': 'completed',
+      });
+      await tester.pumpAndSettle();
+      expect(workspace.previewStale, isTrue);
+      expect(editor, findsOneWidget);
+      final field = tester.widget<TextField>(editor);
+      expect(field.controller!.text, 'still composing中文');
+      expect(
+        field.controller!.value.composing,
+        const TextRange(start: 15, end: 17),
+      );
+      expect(field.focusNode!.hasFocus, isTrue);
+      expect(
+        tester.state<EditableTextState>(find.byType(EditableText).first),
+        same(state),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final width in [320.0, 375.0]) {
     for (final locale in [const Locale('zh'), const Locale('en')]) {
@@ -299,7 +469,7 @@ void main() {
         size: const Size(320, 800),
         locale: const Locale('en'),
       );
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
       final editor = find.byKey(const ValueKey('text-editor'));
       await tester.tap(editor);
       await tester.pumpAndSettle();
@@ -329,8 +499,8 @@ void main() {
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('generate-preview')), findsOneWidget);
-      expect(find.byKey(const ValueKey('export-pdf')), findsOneWidget);
-      expect(find.byKey(const ValueKey('export-zip')), findsOneWidget);
+      expect(find.byKey(const ValueKey('open-paper')), findsOneWidget);
+      expect(find.byKey(const ValueKey('open-preview')), findsOneWidget);
       expect(focus.hasFocus, isTrue);
       expect(tester.state<EditableTextState>(editable), same(editingState));
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);

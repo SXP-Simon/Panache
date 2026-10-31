@@ -85,7 +85,7 @@ void main() {
             tester.element(find.byType(Workbench)),
           ),
         );
-        await tester.tap(find.text('纸张'));
+        await tester.tap(find.byKey(const ValueKey('open-paper')));
         await tester.pumpAndSettle();
         final scrollable = find
             .descendant(
@@ -143,7 +143,9 @@ void main() {
         );
         workspace.emit();
         await tester.pumpAndSettle();
-        await tester.tap(find.text('预览').first);
+        await tester.tap(find.byKey(const ValueKey('back-to-editor')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('open-preview')));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await capture('preview');

@@ -51,7 +51,7 @@ void main() {
       );
       await tester.pumpWidget(shell());
       if (width < 900) {
-        expect(find.byType(AppBar), findsNothing);
+        expect(find.byType(AppBar), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('app-preferences')));
         await tester.pumpAndSettle();
       }
@@ -59,10 +59,12 @@ void main() {
       expect(link, findsOneWidget);
       expect(
         find.byKey(const ValueKey('panache-brand-mark')),
-        width < 900 ? findsNothing : findsOneWidget,
+        findsNothing,
       );
       expect(find.text('SXP-Simon/Panache'), findsOneWidget);
 
+      await tester.ensureVisible(link);
+      await tester.pumpAndSettle();
       await tester.tap(link);
       await tester.pumpAndSettle();
       expect(openedUrl, 'https://github.com/SXP-Simon/Panache');
@@ -102,11 +104,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(shell());
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();
     expect(find.byType(NavigationBar), findsNothing);
-    expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(AppBar), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
