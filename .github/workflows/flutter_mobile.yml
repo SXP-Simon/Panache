@@ -1,4 +1,6 @@
 name: Flutter Mobile
+permissions:
+  contents: read
 on:
   push:
     branches: ["flutter"]
