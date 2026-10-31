@@ -10,6 +10,14 @@ function selected(plan) {
   return FLAGS.filter((flag) => plan[flag]).sort();
 }
 
+test("Flutter 版本来源变更进入发布门禁，但不伪造 Web 应用改动", () => {
+  const plan = planChanges(["flutter-release-source.json"]);
+  assert.equal(plan.release, true);
+  assert.equal(plan.hooks, true);
+  assert.equal(plan.frontend, false);
+  assert.equal(plan.python, false);
+});
+
 test("仓库说明不启动应用工具链，文档站输入只选择文档构建", () => {
   for (const file of ["README.md", "AGENTS.md", "backend/README.md", "frontend/README.md", "LICENSE", ".github/ISSUE_TEMPLATE/config.yml"]) {
     const plan = planChanges([file]);

@@ -281,7 +281,7 @@ jobs:
     name: macOS desktop update and storage regression
     needs: changes
     if: needs.changes.outputs.unit_desktop == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4

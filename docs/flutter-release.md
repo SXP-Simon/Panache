@@ -2,6 +2,8 @@
 
 `custom-base` 是自用发布主线。`Flutter Release Assets` 在该分支的 Semantic Release 成功后，读取**触发运行自身**的 `release-result`，将 Flutter 包追加到同一个已有 Release；不创建 tag、不修改源码版本或发布另一套版本。
 
+Flutter 独立改动可通过更新根目录 `flutter-release-source.json` 发起统一版本：文件只包含 `schema_version: 1` 和完整 `flutter_sha`。该变更进入工程质量与 semantic-release；发布前校验该 SHA 的三项 Flutter 质量工作流，发布结果携带该 SHA，安装包控制器只使用这个固定来源。之后其他版本继续使用最后一次明确提升的来源，直至再次更新该文件。旧版本 manifest 不变。
+
 ## 来源固定与质量门禁
 
 首次自动运行解析 `flutter` 的完整提交 SHA，要求同一仓库、`flutter` 分支、同一 SHA 的 `Flutter UI`、`Rust 后端`、`Flutter Mobile` 三个质量工作流全部成功。接受同仓库、同 `flutter` 分支、精确 SHA 的 push 或手动运行；最新一次匹配运行若失败或未完成，不能用较早成功替代，PR 和其它 fork 也不能作为证据。

@@ -64,6 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,11 +76,17 @@ jobs:
           node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify promoted Flutter source before publishing
+        id: flutter-source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/flutter-release.cjs verify-source
       - name: Publish from the checked custom-base commit
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
           GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
           GH_REPO: ${{ github.repository }}
+          FLUTTER_SOURCE_SHA: ${{ steps.flutter-source.outputs.flutter_sha }}
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -96,7 +103,7 @@ jobs:
             if (tag !== `v${version}`) throw new Error('Published tag and release commit version do not match.');
           }
           fs.mkdirSync('preview_outputs', { recursive: true });
-          fs.writeFileSync('preview_outputs/release-result.json', JSON.stringify({ version: 1, run_id: process.env.GITHUB_RUN_ID, tag }));
+          fs.writeFileSync('preview_outputs/release-result.json', JSON.stringify({ version: 1, run_id: process.env.GITHUB_RUN_ID, tag, ...(process.env.FLUTTER_SOURCE_SHA ? { flutter_sha: process.env.FLUTTER_SOURCE_SHA } : {}) }));
           NODE
       - name: Preserve exact desktop build target
         uses: actions/upload-artifact@v4

@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
-const { REQUIRED_WORKFLOWS, releaseVersion, androidVersionCode, verifyAndroidPackage, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, resolveRelease, stagePackage, verifyPackages, waitForWorkflow } = require("../flutter-release.cjs");
+const { REQUIRED_WORKFLOWS, releaseVersion, androidVersionCode, verifyAndroidPackage, sourceSha, promotedSource, verifySource, targetTag, validateManifest, validatePinnedManifest, approvedRun, resolveRelease, stagePackage, verifyPackages, waitForWorkflow } = require("../flutter-release.cjs");
 
 const repository = "owner/fork";
 const sha = "a".repeat(40);
@@ -68,6 +68,23 @@ test("first automatic build pins exact source and all three passing push runs be
   assert.deepEqual(Object.keys(result.quality_runs), REQUIRED_WORKFLOWS);
   assert.ok(io.refs.filter(([name]) => !["backend/VERSION", "desktop/package.json"].includes(name)).every(([, ref]) => ref === sha));
   validateManifest(result, repository, tag);
+});
+
+test("promoted Flutter source must pass all exact trusted checks and survives branch movement", async () => {
+  assert.equal(promotedSource(JSON.stringify({ schema_version: 1, flutter_sha: sha })), sha);
+  for (const record of [{ schema_version: 1, flutter_sha: "flutter" }, { schema_version: 2, flutter_sha: sha }, { schema_version: 1, flutter_sha: sha, extra: true }]) {
+    assert.throws(() => promotedSource(JSON.stringify(record)));
+  }
+  const io = ioFixture();
+  assert.deepEqual(Object.keys(await verifySource(sha, repository, io)), REQUIRED_WORKFLOWS);
+  io.branchSha = () => { throw new Error("promotion must not read branch head"); };
+  const promoted = await resolveRelease({ ...input, result: { ...input.result, flutter_sha: sha } }, io);
+  assert.equal(promoted.flutter_sha, sha);
+  io.runs = async () => [run({ conclusion: "failure" })];
+  await assert.rejects(verifySource(sha, repository, io));
+  io.runs = async () => [run()];
+  io.files["app/android/app/build.gradle.kts"] = "old unsupported source";
+  await assert.rejects(verifySource(sha, repository, io), /formal signing/);
 });
 
 test("missing, pending, failed, fork, PR and older passing checks cannot authorize source", async () => {

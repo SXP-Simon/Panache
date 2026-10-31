@@ -42,6 +42,31 @@ function sourceSha(value) {
   return value;
 }
 
+function promotedSource(contents) {
+  const record = JSON.parse(contents);
+  if (record?.schema_version !== 1 || Object.keys(record).sort().join(",") !== "flutter_sha,schema_version") throw new Error("Invalid Flutter release source record.");
+  return sourceSha(record.flutter_sha);
+}
+
+async function verifySource(sha, repository, io) {
+  sourceSha(sha);
+  const results = {};
+  for (const workflow of REQUIRED_WORKFLOWS) results[workflow] = approvedRun(await io.runs(workflow, sha), sha, repository);
+  await verifySourceContract(sha, io);
+  return results;
+}
+
+async function verifySourceContract(sha, io) {
+  sourceContract(
+    await io.file("scripts/build-flutter-desktop.py", sha),
+    await io.file("crates/handwriting-core/src/lib.rs", sha),
+    await io.file("app/android/app/build.gradle.kts", sha),
+    await io.file("crates/handwriting-bridge/src/api.rs", sha),
+    await io.file("crates/handwriting-server/src/lib.rs", sha),
+    await io.file("scripts/embed-macos-backend.sh", sha),
+  );
+}
+
 function targetTag({ event, manualTag, result, sourceRunId }) {
   if (event === "workflow_dispatch") return manualTag;
   if (event !== "workflow_run" || result?.version !== 1 || result.run_id !== sourceRunId || !(result.tag === null || typeof result.tag === "string")) {
@@ -147,14 +172,16 @@ async function resolveRelease(input, io) {
   const assets = release.assets.filter((asset) => asset.name === MANIFEST);
   if (assets.length > 1) throw new Error("Ambiguous Flutter source manifests on the target release.");
   let manifest = assets.length ? await validatePinnedManifest(await io.manifest(assets[0].id), input.repository, tag, io) : null;
+  const promoted = input.event === "workflow_run" && input.result?.flutter_sha ? sourceSha(input.result.flutter_sha) : undefined;
   let sha;
   if (manifest) {
     sha = manifest.flutter_sha;
     if (input.manualSha && sourceSha(input.manualSha) !== sha) throw new Error("A release's pinned Flutter SHA cannot be replaced during a retry.");
+    if (promoted && promoted !== sha) throw new Error("A release's promoted Flutter SHA differs from its immutable manifest.");
   } else {
     if (input.event === "workflow_run" && Number(input.runAttempt ?? 1) > 1) throw new Error("Automatic retry has no immutable source manifest. Use workflow_dispatch with the original full Flutter SHA; never resolve a newer branch during retry.");
     if (input.event === "workflow_dispatch" && !input.manualSha) throw new Error("First manual build requires an explicit full Flutter SHA; a historical release cannot use the latest branch implicitly.");
-    sha = sourceSha(input.manualSha || await io.branchSha());
+    sha = sourceSha(input.manualSha || promoted || await io.branchSha());
   }
   const qualityRuns = {};
   for (const workflow of REQUIRED_WORKFLOWS) {
@@ -164,14 +191,7 @@ async function resolveRelease(input, io) {
       throw new Error(`Required ${workflow}: ${error.message}`, { cause: error });
     }
   }
-  sourceContract(
-    await io.file("scripts/build-flutter-desktop.py", sha),
-    await io.file("crates/handwriting-core/src/lib.rs", sha),
-    await io.file("app/android/app/build.gradle.kts", sha),
-    await io.file("crates/handwriting-bridge/src/api.rs", sha),
-    await io.file("crates/handwriting-server/src/lib.rs", sha),
-    await io.file("scripts/embed-macos-backend.sh", sha),
-  );
+  await verifySourceContract(sha, io);
   if (!manifest) {
     manifest = {
       schema_version: 1,
@@ -283,6 +303,12 @@ async function main() {
     fs.writeFileSync(`release-plan/${MANIFEST}`, `${JSON.stringify(manifest, null, 2)}\n`);
     fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${manifest.release_tag}\nversion=${manifest.version}\nbuild_number=${manifest.build_number}\nflutter_sha=${manifest.flutter_sha}\nandroid=${process.env.ANDROID_SIGNING_READY === "true"}\n`);
     if (process.env.ANDROID_SIGNING_READY !== "true" && process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "\nAndroid APK omitted: all four formal release signing secrets are required. No debug-signed APK or unsigned iOS IPA is distributed.\n");
+  } else if (command === "verify-source") {
+    const file = "flutter-release-source.json";
+    if (!fs.existsSync(file)) return;
+    const sha = promotedSource(fs.readFileSync(file, "utf8"));
+    await verifySource(sha, process.env.GITHUB_REPOSITORY, github(process.env.GITHUB_REPOSITORY));
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `flutter_sha=${sha}\n`);
   } else if (command === "verify-apk") {
     const [manifestFile, platform, badgingFile] = args;
     const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -297,5 +323,5 @@ async function main() {
   } else throw new Error("Use flutter-release.cjs resolve|stage|verify.");
 }
 
-module.exports = { MANIFEST, REQUIRED_WORKFLOWS, releaseVersion, androidVersionCode, verifyAndroidPackage, sourceSha, targetTag, validateManifest, validatePinnedManifest, approvedRun, sourceContract, resolveRelease, stagePackage, verifyPackages, waitForWorkflow };
+module.exports = { MANIFEST, REQUIRED_WORKFLOWS, releaseVersion, androidVersionCode, verifyAndroidPackage, sourceSha, promotedSource, verifySource, targetTag, validateManifest, validatePinnedManifest, approvedRun, sourceContract, resolveRelease, stagePackage, verifyPackages, waitForWorkflow };
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });

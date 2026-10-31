@@ -38,10 +38,14 @@ function assertCleanInputs(plan, files, groups = ["frontend", "python", "hooks",
 
 function runQualityChecks(run = spawnSync, write = console.error, checks = CHECKS) {
   const failures = [];
+  // Git hooks export repository-local routing variables. Child checks create
+  // temporary repositories and must discover them from their own cwd.
+  const env = { ...process.env };
+  for (const name of ["GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE", "GIT_COMMON_DIR"]) delete env[name];
   for (const command of checks) {
     write(`\n正在检查：${command}`);
     // Commands are fixed project constants; shell mode supports pnpm.cmd and uv on Windows.
-    const result = run(command, { shell: true, stdio: "inherit" });
+    const result = run(command, { shell: true, stdio: "inherit", env });
     if (result.status !== 0) failures.push(command);
   }
   if (failures.length) {

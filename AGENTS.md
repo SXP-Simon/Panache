@@ -81,7 +81,7 @@ bash desktop/build.sh
 pnpm run test:desktop
 ```
 
-自用发布从 `custom-base` 进行：工程质量工作流通过且实际改动涉及应用时触发 semantic-release，再由桌面工作流按本次发布结果构建安装包。`main` 只同步上游。
+自用发布从 `custom-base` 进行：工程质量工作流通过且实际改动涉及应用或提升 Flutter 发布来源时触发 semantic-release，再由桌面工作流按本次发布结果构建安装包。`main` 只同步上游。
 桌面版按构建机的平台与架构出包，产物上传使用 `scripts/upload-release-assets.sh`。
 Flutter/Rust 附属安装包使用[固定来源发布流程](docs/flutter-release.md)，同一版本的源 SHA 由 Release manifest 固定，正式 Android 签名未就绪时跳过 APK。
 

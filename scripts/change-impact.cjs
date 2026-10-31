@@ -16,6 +16,9 @@ function planChanges(paths, { full = false, reason = "actual Git paths", head_sh
   const desktop = () => enable("unit_desktop", "desktop_e2e");
   const normalized = [...new Set(paths)].sort();
   for (const file of normalized) {
+    if (file === "flutter-release-source.json") {
+      scopes.add("ci"); enable("hooks", "release"); continue;
+    }
     // Python configuration and source take precedence over directory labels and documentation suffixes.
     if (/\.(?:py|pyi|spec)$/.test(file)) enable("python");
     if (file.startsWith(".github/ISSUE_TEMPLATE/")) {

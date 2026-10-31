@@ -126,7 +126,7 @@ test("桌面单测要求 macOS 原生回归，其他检查跳过不能替代它"
   const gate = snippets("engineering-quality")[1];
   const job = workflow.split("\n  desktop_macos:\n")[1].split("\n  gate:\n")[0];
   assert.match(job, /if: needs\.changes\.outputs\.unit_desktop == 'true'/u);
-  assert.match(job, /runs-on: macos-14/u);
+  assert.match(job, /runs-on: macos-15/u);
   assert.match(job, /pnpm run test:desktop-storage/u);
   assert.match(job, /pnpm run test:desktop-updater/u);
   const nativeTests = job.indexOf('run: pnpm run test:desktop-updater');

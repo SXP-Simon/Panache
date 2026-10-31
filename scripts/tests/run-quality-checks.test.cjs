@@ -31,6 +31,21 @@ test("全部检查成功时才能放行提交", () => {
   assert.equal(runQualityChecks(() => ({ status: null }), () => {}), 1);
 });
 
+test("钩子调用检查时不能把当前仓库的 Git 路由传入临时仓库", () => {
+  const previous = process.env.GIT_DIR;
+  process.env.GIT_DIR = "fixture-parent-repository";
+  try {
+    assert.equal(runQualityChecks((_command, options) => {
+      assert.equal(options.env.GIT_DIR, undefined);
+      assert.equal(options.env.PATH, process.env.PATH);
+      return { status: 0 };
+    }, () => {}, ["fixture"]), 0);
+  } finally {
+    if (previous === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = previous;
+  }
+});
+
 test("桌面构建在 Windows 查找 Git Bash，缺失时明确拒绝而非误用 WSL", (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "desktop-bash-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

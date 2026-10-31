@@ -279,7 +279,7 @@ jobs:
     # 必须是 arm64 的 runner（macos-13 是 Intel）。PyInstaller 不能交叉编译，
     # 后端的架构由构建机决定，而 electron-builder 也只能给 mac 出 arm64 目标，
     # 所以 Intel 包得另开一个 macos-13 的 job 才行，目前没有。
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
