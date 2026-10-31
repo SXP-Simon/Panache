@@ -101,7 +101,7 @@ flutter test test/mobile_api_test.dart --dart-define=MOBILE_ENGINE_LIBRARY=<仓�
 
 原生剪贴板集成测试会用测试图片覆盖系统剪贴板，不读写工作区草稿：`flutter test integration_test/preview_clipboard_test.dart -d windows`。插件使用 Cargokit 构建原生适配，可能自动安装 Rust stable；Android 的图片内容提供器在 manifest 注册。
 
-`super_native_extensions 0.9.1` 的 Windows Cargokit 路径解析会启动 PowerShell。若用户 profile 输出文字，需让依赖的 `cargokit/cmake/cargokit.cmake` 中 PowerShell 调用带上 `-NoProfile`，避免输出混入构建路径；不需要修改用户的全局 profile。
+图片剪贴板的 `super_native_extensions 0.9.1` 与 `irondash_engine_context 0.5.5` 固定在 `vendor/`：保留各自许可，修补 Gradle 9 的进程执行接口、Android compile SDK 以及 Windows PowerShell 路径解析。更新上游依赖时应重新检查这些兼容修补。
 
 ```bash
 cd app
