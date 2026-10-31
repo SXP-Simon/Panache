@@ -42,6 +42,13 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
+dependency_overrides:
+  # CargoKit 0.9.x needs Gradle 9's ExecOperations API.
+  irondash_engine_context:
+    path: ../vendor/irondash_engine_context
+  super_native_extensions:
+    path: ../vendor/super_native_extensions
+
 flutter:
   generate: true
   uses-material-design: true

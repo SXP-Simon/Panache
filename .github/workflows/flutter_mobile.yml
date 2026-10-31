@@ -4,9 +4,9 @@ permissions:
 on:
   push:
     branches: ["flutter"]
-    paths: ["VERSION", "app/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
+    paths: ["VERSION", "app/**", "vendor/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
   pull_request:
-    paths: ["VERSION", "app/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
+    paths: ["VERSION", "app/**", "vendor/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
   workflow_dispatch:
 jobs:
   android:
