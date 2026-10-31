@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'project_source_link.dart';
+import 'workbench_motion.dart';
 import 'theme_color_editor.dart';
 import '../theme/handwriting_theme.dart';
 
@@ -12,6 +13,8 @@ class WorkbenchShell extends StatelessWidget {
     super.key,
     this.themeColor = defaultThemeColor,
     this.onThemeColorChanged,
+    this.reduceMotion = false,
+    this.onReduceMotionChanged,
     this.updateAvailable = false,
     required this.destination,
     required this.onDestinationSelected,
@@ -25,6 +28,8 @@ class WorkbenchShell extends StatelessWidget {
     required this.informationBuilder,
   });
   final Color themeColor;
+  final bool reduceMotion;
+  final Future<bool> Function(bool)? onReduceMotionChanged;
   final Future<bool> Function(Color)? onThemeColorChanged;
   final bool updateAvailable;
   final int destination;
@@ -37,6 +42,9 @@ class WorkbenchShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final showKeyboardDismiss =
+        MediaQuery.sizeOf(context).width < 1100 &&
+        MediaQuery.viewInsetsOf(context).bottom > 0;
     final labels = [l.workspace, l.guide, l.about];
     const icons = [
       Icons.edit_note_rounded,
@@ -45,46 +53,27 @@ class WorkbenchShell extends StatelessWidget {
     ];
     return Scaffold(
       appBar: MediaQuery.sizeOf(context).width < 900
-          ? null
-          : AppBar(
-              title: Row(
-                children: [
-                  Image.asset(
-                    'assets/branding/panache.png',
-                    key: const ValueKey('panache-brand-mark'),
-                    width: 32,
-                    height: 32,
-                    excludeFromSemantics: true,
+          ? AppBar(
+              title: Text(labels[destination]),
+              automaticallyImplyLeading: false,
+              actions: [
+                TextButton.icon(
+                  key: const ValueKey('app-preferences'),
+                  onPressed: () => preferencesSheet(context),
+                  icon: Badge(
+                    isLabelVisible: updateAvailable,
+                    child: const Icon(Icons.settings_outlined),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      l.appTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              bottom: PreferredSize(
-                preferredSize: Size.fromHeight(
-                  MediaQuery.sizeOf(context).width < 1100 &&
-                          MediaQuery.viewInsetsOf(context).bottom > 0
-                      ? 80
-                      : 40,
+                  label: Text(l.appPreferences),
                 ),
-                child: Column(
-                  children: [
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: ProjectSourceLink(),
-                      ),
-                    ),
-                    if (MediaQuery.sizeOf(context).width < 1100 &&
-                        MediaQuery.viewInsetsOf(context).bottom > 0)
-                      Align(
+              ],
+            )
+          : AppBar(
+              title: const ProjectSourceLink(),
+              bottom: showKeyboardDismiss
+                  ? PreferredSize(
+                      preferredSize: const Size.fromHeight(40),
+                      child: Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
                           onPressed: () => FocusScope.of(context).unfocus(),
@@ -92,9 +81,8 @@ class WorkbenchShell extends StatelessWidget {
                           label: Text(l.dismissKeyboard),
                         ),
                       ),
-                  ],
-                ),
-              ),
+                    )
+                  : null,
               actions: [
                 if (MediaQuery.sizeOf(context).width < 1100) ...[
                   TextButton.icon(
@@ -147,9 +135,27 @@ class WorkbenchShell extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 900;
-            final content = destination == 0
-                ? workspaceBuilder(wide, constraints.maxWidth)
-                : informationBuilder();
+            final content = RetainedPaneSwitcher(
+              index: destination == 0 ? 0 : 1,
+              children: [
+                workspaceBuilder(wide, constraints.maxWidth),
+                Column(
+                  children: [
+                    if (!wide)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
+                          key: const ValueKey('back-to-workspace'),
+                          onPressed: () => onDestinationSelected(0),
+                          icon: const Icon(Icons.arrow_back),
+                          label: Text(l.backToEditor),
+                        ),
+                      ),
+                    Expanded(child: informationBuilder()),
+                  ],
+                ),
+              ],
+            );
             return Row(
               children: [
                 if (wide)
@@ -183,41 +189,16 @@ class WorkbenchShell extends StatelessWidget {
               child: const Icon(Icons.keyboard_hide_outlined),
             )
           : null,
-      bottomNavigationBar:
-          MediaQuery.sizeOf(context).width < 900 &&
-              MediaQuery.viewInsetsOf(context).bottom == 0
-          ? NavigationBar(
-              selectedIndex: destination,
-              onDestinationSelected: (index) {
-                if (index == 3) {
-                  preferencesSheet(context);
-                } else {
-                  onDestinationSelected(index);
-                }
-              },
-              destinations: [
-                for (var i = 0; i < labels.length; i++)
-                  NavigationDestination(
-                    icon: Badge(
-                      isLabelVisible: i == 2 && updateAvailable,
-                      child: Icon(icons[i]),
-                    ),
-                    label: labels[i],
-                  ),
-                NavigationDestination(
-                  key: const ValueKey('app-preferences'),
-                  icon: const Icon(Icons.settings_outlined),
-                  label: l.appPreferences,
-                ),
-              ],
-            )
-          : null,
     );
   }
 
   Future<void> preferencesSheet(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    var motion = reduceMotion;
     return showModalBottomSheet<void>(
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
       context: context,
       showDragHandle: true,
       useSafeArea: true,
@@ -276,6 +257,38 @@ class WorkbenchShell extends StatelessWidget {
                       Navigator.pop(sheetContext);
                       onToggleTheme();
                     },
+                  ),
+                  for (final item in [
+                    (1, l.guide, Icons.menu_book_outlined),
+                    (2, l.about, Icons.info_outline),
+                  ])
+                    ListTile(
+                      leading: Icon(item.$3),
+                      title: Text(item.$2),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        onDestinationSelected(item.$1);
+                      },
+                    ),
+                  StatefulBuilder(
+                    builder: (context, update) => SwitchListTile(
+                      key: const ValueKey('reduce-motion'),
+                      secondary: const Icon(Icons.animation),
+                      title: Text(l.reduceMotion),
+                      subtitle: Text(l.reduceMotionHint),
+                      value: motion,
+                      onChanged: onReduceMotionChanged == null
+                          ? null
+                          : (value) async {
+                              update(() => motion = value);
+                              final saved = await onReduceMotionChanged!(value);
+                              if (!saved && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(l.motionSaveFailed)),
+                                );
+                              }
+                            },
+                    ),
                   ),
                   ThemeColorEditor(
                     color: themeColor,

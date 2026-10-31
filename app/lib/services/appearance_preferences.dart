@@ -9,6 +9,9 @@ class AppearancePreferences extends ChangeNotifier {
     : _open = open ?? SharedPreferences.getInstance;
   final Future<SharedPreferences> Function() _open;
   static const colorKey = 'panache.themeColor';
+  static const motionKey = 'panache.reduceMotion';
+  bool reduceMotion = false;
+  int _motionRevision = 0;
   Color color = defaultThemeColor;
   bool saveFailed = false;
   bool _disposed = false;
@@ -20,8 +23,14 @@ class AppearancePreferences extends ChangeNotifier {
 
   Future<void> restore() async {
     final revision = _revision;
+    final motionRevision = _motionRevision;
     try {
-      final value = (await _open()).getInt(colorKey);
+      final preferences = await _open();
+      final value = preferences.getInt(colorKey);
+      if (!_disposed && motionRevision == _motionRevision) {
+        reduceMotion = preferences.getBool(motionKey) ?? false;
+        _emit();
+      }
       if (!_disposed && revision == _revision && value != null) {
         color = Color(value | 0xFF000000);
         _emit();
@@ -53,6 +62,21 @@ class AppearancePreferences extends ChangeNotifier {
       }
     });
     return _writes.then((_) => success);
+  }
+
+  Future<bool> setReduceMotion(bool value) {
+    reduceMotion = value;
+    ++_motionRevision;
+    _emit();
+    var saved = false;
+    _writes = _writes.then((_) async {
+      try {
+        saved = await (await _open()).setBool(motionKey, value);
+      } catch (_) {
+        saved = false;
+      }
+    });
+    return _writes.then((_) => saved);
   }
 
   Future<void> get settled => _writes;

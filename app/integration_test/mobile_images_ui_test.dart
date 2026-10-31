@@ -128,16 +128,18 @@ void main() {
     expect(workspace.text, isNot(contains('![插图 9]')));
     await workspace.persist();
     expect(storage.read('flutter.workspace'), contains('120%'));
-    await tester.tap(find.text(l.mobilePaper));
+    await tester.tap(find.byKey(const ValueKey('open-paper')));
     await tester.pumpAndSettle();
     final settingsView = find.byType(WorkbenchSettings);
     final scrollable = find
         .descendant(of: settingsView, matching: find.byType(Scrollable))
         .first;
-    final layout = find.text(l.layout);
+    final layout = find.text(l.sizeSpacing);
     await tester.scrollUntilVisible(layout, 200, scrollable: scrollable);
     await tester.pumpAndSettle();
     // Exercise both transitions, then inspect the first numeric field.
+    await tester.tap(layout);
+    await tester.pumpAndSettle();
     await tester.tap(layout);
     await tester.pumpAndSettle();
     await tester.tap(layout);

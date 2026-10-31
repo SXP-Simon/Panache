@@ -14,9 +14,12 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::Stream;
+#[cfg(test)]
+use handwriting_core::export;
 use handwriting_core::{
-    Cancellation, Error, FontBook, Limits, Parameters, RenderRequest, Result, document, export,
-    imaging, render,
+    Cancellation, Error, FontBook, Limits, Parameters, RenderRequest, Result, document,
+    generation::{self, Event, Output},
+    imaging,
 };
 use std::{
     collections::HashMap,
@@ -312,46 +315,37 @@ impl Server {
         let partial = path.with_extension("partial");
         let outcome = (|| {
             let mut output = std::fs::File::create(&partial).map_err(storage_error)?;
+            let progress = |event| self.generation_progress(id, event);
             if extension == "zip" {
-                let mut zip = export::ZipExport::new(&mut output);
-                render(&request, &token, |index, image| {
-                    token.check()?;
-                    zip.add(index, &image)?;
-                    self.progress(id, index)
-                })?;
-                zip.finish()?;
+                generation::generate(&request, &token, Output::Zip(&mut output), progress)?;
             } else if extension == "pdf" {
-                let mut pdf = export::PdfExport::new();
-                render(&request, &token, |index, image| {
-                    token.check()?;
-                    pdf.add(&image)?;
-                    self.progress(id, index)
-                })?;
-                token.check()?;
-                output.write_all(&pdf.finish()).map_err(storage_error)?;
+                generation::generate(&request, &token, Output::Pdf(&mut output), progress)?;
             } else {
                 if extension == "json" {
                     output
                         .write_all(b"{\"status\":\"success\",\"images\":[")
                         .map_err(storage_error)?;
                 }
-                render(&request, &token, |index, image| {
-                    token.check()?;
-                    let bytes = export::png(&image)?;
-                    if extension == "png" {
-                        output.write_all(&bytes).map_err(storage_error)?;
-                    } else {
-                        if index > 0 {
-                            output.write_all(b",").map_err(storage_error)?;
+                generation::generate(
+                    &request,
+                    &token,
+                    Output::Preview(&mut |index, bytes| {
+                        if extension == "png" {
+                            output.write_all(&bytes).map_err(storage_error)?;
+                        } else {
+                            if index > 0 {
+                                output.write_all(b",").map_err(storage_error)?;
+                            }
+                            output.write_all(b"\"").map_err(storage_error)?;
+                            output
+                                .write_all(STANDARD.encode(bytes).as_bytes())
+                                .map_err(storage_error)?;
+                            output.write_all(b"\"").map_err(storage_error)?;
                         }
-                        output.write_all(b"\"").map_err(storage_error)?;
-                        output
-                            .write_all(STANDARD.encode(bytes).as_bytes())
-                            .map_err(storage_error)?;
-                        output.write_all(b"\"").map_err(storage_error)?;
-                    }
-                    self.progress(id, index)
-                })?;
+                        Ok(())
+                    }),
+                    progress,
+                )?;
                 if extension == "json" {
                     output.write_all(b"]}").map_err(storage_error)?;
                 }
@@ -384,11 +378,24 @@ impl Server {
         }
         outcome
     }
-    fn progress(&self, id: &str, index: usize) -> Result<()> {
+    fn generation_progress(&self, id: &str, event: Event) -> Result<()> {
         self.update(id, |t| {
-            if t.task_status == "processing" {
-                t.task_progress = (10 + index * 3).min(90) as u8;
-                t.task_message = format!("正在处理第 {} 页", index + 1);
+            if t.task_status != "processing" {
+                return;
+            }
+            match event {
+                Event::Rendering => {
+                    t.task_stage = "rendering".into();
+                }
+                Event::PageReady(pages) => {
+                    t.pages_completed = pages;
+                    t.task_progress = (10 + (pages - 1) * 3).min(90) as u8;
+                    t.task_message = format!("已生成 {pages} 页");
+                }
+                Event::Exporting => {
+                    t.task_stage = "exporting".into();
+                    t.task_message = "正在导出".into();
+                }
             }
         })
     }
@@ -1146,6 +1153,17 @@ mod tests {
             vec![("preview", "false")],
         ] {
             let id = generate(&s, &extra).await;
+            let (_, state) = call(&s, &format!("/api/generate_handwriting/task/{id}")).await;
+            let state: serde_json::Value = serde_json::from_slice(&state).unwrap();
+            assert_eq!(state["task_stage"], "completed");
+            assert_eq!(
+                state["pages_completed"],
+                if extra.contains(&("full_preview", "false")) {
+                    1
+                } else {
+                    2
+                }
+            );
             let path = format!("/api/generate_handwriting/task/{id}/result");
             let (status, bytes) = call(&s, &path).await;
             assert_eq!(status, StatusCode::OK);

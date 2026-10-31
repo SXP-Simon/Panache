@@ -1,14 +1,19 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../services/image_clipboard.dart';
+import 'preview_image_actions.dart';
 import 'workbench_controls.dart';
+import 'preview_pager.dart';
 
-class WorkbenchPreview extends StatelessWidget {
+class WorkbenchPreview extends StatefulWidget {
   const WorkbenchPreview({
     super.key,
     required this.pages,
+    this.stale = false,
     required this.page,
     required this.version,
     required this.locked,
@@ -16,14 +21,43 @@ class WorkbenchPreview extends StatelessWidget {
     required this.onSaveImage,
     this.onSaveExport,
     this.onCancel,
+    this.copyImage = copyPreviewImage,
   });
   final List<Uint8List> pages;
   final int page;
   final String version;
-  final bool locked;
+  final bool locked, stale;
   final ValueChanged<int> onPageChanged;
   final VoidCallback onSaveImage;
   final VoidCallback? onSaveExport, onCancel;
+  final ImageClipboardWriter copyImage;
+
+  @override
+  State<WorkbenchPreview> createState() => _WorkbenchPreviewState();
+}
+
+class _WorkbenchPreviewState extends State<WorkbenchPreview> {
+  final _heroOwner = Object();
+
+  void _expand() {
+    final source = widget.pages;
+    unawaited(
+      showFullscreenPreview(
+        context,
+        pages: List<Uint8List>.unmodifiable(source),
+        page: widget.page.clamp(0, source.length - 1),
+        heroOwner: _heroOwner,
+        copyImage: widget.copyImage,
+        onPageChanged: (page) {
+          // A viewer of an old result must not change a newly generated result.
+          if (mounted && identical(source, widget.pages)) {
+            widget.onPageChanged(page);
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -32,6 +66,24 @@ class WorkbenchPreview extends StatelessWidget {
       icon: Icons.description_outlined,
       child: Column(
         children: [
+          if (widget.stale)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                l.previewOutdated,
+                key: const ValueKey('preview-stale'),
+              ),
+            ),
+          if (widget.pages.isNotEmpty)
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                key: const ValueKey('expand-preview'),
+                onPressed: _expand,
+                icon: const Icon(Icons.open_in_full),
+                label: Text(l.expandPreview),
+              ),
+            ),
           Expanded(
             child: Container(
               width: double.infinity,
@@ -40,7 +92,7 @@ class WorkbenchPreview extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               clipBehavior: Clip.antiAlias,
-              child: pages.isEmpty
+              child: widget.pages.isEmpty
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -58,66 +110,46 @@ class WorkbenchPreview extends StatelessWidget {
                         ),
                       ),
                     )
-                  : InteractiveViewer(
-                      minScale: .25,
-                      maxScale: 5,
-                      child: Center(
-                        child: Semantics(
-                          identifier: 'preview-image',
-                          child: Image.memory(
-                            pages[page],
-                            key: ValueKey('page-$page-${pages[page].hashCode}'),
-                            fit: BoxFit.contain,
-                            semanticLabel: l.preview,
-                          ),
-                        ),
-                      ),
+                  : PreviewPager(
+                      pages: widget.pages,
+                      page: widget.page,
+                      heroOwner: _heroOwner,
+                      onOpen: _expand,
+                      copyImage: widget.copyImage,
+                      onPageChanged: widget.onPageChanged,
                     ),
             ),
           ),
-          if (pages.isNotEmpty)
+          if (widget.pages.isNotEmpty || widget.onCancel != null)
             Wrap(
               alignment: WrapAlignment.center,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                TextButton.icon(
-                  label: Text(l.previousPage),
-                  onPressed: page > 0 ? () => onPageChanged(page - 1) : null,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Text('${page + 1} / ${pages.length}'),
-                TextButton.icon(
-                  label: Text(l.nextPage),
-                  onPressed: page < pages.length - 1
-                      ? () => onPageChanged(page + 1)
-                      : null,
-                  icon: const Icon(Icons.chevron_right),
-                ),
+                if (widget.onCancel != null)
+                  TextButton.icon(
+                    onPressed: widget.onCancel,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: Text(l.cancel),
+                  ),
+                if (widget.pages.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: widget.locked ? null : widget.onSaveImage,
+                    icon: const Icon(Icons.download),
+                    label: Text(l.saveImage),
+                  ),
+                if (widget.onSaveExport != null)
+                  TextButton.icon(
+                    onPressed: widget.locked ? null : widget.onSaveExport,
+                    icon: const Icon(Icons.save_alt),
+                    label: Text(l.saveExport),
+                  ),
               ],
             ),
-          if (onCancel != null)
-            TextButton.icon(
-              onPressed: onCancel,
-              icon: const Icon(Icons.cancel_outlined),
-              label: Text(l.cancel),
-            ),
-          if (pages.isNotEmpty)
-            TextButton.icon(
-              onPressed: locked ? null : onSaveImage,
-              icon: const Icon(Icons.download),
-              label: Text(l.saveImage),
-            ),
-          if (onSaveExport != null)
-            TextButton.icon(
-              onPressed: locked ? null : onSaveExport,
-              icon: const Icon(Icons.save_alt),
-              label: Text(l.saveExport),
-            ),
-          if (version.isNotEmpty)
+          if (widget.version.isNotEmpty)
             Semantics(
               identifier: 'app-version',
               child: Text(
-                'v$version',
+                'v${widget.version}',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
             ),

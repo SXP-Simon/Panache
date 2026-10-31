@@ -57,6 +57,22 @@ void main() {
           final context = tester.element(find.byType(WorkbenchSettings));
           final l = AppLocalizations.of(context)!;
           final viewport = find.byType(ListView);
+          final scrollable = find
+              .descendant(of: viewport, matching: find.byType(Scrollable))
+              .first;
+          final fontGroup = find.byKey(const PageStorageKey('settings-font'));
+          await tester.scrollUntilVisible(
+            fontGroup,
+            180,
+            scrollable: scrollable,
+          );
+          await tester.tap(find.text(l.fontInk));
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text(l.font),
+            100,
+            scrollable: scrollable,
+          );
           // The first label must occupy space inside the scroll viewport.
           final fontLabel = find.text(l.font);
           expect(
@@ -69,7 +85,7 @@ void main() {
               tester.getRect(find.byType(DropdownButtonFormField<String>)).top,
             ),
           );
-          final layout = find.text(l.layout);
+          final layout = find.text(l.sizeSpacing);
           await tester.scrollUntilVisible(
             layout,
             200,
@@ -81,6 +97,8 @@ void main() {
           await tester.tap(layout);
           await tester.pump(const Duration(milliseconds: 80));
           expect(tester.takeException(), isNull);
+          await tester.pumpAndSettle();
+          await tester.tap(layout);
           await tester.pumpAndSettle();
           await tester.tap(layout);
           await tester.pumpAndSettle();

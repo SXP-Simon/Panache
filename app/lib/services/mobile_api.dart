@@ -134,6 +134,7 @@ class MobileHandwritingApi extends HandwritingApi {
     if (response['ok'] != true) {
       throw ApiException(
         '${response['message']}',
+        code: response['code'] as String?,
         waitSeconds: response['code'] == 'queue_full' ? 1 : null,
       );
     }

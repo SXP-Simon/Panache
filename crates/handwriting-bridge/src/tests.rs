@@ -171,6 +171,7 @@ fn local_engine_lifecycle_and_abi() {
         match mode {
             "cancel" => {
                 assert_eq!(state["task_status"], "cancelled");
+                assert_eq!(state["error_code"], "cancelled");
                 assert!(simple("result", id).is_err());
             }
             "text_limit" => {
@@ -182,9 +183,19 @@ fn local_engine_lifecycle_and_abi() {
                         .contains("文本过长")
                 );
             }
-            "invalid" => assert_eq!(state["task_status"], "failed"),
+            "invalid" => {
+                assert_eq!(state["task_status"], "failed");
+                assert!(
+                    state["error_code"]
+                        .as_str()
+                        .is_some_and(|code| !code.is_empty())
+                );
+            }
             "preview" | "math" | "image" => {
                 assert_eq!(state["task_status"], "completed", "{state}");
+                assert_eq!(state["task_stage"], "completed");
+                assert_eq!(state["pages_completed"], 2);
+                assert!(state["error_code"].is_null());
                 assert_eq!(state["pages"].as_array().unwrap().len(), 2);
                 let bytes = std::fs::read(state["pages"][0].as_str().unwrap()).unwrap();
                 assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");

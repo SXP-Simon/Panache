@@ -33,6 +33,7 @@ dependencies:
   path: ^1.9.1
   panache_updater:
     path: updater
+  super_clipboard: 0.9.1
 
 dev_dependencies:
   flutter_test:

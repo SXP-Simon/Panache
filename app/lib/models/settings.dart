@@ -129,6 +129,7 @@ class Settings {
   final Map<String, String> values = {
     for (final p in parameters) p.key: '${p.value}',
   };
+  bool strikethroughEnabled = false;
   String fill = '(0, 0, 0, 255)';
   String layoutStyle = 'standard';
   String? font;
@@ -142,6 +143,7 @@ class Settings {
     'isUnderlined': underlined,
     'enableEnglishSpacing': englishSpacing,
     'full_preview': fullPreview,
+    'strikethroughEnabled': strikethroughEnabled,
   };
 
   void restore(Map<String, dynamic> json) {
@@ -158,6 +160,12 @@ class Settings {
           (p.maximum == null || value <= p.maximum!)) {
         values[p.key] = p.integer ? '${value.toInt()}' : '$value';
       }
+    }
+    if (json['strikethroughEnabled'] is bool) {
+      strikethroughEnabled = json['strikethroughEnabled'] as bool;
+    } else if (json.containsKey('strikethrough_probability')) {
+      strikethroughEnabled =
+          (num.tryParse('${json['strikethrough_probability']}') ?? 0) > 0;
     }
     layoutStyle = (json['layoutStyle'] ?? json['layout_style']) == 'homework'
         ? 'homework'
@@ -189,6 +197,7 @@ class Settings {
     required bool pdf,
   }) => {
     ...values,
+    if (!strikethroughEnabled) 'strikethrough_probability': '0',
     'text': text,
     'fill': fill,
     'font_option': ?font,
@@ -200,7 +209,16 @@ class Settings {
     'enableEnglishSpacing': '$englishSpacing',
   };
 
+  void setStrikethroughEnabled(bool enabled) {
+    strikethroughEnabled = enabled;
+    if (enabled &&
+        (num.tryParse(values['strikethrough_probability'] ?? '') ?? 0) <= 0) {
+      values['strikethrough_probability'] = '0.005';
+    }
+  }
+
   void smallPreset() {
+    strikethroughEnabled = false;
     values.addAll({for (final p in parameters) p.key: '${p.value}'});
     englishSpacing = false;
     values.addAll({

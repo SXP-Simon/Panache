@@ -25,6 +25,8 @@ pub struct Task {
     pub task_stage: String,
     pub task_message: String,
     pub task_progress: u8,
+    #[serde(default)]
+    pub pages_completed: usize,
     pub created_at: f64,
     pub updated_at: f64,
     pub error_message: Option<String>,
@@ -127,6 +129,7 @@ impl Store {
             task_stage: "queued".into(),
             task_message: "任务排队中".into(),
             task_progress: 0,
+            pages_completed: 0,
             created_at: time,
             updated_at: time,
             error_message: None,
@@ -187,7 +190,7 @@ impl Store {
             0
         };
         Some(
-            serde_json::json!({"status":"success","task_id":id,"task_status":target.task_status,"task_stage":target.task_stage,"task_message":target.task_message,"task_progress":target.task_progress,"created_at":target.created_at,"updated_at":target.updated_at,"error_message":target.error_message,"error_code":target.error_code,"queue_pending_count":pending,"queue_ahead_count":ahead,"processing_count":processing,"active_task_count":pending+processing}),
+            serde_json::json!({"status":"success","task_id":id,"task_status":target.task_status,"task_stage":target.task_stage,"task_message":target.task_message,"task_progress":target.task_progress,"pages_completed":target.pages_completed,"created_at":target.created_at,"updated_at":target.updated_at,"error_message":target.error_message,"error_code":target.error_code,"queue_pending_count":pending,"queue_ahead_count":ahead,"processing_count":processing,"active_task_count":pending+processing}),
         )
     }
     pub fn cleanup(&mut self) -> Result<()> {

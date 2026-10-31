@@ -8,15 +8,11 @@ import '../models/settings.dart';
 import '../utils/text_tools.dart';
 import '../utils/image_data.dart';
 import 'api.dart';
+import 'engine_gateway.dart';
+import '../view_models/generation_view_model.dart';
 import 'workspace_storage.dart';
 import 'uploaded_font_storage.dart';
 import 'legacy_stub.dart' if (dart.library.js_interop) 'legacy_web.dart';
-
-class _GenerationOperation {
-  final submitted = Completer<String?>();
-  bool cancelled = false;
-  Future<void>? stopping;
-}
 
 class Workspace extends ChangeNotifier {
   Workspace({
@@ -28,7 +24,9 @@ class Workspace extends ChangeNotifier {
   }) : fontStorage = fontStorage ?? createUploadedFontStorage(),
        api = api ?? HandwritingApi(defaultBase),
        _settingsFactory = settingsFactory ?? Settings.new,
-       settings = (settingsFactory ?? Settings.new)();
+       settings = (settingsFactory ?? Settings.new)() {
+    generation.addListener(emit);
+  }
   final Settings Function() _settingsFactory;
 
   /// Platform adapters inject defaults; restored user settings take priority.
@@ -42,9 +40,9 @@ class Workspace extends ChangeNotifier {
 
   HandwritingApi api;
   Settings settings;
-  String text = '', version = '', phase = '', error = '', taskId = '';
+  String text = '', version = '';
+  final generation = GenerationViewModel();
   List<String> fonts = [];
-  List<Uint8List> pages = [];
   Map<String, String> images = {};
   Upload? _background;
   bool backgroundRuled = false;
@@ -67,19 +65,43 @@ class Workspace extends ChangeNotifier {
 
   final UploadedFontStorage fontStorage;
   Upload? _savedFont;
-  Uint8List? exportBytes;
-  String exportExtension = '';
-  int progress = 0, page = 0;
-  DateTime? retryAt;
-  bool busy = false, connected = false, disposed = false, initialized = false;
+  bool connected = false, disposed = false, initialized = false;
   WorkspaceStorage? storage;
   Future<void> _writes = Future<void>.value();
-  int _generation = 0, _connection = 0, _editRevision = 0;
+  int _connection = 0, _editRevision = 0;
+  String? get previewTaskId => generation.previewTaskId;
+  bool get previewStale =>
+      pages.isNotEmpty && generation.previewRevision != _editRevision;
   bool _initializing = false;
-  _GenerationOperation? _operation;
-  bool get stopping => _operation?.stopping != null;
+  bool get stopping => generation.stopping;
   Timer? saveTimer;
   int? legacyFontIndex;
+
+  String get phase => generation.phase;
+  set phase(String value) => generation.phase = value;
+  String get error => generation.error;
+  set error(String value) {
+    generation.error = value;
+    generation.errorCode = null;
+    generation.queueWaitSeconds = null;
+  }
+
+  String get taskId => generation.taskId;
+  set taskId(String value) => generation.taskId = value;
+  int get progress => generation.progress;
+  set progress(int value) => generation.progress = value;
+  int get page => generation.page;
+  set page(int value) => generation.page = value;
+  DateTime? get retryAt => generation.retryAt;
+  set retryAt(DateTime? value) => generation.retryAt = value;
+  bool get busy => generation.busy;
+  set busy(bool value) => generation.busy = value;
+  List<Uint8List> get pages => generation.pages;
+  set pages(List<Uint8List> value) => generation.pages = value;
+  Uint8List? get exportBytes => generation.exportBytes;
+  set exportBytes(Uint8List? value) => generation.exportBytes = value;
+  String get exportExtension => generation.exportExtension;
+  set exportExtension(String value) => generation.exportExtension = value;
 
   Future<void> initialize() async {
     if (initialized || _initializing || disposed) return;
@@ -157,12 +179,10 @@ class Workspace extends ChangeNotifier {
   Future<void> connect() async {
     if (disposed) return;
     final connection = ++_connection;
-    final activeApi = api;
+    final engine = ApiEngineGateway(api);
     error = '';
     try {
-      final loadedFonts = List<String>.from(
-        await activeApi.getJson('/api/fonts_info'),
-      );
+      final loadedFonts = await engine.loadFonts();
       if (disposed || connection != _connection) return;
       fonts = loadedFonts;
       if (legacyFontIndex != null &&
@@ -174,10 +194,10 @@ class Workspace extends ChangeNotifier {
       if (!fonts.contains(settings.font)) settings.font = fonts.firstOrNull;
       connected = true;
       try {
-        final info = await activeApi.getJson('/api/version');
+        final info = await engine.loadInfo();
         if (disposed || connection != _connection) return;
-        version = '${info['version'] ?? ''}';
-        activeApi.configureCapabilities(info);
+        version = info.version;
+        engine.configure(info);
       } catch (_) {
         if (disposed || connection != _connection) return;
         version = '';
@@ -287,144 +307,32 @@ class Workspace extends ChangeNotifier {
       emit();
       return false;
     }
-    final generation = ++_generation;
-    final operation = _GenerationOperation();
-    _operation = operation;
-    bool current() =>
-        !disposed && generation == _generation && !operation.cancelled;
-    var succeeded = false;
-    busy = true;
-    taskId = '';
-    error = '';
-    progress = 0;
-    phase = 'pending';
-    emit();
-    final activeApi = api;
-    final requestedId = activeApi.createTaskId();
-    if (requestedId != null) {
-      taskId = requestedId;
-      operation.submitted.complete(requestedId);
+    final revision = _editRevision;
+    final fields = settings.form(
+      expandImages(text, images),
+      preview: preview,
+      pdf: pdf,
+    );
+    if (background != null) {
+      fields.remove('width');
+      fields.remove('height');
+      fields['background_ruled'] = '$backgroundRuled';
     }
-    try {
-      final fields = settings.form(
-        expandImages(text, images),
-        preview: preview,
-        pdf: pdf,
-      );
-      if (background != null) {
-        fields.remove('width');
-        fields.remove('height');
-        fields['background_ruled'] = '$backgroundRuled';
-      }
-      final submittedId = await activeApi.submit(fields, {
-        'font_file': ?fontFile,
-        'background_image': ?background,
-      }, taskId: requestedId);
-      if (!operation.submitted.isCompleted) {
-        operation.submitted.complete(submittedId);
-      }
-      if (!current()) return false;
-      taskId = submittedId;
-      await persist();
-      if (!current()) return false;
-      final deadline = DateTime.now().add(const Duration(minutes: 29));
-      while (current()) {
-        final data = await activeApi.status(submittedId);
-        if (!current()) return false;
-        phase = '${data['task_status'] ?? data['status']}';
-        progress = ((data['task_progress'] ?? data['progress']) as num? ?? 0)
-            .toInt()
-            .clamp(0, 100);
-        emit();
-        if (phase == 'failed' || phase == 'error' || phase == 'cancelled') {
-          throw ApiException(
-            '${data['error_message'] ?? data['message'] ?? 'Task failed'}',
-          );
-        }
-        if (phase == 'completed') break;
-        if (DateTime.now().isAfter(deadline)) {
-          throw TimeoutException('Task timed out');
-        }
-        await Future<void>.delayed(const Duration(seconds: 2));
-      }
-      if (!current()) return false;
-      if (preview) {
-        final rendered = await activeApi.preview(submittedId);
-        if (!current()) return false;
-        pages = rendered;
-        page = 0;
-      } else {
-        final response = await activeApi.result(submittedId);
-        if (!current()) return false;
-        exportBytes = response.bodyBytes;
-        exportExtension = pdf ? 'pdf' : 'zip';
-      }
-      progress = 100;
-      succeeded = true;
-    } on ApiException catch (e) {
-      if (!current()) return false;
-      error = e.waitSeconds == null ? '$e' : 'queue:${e.waitSeconds}';
-      if (e.waitSeconds != null) {
-        retryAt = DateTime.now().add(Duration(seconds: e.waitSeconds!));
-      }
-    } catch (e) {
-      if (!current()) return false;
-      error = '$e';
-    } finally {
-      if (!operation.submitted.isCompleted) operation.submitted.complete(null);
-      if (!succeeded &&
-          current() &&
-          taskId.isNotEmpty &&
-          activeApi.supportsCancel &&
-          !['completed', 'failed', 'error', 'cancelled'].contains(phase)) {
-        final failure = error;
-        await cancel();
-        if (!disposed && !busy) {
-          error = failure;
-          emit();
-        }
-      }
-      if (current()) {
-        busy = false;
-        _operation = null;
-        emit();
-      }
-    }
-    return current() && succeeded;
+    final request = GenerationRequest(fields, {
+      'font_file': ?fontFile,
+      'background_image': ?background,
+    });
+    return generation.generate(
+      request,
+      ApiEngineGateway(api),
+      revision: revision,
+      preview: preview,
+      pdf: pdf,
+      onSubmitted: persist,
+    );
   }
 
-  Future<void> cancel() {
-    final operation = _operation;
-    if (!busy || !api.supportsCancel || disposed || operation == null) {
-      return Future.value();
-    }
-    if (operation.stopping != null) return operation.stopping!;
-    final activeApi = api;
-    operation.cancelled = true;
-    phase = 'cancelling';
-    error = '';
-    final stopped = () async {
-      try {
-        final id = await operation.submitted.future;
-        if (id != null) await activeApi.cancelTask(id);
-        if (disposed || !identical(operation, _operation)) return;
-        ++_generation;
-        busy = false;
-        phase = 'cancelled';
-        _operation = null;
-      } catch (e) {
-        if (disposed || !identical(operation, _operation)) return;
-        // Keep the slot locked until termination is confirmed; retry is safe.
-        error = '$e';
-      } finally {
-        operation.stopping = null;
-        emit();
-      }
-    }();
-    operation.stopping = stopped;
-    emit();
-    return stopped;
-  }
+  Future<void> cancel() => generation.cancel();
 
   void emit() {
     if (!disposed) notifyListeners();
@@ -432,28 +340,12 @@ class Workspace extends ChangeNotifier {
 
   @override
   void dispose() {
-    ++_generation;
     ++_connection;
     saveTimer?.cancel();
     unawaited(persist());
     disposed = true;
-    final operation = _operation;
-    final activeApi = api;
-    if (operation != null && activeApi.supportsCancel) {
-      operation.cancelled = true;
-      unawaited(() async {
-        try {
-          final id = await operation.submitted.future;
-          if (id != null) await activeApi.cancelTask(id);
-        } catch (_) {
-          // Closing cannot update an already disposed screen.
-        } finally {
-          activeApi.close();
-        }
-      }());
-    } else {
-      activeApi.close();
-    }
+    generation.removeListener(emit);
+    generation.shutdown(api.close);
     pages = [];
     images = {};
     fontFile = null;

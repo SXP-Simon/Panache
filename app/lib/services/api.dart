@@ -6,18 +6,19 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
+import '../models/engine_failure.dart';
+
 class Upload {
   const Upload(this.name, this.bytes);
   final String name;
   final Uint8List bytes;
 }
 
-class ApiException implements Exception {
-  ApiException(this.message, {this.status, this.waitSeconds});
-  final String message;
-  final int? status, waitSeconds;
-  @override
-  String toString() => message;
+class ApiException extends EngineFailure {
+  ApiException(super.message, {this.status, int? waitSeconds, super.code})
+    : super(retryAfterSeconds: waitSeconds);
+  final int? status;
+  int? get waitSeconds => retryAfterSeconds;
 }
 
 class HandwritingApi {
@@ -49,6 +50,9 @@ class HandwritingApi {
             ? '${data['message'] ?? data['error'] ?? data['detail'] ?? response.statusCode}'
             : 'HTTP ${response.statusCode}',
         status: response.statusCode,
+        code: data is Map
+            ? (data['code'] ?? data['error_code']) as String?
+            : null,
         waitSeconds: data is Map
             ? data['estimated_wait_seconds'] as int?
             : null,

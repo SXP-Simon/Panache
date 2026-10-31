@@ -59,43 +59,6 @@ class WorkbenchSettings extends StatelessWidget {
       icon: Icons.tune,
       child: ListView(
         children: [
-          Semantics(
-            identifier: 'font-select',
-            child: SettingsFieldLabel(
-              label: l.font,
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('font-${settings.font}-${fontFile?.name}'),
-                initialValue: fonts.contains(settings.font)
-                    ? settings.font
-                    : null,
-                isExpanded: true,
-                items: fonts
-                    .map(
-                      (f) => DropdownMenuItem(
-                        value: f,
-                        child: Text(f, overflow: TextOverflow.ellipsis),
-                      ),
-                    )
-                    .toList(),
-                onChanged: locked
-                    ? null
-                    : (value) {
-                        onSelectFont(value);
-                      },
-              ),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: locked ? null : onUploadFont,
-            icon: const Icon(Icons.upload),
-            label: Text(fontFile?.name ?? l.uploadFont),
-          ),
-          if (fontFile != null)
-            TextButton(
-              onPressed: locked ? null : onRemoveFont,
-              child: Text(l.remove),
-            ),
-          const Divider(),
           Text(l.presets, style: Theme.of(context).textTheme.titleSmall),
           Wrap(
             spacing: 4,
@@ -115,107 +78,225 @@ class WorkbenchSettings extends StatelessWidget {
             ],
           ),
           const Divider(),
-          Text(l.background, style: Theme.of(context).textTheme.titleSmall),
-          if (background != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                background!.bytes,
-                height: 120,
-                fit: BoxFit.contain,
+          section(
+            context,
+            'paper',
+            l.paperBackground,
+            Icons.description_outlined,
+            [
+              Text(l.background, style: Theme.of(context).textTheme.titleSmall),
+              if (background != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    background!.bytes,
+                    height: 120,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: locked ? null : onUploadBackground,
+                icon: const Icon(Icons.image_outlined),
+                label: Text(background?.name ?? l.uploadBackground),
               ),
-            ),
-          TextButton.icon(
-            onPressed: locked ? null : onUploadBackground,
-            icon: const Icon(Icons.image_outlined),
-            label: Text(background?.name ?? l.uploadBackground),
-          ),
-          if (background != null)
-            Wrap(
-              children: [
-                TextButton.icon(
-                  key: const ValueKey('identify-paper'),
-                  onPressed: locked ? null : onDetectBackground,
-                  icon: const Icon(Icons.format_line_spacing),
-                  label: Text(l.detectBackground),
-                ),
-                TextButton(
-                  onPressed: locked ? null : onRemoveBackground,
-                  child: Text(l.remove),
-                ),
-              ],
-            ),
-          const Divider(),
-          ExpansionTile(
-            title: Text(l.layout),
-            initiallyExpanded: true,
-            tilePadding: EdgeInsets.zero,
-            children: [
-              SettingsFieldLabel(
-                label: l.layoutPreset,
-                child: SegmentedButton<String>(
-                  key: const ValueKey('layout-style'),
-                  segments: [
-                    ButtonSegment(
-                      value: 'standard',
-                      label: Text(l.layoutStandard),
+              if (background != null)
+                Wrap(
+                  children: [
+                    TextButton.icon(
+                      key: const ValueKey('identify-paper'),
+                      onPressed: locked ? null : onDetectBackground,
+                      icon: const Icon(Icons.format_line_spacing),
+                      label: Text(l.detectBackground),
                     ),
-                    ButtonSegment(
-                      value: 'homework',
-                      label: Text(l.layoutHomework),
+                    TextButton(
+                      onPressed: locked ? null : onRemoveBackground,
+                      child: Text(l.remove),
                     ),
                   ],
-                  selected: {settings.layoutStyle},
-                  onSelectionChanged: locked
+                ),
+              parameterGrid(
+                context,
+                parameters
+                    .where((p) => {'width', 'height'}.contains(p.key))
+                    .toList(),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l.underlined),
+                value: settings.underlined,
+                onChanged: locked
+                    ? null
+                    : (v) {
+                        settings.underlined = v;
+                        onEdited();
+                      },
+              ),
+            ],
+            expanded: true,
+          ),
+          section(context, 'font', l.fontInk, Icons.font_download_outlined, [
+            Semantics(
+              identifier: 'font-select',
+              child: SettingsFieldLabel(
+                label: l.font,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('font-${settings.font}-${fontFile?.name}'),
+                  initialValue: fonts.contains(settings.font)
+                      ? settings.font
+                      : null,
+                  isExpanded: true,
+                  items: fonts
+                      .map(
+                        (f) => DropdownMenuItem(
+                          value: f,
+                          child: Text(f, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: locked
                       ? null
-                      : (selection) {
-                          settings.layoutStyle = selection.single;
-                          onEdited();
+                      : (value) {
+                          onSelectFont(value);
                         },
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 16),
-                child: Text(
-                  l.layoutPresetHint,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+            ),
+            TextButton.icon(
+              onPressed: locked ? null : onUploadFont,
+              icon: const Icon(Icons.upload),
+              label: Text(fontFile?.name ?? l.uploadFont),
+            ),
+            if (fontFile != null)
+              TextButton(
+                onPressed: locked ? null : onRemoveFont,
+                child: Text(l.remove),
               ),
-              parameterGrid(context, parameters.take(9).toList()),
-            ],
-          ),
-          ExpansionTile(
-            title: Text(l.variation),
-            tilePadding: EdgeInsets.zero,
-            children: [parameterGrid(context, parameters.sublist(9, 15))],
-          ),
-          ExpansionTile(
-            title: Text(l.strike),
-            tilePadding: EdgeInsets.zero,
-            children: [parameterGrid(context, parameters.sublist(15))],
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(l.underlined),
-            value: settings.underlined,
-            onChanged: locked
-                ? null
-                : (v) {
-                    settings.underlined = v;
-                    onEdited();
-                  },
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(l.englishSpacing),
-            value: settings.englishSpacing,
-            onChanged: locked
-                ? null
-                : (v) {
-                    settings.englishSpacing = v;
-                    onEdited();
-                  },
-          ),
+            Text(l.ink),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final color in [
+                  (l.black, '(0, 0, 0, 255)'),
+                  (l.blue, '(0, 51, 153, 255)'),
+                  (l.red, '(180, 0, 0, 255)'),
+                ])
+                  ChoiceChip(
+                    label: Text(color.$1),
+                    selected: settings.fill == color.$2,
+                    onSelected: locked
+                        ? null
+                        : (_) {
+                            onColorSelected(color.$2);
+                          },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SettingsFieldLabel(
+              key: const PageStorageKey('parameter-fill'),
+              label: l.customColor,
+              child: TextFormField(
+                key: ValueKey('fill-$settingsRevision'),
+                initialValue: settings.fill,
+                enabled: !locked,
+                validator: (s) =>
+                    RegExp(r'^\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$')
+                            .hasMatch(s ?? '') &&
+                        (s!
+                            .replaceAll(RegExp(r'[()\s]'), '')
+                            .split(',')
+                            .every((c) => int.parse(c) <= 255))
+                    ? null
+                    : l.validation,
+                onChanged: (s) {
+                  settings.fill = s;
+                  onEdited();
+                },
+              ),
+            ),
+          ], expanded: MediaQuery.sizeOf(context).width >= 900),
+          section(context, 'spacing', l.sizeSpacing, Icons.format_size, [
+            parameterGrid(context, parameters.take(3).toList()),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.englishSpacing),
+              value: settings.englishSpacing,
+              onChanged: locked
+                  ? null
+                  : (v) {
+                      settings.englishSpacing = v;
+                      onEdited();
+                    },
+            ),
+          ], expanded: MediaQuery.sizeOf(context).width >= 900),
+          section(context, 'layout', l.marginsLayout, Icons.space_bar, [
+            SettingsFieldLabel(
+              label: l.layoutPreset,
+              child: SegmentedButton<String>(
+                key: const ValueKey('layout-style'),
+                segments: [
+                  ButtonSegment(
+                    value: 'standard',
+                    label: Text(l.layoutStandard),
+                  ),
+                  ButtonSegment(
+                    value: 'homework',
+                    label: Text(l.layoutHomework),
+                  ),
+                ],
+                selected: {settings.layoutStyle},
+                onSelectionChanged: locked
+                    ? null
+                    : (selection) {
+                        settings.layoutStyle = selection.single;
+                        onEdited();
+                      },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 16),
+              child: Text(
+                l.layoutPresetHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            parameterGrid(
+              context,
+              parameters.where((p) => p.key.endsWith('_margin')).toList(),
+            ),
+          ], expanded: MediaQuery.sizeOf(context).width >= 900),
+          section(context, 'variation', l.variation, Icons.gesture, [
+            parameterGrid(
+              context,
+              parameters
+                  .where(
+                    (p) =>
+                        p.key.endsWith('_sigma') &&
+                        !p.key.startsWith('strikethrough_'),
+                  )
+                  .toList(),
+            ),
+          ], expanded: false),
+          section(context, 'strike', l.strike, Icons.strikethrough_s, [
+            SwitchListTile(
+              key: const ValueKey('enable-strikethrough'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.enableStrikethrough),
+              value: settings.strikethroughEnabled,
+              onChanged: locked
+                  ? null
+                  : (enabled) {
+                      settings.setStrikethroughEnabled(enabled);
+                      onEdited();
+                    },
+            ),
+            parameterGrid(
+              context,
+              parameters
+                  .where((p) => p.key.startsWith('strikethrough_'))
+                  .toList(),
+            ),
+          ], expanded: false),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(l.fullPreview),
@@ -227,95 +308,83 @@ class WorkbenchSettings extends StatelessWidget {
                     onEdited();
                   },
           ),
-          const Divider(),
-          Text(l.ink),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final color in [
-                (l.black, '(0, 0, 0, 255)'),
-                (l.blue, '(0, 51, 153, 255)'),
-                (l.red, '(180, 0, 0, 255)'),
-              ])
-                ChoiceChip(
-                  label: Text(color.$1),
-                  selected: settings.fill == color.$2,
-                  onSelected: locked
-                      ? null
-                      : (_) {
-                          onColorSelected(color.$2);
-                        },
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SettingsFieldLabel(
-            label: l.customColor,
-            child: TextFormField(
-              key: ValueKey('fill-$settingsRevision'),
-              initialValue: settings.fill,
-              enabled: !locked,
-              validator: (s) =>
-                  RegExp(r'^\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$')
-                          .hasMatch(s ?? '') &&
-                      (s!
-                          .replaceAll(RegExp(r'[()\s]'), '')
-                          .split(',')
-                          .every((c) => int.parse(c) <= 255))
-                  ? null
-                  : l.validation,
-              onChanged: (s) {
-                settings.fill = s;
-                onEdited();
-              },
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget parameterGrid(BuildContext context, List<Parameter> fields) =>
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final minWidth = 140 * MediaQuery.textScalerOf(context).scale(1);
-          final columns = constraints.maxWidth >= minWidth * 2 + 8 ? 2 : 1;
-          return Wrap(
-            spacing: 8,
-            runSpacing: 12,
-            children: [
-              for (final p in fields)
-                SizedBox(
-                  width: (constraints.maxWidth - 8 * (columns - 1)) / columns,
-                  child: Semantics(
-                    identifier: p.key,
-                    child: SettingsFieldLabel(
-                      label:
-                          Localizations.localeOf(context).languageCode == 'en'
-                          ? p.en
-                          : p.zh,
-                      child: TextFormField(
-                        key: ValueKey('${p.key}-$settingsRevision'),
-                        initialValue: settings.values[p.key],
-                        enabled: !locked,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        validator: (s) => p.accepts(s)
-                            ? null
-                            : AppLocalizations.of(context)!.validation,
-                        onChanged: (s) {
-                          settings.values[p.key] = s;
-                          onEdited();
-                        },
-                      ),
+  Widget section(
+    BuildContext context,
+    String id,
+    String title,
+    IconData icon,
+    List<Widget> children, {
+    bool expanded = false,
+  }) => ExpansionTile(
+    key: PageStorageKey('settings-$id'),
+    leading: Icon(icon),
+    title: Text(title),
+    initiallyExpanded: expanded,
+    maintainState: true,
+    tilePadding: EdgeInsets.zero,
+    expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
+        ? AnimationStyle.noAnimation
+        : null,
+    childrenPadding: const EdgeInsets.only(bottom: 16),
+    children: children,
+  );
+
+  Widget parameterGrid(
+    BuildContext context,
+    List<Parameter> fields,
+  ) => LayoutBuilder(
+    builder: (context, constraints) {
+      final minWidth = 140 * MediaQuery.textScalerOf(context).scale(1);
+      final columns = constraints.maxWidth >= minWidth * 2 + 8 ? 2 : 1;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 12,
+        children: [
+          for (final p in fields)
+            SizedBox(
+              // TextField scroll offsets must not share the tile's stored bool.
+              key: PageStorageKey('parameter-${p.key}'),
+              width: (constraints.maxWidth - 8 * (columns - 1)) / columns,
+              child: Semantics(
+                identifier: p.key,
+                child: SettingsFieldLabel(
+                  label: Localizations.localeOf(context).languageCode == 'en'
+                      ? p.en
+                      : p.zh,
+                  child: TextFormField(
+                    key: ValueKey(
+                      p.key.startsWith('strikethrough_')
+                          ? '${p.key}-$settingsRevision-${settings.strikethroughEnabled}'
+                          : '${p.key}-$settingsRevision',
                     ),
+                    initialValue: settings.values[p.key],
+                    enabled:
+                        !locked &&
+                        (!p.key.startsWith('strikethrough_') ||
+                            settings.strikethroughEnabled),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (s) => p.accepts(s)
+                        ? null
+                        : AppLocalizations.of(context)!.validation,
+                    onChanged: (s) {
+                      settings.values[p.key] = s;
+                      onEdited();
+                    },
                   ),
                 ),
-            ],
-          );
-        },
+              ),
+            ),
+        ],
       );
+    },
+  );
 }
 
 /// Labels participate in layout rather than painting above an outlined field.

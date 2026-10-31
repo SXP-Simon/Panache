@@ -39,6 +39,8 @@ class Workbench extends StatefulWidget {
     this.updates,
     this.themeColor = defaultThemeColor,
     this.onThemeColorChanged,
+    this.reduceMotion = false,
+    this.onReduceMotionChanged,
     this.initialDestination = 0,
     required this.toggleLocale,
     required this.toggleTheme,
@@ -46,6 +48,8 @@ class Workbench extends StatefulWidget {
   final Workspace? workspace;
   final UpdateController? updates;
   final Color themeColor;
+  final bool reduceMotion;
+  final Future<bool> Function(bool)? onReduceMotionChanged;
   final Future<bool> Function(Color)? onThemeColorChanged;
   final int initialDestination;
   final VoidCallback toggleLocale, toggleTheme;
@@ -60,6 +64,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   final form = GlobalKey<FormState>();
   final undo = UndoHistoryController();
   int destination = 0, mobileTab = 0;
+  int navigationRevision = 0;
   bool operation = false;
   int settingsRevision = 0;
   bool restored = false;
@@ -73,8 +78,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';
-  bool get locked =>
-      w.busy ||
+  bool get locked => w.busy || editingLocked;
+  bool get editingLocked =>
       operation ||
       preparation != null ||
       {
@@ -312,12 +317,37 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       return;
     }
     w.text = editor.text;
+    final navigation = navigationRevision;
     final succeeded = await w.generate(preview: preview, pdf: pdf);
     if (!mounted || !succeeded) return;
-    if (w.exportBytes != null) {
+    if (!preview && w.exportBytes != null) {
       await action(() => saveBytes(w.exportBytes!, w.exportExtension));
     }
-    if (w.pages.isNotEmpty) setState(() => mobileTab = 2);
+    if (preview && w.pages.isNotEmpty) {
+      if (navigation == navigationRevision &&
+          destination == 0 &&
+          !w.previewStale) {
+        selectPane(2);
+      } else {
+        notify(l.previewReady);
+      }
+    }
+  }
+
+  void selectPane(int index) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      mobileTab = index;
+      navigationRevision++;
+    });
+  }
+
+  void selectDestination(int index) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      destination = index;
+      navigationRevision++;
+    });
   }
 
   @override
@@ -336,20 +366,35 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
           },
         ),
       },
-      child: WorkbenchShell(
-        updateAvailable: widget.updates?.phase == UpdatePhase.available,
-        destination: destination,
-        onDestinationSelected: (value) => setState(() => destination = value),
-        connected: w.connected,
-        managedBackend: w.managedBackend,
-        locked: locked,
-        onConnection: connectionDialog,
-        onToggleLocale: widget.toggleLocale,
-        onToggleTheme: widget.toggleTheme,
-        themeColor: widget.themeColor,
-        onThemeColorChanged: widget.onThemeColorChanged,
-        workspaceBuilder: workspace,
-        informationBuilder: information,
+      child: PopScope(
+        canPop:
+            destination == 0 &&
+            (MediaQuery.sizeOf(context).width >= 900 || mobileTab == 0),
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (destination != 0) {
+            selectDestination(0);
+          } else {
+            selectPane(0);
+          }
+        },
+        child: WorkbenchShell(
+          updateAvailable: widget.updates?.phase == UpdatePhase.available,
+          destination: destination,
+          onDestinationSelected: selectDestination,
+          connected: w.connected,
+          managedBackend: w.managedBackend,
+          locked: locked,
+          onConnection: connectionDialog,
+          onToggleLocale: widget.toggleLocale,
+          onToggleTheme: widget.toggleTheme,
+          themeColor: widget.themeColor,
+          reduceMotion: widget.reduceMotion,
+          onReduceMotionChanged: widget.onReduceMotionChanged,
+          onThemeColorChanged: widget.onThemeColorChanged,
+          workspaceBuilder: workspace,
+          informationBuilder: information,
+        ),
       ),
     ),
   );
@@ -359,10 +404,13 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     keyboardVisible: keyboardVisible,
     width: width,
     error: w.error,
+    queueWaitSeconds: w.generation.queueWaitSeconds,
     busy: locked,
     generating: w.busy,
     progress: w.progress,
     phase: w.phase,
+    stage: w.generation.stage,
+    pagesCompleted: w.generation.pagesCompleted,
     mobileTab: mobileTab,
     formKey: form,
     editorView: editorPanel(),
@@ -372,7 +420,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       w.error = '';
       w.emit();
     },
-    onTabChanged: (index) => setState(() => mobileTab = index),
+    onTabChanged: selectPane,
     onPreview: generate,
     onPdf: () => generate(preview: false, pdf: true),
     onZip: () => generate(preview: false),
@@ -385,7 +433,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     controller: editor,
     focusNode: editorFocus,
     undo: undo,
-    locked: locked,
+    locked: editingLocked,
     images: w.images,
     onEditImage: editImage,
     onUndo: () {
@@ -541,6 +589,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Widget previewPanel() => WorkbenchPreview(
     pages: w.pages,
+    stale: w.previewStale,
     page: w.page,
     version: w.version,
     locked: locked,

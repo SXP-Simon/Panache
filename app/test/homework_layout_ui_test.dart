@@ -79,7 +79,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('纸张'));
+        await tester.tap(find.byKey(const ValueKey('open-paper')));
         await tester.pumpAndSettle();
         final scrollable = find
             .descendant(
@@ -87,6 +87,10 @@ void main() {
               matching: find.byType(Scrollable),
             )
             .first;
+        final group = find.byKey(const PageStorageKey('settings-layout'));
+        await tester.scrollUntilVisible(group, 150, scrollable: scrollable);
+        await tester.tap(find.text('边距与排版'));
+        await tester.pumpAndSettle();
         final selector = find.byKey(const ValueKey('layout-style'));
         await tester.scrollUntilVisible(selector, 150, scrollable: scrollable);
         await tester.drag(scrollable, const Offset(0, 80));
@@ -130,7 +134,9 @@ void main() {
         );
         workspace.emit();
         await tester.pumpAndSettle();
-        await tester.tap(find.text('预览').first);
+        await tester.tap(find.byKey(const ValueKey('back-to-editor')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('open-preview')));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await capture('preview');
