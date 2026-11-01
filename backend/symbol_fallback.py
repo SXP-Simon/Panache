@@ -270,7 +270,11 @@ def _find_fallback_font_files() -> list[str]:
         if not d:
             continue
         # 2026-10-22：内部数学字库放子目录，随字体资源打包但不进入用户字体菜单。
-        for candidate in (*Path(d).glob("*.ttf"), *(Path(d) / "math").glob("*.ttf")):
+        # 2026-11-01：文件系统遍历顺序因平台而异；固定顺序以稳定备用字形选择。
+        for candidate in (
+            *sorted(Path(d).glob("*.ttf")),
+            *sorted((Path(d) / "math").glob("*.ttf")),
+        ):
             f = str(candidate)
             if f not in candidates:
                 candidates.append(f)

@@ -37,7 +37,7 @@ test("钩子调用检查时不能把当前仓库的 Git 路由传入临时仓库
   try {
     assert.equal(runQualityChecks((_command, options) => {
       assert.equal(options.env.GIT_DIR, undefined);
-      assert.equal(options.env.PATH, process.env.PATH);
+      assert.equal(Object.entries(options.env).find(([name]) => name.toUpperCase() === "PATH")?.[1], process.env.PATH);
       return { status: 0 };
     }, () => {}, ["fixture"]), 0);
   } finally {

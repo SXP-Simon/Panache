@@ -148,6 +148,16 @@ def test_fallback_glyph_bbox_proportions():
     assert 3 <= w_sub <= 20
 
 
+def test_fallback_font_discovery_is_stable_across_filesystem_order(tmp_path, monkeypatch):
+    # 2026-11-01：不同文件系统返回顺序不同，不应改变实际选择的备用字形。
+    (tmp_path / "z.ttf").touch()
+    (tmp_path / "a.ttf").touch()
+    monkeypatch.setenv("FONT_ASSETS_DIR", str(tmp_path))
+    monkeypatch.delenv("FONT_ASSETS_BUNDLED_DIR", raising=False)
+    found = symbols._find_fallback_font_files()
+    assert found[:2] == [str(tmp_path / "a.ttf"), str(tmp_path / "z.ttf")]
+
+
 def test_radical_vinculum_conversion_and_rendering():
     # 测试根式转换与横线封顶手写渲染：\\sqrt{...}, √( ... ), ³√( ... ), √x 均无外层括号并完成绘制
 
