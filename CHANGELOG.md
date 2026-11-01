@@ -1,3 +1,17 @@
+# [1.10.0](https://github.com/SXP-Simon/Panache/compare/v1.9.0...v1.10.0) (2026-11-01)
+
+
+### Bug Fixes
+
+* 浏览器回归前构建前端生产资源 ([b1ace79](https://github.com/SXP-Simon/Panache/commit/b1ace79c798d8c2fbb9b6de6c846b984ed1f3476))
+* 稳定跨平台字体与 Git 钩子检查 ([e5e2f12](https://github.com/SXP-Simon/Panache/commit/e5e2f1235c5e00b37d7e82349cfada067b9d2ea9))
+
+
+### Features
+
+* 提升 Flutter 发布来源 ([1868158](https://github.com/SXP-Simon/Panache/commit/1868158a04d3f4431d987066d431e107fd6db4e8))
+* 支持提升 Flutter 来源触发统一发版 ([e6e139a](https://github.com/SXP-Simon/Panache/commit/e6e139a0258df432ec5027c13dbdc31cd8f3c780))
+
 # [1.9.0](https://github.com/SXP-Simon/Panache/compare/v1.8.0...v1.9.0) (2026-10-24)
 
 
