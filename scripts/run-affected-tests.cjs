@@ -12,7 +12,7 @@ function testCommands(plan) {
     ...(plan.unit_frontend ? ["pnpm run test:frontend"] : []),
     ...(plan.unit_python ? ["uv run --extra dev python -m pytest backend/tests"] : []),
     ...(plan.unit_desktop ? ["pnpm run test:desktop-storage", "pnpm run test:desktop-updater"] : []),
-    ...(plan.build || plan.sw_upgrade ? ["pnpm --filter handwrite run build"] : []),
+    ...(plan.build || plan.sw_upgrade || plan.e2e ? ["pnpm --filter handwrite run build"] : []),
     ...(plan.sw_upgrade ? ["pnpm run test:sw-upgrade"] : []),
     ...(plan.e2e ? ["pnpm --filter handwriting-web-e2e run test"] : []),
     ...(plan.docs ? ["uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict"] : []),

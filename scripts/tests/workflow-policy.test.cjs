@@ -243,6 +243,7 @@ test("Semantic API 显式使用已检出的 custom-base SHA，按真实返回值
 test("Python 与桌面打包使用独立 job，打包后不再执行会移除 build extra 的 uv 同步", () => {
   const workflow = source("engineering-quality");
   const quality = workflow.split("\n  quality:\n")[1].split("\n  docker:\n")[0];
+  assert.match(quality, /outputs\.build == 'true' \|\| needs\.changes\.outputs\.e2e == 'true'/u);
   const desktop = workflow.split("\n  desktop:\n")[1].split("\n  desktop_macos:\n")[0];
   assert.match(quality, /NEEDS_PYTHON: .*outputs\.python == 'true'.*outputs\.unit_python == 'true'.*matrix\.os == 'ubuntu-latest'.*outputs\.e2e == 'true'/u);
   assert.match(quality, /if: env\.NEEDS_PYTHON == 'true'/u);

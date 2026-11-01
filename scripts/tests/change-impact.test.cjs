@@ -54,6 +54,8 @@ test("后端运行时需要 Python 与生成集成检查，后端测试不触发
   }
   assert.equal(runtime.frontend, false);
   assert.equal(runtime.frontend_image, false);
+  assert.ok(testCommands(runtime).indexOf("pnpm --filter handwrite run build") < testCommands(runtime).indexOf("pnpm --filter handwriting-web-e2e run test"));
+  assert.ok(testCommands(runtime).includes("pnpm --filter handwrite run build"));
   assert.deepEqual(selected(planChanges(["backend/tests/test_layout.py"])), ["python", "unit_python"]);
   assert.deepEqual(selected(planChanges(["backend/stubs/handrightbeta/__init__.pyi"])), ["python", "unit_python"]);
 });
