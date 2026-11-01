@@ -1,5 +1,7 @@
 # Flutter assets in the same release
 
+The GitHub Release notes include a separate Flutter / Rust section based on the previous published `Flutter-source.json` and the newly pinned source SHA. Unchanged sources are not repeated; missing baselines or unrelated histories produce a warning instead of guessed changes. The repository `CHANGELOG.md` continues to describe `custom-base` commits.
+
 `Flutter Release Assets` follows Semantic Release on `custom-base` and consumes that exact run's `release-result`. It adds Flutter packages to the existing release without creating another tag or changing source versions.
 
 ## Pinned source and checks

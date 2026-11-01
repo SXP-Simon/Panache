@@ -6,6 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
 const { FLAGS, planChanges } = require("../change-impact.cjs");
+require("./release-notes.test.cjs");
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const workflowRoot = path.resolve(__dirname, "../../.github/workflows");

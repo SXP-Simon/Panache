@@ -4,6 +4,8 @@
 
 Flutter 独立改动可通过更新根目录 `flutter-release-source.json` 发起统一版本：文件只包含 `schema_version: 1` 和完整 `flutter_sha`。该变更进入工程质量与 semantic-release；发布前校验该 SHA 的三项 Flutter 质量工作流，发布结果携带该 SHA，安装包控制器只使用这个固定来源。之后其他版本继续使用最后一次明确提升的来源，直至再次更新该文件。旧版本 manifest 不变。
 
+Release 正文另外列出 Flutter / Rust 的功能与修复：以上一次实际发布的 `Flutter-source.json` 为基线，与本次固定 SHA 比较。来源未变化时不重复列出；缺少可信基线或提交历史不连续时输出告警，不臆测更新内容。此区段只用于 GitHub Release，仓库的 `CHANGELOG.md` 仍记录 `custom-base` 的提交。
+
 ## 来源固定与质量门禁
 
 首次自动运行解析 `flutter` 的完整提交 SHA，要求同一仓库、`flutter` 分支、同一 SHA 的 `Flutter UI`、`Rust 后端`、`Flutter Mobile` 三个质量工作流全部成功。接受同仓库、同 `flutter` 分支、精确 SHA 的 push 或手动运行；最新一次匹配运行若失败或未完成，不能用较早成功替代，PR 和其它 fork 也不能作为证据。

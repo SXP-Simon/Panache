@@ -19,6 +19,7 @@ const path = require("path");
 
 // 幂等标记：补跑或手动重跑时靠它判断正文里是否已经有这段说明
 const MARKER = "<!-- download-guide -->";
+const FLUTTER_MARKER = "<!-- flutter-changes -->";
 
 const tag = process.argv[2];
 if (!tag && require.main === module) {
@@ -33,6 +34,59 @@ function gh(args) {
   const repository = process.env.GITHUB_REPOSITORY || origin.replace(/^.*github\.com[:/]/u, "").replace(/\.git$/u, "");
   if (!/^[\w.-]+\/[\w.-]+$/u.test(repository)) throw new Error("无法确定当前发布仓库");
   return execFileSync("gh", [...args, "--repo", repository], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+}
+
+function flutterSection(previous, current, commits, repository) {
+  if (previous === current) return "";
+  const groups = { feat: [], fix: [] };
+  for (const { sha, subject } of commits) {
+    const match = /^(feat|fix)(?:\(([^)]+)\))?!?:\s+(.+)$/u.exec(subject);
+    if (!match || /^(?:\.github|scripts|vendor)(?:\/|$)/u.test(match[2] || "")) continue;
+    const title = match[3].replace(/[\r\n]/gu, " ").replace(/([\\\[\]<>])/gu, "\\$1");
+    groups[match[1]].push(`- ${title} ([${sha.slice(0, 7)}](https://github.com/${repository}/commit/${sha}))`);
+  }
+  const changes = [["新功能", groups.feat], ["修复", groups.fix]]
+    .filter(([, entries]) => entries.length).map(([heading, entries]) => `### ${heading}\n\n${entries.join("\n")}`).join("\n\n");
+  return `${FLUTTER_MARKER}\n## Flutter / Rust 更新\n\n${changes || "此来源更新没有可展示的功能或修复提交。"}\n\n[查看 Flutter 源码变更](https://github.com/${repository}/compare/${previous}...${current})\n<!-- /flutter-changes -->`;
+}
+
+function replaceSection(body, marker, closing, section) {
+  const start = body.indexOf(marker);
+  const end = start < 0 ? -1 : body.indexOf(closing, start);
+  if (start >= 0 && end < 0) throw new Error(`区段缺少结束标记: ${marker}`);
+  const prefix = start < 0 ? body : body.slice(0, start);
+  const suffix = end < 0 ? "" : body.slice(end + closing.length);
+  return `${prefix.trimEnd()}${section ? `\n\n${section}` : ""}${suffix}`.trimEnd() + "\n";
+}
+
+function readManifest(releaseTag) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "flutter-manifest-"));
+  try {
+    gh(["release", "download", releaseTag, "--pattern", "Flutter-source.json", "--dir", dir]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, "Flutter-source.json"), "utf8"));
+    if (manifest.release_tag !== releaseTag || !/^[a-f0-9]{40}$/u.test(manifest.flutter_sha)) throw new Error("Flutter manifest 不合法");
+    return manifest.flutter_sha;
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+function flutterChanges() {
+  const repository = process.env.GITHUB_REPOSITORY || execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8" }).trim().replace(/^.*github\.com[:/]/u, "").replace(/\.git$/u, "");
+  if (!/^[\w.-]+\/[\w.-]+$/u.test(repository)) throw new Error("无法确定发布仓库");
+  const releases = JSON.parse(execFileSync("gh", ["api", "--paginate", "--slurp", `repos/${repository}/releases?per_page=100`], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })).flat();
+  const currentRelease = releases.find((release) => release.tag_name === tag && !release.draft);
+  if (!currentRelease) throw new Error("找不到当前 Release");
+  const current = process.env.FLUTTER_SOURCE_SHA || readManifest(tag);
+  if (!/^[a-f0-9]{40}$/u.test(current)) throw new Error("当前 Flutter SHA 不合法");
+  const previous = releases.filter((release) => !release.draft && !release.prerelease && release.published_at < currentRelease.published_at && release.assets.some((asset) => asset.name === "Flutter-source.json"))
+    .sort((a, b) => b.published_at.localeCompare(a.published_at))[0];
+  if (!previous) throw new Error("没有可核实的上一个 Flutter 发布来源");
+  const base = readManifest(previous.tag_name);
+  if (base === current) return "";
+  for (const sha of [base, current]) execFileSync("git", ["fetch", "--no-tags", "origin", sha], { stdio: "ignore" });
+  execFileSync("git", ["merge-base", "--is-ancestor", base, current]);
+  const log = execFileSync("git", ["log", "--reverse", "--no-merges", "--format=%H%x09%s", `${base}..${current}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const commits = log.trim().split("\n").filter(Boolean).map((line) => { const [sha, ...subject] = line.split("\t"); return { sha, subject: subject.join("\t") }; });
+  return flutterSection(base, current, commits, repository);
 }
 
 // The guide follows the target tag, so rebuilding an older release preserves its actual filenames.
@@ -92,7 +146,16 @@ function main() {
   const section = downloadGuide(metadata.build.productName, version);
   const raw = gh(["release", "view", tag, "--json", "body", "--jq", ".body"]);
   // 正文为空时 --jq .body 会给一个字符串 "null"
-  const body = raw.trim() === "null" ? "" : raw;
+  let body = raw.trim() === "null" ? "" : raw;
+  try {
+    const flutter = flutterChanges();
+    // Place Flutter changes before the download guide and preserve manually written text.
+    const guideAt = body.indexOf(MARKER);
+    if (body.includes(FLUTTER_MARKER) || guideAt < 0) body = replaceSection(body, FLUTTER_MARKER, "<!-- /flutter-changes -->", flutter);
+    else body = replaceSection(body.slice(0, guideAt), FLUTTER_MARKER, "<!-- /flutter-changes -->", flutter).trimEnd() + "\n\n" + body.slice(guideAt);
+  } catch (error) {
+    console.error(`!! 无法生成 Flutter 更新说明：${error.message}`);
+  }
   // 2026-10-15：替换受管区段，允许更新模板并保留其后的人工说明。
   const start = body.indexOf(MARKER);
   const closing = "<!-- /download-guide -->";
@@ -121,4 +184,4 @@ if (require.main === module) try {
   console.error(`!! 追加下载说明失败（不影响发版与桌面包上传）：${error.message}`);
 }
 
-module.exports = { downloadGuide };
+module.exports = { downloadGuide, flutterSection, replaceSection, flutterChanges };
