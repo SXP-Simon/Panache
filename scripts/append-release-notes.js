@@ -73,12 +73,13 @@ function flutterChanges() {
   const repository = process.env.GITHUB_REPOSITORY || execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8" }).trim().replace(/^.*github\.com[:/]/u, "").replace(/\.git$/u, "");
   if (!/^[\w.-]+\/[\w.-]+$/u.test(repository)) throw new Error("无法确定发布仓库");
   const releases = JSON.parse(execFileSync("gh", ["api", "--paginate", "--slurp", `repos/${repository}/releases?per_page=100`], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })).flat();
-  const currentRelease = releases.find((release) => release.tag_name === tag && !release.draft);
-  if (!currentRelease) throw new Error("找不到当前 Release");
+  // The releases list can be cached immediately after publication. Resolve the
+  // target directly, as the download guide already does, instead of searching it.
+  const currentRelease = JSON.parse(gh(["release", "view", tag, "--json", "publishedAt,isDraft"]));
+  if (currentRelease.isDraft || !currentRelease.publishedAt) throw new Error("找不到已发布的当前 Release");
   const current = process.env.FLUTTER_SOURCE_SHA || readManifest(tag);
   if (!/^[a-f0-9]{40}$/u.test(current)) throw new Error("当前 Flutter SHA 不合法");
-  const previous = releases.filter((release) => !release.draft && !release.prerelease && release.published_at < currentRelease.published_at && release.assets.some((asset) => asset.name === "Flutter-source.json"))
-    .sort((a, b) => b.published_at.localeCompare(a.published_at))[0];
+  const previous = previousFlutterRelease(releases, currentRelease.publishedAt);
   if (!previous) throw new Error("没有可核实的上一个 Flutter 发布来源");
   const base = readManifest(previous.tag_name);
   if (base === current) return "";
@@ -87,6 +88,11 @@ function flutterChanges() {
   const log = execFileSync("git", ["log", "--reverse", "--no-merges", "--format=%H%x09%s", `${base}..${current}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   const commits = log.trim().split("\n").filter(Boolean).map((line) => { const [sha, ...subject] = line.split("\t"); return { sha, subject: subject.join("\t") }; });
   return flutterSection(base, current, commits, repository);
+}
+
+function previousFlutterRelease(releases, publishedAt) {
+  return releases.filter((release) => !release.draft && !release.prerelease && release.published_at < publishedAt && release.assets.some((asset) => asset.name === "Flutter-source.json"))
+    .sort((a, b) => b.published_at.localeCompare(a.published_at))[0];
 }
 
 // The guide follows the target tag, so rebuilding an older release preserves its actual filenames.
@@ -184,4 +190,4 @@ if (require.main === module) try {
   console.error(`!! 追加下载说明失败（不影响发版与桌面包上传）：${error.message}`);
 }
 
-module.exports = { downloadGuide, flutterSection, replaceSection, flutterChanges };
+module.exports = { downloadGuide, flutterSection, replaceSection, flutterChanges, previousFlutterRelease };

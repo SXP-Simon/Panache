@@ -4,6 +4,15 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { flutterSection, replaceSection } = require("../append-release-notes.js");
 
+test("previous Flutter source can be selected before the new release appears in the cached list", () => {
+  const { previousFlutterRelease } = require("../append-release-notes.js");
+  const older = { tag_name: "v1.9.0", published_at: "2026-10-24T00:00:00Z", assets: [{ name: "Flutter-source.json" }] };
+  const previous = { ...older, tag_name: "v1.10.0", published_at: "2026-11-01T00:00:00Z" };
+  const later = { ...previous, tag_name: "v1.11.0", published_at: "2026-11-04T00:00:00Z" };
+  assert.equal(previousFlutterRelease([older, later, { ...previous, draft: true }, previous], "2026-11-03T00:00:00Z"), previous);
+  assert.equal(previousFlutterRelease([], "2026-11-03T00:00:00Z"), undefined);
+});
+
 test("Flutter notes group user-facing changes and link exact commits", () => {
   const base = "a".repeat(40);
   const head = "b".repeat(40);
