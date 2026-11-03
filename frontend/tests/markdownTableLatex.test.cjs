@@ -1,6 +1,16 @@
 const assert = require('node:assert/strict');
 const {test} = require('node:test');
 const modules = Promise.all([import('../src/utils/cleanMarkdown.ts'), import('../src/utils/latexToUnicode.ts')]);
+
+test('cleans emphasis spanning formulas while retaining literal code in cells', async () => {
+ const [{cleanMarkdown:clean}] = await modules;
+ const source = '| 名称 | 值 |\n| --- | --- |\n| **$E$** | **结果 $x$ 正确** |\n| `**literal**` | $a*b$ |';
+ const result = clean(source);
+ assert.ok(!result.includes('text{**}'));
+ assert.ok(result.includes('text{**literal**}'));
+ assert.ok(result.includes('a*b'));
+ assert.equal(clean(result), result);
+});
 const table = (body) => '| 项目 | 值 |\n|:---|---:|\n' + body;
 test('Markdown defaults to editable LaTeX and converts to full grid', async()=>{
  const [{cleanMarkdown:clean},{convertLatexToUnicode:convert}] = await modules;

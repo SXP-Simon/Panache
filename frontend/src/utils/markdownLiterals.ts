@@ -29,7 +29,7 @@ export function protectMarkdownCode(source: string): {
       const leading = /^ */.exec(current)?.[0].length ?? 0;
       body.push(current.slice(Math.min(indent, leading)));
     }
-    output.push(save(body.join('\n')));
+    output.push(save(body.filter((line) => line.trim() !== '').join('\n')));
   }
   // Exact backtick run lengths allow ` characters inside a longer code span.
   const joined = output.join('\n');

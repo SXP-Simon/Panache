@@ -7,10 +7,16 @@ function test(name, run) {
 
 const cleanModule = import("../src/utils/cleanMarkdown.ts");
 
+test('removes blank fenced-code lines while retaining indentation and operators', async () => {
+  const { cleanMarkdown } = await cleanModule;
+  const source = '```c\n\nvoid T() {\n    *p = a < b;\n   \n    return;\n}\n\n```';
+  assert.equal(cleanMarkdown(source), 'void T() {\n    *p = a < b;\n    return;\n}');
+});
+
 test("one-step preparation converts prose but preserves code throughout the pipeline", async () => {
   const { prepareHandwritingText: prepare } = await import('../src/utils/prepareHandwritingText.ts');
   const source = '# 结果\n\n---\n* **答案** $x^2$，`x^2 + a_b`\n```cpp\n    *p = a * b;\n    x^2;\n\n---\n```';
-  assert.equal(prepare(source), '结果\n答案 x²，x^2 + a_b\n    *p = a * b;\n    x^2;\n\n---');
+  assert.equal(prepare(source), '结果\n答案 x²，x^2 + a_b\n    *p = a * b;\n    x^2;\n---');
   for (const [name, formula, expected] of require('./fixtures/automata-latex.json')) {
     const wrapped = '$$' + formula + '$$';
     const result = '结果\n' + (expected ?? wrapped);

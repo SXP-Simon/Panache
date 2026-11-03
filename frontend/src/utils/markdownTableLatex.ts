@@ -51,6 +51,21 @@ function unescapeMarkdown(text: string): string {
 }
 
 function latexCell(source: string, cleanText: (text: string) => string): string | null {
+  // Clean decorations across math boundaries without interpreting code or math.
+  let prefix = '\ue130CELL';
+  while (source.includes(prefix)) prefix += '\ue130';
+  const saved: string[] = [];
+  let masked = '';
+  let end = 0;
+  for (const span of scanMathSegments(source)) {
+    masked += source.slice(end, span.start) + `${prefix}${saved.length}\ue131`;
+    saved.push(source.slice(span.start, span.end));
+    end = span.end;
+  }
+  source = cleanText(masked + source.slice(end)).replace(
+    new RegExp(`${prefix}(\\d+)\ue131`, 'g'),
+    (raw: string, index: string) => saved[Number(index)] ?? raw,
+  );
   const clean = (value: string): string => {
     const content = unescapeMarkdown(cleanText(value));
     return content
