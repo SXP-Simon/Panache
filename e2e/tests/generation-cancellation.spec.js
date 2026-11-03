@@ -42,6 +42,9 @@ for(const options of [{holdCreate:true},{failOnce:true},{lateResult:true}]){
   await useSmallCanvas(page);
   await page.getByTestId('text-input').fill('取消测试，保留正文');
   await page.getByTestId('preview-btn').click();
+  // The pending-create case must reach submission before cancellation; clicking
+  // earlier exercises cancellation during capability discovery instead.
+  await expect.poll(server.count).toBe(1);
   if(options.lateResult)await expect.poll(server.resultCalls).toBe(1);
   await page.getByTestId('cancel-generation-btn').click();
   if(options.holdCreate) await expect.poll(server.cancels).toBe(1);
