@@ -3,9 +3,9 @@ import 'package:handwriting_app/utils/text_tools.dart';
 import 'package:handwriting_app/utils/latex.dart';
 
 void main() {
-  test('程序课代码只移除 Markdown 包装并保留空行和运算符', () {
+  test('程序课代码清除包装及空行并保留运算符', () {
     const body = '#include <stdio.h>\nint *p;\n\n---\nvector<T> value;';
-    expect(cleanMarkdown('```cpp\n$body\n```'), body);
+    expect(cleanMarkdown('```cpp\n$body\n```'), body.replaceAll('\n\n', '\n'));
     expect(
       cleanMarkdown('程序 `*p` 和 ``a`b`` 与 `**literal**`'),
       '程序 *p 和 a`b 与 **literal**',

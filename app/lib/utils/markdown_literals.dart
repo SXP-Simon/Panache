@@ -36,7 +36,7 @@
       final leading = RegExp(r'^ *').firstMatch(current)![0]!.length;
       body.add(current.substring(indent < leading ? indent : leading));
     }
-    output.add(save(body.join('\n')));
+    output.add(save(body.where((line) => line.trim().isNotEmpty).join('\n')));
   }
   final joined = output.join('\n');
   final result = StringBuffer();

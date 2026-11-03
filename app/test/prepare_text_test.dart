@@ -28,7 +28,10 @@ void main() {
     const code =
         'int *p;\n\n---\nx^2 + y_1;\n'
         r'\frac12 $x^2$ **literal**';
-    expect(prepareHandwritingText('```cpp\n$code\n```'), code);
+    expect(
+      prepareHandwritingText('```cpp\n$code\n```'),
+      code.replaceAll('\n\n', '\n'),
+    );
     expect(prepareHandwritingText(r'代码 `$x^2$`；公式 $x^2$'), '代码 \$x^2\$；公式 x²');
     expect(prepareHandwritingText('``x^2 ` *p``'), 'x^2 ` *p');
   });

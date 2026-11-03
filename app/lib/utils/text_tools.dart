@@ -356,6 +356,25 @@ List<String>? _tableCells(String line) {
 }
 
 String _tableLatexCell(String cell) {
+  // Clean paired decorations before splitting a cell into text and formulas.
+  var prefix = '\uE130CELL';
+  while (cell.contains(prefix)) {
+    prefix += '\uE130';
+  }
+  final saved = <String>[];
+  final masked = StringBuffer();
+  var end = 0;
+  for (final segment in scanMathSegments(cell)) {
+    masked.write(cell.substring(end, segment.start));
+    masked.write('$prefix${saved.length}\uE131');
+    saved.add(cell.substring(segment.start, segment.end));
+    end = segment.end;
+  }
+  masked.write(cell.substring(end));
+  cell = cleanMarkdown(masked.toString(), tableMode: 'clean').replaceAllMapped(
+    RegExp('${RegExp.escape(prefix)}(\\d+)\uE131'),
+    (match) => saved[int.parse(match[1]!)],
+  );
   final output = StringBuffer();
   var cursor = 0;
   for (final segment in scanMathSegments(cell)) {
