@@ -191,6 +191,11 @@ jobs:
       HANDWRITING_ANDROID_KEY_ALIAS: ${{ secrets.HANDWRITING_ANDROID_KEY_ALIAS }}
       HANDWRITING_ANDROID_KEY_PASSWORD: ${{ secrets.HANDWRITING_ANDROID_KEY_PASSWORD }}
     steps:
+      - name: Free space for Android and Rust release builds
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.workflow_sha }}
