@@ -4,6 +4,7 @@
 import base64
 import math
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import cast
 
 import cv2
@@ -16,6 +17,8 @@ MIN_BANDS = 3
 MIN_TRACKED_BANDS = 6
 MIN_IMAGE_SIZE = 32
 MIN_SPACING = 8
+MIN_LOCAL_CONTRAST = 3
+HEADER_CONTRAST = 24
 ANGLE_PIXEL_TOLERANCE = 1.5
 
 type GrayImage = NDArray[np.uint8]
@@ -73,6 +76,15 @@ def _binary(image: GrayImage) -> GrayImage:
     contrast = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
     _, binary = cv2.threshold(contrast, 0, PIXEL_WHITE, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     return np.asarray(binary, dtype=np.uint8)
+
+
+def _local_ruling_mask(image: GrayImage) -> GrayImage:
+    """Keep faint lines even when darker objects occupy part of the photo."""
+    # 2026-11-16：与 Rust 一样用局部纵向亮度差提取浅线。
+    gray = np.asarray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), dtype=np.float32)
+    radius = min(64, max(12, image.shape[0] // 30))
+    mean = cv2.blur(gray, (1, radius * 2 + 1))
+    return np.asarray((mean - gray > MIN_LOCAL_CONTRAST) * PIXEL_WHITE, dtype=np.uint8)
 
 
 def _angle(binary: GrayImage) -> float:
@@ -158,53 +170,135 @@ def _spacing(centres: NDArray[np.float64]) -> int:
     return rounded
 
 
+def _has_printed_header(image: GrayImage, top: int, spacing: int) -> bool:
+    """Recognize groups of printed strokes before the first physical ruling."""
+    # 2026-11-16：在校正后的背景检查页眉，排除紧贴首条横线的墨迹和通栏边框。
+    radius = max(2, spacing // 6)
+    start = max(radius, top - spacing * 5 // 2)
+    end = top - max(radius * 2, 3)
+    if end <= start:
+        return False
+    width = image.shape[1]
+    gray = cv2.cvtColor(image[:, width * 15 // 100 : width * 85 // 100], cv2.COLOR_BGR2GRAY)
+    rows = np.asarray(gray[start:end], dtype=np.int16)
+    surroundings = np.asarray(gray[start - radius : end - radius], dtype=np.int16) + np.asarray(
+        gray[start + radius : end + radius], dtype=np.int16
+    )
+    ink = surroundings - 2 * rows > HEADER_CONTRAST
+    counts = np.count_nonzero(ink, axis=1)
+    text_rows = (counts >= rows.shape[1] * 0.025) & (counts <= rows.shape[1] * 0.70)
+    return bool(
+        np.count_nonzero(text_rows) >= max(3, spacing // 5)
+        and np.count_nonzero(np.any(ink[text_rows], axis=0)) >= rows.shape[1] * 0.12
+    )
+
+
+def _first_writable_baseline(image: GrayImage, top: int, spacing: int) -> int:
+    if top < spacing or _has_printed_header(image, top, spacing):
+        return top + spacing
+    return top
+
+
+def _strip_centres(binary: GrayImage) -> NDArray[np.float64]:
+    """Find local line candidates, merging nearby fragments of the same stroke."""
+    counts = np.count_nonzero(binary, axis=1)
+    active = np.flatnonzero(counts >= binary.shape[1] * 0.40)
+    gap = max(2, binary.shape[0] // 220)
+    groups = np.split(active, np.flatnonzero(np.diff(active) > gap) + 1)
+    return np.asarray(
+        [
+            np.average(group, weights=counts[group])
+            for group in groups
+            if group.size and group[-1] - group[0] <= gap * 2
+        ],
+        dtype=np.float64,
+    )
+
+
+def _match_strip(
+    strip: NDArray[np.float64], previous: NDArray[np.float64], tolerance: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Match adjacent strips using the local distance between rulings."""
+    if not strip.size:
+        return np.full_like(previous, np.nan)
+    after = np.minimum(np.searchsorted(strip, previous), len(strip) - 1)
+    before = np.maximum(after - 1, 0)
+    left, right = strip[before], strip[after]
+    matched = np.where(np.abs(previous - left) < np.abs(right - previous), left, right)
+    return np.asarray(
+        np.where(np.abs(matched - previous) <= tolerance, matched, np.nan), dtype=np.float64
+    )
+
+
+def _track_strips(
+    strips: list[NDArray[np.float64]],
+    sequence: NDArray[np.float64],
+    tolerance: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Match neighboring strips and bridge isolated gaps with measured support."""
+    mid = len(strips) // 2
+    tracks = [sequence[:0]] * len(strips)
+    tracks[mid] = sequence
+    for walk in (range(mid - 1, -1, -1), range(mid + 1, len(strips))):
+        previous = sequence
+        for index in walk:
+            matched = _match_strip(strips[index], previous, tolerance)
+            tracks[index] = matched
+            previous = np.asarray(
+                np.where(np.isfinite(matched), matched, previous), dtype=np.float64
+            )
+    track = np.asarray(tracks, dtype=np.float64)
+    # 2026-11-16：仅补齐两侧都有实测支撑的单个采样缺口，不外推缺失的线。
+    left, middle_track, right = track[:-2], track[1:-1], track[2:]
+    bridge = (
+        ~np.isfinite(middle_track)
+        & np.isfinite(left)
+        & np.isfinite(right)
+        & (np.abs(left - right) <= tolerance)
+    )
+    track[1:-1] = np.where(bridge, (left + right) / 2, middle_track)
+    return track
+
+
 def _tracked_rulings(
     binary: GrayImage,
 ) -> tuple[GrayImage, NDArray[np.float32], NDArray[np.float64], int]:
     """Measure and flatten ruling tracks through narrow vertical strips."""
     # 2026-11-16：在窄条内追踪同一组横线，校正照片的弯曲和透视。
     height, width = binary.shape
-    columns = np.asarray([width * (0.15 + i * 0.175) for i in range(5)], dtype=np.float64)
-    radius = max(8, width // 30)
-    strips = [
-        np.array([y for y, _, _ in _bands(binary[:, int(x) - radius : int(x) + radius])])
-        for x in columns
-    ]
-    middle = strips[2]
+    columns = np.asarray([width * (0.22 + i * 0.07) for i in range(9)], dtype=np.float64)
+    radius = max(4, width // 120)
+    strips = [_strip_centres(binary[:, int(x) - radius : int(x) + radius]) for x in columns]
+    mid = len(strips) // 2
+    middle = strips[mid]
+    if len(middle) < MIN_TRACKED_BANDS:
+        raise _no_rulings()
     gaps = np.diff(middle)
-    spacing = round(float(np.median(gaps)))
-    if spacing < MIN_SPACING:
+    # 2026-11-16：透视会逐步改变间距，只比较相邻间隔并寻找最长连续序列。
+    stop = np.flatnonzero((gaps[1:] < gaps[:-1] * 0.75) | (gaps[1:] > gaps[:-1] * 1.33)) + 1
+    boundaries = [0, *stop.tolist(), len(gaps)]
+    start, end = max(pairwise(boundaries), key=lambda pair: pair[1] - pair[0])
+    sequence = middle[start : end + 1]
+    local = np.diff(sequence)
+    if len(sequence) < MIN_TRACKED_BANDS or np.any(local < MIN_SPACING):
         raise _no_rulings()
-    breaks = np.flatnonzero(np.abs(gaps - spacing) > spacing * 0.18) + 1
-    sequence = max(np.split(middle, breaks), key=len)
-    if len(sequence) < MIN_TRACKED_BANDS:
+    tolerance = np.minimum(np.r_[local[0], local], np.r_[local, local[-1]]) * 0.42
+    track = _track_strips(strips, sequence, tolerance)
+    verified = np.flatnonzero(np.all(np.isfinite(track), axis=0))
+    runs = np.split(verified, np.flatnonzero(np.diff(verified) != 1) + 1)
+    run = max(runs, key=len)
+    if len(run) < MIN_TRACKED_BANDS or len(run) < len(sequence) * 0.75:
         raise _no_rulings()
+    track = track[:, run]
+    sequence = sequence[run]
     spacing = round(float((sequence[-1] - sequence[0]) / (len(sequence) - 1)))
     target = np.rint(sequence[0]) + np.arange(len(sequence)) * spacing
     if target[-1] >= height - 1:
         raise _no_rulings()
-    tracks: list[NDArray[np.float64]] = []
-    for strip in strips:
-        after = np.minimum(np.searchsorted(strip, sequence), len(strip) - 1)
-        before = np.maximum(after - 1, 0)
-        matched = np.asarray(
-            np.where(
-                np.abs(sequence - strip[before]) < np.abs(strip[after] - sequence),
-                strip[before],
-                strip[after],
-            ),
-            dtype=np.float64,
-        )
-        if np.any(np.abs(matched - sequence) > spacing * 0.42):
-            raise _no_rulings()
-        if np.any(np.abs(np.diff(matched) - spacing) > spacing * 0.22):
-            raise _no_rulings()
-        tracks.append(matched)
     # 2026-11-16：外侧沿最近两个采样条外推，固定图像上下边缘。
     x = np.arange(width, dtype=np.float64)
     index = np.asarray(np.clip(np.searchsorted(columns, x) - 1, 0, len(columns) - 2), dtype=np.intp)
     weight = (x - columns[index]) / (columns[index + 1] - columns[index])
-    track = np.asarray(tracks)
     source = track[index] + weight[:, None] * (track[index + 1] - track[index])
     if (
         np.any(source[:, 0] <= 0)
@@ -245,7 +339,7 @@ def identify_paper(filename: str) -> PaperMeasurement:
         spacing = _spacing(centres)
         pixels = rotated
     except ImageIdentificationError:
-        rectified, map_y, target, spacing = _tracked_rulings(binary)
+        rectified, map_y, target, spacing = _tracked_rulings(_local_ruling_mask(pixels))
         # 2026-11-16：排除校正后仍能投影成长横线的页眉装饰。
         bands = [
             band
@@ -258,11 +352,11 @@ def identify_paper(filename: str) -> PaperMeasurement:
         if _spacing(centres) != spacing:
             raise _no_rulings() from None
         map_x = np.broadcast_to(np.arange(pixels.shape[1], dtype=np.float32), map_y.shape).copy()
-        pixels = cv2.remap(pixels, map_x, map_y, cv2.INTER_LINEAR)
+        pixels = np.asarray(cv2.remap(pixels, map_x, map_y, cv2.INTER_LINEAR), dtype=np.uint8)
         angle = 0.0
         warped = True
     top = round(float(centres[0]))
-    first = top + max(0, math.ceil((spacing - top) / spacing)) * spacing
+    first = _first_writable_baseline(pixels, top, spacing)
     if first > round(float(centres[-1])):
         raise _no_rulings()
     height, width = pixels.shape[:2]
@@ -272,9 +366,14 @@ def identify_paper(filename: str) -> PaperMeasurement:
         if not success:
             raise _no_rulings()
         corrected = base64.b64encode(encoded.tobytes()).decode("ascii")
+    # 2026-11-16：透视使下半页更宽，取多数横线共用的内侧书写区。
+    left = round(float(np.quantile([band[1] for band in bands], 0.9 if warped else 0.5)))
+    right = round(float(np.quantile([band[2] for band in bands], 0.1 if warped else 0.5)))
+    if warped and right - left < width * 0.35:
+        raise _no_rulings()
     return PaperMeasurement(
-        round(float(np.median([band[1] for band in bands]))),
-        width - round(float(np.median([band[2] for band in bands]))),
+        left,
+        width - right,
         top,
         height - round(float(centres[-1])),
         spacing,

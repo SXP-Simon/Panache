@@ -8,6 +8,7 @@ from pathlib import Path
 
 import app
 import numpy as np
+import pytest
 from identify import ImageIdentificationError, identify_distance, identify_paper
 from PIL import Image, ImageDraw
 
@@ -188,3 +189,54 @@ def test_photo_with_changing_slope_is_flattened_before_layout(tmp_path: Path) ->
             for row in (0, 7, 14):
                 y = measured.top + measured.spacing * row
                 assert np.min(pixels[y - 2 : y + 3, x]) < 80
+
+
+@pytest.mark.parametrize("broken_lines", [False, True])
+def test_perspective_photo_keeps_faint_top_rows_and_common_writing_area(
+    tmp_path: Path, *, broken_lines: bool
+) -> None:
+    image = Image.new("RGB", (960, 1200), (42, 46, 51))
+    draw = ImageDraw.Draw(image)
+    draw.polygon([(145, 80), (800, 35), (950, 1090), (12, 1140)], fill=(220, 220, 220))
+    for row in range(18):
+        inset = 168 - row * 7
+        points: list[tuple[float, float]] = []
+        for x in range(inset, image.width - inset):
+            u = (x - 480) / 480
+            points.append((x, round(168 + 34 * row + row**2 - (27 - row) * u + 9 * u**2)))
+        shade = 194 if row < 6 else 72
+        draw.line(points, fill=(shade, shade, shade), width=4)
+        if broken_lines and row % 3 == 1:
+            center = 168 + 34 * row + row**2
+            draw.rectangle((601, center - 14, 628, center + 14), fill=(220, 220, 220))
+    path = tmp_path / "perspective.jpg"
+    image.save(path)
+    measured = identify_paper(str(path))
+    assert measured.corrected is not None
+    assert abs(measured.spacing - 51) <= 1
+    assert abs(measured.top - 168) <= 4
+    assert abs(measured.bottom - 165) <= 8
+    assert min(measured.left, measured.right) >= 130
+    with Image.open(io.BytesIO(base64.b64decode(measured.corrected))) as corrected:
+        pixels = np.asarray(corrected.convert("L"), dtype=np.uint8)
+        for x in (280, 480, 680):
+            for row in (1, 8, 16):
+                y = measured.top + measured.spacing * row
+                assert np.min(pixels[y - 2 : y + 3, x]) < 215
+
+
+def test_printed_title_reserves_first_rule_as_a_separator(tmp_path: Path) -> None:
+    image = Image.new("RGB", (800, 1000), "white")
+    draw = ImageDraw.Draw(image)
+    for y in range(160, 900, 65):
+        draw.line((60, y, 740, y), fill=INK, width=4)
+    path = tmp_path / "headed-paper.png"
+    image.save(path)
+    plain = identify_paper(str(path))
+    assert plain.first_baseline == plain.top
+    for x in range(260, 540, 32):
+        draw.line([(x, 120), (x, 90), (x + 18, 90), (x + 18, 120)], fill=INK, width=4)
+    image.save(path)
+    headed = identify_paper(str(path))
+    assert headed.top == plain.top
+    assert headed.first_baseline == headed.top + headed.spacing
