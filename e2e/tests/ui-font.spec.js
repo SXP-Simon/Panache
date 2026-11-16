@@ -64,7 +64,9 @@ for (const width of [1440, 390]) {
         const documentNode = await session.send('DOM.getDocument');
         const renderedFonts = [];
         for (const selector of [
-          ...(width > 720 ? ['h1', '[data-testid="brand-title"]', '[data-testid="project-source-link"]'] : ['[data-testid="mobile-settings-btn"]']),
+          ...(width > 720
+            ? ['[data-testid="text-panel"] h2', '[data-testid="brand-title"]', '[data-testid="project-source-link"]']
+            : ['[data-testid="mobile-settings-btn"]']),
           '[data-testid="quick-symbol-α"]',
           '[data-testid="text-input"]',
         ]) {

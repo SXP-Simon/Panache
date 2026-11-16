@@ -364,13 +364,6 @@ input[type='range'] {
   margin: 0 auto;
   padding: 18px 24px 12px;
 }
-.workspace-intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 16px;
-}
 .eyebrow {
   font-size: 12px;
   text-transform: uppercase;
@@ -382,7 +375,6 @@ input[type='range'] {
   gap: 7px;
   margin: 0 0 9px;
 }
-.live-dot,
 .local-dot {
   width: 6px;
   height: 6px;
@@ -1230,23 +1222,6 @@ input[type='color'] {
   .workspace-content {
     padding: 16px 14px 12px;
   }
-  .workspace-intro {
-    gap: 10px;
-    margin-bottom: 14px;
-    align-items: flex-start;
-  }
-  .workspace-intro h1 {
-    font-size: 18px;
-    line-height: 1.65;
-    max-width: 230px;
-  }
-  .workspace-intro > .button {
-    padding: 0 11px;
-    min-height: 37px;
-    font-size: 11px;
-    margin-top: 10px;
-    gap: 6px;
-  }
   .eyebrow {
     font-size: 11px;
   }
@@ -1395,6 +1370,10 @@ input[type='color'] {
   gap: 12px;
   flex-wrap: wrap;
 }
+.workspace-actions {
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
 .preview-sheet {
   position: relative;
   margin-inline: auto;
@@ -1474,16 +1453,9 @@ input[type='color'] {
   .app-header {
     display: none;
   }
-  .workspace-intro > div:first-child {
-    display: none;
-  }
-  .workspace-intro {
-    justify-content: flex-end;
-    margin-bottom: 12px;
-  }
   .workspace-actions {
-    width: 100%;
     justify-content: space-between;
+    margin-bottom: 12px;
     gap: 8px;
   }
   .mobile-settings-button {

@@ -157,29 +157,21 @@ function Studio() {
       </header>
       <motion.main
         className="workspace-content"
+        aria-label={t('workspace')}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: reduced ? 0 : 0.2 }}
       >
-        <div className="workspace-intro">
-          <div>
-            <p className="eyebrow">
-              <span className="live-dot" />
-              {t('workspace')}
-            </p>
-            <h1>{t('tagline')}</h1>
-          </div>
-          <div className="workspace-actions">
-            <Button
-              className="mobile-settings-button"
-              variant="ghost"
-              data-testid="mobile-settings-btn"
-              onClick={() => setAppearance(true)}
-            >
-              {t('appearance')}
-            </Button>
-            <GenerateButton testId="preview-btn" />
-          </div>
+        <div className="workspace-actions">
+          <Button
+            className="mobile-settings-button"
+            variant="ghost"
+            data-testid="mobile-settings-btn"
+            onClick={() => setAppearance(true)}
+          >
+            {t('appearance')}
+          </Button>
+          <GenerateButton testId="preview-btn" />
         </div>
         <WorkspaceStatus />
         <div className="workspace-grid" data-testid="workspace">

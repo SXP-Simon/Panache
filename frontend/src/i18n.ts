@@ -139,7 +139,6 @@ const words = {
     'Enter valid parameter values. Pixel values must be integers.',
   ],
   app: ['Panache', 'Panache'],
-  tagline: ['让每一次落笔，都有自己的样子。', 'A little more you, in every handwritten page.'],
   workspace: ['创作工作台', 'Workspace'],
   help: ['使用指南', 'Guide'],
   desktop: ['桌面版', 'Desktop app'],
