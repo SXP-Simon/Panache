@@ -202,21 +202,101 @@ fn projected_rows(points: &[(f32, f32)], h: u32, angle: f32) -> (f64, Vec<u32>) 
     (score, rows)
 }
 
+fn has_printed_header(image: &RgbaImage, first: u32, spacing: u32) -> bool {
+    use image::Pixel;
+    let radius = (spacing / 6).max(2);
+    let start = radius.max(first.saturating_sub(spacing * 5 / 2));
+    let end = first.saturating_sub(radius * 2);
+    let left = image.width() * 15 / 100;
+    let right = image.width() * 85 / 100;
+    let width = right - left;
+    let mut text_rows = 0;
+    let mut columns = vec![false; width as usize];
+    let mut row = Vec::new();
+    for y in start..end {
+        row.clear();
+        for x in left..right {
+            let luma = |y| i16::from(image[(x, y)].to_luma()[0]);
+            if luma(y - radius) + luma(y + radius) - 2 * luma(y) > 24 {
+                row.push((x - left) as usize);
+            }
+        }
+        if row.len() * 40 >= width as usize && row.len() * 10 <= width as usize * 7 {
+            text_rows += 1;
+            for &x in &row {
+                columns[x] = true;
+            }
+        }
+    }
+    text_rows >= (spacing / 5).max(3)
+        && columns.iter().filter(|&&ink| ink).count() * 100 >= width as usize * 12
+}
+
 fn strip_centers(rows: &[u32], threshold: u32) -> Vec<f32> {
     let mut centers = Vec::new();
-    let mut count = 0.;
-    let mut weighted = 0.;
-    for (y, value) in rows.iter().copied().chain([0]).enumerate() {
-        if value >= threshold {
-            count += value as f32;
-            weighted += y as f32 * value as f32;
-        } else if count > 0. {
-            centers.push(weighted / count);
+    let gap = (rows.len() / 220).max(2);
+    let (mut first, mut last, mut count, mut weighted) = (0, 0, 0., 0.);
+    for (y, value) in rows
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(_, n)| *n >= threshold)
+    {
+        if count == 0. || y - last > gap {
+            if count > 0. && last - first <= gap * 2 {
+                centers.push(weighted / count);
+            }
+            first = y;
             count = 0.;
             weighted = 0.;
         }
+        last = y;
+        count += value as f32;
+        weighted += y as f32 * value as f32;
+    }
+    if count > 0. && last - first <= gap * 2 {
+        centers.push(weighted / count);
     }
     centers
+}
+
+fn nearest_ruling(strip: &[f32], y: f32, tolerance: f32) -> f32 {
+    if strip.is_empty() || !y.is_finite() {
+        return f32::NAN;
+    }
+    let next = strip.partition_point(|candidate| *candidate < y);
+    let left = strip[next.saturating_sub(1)];
+    let right = strip[next.min(strip.len() - 1)];
+    let matched = if (y - left).abs() < (right - y).abs() {
+        left
+    } else {
+        right
+    };
+    if (matched - y).abs() <= tolerance {
+        matched
+    } else {
+        f32::NAN
+    }
+}
+
+fn smooth_ruling_run(centers: &[f32]) -> &[f32] {
+    let mut start = 0;
+    let mut best = &centers[..0];
+    for (i, window) in centers.windows(3).enumerate() {
+        let previous = window[1] - window[0];
+        let next = window[2] - window[1];
+        if next < 0.75 * previous || next > 1.33 * previous {
+            if i + 2 - start > best.len() {
+                best = &centers[start..i + 2];
+            }
+            start = i + 1;
+        }
+    }
+    if centers.len() - start > best.len() {
+        &centers[start..]
+    } else {
+        best
+    }
 }
 
 // Track the same rulings across the page before applying any global rotation.
@@ -228,80 +308,92 @@ fn flatten_rulings(
     ratio: f32,
 ) -> Result<Option<Identification>> {
     use base64::Engine;
-    const STRIPS: usize = 5;
+    const STRIPS: usize = 9;
+    const MID: usize = STRIPS / 2;
     const MIN_TRACKED_LINES: usize = 6;
-    let columns: [f32; STRIPS] = std::array::from_fn(|i| w as f32 * (0.15 + i as f32 * 0.175));
-    let radius = (w / 30).max(8) as f32;
+    let columns: [f32; STRIPS] = std::array::from_fn(|i| w as f32 * (0.22 + i as f32 * 0.07));
+    let radius = (w / 120).max(4) as f32;
     let mut rows = vec![[0; STRIPS]; h as usize];
     for &(x, y) in points {
-        for (i, column) in columns.iter().enumerate() {
-            if (x + w as f32 / 2. - column).abs() < radius {
-                rows[(y + h as f32 / 2.) as usize][i] += 1;
-            }
+        let x = x + w as f32 / 2.;
+        let index = ((x / w as f32 - 0.22) / 0.07).round() as usize;
+        if index < STRIPS && (x - columns[index]).abs() < radius {
+            rows[(y + h as f32 / 2.) as usize][index] += 1;
         }
     }
     let strips: [Vec<f32>; STRIPS] = std::array::from_fn(|index| {
         let profile: Vec<_> = rows.iter().map(|row| row[index]).collect();
-        strip_centers(&profile, (radius * 1.1).ceil() as u32)
+        strip_centers(&profile, (radius * 0.8).ceil() as u32)
     });
-    if strips.iter().any(|strip| strip.len() < MIN_TRACKED_LINES) {
+    let sequence = smooth_ruling_run(&strips[MID]);
+    if sequence.len() < MIN_TRACKED_LINES || sequence.windows(2).any(|pair| pair[1] - pair[0] < 5.)
+    {
         return Ok(None);
     }
-    let middle = &strips[2];
-    let mut gaps: Vec<_> = middle.windows(2).map(|pair| pair[1] - pair[0]).collect();
-    gaps.sort_by(f32::total_cmp);
-    let spacing = gaps[gaps.len() / 2];
-    if spacing < 6. {
-        return Ok(None);
+    let mut tracks: [Vec<f32>; STRIPS] = std::array::from_fn(|_| Vec::new());
+    tracks[MID] = sequence.to_vec();
+    let tolerance = |i: usize| {
+        let previous = if i == 0 {
+            f32::INFINITY
+        } else {
+            sequence[i] - sequence[i - 1]
+        };
+        let next = sequence
+            .get(i + 1)
+            .map_or(f32::INFINITY, |y| y - sequence[i]);
+        previous.min(next) * 0.42
+    };
+    for walk in [
+        (0..MID).rev().collect::<Vec<_>>(),
+        (MID + 1..STRIPS).collect(),
+    ] {
+        let mut previous = sequence.to_vec();
+        for index in walk {
+            tracks[index] = previous
+                .iter_mut()
+                .enumerate()
+                .map(|(i, y)| {
+                    let matched = nearest_ruling(&strips[index], *y, tolerance(i));
+                    if matched.is_finite() {
+                        *y = matched;
+                    }
+                    matched
+                })
+                .collect();
+        }
     }
-    let mut first = 0;
-    let mut best = &middle[..0];
-    for (i, pair) in middle.windows(2).enumerate() {
-        if (pair[1] - pair[0] - spacing).abs() > spacing * 0.18 {
-            if i + 1 - first > best.len() {
-                best = &middle[first..=i];
+    // Interpolate only an isolated missing sample with measured neighbors.
+    for index in 1..STRIPS - 1 {
+        let (before, rest) = tracks.split_at_mut(index);
+        let (middle, after) = rest.split_at_mut(1);
+        for (i, y) in middle[0].iter_mut().enumerate() {
+            let (left, right) = (before[index - 1][i], after[0][i]);
+            if !y.is_finite() && (left - right).abs() <= tolerance(i) {
+                *y = (left + right) / 2.;
             }
-            first = i + 1;
         }
     }
-    if middle.len() - first > best.len() {
-        best = &middle[first..];
+    let mut start = 0;
+    let mut run = 0..0;
+    for i in 0..=sequence.len() {
+        if i == sequence.len() || tracks.iter().any(|track| !track[i].is_finite()) {
+            if i - start > run.len() {
+                run = start..i;
+            }
+            start = i + 1;
+        }
     }
-    if best.len() < MIN_TRACKED_LINES {
+    if run.len() < MIN_TRACKED_LINES || run.len() * 4 < sequence.len() * 3 {
         return Ok(None);
     }
+    let best = &sequence[run.clone()];
+    let tracks = tracks.each_ref().map(|track| &track[run.clone()]);
     let spacing = (best[best.len() - 1] - best[0]) / (best.len() - 1) as f32;
-    let tracks = strips.each_ref().map(|strip| {
-        best.iter()
-            .map(|y| {
-                let next = strip.partition_point(|candidate| candidate < y);
-                let left = strip[next.saturating_sub(1)];
-                let right = strip[next.min(strip.len() - 1)];
-                if (y - left).abs() < (right - y).abs() {
-                    left
-                } else {
-                    right
-                }
-            })
-            .collect::<Vec<_>>()
-    });
-    for track in &tracks {
-        if track
-            .iter()
-            .zip(best)
-            .any(|(y, reference)| (y - reference).abs() > spacing * 0.42)
-            || track
-                .windows(2)
-                .any(|pair| (pair[1] - pair[0] - spacing).abs() > spacing * 0.22)
-        {
-            return Ok(None);
-        }
-    }
     // Leave flat or uniformly rotated paper on the existing affine path.
-    let slope = (tracks[4][0] - tracks[0][0]) / (columns[4] - columns[0]);
+    let slope = (tracks[STRIPS - 1][0] - tracks[0][0]) / (columns[STRIPS - 1] - columns[0]);
     let nonlinear = tracks.iter().zip(columns).any(|(track, x)| {
         track.iter().enumerate().any(|(i, y)| {
-            (y - (best[0] + spacing * i as f32 + slope * (x - columns[2]))).abs() > 3.
+            (y - (best[0] + spacing * i as f32 + slope * (x - columns[MID]))).abs() > 3.
         })
     });
     if !nonlinear {
@@ -322,31 +414,54 @@ fn flatten_rulings(
     if top == 0 || last >= oh - 1 {
         return Ok(None);
     }
+    let analysis_tracks: Vec<Vec<f32>> = (0..w)
+        .map(|x| (0..best.len()).map(|i| geometry(x as f32, i)).collect())
+        .collect();
+    if analysis_tracks
+        .iter()
+        .any(|track| track.windows(2).any(|pair| pair[0] >= pair[1]))
+    {
+        return Ok(None);
+    }
     let mut support = vec![vec![false; best.len()]; w as usize];
     for &(x, y) in points {
-        let x = x + w as f32 / 2.;
+        let x = (x + w as f32 / 2.) as usize;
         let y = y + h as f32 / 2.;
-        let i = ((y - best[0]) / spacing).round() as usize;
-        // A slanted row can be closer to an adjacent row at the outer edges.
-        let column = &mut support[x as usize];
-        for (j, hit) in column
-            .iter_mut()
-            .enumerate()
-            .take(i + 2)
-            .skip(i.saturating_sub(1))
-        {
-            if (y - geometry(x, j)).abs() <= 3. {
-                *hit = true;
-            }
+        let track = &analysis_tracks[x];
+        let first = track.partition_point(|line| *line < y - 3.);
+        if track.get(first).is_some_and(|line| *line <= y + 3.) {
+            support[x][first] = true;
         }
     }
-    let supported =
-        |column: &Vec<bool>| column.iter().filter(|&&hit| hit).count() * 2 >= best.len();
-    let Some(left) = support.iter().position(supported) else {
-        return Ok(None);
-    };
-    let right = support.iter().rposition(supported).unwrap();
-    if right - left < w as usize / 2 {
+    // Use the shared writing area when perspective makes the lower rows wider.
+    let mut left_edges = Vec::new();
+    let mut right_edges = Vec::new();
+    for i in 0..best.len() {
+        let ink: Vec<_> = support
+            .iter()
+            .enumerate()
+            .filter_map(|(x, column)| column[i].then_some(x))
+            .collect();
+        let max_gap = (w as usize / 30).max(3);
+        let Some(continuous) = ink
+            .chunk_by(|a, b| b - a <= max_gap)
+            .max_by_key(|run| run.len())
+        else {
+            return Ok(None);
+        };
+        if continuous.len() < w as usize / 3 {
+            return Ok(None);
+        }
+        let trim = continuous.len() / 40;
+        left_edges.push(continuous[trim]);
+        right_edges.push(continuous[continuous.len() - 1 - trim]);
+    }
+    left_edges.sort_unstable();
+    right_edges.sort_unstable();
+    let trim = best.len() / 10;
+    let left = left_edges[best.len() - 1 - trim];
+    let right = right_edges[trim];
+    if right.saturating_sub(left) < w as usize / 3 {
         return Ok(None);
     }
     let mut corrected = RgbaImage::new(ow, oh);
@@ -381,7 +496,11 @@ fn flatten_rulings(
         }
     }
     let bottom = oh - last;
-    let first_writable = if top >= step { top } else { top + step };
+    let first_writable = if top >= step && !has_printed_header(&corrected, top, step) {
+        top
+    } else {
+        top + step
+    };
     Ok(Some(Identification {
         margin_left: (left as f32 / ratio).round() as u32,
         margin_right: ((w as usize - 1 - right) as f32 / ratio).round() as u32,
@@ -393,7 +512,7 @@ fn flatten_rulings(
         image_height: oh,
         line_spacing: step,
         deskew_angle_degrees: 0.,
-        confidence: 1.,
+        confidence: best.len() as f32 / sequence.len() as f32,
         corrected_background: Some(
             base64::engine::general_purpose::STANDARD.encode(crate::export::png(&corrected)?),
         ),
@@ -524,37 +643,41 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
         }
     }
     let angle = best.1.to_degrees();
-    let (image_width, image_height, corrected_background) = if angle.abs() >= 0.1 {
+    let corrected = if angle.abs() >= 0.1 {
         let fill = opaque[(0, 0)];
         let rotated_width = (oh as f32 * sin.abs() + ow as f32 * cos.abs()).ceil() as u32;
         let rotated_height = (oh as f32 * cos.abs() + ow as f32 * sin.abs()).ceil() as u32;
         if u64::from(rotated_width) * u64::from(rotated_height) > Limits::default().max_pixels {
             return Err(Error::new("image_limit", "校正后的纸张尺寸超出限制"));
         }
-        let corrected = rotate_about_center_no_crop(
+        Some(rotate_about_center_no_crop(
             &opaque,
             -best.1,
             Interpolation::Bilinear,
             Border::Constant(fill),
-        );
-        (
-            corrected.width(),
-            corrected.height(),
-            Some(base64::engine::general_purpose::STANDARD.encode(crate::export::png(&corrected)?)),
-        )
+        ))
     } else {
-        (ow, oh, None)
+        None
     };
+    let layout_image = corrected.as_ref().unwrap_or(&opaque);
+    let (image_width, image_height) = layout_image.dimensions();
     let offset_x = (image_width - ow) as f32 / 2.;
     let offset_y = (image_height - oh) as f32 / 2.;
     let first = centers[0] / ratio + offset_y;
     let line_spacing = (spacing / ratio).round() as u32;
+    let header = has_printed_header(layout_image, first.round() as u32, line_spacing);
     let first_writable = centers
         .iter()
+        .skip(usize::from(header))
         .map(|y| y / ratio + offset_y)
         .find(|y| *y >= line_spacing as f32)
         .ok_or_else(|| Error::new("identification_unreliable", "纸张没有足够书写空间"))?;
     let margin_bottom = (oh as f32 - centers.last().unwrap() / ratio + offset_y).round() as u32;
+    let corrected_background = corrected
+        .as_ref()
+        .map(crate::export::png)
+        .transpose()?
+        .map(|png| base64::engine::general_purpose::STANDARD.encode(png));
     Ok(Identification {
         margin_left: (left as f32 / ratio + offset_x).round() as u32,
         margin_right: ((w - 1 - right) as f32 / ratio + offset_x).round() as u32,

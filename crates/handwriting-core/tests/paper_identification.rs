@@ -119,6 +119,29 @@ fn top_edge_line_uses_next_available_notebook_baseline() {
 }
 
 #[test]
+fn printed_title_reserves_first_rule_as_a_separator() {
+    for header in [false, true] {
+        let source = GrayImage::from_fn(800, 1000, |x, y| {
+            let ruling = (60..740).contains(&x) && y >= 160 && (y - 160) % 65 < 4;
+            let title = header
+                && (260..540).contains(&x)
+                && (90..120).contains(&y)
+                && ((x - 260) % 32 < 4
+                    || (14..18).contains(&((x - 260) % 32))
+                    || (y < 94 && (x - 260) % 32 < 18));
+            Luma([if ruling || title { 24 } else { 245 }])
+        });
+        let result = imaging::identify(&DynamicImage::ImageLuma8(source)).unwrap();
+        assert!(result.margin_top.abs_diff(162) <= 2);
+        assert_eq!(result.line_spacing, 65);
+        assert_eq!(
+            result.layout_top_margin + result.line_spacing,
+            result.margin_top + u32::from(header) * result.line_spacing
+        );
+    }
+}
+
+#[test]
 fn curved_and_perspective_rulings_are_flattened_before_layout() {
     let source = GrayImage::from_fn(800, 1000, |x, y| {
         let u = (x as f32 - 400.) / 400.;
@@ -145,6 +168,59 @@ fn curved_and_perspective_rulings_are_flattened_before_layout() {
         for row in [0, 7, 14] {
             let y = detected.margin_top + row * detected.line_spacing;
             assert!((y - 2..=y + 2).any(|y| corrected[(x, y)][0] < 80));
+        }
+    }
+}
+
+#[test]
+fn strong_perspective_keeps_faint_top_rows_and_common_writing_area() {
+    check_perspective(false);
+}
+
+#[test]
+fn isolated_track_gaps_do_not_discard_visible_rulings() {
+    check_perspective(true);
+}
+
+fn check_perspective(broken_lines: bool) {
+    let source = GrayImage::from_fn(960, 1200, |x, y| {
+        let u = (x as f32 - 480.) / 480.;
+        for row in 0..18 {
+            let inset = 168 - row * 7;
+            let r = row as f32;
+            let center = 168. + 34. * r + r * r - (27. - r) * u + 9. * u * u;
+            let occluded = broken_lines && row % 3 == 1 && (601..=628).contains(&x);
+            if !occluded
+                && (inset..960 - inset).contains(&x)
+                && (y as f32 - center.round()).abs() <= 2.
+            {
+                return Luma([if row < 6 { 194 } else { 72 }]);
+            }
+        }
+        let edge = 145u32.saturating_sub(y / 8);
+        Luma([
+            if (edge..960 - edge).contains(&x) && (65..1120).contains(&y) {
+                220
+            } else {
+                42
+            },
+        ])
+    });
+    let detected = imaging::identify(&DynamicImage::ImageLuma8(source)).unwrap();
+    assert!(detected.line_spacing.abs_diff(51) <= 1);
+    assert!(detected.margin_top.abs_diff(168) <= 4);
+    assert!(detected.margin_bottom.abs_diff(165) <= 8);
+    assert!(detected.margin_left.min(detected.margin_right) >= 130);
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(detected.corrected_background.unwrap())
+        .unwrap();
+    let corrected = imaging::decode(&png, &Limits::default())
+        .unwrap()
+        .into_luma8();
+    for x in [280, 480, 680] {
+        for row in [1, 8, 16] {
+            let y = detected.margin_top + row * detected.line_spacing;
+            assert!((y - 2..=y + 2).any(|y| corrected[(x, y)][0] < 215));
         }
     }
 }
