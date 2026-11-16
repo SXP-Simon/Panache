@@ -351,6 +351,19 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
         cancel.check()?;
         fs::rename(&partial, &path).map_err(io_error)?;
         Some((path, mime))
+    } else if params.ink_layers {
+        generation::generate(
+            &render_request,
+            &cancel,
+            Output::InkLayers(&mut |index, page| {
+                let path = directory.join(format!("{index}.json"));
+                fs::write(&path, serde_json::to_vec(&page).map_err(io_error)?).map_err(io_error)?;
+                task.lock().map_err(io_error)?.pages.push(path);
+                Ok(())
+            }),
+            progress,
+        )?;
+        None
     } else {
         generation::generate(
             &render_request,
@@ -371,7 +384,12 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
         state.result = Some(path);
         state.content_type = mime.into();
     } else {
-        state.content_type = "image/png".into();
+        state.content_type = if params.ink_layers {
+            "application/json"
+        } else {
+            "image/png"
+        }
+        .into();
     }
     Ok(())
 }

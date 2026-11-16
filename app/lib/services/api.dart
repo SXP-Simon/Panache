@@ -173,6 +173,24 @@ class HandwritingApi {
     final response = await result(id);
     if (response.headers['content-type']?.contains('json') ?? false) {
       final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      if (data['layers'] case final List layers) {
+        return [
+          for (final page in layers)
+            Uint8List.fromList(utf8.encode(jsonEncode(page))),
+        ];
+      }
+      if (data['ink_layers'] case final List inks) {
+        final papers = data['images'] as List;
+        if (papers.length != inks.length) {
+          throw ApiException('Invalid ink layers');
+        }
+        return [
+          for (var i = 0; i < papers.length; i++)
+            Uint8List.fromList(
+              utf8.encode(jsonEncode({'paper': papers[i], 'ink': inks[i]})),
+            ),
+        ];
+      }
       return [
         for (final image in data['images'] as List)
           base64Decode(image as String),

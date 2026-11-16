@@ -295,7 +295,7 @@ impl Server {
             "pdf"
         } else if !p.preview {
             "zip"
-        } else if !p.full_preview {
+        } else if !p.full_preview && !p.ink_layers {
             "png"
         } else {
             "json"
@@ -320,6 +320,22 @@ impl Server {
                 generation::generate(&request, &token, Output::Zip(&mut output), progress)?;
             } else if extension == "pdf" {
                 generation::generate(&request, &token, Output::Pdf(&mut output), progress)?;
+            } else if p.ink_layers {
+                output
+                    .write_all(b"{\"status\":\"success\",\"layers\":[")
+                    .map_err(storage_error)?;
+                generation::generate(
+                    &request,
+                    &token,
+                    Output::InkLayers(&mut |index, page| {
+                        if index > 0 {
+                            output.write_all(b",").map_err(storage_error)?;
+                        }
+                        serde_json::to_writer(&mut output, &page).map_err(storage_error)
+                    }),
+                    progress,
+                )?;
+                output.write_all(b"]}").map_err(storage_error)?;
             } else {
                 if extension == "json" {
                     output
@@ -1149,6 +1165,11 @@ mod tests {
         for extra in [
             vec![("preview", "true"), ("full_preview", "false")],
             vec![("preview", "true"), ("full_preview", "true")],
+            vec![
+                ("preview", "true"),
+                ("full_preview", "false"),
+                ("ink_layers", "true"),
+            ],
             vec![("pdf_save", "true")],
             vec![("preview", "false")],
         ] {
@@ -1172,6 +1193,13 @@ mod tests {
                 assert!(bytes.starts_with(b"%PDF-"));
             } else if extra.contains(&("preview", "false")) {
                 assert!(bytes.starts_with(b"PK"));
+            } else if extra.contains(&("ink_layers", "true")) {
+                let data: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+                let layers = data["layers"].as_array().unwrap();
+                assert_eq!(layers.len(), 1);
+                for kind in ["paper", "ink"] {
+                    assert!(layers[0][kind].as_str().unwrap().starts_with("iVBORw0KGgo"));
+                }
             } else if extra.contains(&("full_preview", "false")) {
                 assert!(bytes.starts_with(b"\x89PNG"));
             } else {

@@ -1,5 +1,5 @@
 use crate::{
-    Error, LayoutStyle, Limits, Parameters, Result, imaging,
+    Error, LayoutStyle, Limits, Parameters, Result, imaging, ink_effects,
     text::{self, Node},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -50,10 +50,11 @@ struct LineUnit {
 }
 struct Pages<'a, F>
 where
-    F: FnMut(usize, RgbaImage) -> Result<()>,
+    F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>,
 {
     background: RgbaImage,
     canvas: RgbaImage,
+    ink_layer: Option<RgbaImage>,
     mask: GrayImage,
     p: &'a Parameters,
     rng: ChaCha8Rng,
@@ -69,7 +70,17 @@ where
     emit: F,
     stopped: bool,
 }
-impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
+impl<F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>> Pages<'_, F> {
+    fn flush_ink(&mut self) -> Result<()> {
+        perturb(
+            &mut self.mask,
+            self.ink_layer.as_mut().unwrap_or(&mut self.canvas),
+            self.p,
+            &mut self.rng,
+            self.cancel,
+        )
+    }
+
     fn emit_page(&mut self, force: bool) -> Result<()> {
         if (!self.dirty && !force) || self.stopped {
             return Ok(());
@@ -78,15 +89,14 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
         if self.count >= self.max_pages {
             return Err(Error::new("page_limit", "页数超出限制"));
         }
-        perturb(
-            &mut self.mask,
-            &mut self.canvas,
-            self.p,
-            &mut self.rng,
-            self.cancel,
-        )?;
+        self.flush_ink()?;
         let canvas = std::mem::replace(&mut self.canvas, self.background.clone());
-        (self.emit)(self.count, canvas)?;
+        let alpha = self.ink_layer.as_mut().map(|ink| {
+            let alpha = ink_effects::coverage(ink);
+            ink.as_mut().fill(0);
+            alpha
+        });
+        (self.emit)(self.count, canvas, alpha)?;
         self.count += 1;
         self.stopped = self.p.preview && !self.p.full_preview && !self.p.pdf_save;
         self.x = self.p.left_margin;
@@ -204,7 +214,7 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
             );
             if u.rigid {
                 paint_math_unit(
-                    &mut self.canvas,
+                    self.ink_layer.as_mut().unwrap_or(&mut self.canvas),
                     &u.glyph.mask,
                     origin,
                     self.p,
@@ -265,12 +275,26 @@ impl<F: FnMut(usize, RgbaImage) -> Result<()>> Pages<'_, F> {
 pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     r: &RenderRequest,
     cancel: &Cancellation,
-    emit: F,
+    mut emit: F,
+) -> Result<usize> {
+    render_pages(r, cancel, |i, paper, ink| {
+        let image = match ink {
+            Some(ink) => ink_effects::composite(paper, ink, &r.params, cancel)?,
+            None => paper,
+        };
+        emit(i, image)
+    })
+}
+
+pub(crate) fn render_pages(
+    r: &RenderRequest,
+    cancel: &Cancellation,
+    emit: impl FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>,
 ) -> Result<usize> {
     cancel.check()?;
     crate::validate_document(&r.text, &r.limits)?;
     let p = &r.params;
-    let background = match (p.width, p.height) {
+    let mut background = match (p.width, p.height) {
         (Some(w), Some(h)) => {
             p.validate(w, h, &r.limits)?;
             blank_paper(w, h, p)
@@ -292,11 +316,23 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     let (w, h) = background.dimensions();
     p.validate(w, h, &r.limits)?;
     let homework_mode = p.layout_style == LayoutStyle::Homework;
-    let layout = if homework_mode {
+    let mut layout = if homework_mode {
         homework::parameters(p, w, h)
     } else {
         p.clone()
     };
+    if p.ink_layers {
+        // The generated mask stores concentration, independent of the selected tint.
+        layout.fill = [0, 0, 0, 255];
+        for pixel in background.pixels_mut() {
+            let opacity = u16::from(pixel[3]);
+            for channel in &mut pixel.0[..3] {
+                *channel =
+                    ((u16::from(*channel) * opacity + 255 * (255 - opacity) + 127) / 255) as u8;
+            }
+            pixel[3] = 255;
+        }
+    }
     let p = &layout;
     p.validate(w, h, &r.limits)?;
     let nodes = text::parse(&text::normalize(&r.text, p.english_spacing));
@@ -308,6 +344,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     let mut glyphs = Glyphs::with_parameters(&r.fonts, p);
     let mut pages = Pages {
         canvas: background.clone(),
+        ink_layer: p.ink_layers.then(|| RgbaImage::new(w, h)),
         background,
         mask: GrayImage::new(w, h),
         p,
@@ -393,13 +430,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
                 if pages.stopped {
                     break;
                 }
-                perturb(
-                    &mut pages.mask,
-                    &mut pages.canvas,
-                    p,
-                    &mut pages.rng,
-                    cancel,
-                )?;
+                pages.flush_ink()?;
                 let raw = data.split_once(',').map(|(_, s)| s).unwrap_or(data);
                 let compact: String = raw.chars().filter(|c| !c.is_whitespace()).collect();
                 if compact.len() > r.limits.max_file_bytes * 4 / 3 + 4 {
@@ -616,6 +647,7 @@ mod ruled_tests {
             let mut pages = Pages {
                 background: bg.clone(),
                 canvas: bg,
+                ink_layer: None,
                 mask: GrayImage::new(180, 193),
                 p: &p,
                 rng: ChaCha8Rng::seed_from_u64(42),
@@ -628,7 +660,7 @@ mod ruled_tests {
                 dirty: false,
                 count: 0,
                 max_pages: 100,
-                emit: |_, _| Ok(()),
+                emit: |_, _, _| Ok(()),
                 stopped: false,
             };
             for n in 0..20 {
