@@ -9,12 +9,14 @@ export default function Modal({
   onClose,
   children,
   testId,
+  className,
 }: {
   title: string;
   closeLabel: string;
   onClose: () => void;
   children: ReactNode;
   testId?: string;
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -32,7 +34,7 @@ export default function Modal({
   return (
     <motion.dialog
       ref={dialog}
-      className="modal"
+      className={className ? `modal ${className}` : 'modal'}
       data-present={present}
       inert={!present}
       initial={{ opacity: 0, y: reduced ? 0 : 10, scale: reduced ? 1 : 0.985 }}

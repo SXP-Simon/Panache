@@ -597,14 +597,12 @@ h2 svg {
   height: clamp(300px, calc(100dvh - 390px), 430px);
   padding: 18px;
   overflow: auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
 .preview-canvas.is-empty {
-  align-items: center;
+  display: grid;
+  place-items: center;
 }
 .empty-preview {
   display: flex;
@@ -655,8 +653,8 @@ h2 svg {
   min-height: 37px;
 }
 .preview-image {
-  flex-shrink: 0;
-  max-width: none;
+  display: block;
+  width: 100%;
   height: auto;
   object-fit: contain;
   border-radius: 6px;
@@ -1404,6 +1402,32 @@ input[type='color'] {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+.preview-sheet {
+  position: relative;
+  margin-inline: auto;
+}
+.modal.preview-modal[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: calc(100vw - 24px);
+  height: calc(100dvh - 24px);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+}
+.preview-modal .modal-heading {
+  margin: 0;
+  padding: 10px 16px;
+}
+.preview-modal .preview-canvas {
+  height: auto;
+  min-height: 0;
+  container-type: size;
+}
+.preview-modal .zoom-tools {
+  margin-inline-start: auto;
 }
 .mobile-settings-button {
   display: none;

@@ -252,6 +252,7 @@ const words = {
   zoomIn: ['放大', 'Zoom in'],
   zoomOut: ['缩小', 'Zoom out'],
   fit: ['适应窗口', 'Fit page'],
+  expandPreview: ['全屏预览', 'Fullscreen preview'],
   page: ['页', 'page'],
   settings: ['笔迹与纸张', 'Handwriting & paper'],
   settingsHint: ['调整到你喜欢的样子', 'Make it feel like you'],

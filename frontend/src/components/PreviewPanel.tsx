@@ -8,6 +8,7 @@ import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import GenerateButton, { useGenerationAvailability } from './GenerateButton';
 import { useI18n } from '../i18n';
 import Button from '../shared/ui/Button';
+import Modal from '../shared/ui/Modal';
 import {
   Eye,
   PenLine,
@@ -16,6 +17,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  RotateCcw,
   LoaderCircle,
   Download,
   FileDown,
@@ -42,6 +44,7 @@ export default function PreviewPanel() {
   const { disabled } = useGenerationAvailability();
   const { t } = useI18n();
   const [zoom, setZoom] = useState(100);
+  const [expanded, setExpanded] = useState(false);
   const image = images[currentPage] ?? backgroundUrl;
   return (
     <section className="panel preview-panel" data-testid="preview-panel">
@@ -57,7 +60,7 @@ export default function PreviewPanel() {
           {background ? background.name : `${width} × ${height}`}
         </span>
       </header>
-      <div className={`preview-canvas ${image ? '' : 'is-empty'}`}>
+      <div className={`preview-canvas ${image ? '' : 'is-empty'}`} data-testid="preview-viewport">
         {!image ? (
           <div className="empty-preview">
             <div className="empty-paper">
@@ -71,55 +74,23 @@ export default function PreviewPanel() {
             <GenerateButton compact />
           </div>
         ) : (
-          <PreviewImage key={image} src={image} zoom={zoom} alt={t('preview')} />
-        )}{' '}
+          <PreviewSheet key={image} image={image} zoom={zoom} />
+        )}
         <PreviewProgress />
       </div>
       <footer className="preview-tools">
-        <div className="page-nav">
-          <Button
-            size="icon"
-            variant="ghost"
-            data-testid="preview-prev-btn"
-            aria-label={t('previous')}
-            disabled={currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
-          >
-            <ChevronLeft size={16} />
-          </Button>
-          <span data-testid="preview-page-indicator">
-            {images.length ? currentPage + 1 : 0} / {images.length}
-          </span>
-          <Button
-            size="icon"
-            variant="ghost"
-            data-testid="preview-next-btn"
-            aria-label={t('next')}
-            disabled={currentPage >= images.length - 1}
-            onClick={() => setPage(currentPage + 1)}
-          >
-            <ChevronRight size={16} />
-          </Button>
-        </div>
+        <PreviewPages page={currentPage} count={images.length} setPage={setPage} />
         <div className="zoom-tools">
+          <PreviewZoom zoom={zoom} setZoom={setZoom} disabled={!image} />
           <Button
             size="icon"
             variant="ghost"
-            aria-label={t('zoomOut')}
-            onClick={() => setZoom(Math.max(25, zoom - 25))}
+            data-testid="expand-preview"
+            aria-label={t('expandPreview')}
+            title={t('expandPreview')}
+            disabled={!image}
+            onClick={() => setExpanded(true)}
           >
-            <ZoomOut size={16} />
-          </Button>
-          <span>{zoom}%</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={t('zoomIn')}
-            onClick={() => setZoom(Math.min(300, zoom + 25))}
-          >
-            <ZoomIn size={16} />
-          </Button>
-          <Button size="icon" variant="ghost" aria-label={t('fit')} onClick={() => setZoom(100)}>
             <Maximize2 size={15} />
           </Button>
         </div>
@@ -154,24 +125,180 @@ export default function PreviewPanel() {
           </Button>
         </div>
       </div>
+      <AnimatePresence>
+        {expanded && image && (
+          <ExpandedPreview
+            image={image}
+            page={currentPage}
+            count={images.length}
+            setPage={setPage}
+            close={() => setExpanded(false)}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }
 
-function PreviewImage({ src, zoom, alt }: { src: string; zoom: number; alt: string }) {
-  const [loaded, setLoaded] = useState(false);
-  const reduced = useReducedMotion();
+function PreviewPages({
+  page,
+  count,
+  setPage,
+  prefix = 'preview',
+}: {
+  page: number;
+  count: number;
+  setPage: (page: number) => void;
+  prefix?: string;
+}) {
+  const { t } = useI18n();
   return (
-    <motion.img
-      src={src}
-      data-testid="preview-image"
-      className="preview-image"
-      initial={{ width: `${zoom}%`, opacity: 0 }}
-      animate={{ width: `${zoom}%`, opacity: loaded ? 1 : 0 }}
-      transition={{ duration: reduced ? 0 : 0.2, ease: 'easeOut' }}
-      onLoad={() => setLoaded(true)}
-      alt={alt}
-    />
+    <div className="page-nav">
+      <Button
+        size="icon"
+        variant="ghost"
+        data-testid={`${prefix}-prev-btn`}
+        aria-label={t('previous')}
+        disabled={page === 0}
+        onClick={() => setPage(page - 1)}
+      >
+        <ChevronLeft size={16} />
+      </Button>
+      <span data-testid={`${prefix}-page-indicator`}>
+        {count ? page + 1 : 0} / {count}
+      </span>
+      <Button
+        size="icon"
+        variant="ghost"
+        data-testid={`${prefix}-next-btn`}
+        aria-label={t('next')}
+        disabled={page >= count - 1}
+        onClick={() => setPage(page + 1)}
+      >
+        <ChevronRight size={16} />
+      </Button>
+    </div>
+  );
+}
+
+function PreviewZoom({
+  zoom,
+  setZoom,
+  disabled = false,
+}: {
+  zoom: number;
+  setZoom: (zoom: number) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        aria-label={t('zoomOut')}
+        disabled={disabled || zoom <= 25}
+        onClick={() => setZoom(zoom - 25)}
+      >
+        <ZoomOut size={16} />
+      </Button>
+      <span>{zoom}%</span>
+      <Button
+        size="icon"
+        variant="ghost"
+        aria-label={t('zoomIn')}
+        disabled={disabled || zoom >= 300}
+        onClick={() => setZoom(zoom + 25)}
+      >
+        <ZoomIn size={16} />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        aria-label={t('fit')}
+        title={t('fit')}
+        disabled={disabled || zoom === 100}
+        onClick={() => setZoom(100)}
+      >
+        <RotateCcw size={15} />
+      </Button>
+    </>
+  );
+}
+
+function ExpandedPreview({
+  image,
+  page,
+  count,
+  setPage,
+  close,
+}: {
+  image: string;
+  page: number;
+  count: number;
+  setPage: (page: number) => void;
+  close: () => void;
+}) {
+  const { t } = useI18n();
+  const [zoom, setZoom] = useState(100);
+  return (
+    <Modal
+      title={t('expandPreview')}
+      closeLabel={t('close')}
+      onClose={close}
+      testId="fullscreen-preview"
+      className="preview-modal"
+    >
+      <div className="preview-canvas" data-testid="expanded-preview-viewport">
+        <PreviewSheet key={image} image={image} zoom={zoom} expanded />
+      </div>
+      <footer className="preview-tools">
+        {count > 1 && (
+          <PreviewPages page={page} count={count} setPage={setPage} prefix="expanded-preview" />
+        )}
+        <div className="zoom-tools">
+          <PreviewZoom zoom={zoom} setZoom={setZoom} />
+        </div>
+      </footer>
+    </Modal>
+  );
+}
+
+function PreviewSheet({
+  image,
+  zoom,
+  expanded = false,
+}: {
+  image: string;
+  zoom: number;
+  expanded?: boolean;
+}) {
+  const { t } = useI18n();
+  const [loaded, setLoaded] = useState(false);
+  const [aspect, setAspect] = useState(1);
+  const reduced = useReducedMotion();
+  const prefix = expanded ? 'expanded-preview' : 'preview';
+  const width = expanded ? `calc(min(100cqw, ${aspect * 100}cqh) * ${zoom / 100})` : `${zoom}%`;
+  return (
+    <motion.div
+      className="preview-sheet"
+      style={{ width }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: loaded ? 1 : 0 }}
+      transition={{ duration: reduced ? 0 : 0.2 }}
+    >
+      <img
+        src={image}
+        data-testid={`${prefix}-image`}
+        className="preview-image"
+        onLoad={(event) => {
+          const { naturalWidth, naturalHeight } = event.currentTarget;
+          if (expanded && naturalHeight) setAspect(naturalWidth / naturalHeight);
+          setLoaded(true);
+        }}
+        alt={t('preview')}
+      />
+    </motion.div>
   );
 }
 
