@@ -531,6 +531,8 @@ class _PageRenderer:
                     self._blank_line()
                 self.section_lines = 0
             units, start = self._line(start)
+            # 2026-11-16：空格已计入横向字距，但没有墨迹，不能触发纵向避让。
+            units = [unit for unit in units if unit[1][1] < unit[1][3]]
             if not units:
                 self._blank_line()
                 self.section_lines = 0

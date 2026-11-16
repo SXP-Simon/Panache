@@ -187,6 +187,27 @@ def test_ruled_math_keeps_original_grid_after_temporary_top_margin():
     assert_inside(pages, tpl)
 
 
+def test_standard_ruled_inline_subscripts_keep_consecutive_rows():
+    font_path = Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"
+    font = ImageFont.truetype(str(font_path), 56)
+    tpl = template(size=(1440, 800), font=font, line_spacing=78, ruled_origin=10, word_spacing=1)
+    source = (
+        "O₁(1,1)：d₁²=0，d₂²=32→ 簇 1\n"
+        "O₂(2,2)：d₁²=2，d₂²=18→ 簇 1\n"
+        "O₃(3,4)：d₁²=13，d₂²=5→ 簇 2\n"
+        "O₄(4,4)：d₁²=18，d₂²=2→ 簇 2\n"
+        "O₅(5,5)：d₁²=32，d₂²=0→ 簇 2"
+    )
+    text = symbols.normalize_text_for_font(source, str(font_path))
+    pages, consumed = draft(real_core, text, tpl)
+    assert consumed == [(0, len(text))]
+    # 2026-11-16：首字母一致，检查同一笔画是否落在连续的纸张行格。
+    prefix = pages[0].crop((10, 0, 26, pages[0].height))
+    rows = [run[0] for run in occupied_runs(prefix, "y")]
+    assert len(rows) == 5
+    assert rows == [rows[0] + i * 78 for i in range(5)]
+
+
 def test_ruled_oversized_first_formula_fits_whole_row_without_bottom_clamp():
     tpl = template(size=(230, 66), ruled_origin=10)
     pages, consumed = draft(synthetic_core(), "§\n§", tpl)
