@@ -4,6 +4,7 @@
 import base64
 import math
 from dataclasses import dataclass
+from typing import cast
 
 import cv2
 import numpy as np
@@ -12,6 +13,7 @@ from numpy.typing import NDArray
 PIXEL_WHITE = 255
 MAX_DESKEW_ANGLE = 12.0
 MIN_BANDS = 3
+MIN_TRACKED_BANDS = 6
 MIN_IMAGE_SIZE = 32
 MIN_SPACING = 8
 ANGLE_PIXEL_TOLERANCE = 1.5
@@ -156,6 +158,72 @@ def _spacing(centres: NDArray[np.float64]) -> int:
     return rounded
 
 
+def _tracked_rulings(
+    binary: GrayImage,
+) -> tuple[GrayImage, NDArray[np.float32], NDArray[np.float64], int]:
+    """Measure and flatten ruling tracks through narrow vertical strips."""
+    # 2026-11-16：在窄条内追踪同一组横线，校正照片的弯曲和透视。
+    height, width = binary.shape
+    columns = np.asarray([width * (0.15 + i * 0.175) for i in range(5)], dtype=np.float64)
+    radius = max(8, width // 30)
+    strips = [
+        np.array([y for y, _, _ in _bands(binary[:, int(x) - radius : int(x) + radius])])
+        for x in columns
+    ]
+    middle = strips[2]
+    gaps = np.diff(middle)
+    spacing = round(float(np.median(gaps)))
+    if spacing < MIN_SPACING:
+        raise _no_rulings()
+    breaks = np.flatnonzero(np.abs(gaps - spacing) > spacing * 0.18) + 1
+    sequence = max(np.split(middle, breaks), key=len)
+    if len(sequence) < MIN_TRACKED_BANDS:
+        raise _no_rulings()
+    spacing = round(float((sequence[-1] - sequence[0]) / (len(sequence) - 1)))
+    target = np.rint(sequence[0]) + np.arange(len(sequence)) * spacing
+    if target[-1] >= height - 1:
+        raise _no_rulings()
+    tracks: list[NDArray[np.float64]] = []
+    for strip in strips:
+        after = np.minimum(np.searchsorted(strip, sequence), len(strip) - 1)
+        before = np.maximum(after - 1, 0)
+        matched = np.asarray(
+            np.where(
+                np.abs(sequence - strip[before]) < np.abs(strip[after] - sequence),
+                strip[before],
+                strip[after],
+            ),
+            dtype=np.float64,
+        )
+        if np.any(np.abs(matched - sequence) > spacing * 0.42):
+            raise _no_rulings()
+        if np.any(np.abs(np.diff(matched) - spacing) > spacing * 0.22):
+            raise _no_rulings()
+        tracks.append(matched)
+    # 2026-11-16：外侧沿最近两个采样条外推，固定图像上下边缘。
+    x = np.arange(width, dtype=np.float64)
+    index = np.asarray(np.clip(np.searchsorted(columns, x) - 1, 0, len(columns) - 2), dtype=np.intp)
+    weight = (x - columns[index]) / (columns[index + 1] - columns[index])
+    track = np.asarray(tracks)
+    source = track[index] + weight[:, None] * (track[index + 1] - track[index])
+    if (
+        np.any(source[:, 0] <= 0)
+        or np.any(source[:, -1] >= height - 1)
+        or np.any(np.diff(source, axis=1) <= 0)
+    ):
+        raise _no_rulings()
+    anchors = np.column_stack((np.zeros(width), source, np.full(width, height - 1)))
+    rows = np.arange(height, dtype=np.float64)
+    destination = np.concatenate(([0.0], target, [float(height - 1)]))
+    map_y = np.asarray(
+        [cast("NDArray[np.float64]", np.interp(rows, destination, column)) for column in anchors],
+        dtype=np.float32,
+    ).T.copy()
+    map_x = np.broadcast_to(np.arange(width, dtype=np.float32), map_y.shape).copy()
+    rectified = cv2.remap(binary, map_x, map_y, cv2.INTER_NEAREST)
+    return np.asarray(rectified, dtype=np.uint8), map_y, target, spacing
+
+
 def identify_paper(filename: str) -> PaperMeasurement:
     """Measure line centres and optionally return a physically corrected PNG."""
     # 2026-10-24：OpenCV 在 Windows 上无法直接打开中文路径，先读取字节再解码。
@@ -167,19 +235,39 @@ def identify_paper(filename: str) -> PaperMeasurement:
     if image is None or min(image.shape[:2]) < MIN_IMAGE_SIZE:
         raise _no_rulings()
     pixels = np.asarray(image, dtype=np.uint8)
-    angle = _angle(_binary(pixels))
-    if angle:
-        pixels = _rotate(pixels, angle)
-    bands = _bands(_binary(pixels))
-    centres = np.array([band[0] for band in bands], dtype=np.float64)
-    spacing = _spacing(centres)
+    binary = _binary(pixels)
+    warped = False
+    try:
+        angle = _angle(binary)
+        rotated = _rotate(pixels, angle) if angle else pixels
+        bands = _bands(_binary(rotated) if angle else binary)
+        centres = np.array([band[0] for band in bands], dtype=np.float64)
+        spacing = _spacing(centres)
+        pixels = rotated
+    except ImageIdentificationError:
+        rectified, map_y, target, spacing = _tracked_rulings(binary)
+        # 2026-11-16：排除校正后仍能投影成长横线的页眉装饰。
+        bands = [
+            band
+            for band in _bands(rectified)
+            if np.min(np.abs(target - band[0])) <= max(2.0, spacing * 0.06)
+        ]
+        if len(bands) != len(target):
+            raise _no_rulings() from None
+        centres = np.array([band[0] for band in bands], dtype=np.float64)
+        if _spacing(centres) != spacing:
+            raise _no_rulings() from None
+        map_x = np.broadcast_to(np.arange(pixels.shape[1], dtype=np.float32), map_y.shape).copy()
+        pixels = cv2.remap(pixels, map_x, map_y, cv2.INTER_LINEAR)
+        angle = 0.0
+        warped = True
     top = round(float(centres[0]))
     first = top + max(0, math.ceil((spacing - top) / spacing)) * spacing
     if first > round(float(centres[-1])):
         raise _no_rulings()
     height, width = pixels.shape[:2]
     corrected = None
-    if angle:
+    if angle or warped:
         success, encoded = cv2.imencode(".png", pixels)
         if not success:
             raise _no_rulings()

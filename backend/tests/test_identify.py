@@ -1,4 +1,5 @@
 # Copyright (c) 2026 Simon and Panache contributors.
+import base64
 import contextlib
 import io
 import tempfile
@@ -6,7 +7,8 @@ import unittest
 from pathlib import Path
 
 import app
-from identify import ImageIdentificationError, identify_distance
+import numpy as np
+from identify import ImageIdentificationError, identify_distance, identify_paper
 from PIL import Image, ImageDraw
 
 # 与 e2e/fixtures/sample-page.png 同一套几何参数：那张图由下面这段逻辑生成，
@@ -160,3 +162,29 @@ def test_light_upload_returns_measurements_and_cleans_file(tmp_path, monkeypatch
     assert response.status_code == 200
     assert b"marginLeft" in response.body
     assert list(upload_dir.iterdir()) == []
+
+
+def test_photo_with_changing_slope_is_flattened_before_layout(tmp_path: Path) -> None:
+    image = Image.new("RGB", (800, 1000), (182, 182, 182))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((180, 22, 580, 60), fill=INK)
+    for i in range(15):
+        points: list[tuple[float, float]] = []
+        for x in range(50, 750):
+            u = (x - 400) / 400
+            points.append((x, round(110 + 55 * i + 14 * u**2 + (5 - i) * u)))
+        draw.line(points, fill=INK, width=5)
+    path = tmp_path / "photo.jpg"
+    image.save(path)
+    measured = identify_paper(str(path))
+    assert measured.corrected is not None
+    assert abs(measured.spacing - 55) <= 1
+    assert abs(measured.top - 110) <= 3
+    assert abs(measured.bottom - 120) <= 3
+    with Image.open(io.BytesIO(base64.b64decode(measured.corrected))) as corrected:
+        assert corrected.size == image.size
+        pixels = np.asarray(corrected.convert("L"), dtype=np.uint8)
+        for x in (120, 400, 680):
+            for row in (0, 7, 14):
+                y = measured.top + measured.spacing * row
+                assert np.min(pixels[y - 2 : y + 3, x]) < 80
