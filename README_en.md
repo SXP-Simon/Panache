@@ -6,7 +6,20 @@ Run the application locally, self-host it, or download a [desktop build](https:/
 On `custom-base`, the React workspace combines the document editor, preview, and handwriting settings with a responsive layout.
 The handwriting renderer supports nested fractions, radicals, scripts, and fallback glyphs:
 
-![Panache cursive notebook samples: circuits, matrices, probability tables, chemistry and calculus](docs/assets/images/panache-showcase.webp)
+<table>
+  <thead>
+    <tr>
+      <th width="35%">Ruled notebook samples</th>
+      <th width="65%">Custom backgrounds and generated handwriting</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center" valign="top"><a href="docs/assets/images/panache-showcase.webp"><img src="docs/assets/images/panache-showcase.webp" width="294" alt="Panache cursive notebook samples with circuits, matrices, probability tables, chemistry, and calculus"></a></td>
+      <td align="center" valign="top"><a href="docs/assets/images/panache-custom-background.webp"><img src="docs/assets/images/panache-custom-background.webp" width="546" alt="Nanchang University ruled paper and Wuhan University of Technology dotted paper, with uploaded backgrounds on the left and generated handwriting on the right"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 📖 **[Documentation: user guide, self-hosting, and development](https://heliannuits.me/Panache/en/)**
 
