@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 
-typedef InkLook = ({int opacity, int thickness, int softness, int color});
+typedef InkLook = ({int opacity, double thickness, double softness, int color});
 
 const defaultInkLook = (
   opacity: 100,
-  thickness: 0,
-  softness: 0,
+  thickness: 0.0,
+  softness: 0.0,
   color: 0xff000000,
 );
 

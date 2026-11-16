@@ -53,8 +53,8 @@ pub struct Parameters {
     pub ink_depth_sigma: f32,
     pub ink_layers: bool,
     pub ink_opacity: u8,
-    pub ink_thickness: i8,
-    pub ink_softness: u8,
+    pub ink_thickness: f64,
+    pub ink_softness: f64,
     pub fill: [u8; 4],
     pub underlined: bool,
     pub background_ruled: bool,
@@ -92,8 +92,8 @@ impl Default for Parameters {
             ink_depth_sigma: 30.,
             ink_layers: false,
             ink_opacity: 100,
-            ink_thickness: 0,
-            ink_softness: 0,
+            ink_thickness: 0.,
+            ink_softness: 0.,
             fill: [0, 0, 0, 255],
             underlined: false,
             background_ruled: false,
@@ -158,7 +158,12 @@ impl Parameters {
         p.full_preview = boolean(f, "full_preview", true)?;
         p.pdf_save = boolean(f, "pdf_save", false)?;
         p.ink_layers = boolean(f, "ink_layers", false)?;
-        if p.ink_opacity > 100 || p.ink_thickness.unsigned_abs() > 2 || p.ink_softness > 2 {
+        if p.ink_opacity > 100
+            || !(-2. ..=2.).contains(&p.ink_thickness)
+            || !(0. ..=2.).contains(&p.ink_softness)
+            || (p.ink_thickness * 10.).fract() != 0.
+            || (p.ink_softness * 10.).fract() != 0.
+        {
             return Err(Error::new("invalid_parameter", "ink_effects"));
         }
         p.width = f

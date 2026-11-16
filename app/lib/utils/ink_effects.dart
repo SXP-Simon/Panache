@@ -8,7 +8,7 @@ import '../models/ink_page.dart';
 enum _Kernel { minimum, maximum, mean }
 
 typedef InkMask = ({Uint8List alpha, int width, int height});
-typedef _ShapeJob = ({InkMask mask, int thickness, int softness});
+typedef _ShapeJob = ({InkMask mask, double thickness, double softness});
 
 Uint8List _pass(
   Uint8List input,
@@ -38,11 +38,26 @@ Uint8List _pass(
   return output;
 }
 
-// Same separable morphology and box blur as the export engine.
+// Interpolate masks at neighboring integer radii like the export engine.
 Uint8List _shape(_ShapeJob job) {
   final (alpha: alpha, width: w, height: h) = job.mask;
-  Uint8List transform(Uint8List mask, int radius, _Kernel mode) =>
-      _pass(_pass(mask, w, 1, radius, mode), h, w, radius, mode);
+  Uint8List transform(Uint8List mask, double radius, _Kernel mode) {
+    Uint8List at(int whole) => whole == 0
+        ? mask
+        : _pass(_pass(mask, w, 1, whole, mode), h, w, whole, mode);
+    final tenths = (radius * 10).round();
+    final whole = tenths ~/ 10;
+    final weight = tenths % 10;
+    final lower = at(whole);
+    if (weight == 0) return lower;
+    final upper = at(whole + 1);
+    final result = Uint8List(mask.length);
+    for (var i = 0; i < result.length; i++) {
+      result[i] = (lower[i] * (10 - weight) + upper[i] * weight + 5) ~/ 10;
+    }
+    return result;
+  }
+
   var mask = alpha;
   if (job.thickness != 0) {
     final thin = job.thickness < 0;

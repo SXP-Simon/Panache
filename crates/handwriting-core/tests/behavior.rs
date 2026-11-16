@@ -434,8 +434,8 @@ fn layered_preview_zip_and_pdf_keep_the_same_paper_and_ink() {
     request.params.ink_layers = true;
     request.params.fill = [12, 34, 56, 255];
     request.params.ink_opacity = 48;
-    request.params.ink_thickness = 2;
-    request.params.ink_softness = 1;
+    request.params.ink_thickness = 1.4;
+    request.params.ink_softness = 0.3;
     request.params.ink_depth_sigma = 8.;
     request.params.perturb_x_sigma = 1.;
     let cancel = Cancellation::default();

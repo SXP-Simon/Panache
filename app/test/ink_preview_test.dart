@@ -108,14 +108,19 @@ void main() {
     expect(current().image, same(original));
     await fade.up();
 
-    final thicken = await drag('ink-thickness', .98);
-    expect(look.thickness, 2);
+    final thicken = await drag('ink-thickness', .66);
+    expect(look.thickness, inInclusiveRange(.5, .9));
     await waitForMask(original);
     final thick = current().image;
+    final edgeAlpha = await tester.runAsync(() async {
+      final bytes = await thick!.toByteData(format: ui.ImageByteFormat.rawRgba);
+      return bytes!.getUint8((50 * 80 + 29) * 4 + 3);
+    });
+    expect(edgeAlpha, (255 * look.thickness).round());
     await thicken.up();
 
-    final soften = await drag('ink-softness', .98);
-    expect(look.softness, 2);
+    final soften = await drag('ink-softness', .22);
+    expect(look.softness, inInclusiveRange(.3, .6));
     await waitForMask(thick);
     await soften.up();
     await tester.enterText(
