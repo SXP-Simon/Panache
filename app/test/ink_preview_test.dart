@@ -147,5 +147,24 @@ void main() {
       final expected = (255 * (255 - alpha) + color * alpha + 127) ~/ 255;
       expect(result.getUint8(inkPixel + index), closeTo(expected, 2));
     }
+
+    await tester.tap(find.byKey(const ValueKey('expand-preview')));
+    await tester.pumpAndSettle();
+    final reader = find.byKey(const ValueKey('fullscreen-preview'));
+    expect(reader, findsOneWidget);
+    await waitForMask();
+    final canvas = find.descendant(
+      of: reader,
+      matching: find.byKey(const ValueKey('reader-canvas')),
+    );
+    final transform = tester
+        .widget<InteractiveViewer>(canvas)
+        .transformationController!;
+    await tester.tap(find.byKey(const ValueKey('reader-zoom-in')));
+    await tester.pumpAndSettle();
+    expect(transform.value.getMaxScaleOnAxis(), greaterThan(1));
+    await tester.tap(find.byKey(const ValueKey('reader-zoom-out')));
+    await tester.pumpAndSettle();
+    expect(transform.value.getMaxScaleOnAxis(), closeTo(1, .001));
   });
 }
