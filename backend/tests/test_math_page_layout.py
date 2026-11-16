@@ -187,10 +187,13 @@ def test_ruled_math_keeps_original_grid_after_temporary_top_margin():
     assert_inside(pages, tpl)
 
 
-def test_standard_ruled_inline_subscripts_keep_consecutive_rows():
+@pytest.mark.parametrize("spacing", [62, 78])
+def test_standard_ruled_inline_subscripts_keep_consecutive_rows(spacing):
     font_path = Path(__file__).resolve().parents[1] / "font_assets/云烟体.ttf"
     font = ImageFont.truetype(str(font_path), 56)
-    tpl = template(size=(1440, 800), font=font, line_spacing=78, ruled_origin=10, word_spacing=1)
+    tpl = template(
+        size=(1440, 800), font=font, line_spacing=spacing, ruled_origin=10, word_spacing=1
+    )
     source = (
         "O₁(1,1)：d₁²=0，d₂²=32→ 簇 1\n"
         "O₂(2,2)：d₁²=2，d₂²=18→ 簇 1\n"
@@ -205,7 +208,7 @@ def test_standard_ruled_inline_subscripts_keep_consecutive_rows():
     prefix = pages[0].crop((10, 0, 26, pages[0].height))
     rows = [run[0] for run in occupied_runs(prefix, "y")]
     assert len(rows) == 5
-    assert rows == [rows[0] + i * 78 for i in range(5)]
+    assert rows == [rows[0] + i * spacing for i in range(5)]
 
 
 def test_ruled_oversized_first_formula_fits_whole_row_without_bottom_clamp():

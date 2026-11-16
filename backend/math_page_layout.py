@@ -163,17 +163,21 @@ class _Metrics:
             msg = "No writable area for mathematical glyphs"
             raise api.layout_error(msg)
         font_size = _font_size(tpl.get_font())
+        spacing = tpl.get_line_spacing()
+        gap = max(2, round(font_size * 0.12))
+        if isinstance(tpl, RuledTemplate) and not isinstance(tpl, HomeworkTemplate):
+            gap = min(gap, max(2, spacing - font_size))
         return cls(
             left,
             top,
             right,
             bottom,
             area,
-            tpl.get_line_spacing(),
+            spacing,
             font_size,
             api.grid in tpl.get_features(),
             max(1, tpl.get_word_spacing() + font_size),
-            max(2, round(font_size * 0.12)),
+            gap,
             tpl.ruled_origin if isinstance(tpl, RuledTemplate) else None,
         )
 
@@ -507,6 +511,43 @@ class _PageRenderer:
         self.previous_y = previous_y + metrics.spacing
         self.previous_bottom = max(self.previous_bottom, self.previous_y + metrics.font_size)
 
+    def _fit_standard_row(
+        self, units: list[Unit], min_y: int, max_y: int
+    ) -> tuple[list[Unit], int, int]:
+        metrics = self.metrics
+        height = metrics.spacing - metrics.gap
+        ink_height = max_y - min_y
+        if (
+            metrics.ruled_origin is None
+            or isinstance(self.tpl, HomeworkTemplate)
+            or height <= 0
+            or ink_height > height * 1.20
+        ):
+            return units, min_y, max_y
+        # 2026-11-16：轻微越界先在行内平移或压缩纵向墨迹，再判断是否需要跳格。
+        # 2026-11-16：只调整排版后的纵向范围，保留横向断行、位置和字距。
+        lower = max(metrics.font_size, height)
+        upper = lower - height
+        if min_y >= upper and max_y <= lower:
+            return units, min_y, max_y
+        factor = min(1.0, height / ink_height)
+        start = max(upper, min(min_y, lower - math.ceil(ink_height * factor)))
+        fitted: list[Unit] = []
+        for image, bbox, x, dy, rigid in units:
+            y0 = start + math.floor((bbox[1] + dy - min_y) * factor)
+            y1 = start + math.ceil((bbox[3] + dy - min_y) * factor)
+            resized = (
+                image
+                if y1 - y0 == image.height
+                else image.resize((image.width, y1 - y0), Image.Resampling.NEAREST)
+            )
+            fitted.append((resized, (bbox[0], y0, bbox[2], y1), x, 0, rigid))
+        return (
+            fitted,
+            min(bbox[1] for _, bbox, _, _, _ in fitted),
+            max(bbox[3] for _, bbox, _, _, _ in fitted),
+        )
+
     def _baseline(self, min_y: int) -> int:
         metrics = self.metrics
         if self.previous_y is None:
@@ -538,6 +579,7 @@ class _PageRenderer:
                 self.section_lines = 0
                 continue
             units, min_y, max_y = self._fit_line(units)
+            units, min_y, max_y = self._fit_standard_row(units, min_y, max_y)
             baseline = self._baseline(min_y)
             if baseline + max_y > self.metrics.bottom:
                 if line_start == 0 or self.previous_y is None:
