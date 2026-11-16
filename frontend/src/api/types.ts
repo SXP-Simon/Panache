@@ -18,7 +18,7 @@ export interface GenerationSnapshot {
   ink: string;
 }
 export type GenerationResult =
-  | { type: 'images'; images: string[] }
+  | { type: 'images'; images: string[]; inkLayers?: string[] }
   | { type: 'image'; blob: Blob }
   | { type: 'download'; mode: DownloadMode; blob: Blob };
 export interface BackgroundMargins {

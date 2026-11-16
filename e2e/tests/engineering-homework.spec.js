@@ -1,4 +1,4 @@
-const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded, previewPng } = require('./fixtures');
 const fs = require('node:fs/promises');
 
 const homework = String.raw`# 电路与信号作业
@@ -49,12 +49,7 @@ for (const style of ['neat', 'casual']) {
     expect(converted).toContain('ϑ');
     await page.getByTestId('preview-btn').click();
     await expectPreviewImageLoaded(page);
-    const image = page.getByTestId('preview-image');
-    // Save the real full-resolution output, not merely a screenshot of an <img>.
-    const bytes = await image.evaluate(async (element) => {
-      const response = await fetch(element.src);
-      return Array.from(new Uint8Array(await response.arrayBuffer()));
-    });
+    const bytes = await previewPng(page);
     const output = testInfo.outputPath('engineering-homework.png');
     await fs.writeFile(output, Buffer.from(bytes));
     await testInfo.attach('engineering-homework', {path: output, contentType:'image/png'});

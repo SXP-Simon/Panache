@@ -56,6 +56,33 @@ async function expectPreviewImageLoaded(page, timeout = 90_000) {
     .toBeGreaterThan(0);
 }
 
+
+async function previewPng(page) {
+  return page.getByTestId('preview-image').evaluate(async (image) => {
+    await image.decode();
+    const layer = image.parentElement.querySelector('[data-testid="preview-ink-layer"]');
+    if (!layer) return [...new Uint8Array(await (await fetch(image.src)).arrayBuffer())];
+
+    const style = getComputedStyle(layer);
+    const maskUrl = style.maskImage.slice(5, -2);
+    const mask = await createImageBitmap(await (await fetch(maskUrl)).blob());
+    const canvas = new OffscreenCanvas(image.naturalWidth, image.naturalHeight);
+    const context = canvas.getContext('2d');
+    context.fillStyle = style.backgroundColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.globalCompositeOperation = 'destination-in';
+    context.drawImage(mask, 0, 0);
+    mask.close();
+    const output = new OffscreenCanvas(canvas.width, canvas.height);
+    const composite = output.getContext('2d');
+    composite.drawImage(image, 0, 0);
+    composite.globalAlpha = Number(style.opacity);
+    composite.drawImage(canvas, 0, 0);
+    return [...new Uint8Array(await (await output.convertToBlob()).arrayBuffer())];
+  });
+}
+
+
 module.exports = {
   test,
   expect,
@@ -66,4 +93,5 @@ module.exports = {
   useSmallCanvas,
   openPaperSettings,
   expectPreviewImageLoaded,
+  previewPng,
 };

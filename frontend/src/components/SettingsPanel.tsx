@@ -6,7 +6,7 @@ import { useFontsQuery } from '@/api/catalog';
 import { useSettingsStore } from '@/features/settings/store';
 import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import { useI18n } from '../i18n';
-import { mainFields, paperFields, variationFields, strikeFields } from '../models';
+import { mainFields, paperFields, variationFields, strikeFields, inkFields } from '../models';
 import ParameterField from './ParameterField';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
@@ -124,15 +124,20 @@ export default function SettingsPanel() {
             <ParameterField key={field.key} field={field} />
           ))}
         </div>
-        <label className="color-field">
-          <span>{t('ink')}</span>
-          <input
-            value={settings.ink}
-            onChange={(event) => settings.patch({ ink: event.currentTarget.value })}
-            type="color"
-            data-testid="ink-color-input"
-          />
-        </label>
+        <Accordion title={t('inkEffects')} testId="ink-effects-toggle">
+          {inkFields.map((field) => (
+            <InkSlider key={field.key} field={field} />
+          ))}
+          <label className="color-field">
+            <span>{t('ink')}</span>
+            <input
+              value={settings.ink}
+              onChange={(event) => settings.patch({ ink: event.currentTarget.value })}
+              type="color"
+              data-testid="ink-color-input"
+            />
+          </label>
+        </Accordion>
         <label className="check-row">
           <input
             checked={settings.underlined}
@@ -292,5 +297,28 @@ export default function SettingsPanel() {
         )}
       </AnimatePresence>
     </aside>
+  );
+}
+
+function InkSlider({ field }: { field: (typeof inkFields)[number] }) {
+  const { t } = useI18n();
+  const value = useSettingsStore((state) => state.numbers[field.key]);
+  const setNumber = useSettingsStore((state) => state.setNumber);
+  return (
+    <label className="field-label">
+      <span>
+        {t(field.label)} {value}
+        {field.key === 'ink_opacity' ? '%' : ' px'}
+      </span>
+      <input
+        type="range"
+        min={field.min}
+        max={field.max}
+        step={field.step}
+        value={value}
+        data-testid={field.testId}
+        onChange={(event) => setNumber(field.key, event.currentTarget.valueAsNumber)}
+      />
+    </label>
   );
 }

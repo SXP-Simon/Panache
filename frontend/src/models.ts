@@ -21,6 +21,9 @@ export const defaultNumbers = {
   strikethrough_width_sigma: 2,
   strikethrough_width: 8,
   ink_depth_sigma: 30,
+  ink_opacity: 100,
+  ink_thickness: 0,
+  ink_softness: 0,
 };
 export type NumericKey = keyof typeof defaultNumbers;
 export interface NumberField {
@@ -131,7 +134,25 @@ export const strikeFields: readonly NumberField[] = [
     min: 0,
   },
 ];
-export const allFields = [...mainFields, ...paperFields, ...variationFields, ...strikeFields];
+export const inkFields = [
+  { key: 'ink_opacity', label: 'inkOpacity', testId: 'ink-opacity', step: 1, min: 0, max: 100 },
+  {
+    key: 'ink_thickness',
+    label: 'inkThickness',
+    testId: 'ink-thickness',
+    step: 1,
+    min: -2,
+    max: 2,
+  },
+  { key: 'ink_softness', label: 'inkSoftness', testId: 'ink-softness', step: 1, min: 0, max: 2 },
+] as const;
+export const allFields = [
+  ...mainFields,
+  ...paperFields,
+  ...variationFields,
+  ...strikeFields,
+  ...inkFields,
+];
 
 const integerFields = new Set<NumericKey>([
   'font_size',
@@ -145,6 +166,8 @@ const integerFields = new Set<NumericKey>([
   'right_margin',
 ]);
 export function validNumber(key: NumericKey, value: number): boolean {
+  const ink = inkFields.find((item) => item.key === key);
+  if (ink) return Number.isInteger(value) && value >= ink.min && value <= ink.max;
   const field = allFields.find((item) => item.key === key);
   const maximum = key === 'strikethrough_probability' ? 1 : key === 'font_size' ? 2048 : 10000;
   return Boolean(

@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 PDF_JPEG_QUALITY = 75
 
 
-def generate_pdf(images: Iterable[Image.Image]) -> str | None:
+def generate_pdf(images: Iterable[Image.Image], *, lossless: bool = False) -> str | None:
     """Write page images and return the exported PDF path, or report export failure."""
     base = Path("temp")
     base.mkdir(exist_ok=True)
@@ -30,8 +30,11 @@ def generate_pdf(images: Iterable[Image.Image]) -> str | None:
     try:
         for index, image in enumerate(checked_items(images)):
             width, height = image.size
-            path = temp_dir / f"image{index}.jpg"
-            image.save(path, format="JPEG", quality=PDF_JPEG_QUALITY)
+            path = temp_dir / (f"image{index}.png" if lossless else f"image{index}.jpg")
+            if lossless:
+                image.save(path, format="PNG")
+            else:
+                image.save(path, format="JPEG", quality=PDF_JPEG_QUALITY)
             check_cancelled()
             page = document.new_page(width=width, height=height)
             page.insert_image(fitz.Rect(0, 0, width, height), filename=str(path))
@@ -39,7 +42,10 @@ def generate_pdf(images: Iterable[Image.Image]) -> str | None:
         # 2026-10-15：原子创建输出文件，避免 mktemp 的检查与使用竞态。
         with tempfile.NamedTemporaryFile(suffix=".pdf", dir=base, delete=False) as target:
             output = target.name
-        document.save(output)
+        if lossless:
+            document.save(output, deflate=True)
+        else:
+            document.save(output)
         check_cancelled(force=True)
     except GenerationCancelledError:
         if output is not None:

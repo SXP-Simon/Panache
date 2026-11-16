@@ -1,6 +1,6 @@
 const { test, expect, openHome, fillText, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
 
-test('generated preview zooms without clipping the left edge and opens the image viewer', async ({ page }) => {
+test('layered preview zooms without clipping the left edge and opens the image viewer', async ({ page }) => {
   await openHome(page);
   await useSmallCanvas(page);
   await fillText(page, '手写预览\n放大、缩小与全屏');
@@ -15,6 +15,12 @@ test('generated preview zooms without clipping the left edge and opens the image
   expect(await canvas.evaluate((node) =>
     node.querySelector('img').getBoundingClientRect().left - node.getBoundingClientRect().left
   )).toBeGreaterThanOrEqual(0);
+  const dimensions = () => current.evaluate((image) => {
+    const base = image.getBoundingClientRect();
+    const ink = image.parentElement.querySelector('[data-testid="preview-ink-layer"]').getBoundingClientRect();
+    return [ink.width - base.width, ink.height - base.height];
+  });
+  expect(await dimensions()).toEqual([0, 0]);
   await page.getByRole('button', { name: '缩小', exact: true }).click();
   await expect.poll(() => current.evaluate((image) => image.offsetWidth)).toBe(fit);
   await page.getByRole('button', { name: '缩小', exact: true }).click();
@@ -24,6 +30,7 @@ test('generated preview zooms without clipping the left edge and opens the image
   await page.getByTestId('expand-preview').click();
   const viewer = page.getByTestId('fullscreen-preview');
   await expect(viewer).toBeVisible();
+  await expect(viewer.getByTestId('expanded-preview-ink-layer')).toBeVisible();
   const expanded = viewer.getByTestId('expanded-preview-image');
   const expandedCanvas = viewer.getByTestId('expanded-preview-viewport');
   await expect.poll(() => expandedCanvas.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1);
@@ -60,6 +67,7 @@ test('paper-only preview opens the image viewer on a narrow viewport', async ({ 
   const viewer = page.getByTestId('fullscreen-preview');
   await expect(viewer.getByTestId('expanded-preview-image')).toBeVisible();
   await expect(viewer.getByTestId('expanded-preview-image')).toHaveJSProperty('naturalWidth', 160);
+  await expect(viewer.getByTestId('expanded-preview-ink-layer')).toHaveCount(0);
   await viewer.getByTestId('fullscreen-preview-close').click();
   await expect(viewer).toHaveCount(0);
 });

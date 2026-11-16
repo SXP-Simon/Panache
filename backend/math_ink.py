@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Simon and Panache contributors.
 """2026-10-24：在最终出图时保留复合数学结构，不按连通域拆散格线和内容。."""
 
+import copy
 import functools
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
@@ -15,8 +16,12 @@ if TYPE_CHECKING:
     from handright import Template
 
 if __package__:
+    from .ink_effects import attach_ink
+    from .ink_effects import layers as page_layers
     from .library_boundary import install_member, member
 else:
+    from ink_effects import attach_ink
+    from ink_effects import layers as page_layers
     from library_boundary import install_member, member
 
 
@@ -65,8 +70,7 @@ def install_math_ink(core: object) -> None:
     if getattr(original, "_math_ink", False):
         return
 
-    @functools.wraps(original)
-    def merge(instance: object, page: Page) -> Image.Image:
+    def draw(instance: object, page: Page) -> Image.Image:
         layers = cast("list[MathInk]", page.image.info.get(_KEY, []))
         if not layers:
             return original(instance, page)
@@ -84,6 +88,21 @@ def install_math_ink(core: object) -> None:
         for layer in layers:
             ImageDraw.Draw(canvas).bitmap(layer.position, layer.mask, fill=_ink(template, rand))
         return canvas
+
+    @functools.wraps(original)
+    def merge(instance: object, page: Page) -> Image.Image:
+        templates = cast("Sequence[Template]", member(instance, "_templates"))
+        template = templates[page.num % len(templates)]
+        background = template.get_background()
+        if page_layers(background) is None:
+            return draw(instance, page)
+        # 2026-11-16：分离渲染墨迹浓度，保持普通字和复合公式使用相同的扰动。
+        renderer_copy = copy.copy(instance)
+        source = copy.copy(template)
+        source.set_background(Image.new("RGB", background.size, "white"))
+        source.set_fill((0, 0, 0))
+        install_member(renderer_copy, "_templates", value=(source,))
+        return attach_ink(background, draw(renderer_copy, page))
 
     install_member(merge, "_math_ink", value=True)
     install_member(renderer, "_perturb_and_merge", merge)

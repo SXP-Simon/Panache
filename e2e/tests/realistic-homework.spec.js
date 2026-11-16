@@ -1,4 +1,4 @@
-const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, useSmallCanvas, previewPng, expectPreviewImageLoaded } = require('./fixtures');
 const pages = require('../fixtures/realistic-homework.cjs');
 const circuits = require('../fixtures/realistic-circuits.json');
 const fs = require('node:fs/promises');
@@ -57,10 +57,7 @@ for (const [index, source] of pages.entries()) {
     await page.getByTestId('preview-btn').click();
     await expectPreviewImageLoaded(page);
     await expect(input).toHaveValue(converted);
-    const bytes = await page.getByTestId('preview-image').evaluate(async element => {
-      const response = await fetch(element.src);
-      return Array.from(new Uint8Array(await response.arrayBuffer()));
-    });
+    const bytes = await previewPng(page);
     const output = path.resolve(__dirname, '../../preview_outputs/realistic-homework');
     await fs.mkdir(output, {recursive:true});
     await fs.writeFile(path.join(output, `web-${index + 1}.png`), Buffer.from(bytes));

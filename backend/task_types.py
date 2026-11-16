@@ -54,6 +54,10 @@ class GenerateHandwritingParams(BaseModel):
     strikethrough_angle_sigma: str = "0"
     strikethrough_width: str = "0"
     ink_depth_sigma: str = "0"
+    ink_layers: str = "false"
+    ink_opacity: str = "100"
+    ink_thickness: str = "0"
+    ink_softness: str = "0"
     width: str | None = None
     height: str | None = None
     is_underlined: str = Field("false", alias="isUnderlined")

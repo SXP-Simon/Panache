@@ -9,6 +9,7 @@ import GenerateButton, { useGenerationAvailability } from './GenerateButton';
 import { useI18n } from '../i18n';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
+import InkPreview from './InkPreview';
 import {
   Eye,
   PenLine,
@@ -23,9 +24,10 @@ import {
   FileDown,
 } from '../shared/icons';
 export default function PreviewPanel() {
-  const { images, currentPage, setPage } = usePreviewStore(
+  const { images, inkLayers, currentPage, setPage } = usePreviewStore(
     useShallow((state) => ({
       images: state.images,
+      inkLayers: state.inkLayers,
       currentPage: state.currentPage,
       setPage: state.setPage,
     })),
@@ -46,6 +48,7 @@ export default function PreviewPanel() {
   const [zoom, setZoom] = useState(100);
   const [expanded, setExpanded] = useState(false);
   const image = images[currentPage] ?? backgroundUrl;
+  const ink = inkLayers[currentPage];
   return (
     <section className="panel preview-panel" data-testid="preview-panel">
       <header className="panel-heading">
@@ -74,7 +77,7 @@ export default function PreviewPanel() {
             <GenerateButton compact />
           </div>
         ) : (
-          <PreviewSheet key={image} image={image} zoom={zoom} />
+          <PreviewSheet key={image} image={image} ink={ink} zoom={zoom} />
         )}
         <PreviewProgress />
       </div>
@@ -129,6 +132,7 @@ export default function PreviewPanel() {
         {expanded && image && (
           <ExpandedPreview
             image={image}
+            ink={ink}
             page={currentPage}
             count={images.length}
             setPage={setPage}
@@ -228,12 +232,14 @@ function PreviewZoom({
 
 function ExpandedPreview({
   image,
+  ink,
   page,
   count,
   setPage,
   close,
 }: {
   image: string;
+  ink: string | undefined;
   page: number;
   count: number;
   setPage: (page: number) => void;
@@ -250,7 +256,7 @@ function ExpandedPreview({
       className="preview-modal"
     >
       <div className="preview-canvas" data-testid="expanded-preview-viewport">
-        <PreviewSheet key={image} image={image} zoom={zoom} expanded />
+        <PreviewSheet key={image} image={image} ink={ink} zoom={zoom} expanded />
       </div>
       <footer className="preview-tools">
         {count > 1 && (
@@ -266,10 +272,12 @@ function ExpandedPreview({
 
 function PreviewSheet({
   image,
+  ink,
   zoom,
   expanded = false,
 }: {
   image: string;
+  ink: string | undefined;
   zoom: number;
   expanded?: boolean;
 }) {
@@ -298,6 +306,7 @@ function PreviewSheet({
         }}
         alt={t('preview')}
       />
+      {ink && <InkPreview key={ink} source={ink} testId={`${prefix}-ink-layer`} />}
     </motion.div>
   );
 }

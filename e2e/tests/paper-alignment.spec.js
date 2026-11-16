@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { test, expect, openHome, openPaperSettings, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, openPaperSettings, previewPng, expectPreviewImageLoaded } = require('./fixtures');
 const OUTPUT = path.resolve(__dirname, '../../preview_outputs/paper-alignment');
 
 const cases = [
@@ -97,8 +97,7 @@ for (const options of cases) {
     await expectPreviewImageLoaded(page);
     await fs.mkdir(OUTPUT, { recursive: true });
     await fs.writeFile(path.join(OUTPUT, `web-${options.name}-input.png`), source.buffer);
-    const image = page.getByTestId('preview-image');
-    const bytes = await image.evaluate(async (node) => Array.from(new Uint8Array(await (await fetch(node.src)).arrayBuffer())));
+    const bytes = await previewPng(page);
     await fs.writeFile(path.join(OUTPUT, `web-${options.name}-render.png`), Buffer.from(bytes));
     await fs.writeFile(path.join(OUTPUT, `web-${options.name}-measurements.json`), JSON.stringify({ detected: { ...detected, correctedBackground: Boolean(detected.correctedBackground) }, repeated }, null, 2));
     await page.screenshot({ path: path.join(OUTPUT, `web-${options.name}-ui.png`), fullPage: true });

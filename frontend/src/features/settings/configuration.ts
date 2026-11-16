@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { allFields, validNumber, validPaper } from '@/models';
+import { allFields, inkFields, validNumber, validPaper } from '@/models';
 import type { SettingsData } from './store';
 
 const schema = v.record(v.string(), v.union([v.number(), v.string(), v.boolean()]));
@@ -28,7 +28,8 @@ export function parseConfiguration(
       if (
         typeof value !== 'number' ||
         !Number.isFinite(value) ||
-        (mode === 'preset' && !validNumber(field.key, value))
+        ((mode === 'preset' || inkFields.some((ink) => ink.key === field.key)) &&
+          !validNumber(field.key, value))
       )
         throw new Error('Invalid numeric configuration');
       settings.numbers[field.key] = value;

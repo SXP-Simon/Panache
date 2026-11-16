@@ -37,6 +37,7 @@ export function useGenerationActions() {
       } else {
         replacePreview(
           result.type === 'images' ? result.images : [URL.createObjectURL(result.blob)],
+          result.type === 'images' ? result.inkLayers : undefined,
         );
         useNotificationStore.getState().inform('previewLoaded');
       }

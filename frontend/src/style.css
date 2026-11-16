@@ -1140,11 +1140,6 @@ input[type='color'] {
     grid-row: 1/4;
     margin-top: 0;
   }
-  .settings-body > .color-field {
-    grid-column: 3;
-    grid-row: 1;
-    margin: 0;
-  }
   .settings-body > .check-row {
     grid-column: 3;
     margin: 0;
@@ -1288,9 +1283,6 @@ input[type='color'] {
     margin-top: 12px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .settings-body .color-field {
-    margin: 12px 0 10px;
-  }
   .settings-body > .check-row {
     margin-top: 12px;
   }
@@ -1428,6 +1420,13 @@ input[type='color'] {
 }
 .preview-modal .zoom-tools {
   margin-inline-start: auto;
+}
+.preview-ink-layer {
+  position: absolute;
+  inset: 0;
+  mask-size: 100% 100%;
+  mask-mode: alpha;
+  pointer-events: none;
 }
 .mobile-settings-button {
   display: none;

@@ -23,10 +23,12 @@ from PIL import Image, ImageOps
 
 if __package__:
     from .generation_cancellation import check_cancelled
+    from .ink_effects import INK_LAYERS_KEY, layers
     from .logging_setup import get_logger
     from .math_page_layout import RuledTemplate
 else:
     from generation_cancellation import check_cancelled
+    from ink_effects import INK_LAYERS_KEY, layers
     from logging_setup import get_logger
     from math_page_layout import RuledTemplate
 
@@ -104,6 +106,8 @@ def process_image_to_handdrawn(
     ink_color: tuple[int, int, int] = (20, 20, 25),
     jitter_intensity: float = 1.0,
     noise_ratio: float = 0.003,
+    *,
+    seed: int | None = None,
 ) -> Image.Image:
     """将输入图片转换为仿手绘墨水线稿风格的透明 PNG 图片.
 
@@ -114,7 +118,7 @@ def process_image_to_handdrawn(
     :return: 具有透明背景的 PIL.Image (RGBA)
     """
     check_cancelled()
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed)
     # 1. 统一转换为 OpenCV BGR 格式
     if isinstance(image_input, bytes):
         with Image.open(io.BytesIO(image_input)) as decoded:
@@ -301,7 +305,11 @@ class _InlineRenderer:
             height - top - bottom,
             scale,
         )
-        image = process_image_to_handdrawn(fitted)
+        image = (
+            process_image_to_handdrawn(fitted, seed=20261116)
+            if layers(self.canvas) is not None
+            else process_image_to_handdrawn(fitted)
+        )
         check_cancelled()
         image_width, image_height = image.size
         if self.top + image_height > height - bottom:
@@ -312,6 +320,12 @@ class _InlineRenderer:
             self.dirty = False
         x = left + max(0, (width - left - right - image_width) // 2)
         self.canvas.paste(image, (x, self.top), image)
+        previous = layers(self.canvas)
+        if previous is not None:
+            paper, alpha = previous
+            paper = paper.copy()
+            paper.paste(image, (x, self.top), image)
+            self.canvas.info[INK_LAYERS_KEY] = (paper, alpha)
         self.dirty = True
         self.top += image_height + template.get_line_spacing()
 

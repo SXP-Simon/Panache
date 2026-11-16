@@ -1,4 +1,4 @@
-const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, useSmallCanvas, previewPng, expectPreviewImageLoaded } = require('./fixtures');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const formulas = require('../../frontend/tests/fixtures/automata-latex.json');
@@ -144,8 +144,7 @@ test('automata formula renders after one preparation action', async ({ page }) =
   await expect(page.getByTestId('text-input')).toHaveValue('正规式作业\n能被 5 整除的十进制整数\n' + expected);
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);
-  const bytes = await page.getByTestId('preview-image').evaluate(async image =>
-    Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())));
+  const bytes = await previewPng(page);
   const directory = path.resolve(__dirname, '../../preview_outputs/prepare-text');
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(path.join(directory, 'automata-render.png'), Buffer.from(bytes));

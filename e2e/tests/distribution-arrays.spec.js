@@ -1,6 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded, previewPng } = require('./fixtures');
 
 const source = String.raw`于是，\(X\) 的分布律为
 \[
@@ -35,9 +35,7 @@ for (const repetitions of [1, 2]) {
     await page.getByTestId('preview-image').screenshot({
       path: path.resolve(__dirname, `../../preview_outputs/distribution-arrays/web-${repetitions}.png`),
     });
-    const png = await page.getByTestId('preview-image').evaluate(async (image) =>
-      Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())),
-    );
+    const png = await previewPng(page);
     fs.writeFileSync(
       path.resolve(__dirname, `../../preview_outputs/distribution-arrays/web-${repetitions}-full.png`),
       Buffer.from(png),
@@ -56,6 +54,6 @@ for (const repetitions of [1, 2]) {
     await expect(input).toHaveValue(/⟦/);
     await page.getByTestId('preview-btn').click();
     await expectPreviewImageLoaded(page);
-    const png = await page.getByTestId('preview-image').evaluate(async (image) => Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())));
+    const png = await previewPng(page);
     fs.writeFileSync(path.resolve(__dirname, '../../preview_outputs/distribution-arrays/web-markdown-grid-full.png'), Buffer.from(png));
  });

@@ -6,9 +6,9 @@ export function clearPreview(): void {
     if (url.startsWith('blob:')) URL.revokeObjectURL(url);
   usePreviewStore.getState().setImages([]);
 }
-export function replacePreview(images: string[]): void {
+export function replacePreview(images: string[], inkLayers?: string[]): void {
   clearPreview();
-  usePreviewStore.getState().setImages(images);
+  usePreviewStore.getState().setImages(images, inkLayers);
 }
 export function changeBackground(file: File | null, ruled = false): void {
   const previous = useSettingsStore.getState().backgroundUrl;

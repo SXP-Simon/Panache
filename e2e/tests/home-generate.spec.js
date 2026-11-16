@@ -96,11 +96,12 @@ test('完整预览返回多页，前后导航保留每页图片', async ({ page 
   await expectPreviewImageLoaded(page);
   const indicator = page.getByTestId('preview-page-indicator');
   await expect(indicator).toHaveText(/1 \/ [2-9]\d*/);
-  const first = await page.getByTestId('preview-image').getAttribute('src');
+  const ink = page.getByTestId('preview-ink-layer');
+  const first = await ink.evaluate((node) => getComputedStyle(node).maskImage);
   await expect(page.getByTestId('preview-prev-btn')).toBeDisabled();
   await page.getByTestId('preview-next-btn').click();
   await expect(indicator).toHaveText(/2 \/ [2-9]\d*/);
-  await expect(page.getByTestId('preview-image')).not.toHaveAttribute('src', first);
+  await expect(ink).not.toHaveCSS('mask-image', first);
   await page.getByTestId('preview-prev-btn').click();
-  await expect(page.getByTestId('preview-image')).toHaveAttribute('src', first);
+  await expect(ink).toHaveCSS('mask-image', first);
 });

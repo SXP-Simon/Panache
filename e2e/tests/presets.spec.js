@@ -43,6 +43,7 @@ test('草稿与参数刷新后保留，损坏预设不会覆盖当前值', async
   await openHome(page);
   await page.getByTestId('text-input').fill('自动保存草稿 $x^2$');
   await setNumber(page, 'font-size-input', 99);
+  await page.getByTestId('ink-effects-toggle').click();
   await page.getByTestId('ink-color-input').fill('#184d32');
   await page.getByTestId('english-spacing-checkbox').check();
   await page.reload();

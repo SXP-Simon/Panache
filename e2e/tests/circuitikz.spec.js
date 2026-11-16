@@ -1,4 +1,4 @@
-const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, useSmallCanvas, expectPreviewImageLoaded, previewPng } = require('./fixtures');
 const fixtures = require('../fixtures/circuitikz.json');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -40,10 +40,7 @@ for (const style of ['neat', 'casual']) {
     await page.getByTestId('preview-btn').click();
     await expectPreviewImageLoaded(page);
     await expect(input).toHaveValue(converted);
-    const bytes = await page.getByTestId('preview-image').evaluate(async (element) => {
-      const response = await fetch(element.src);
-      return Array.from(new Uint8Array(await response.arrayBuffer()));
-    });
+    const bytes = await previewPng(page);
     const output = path.resolve(__dirname, '../../preview_outputs/circuits');
     await fs.mkdir(output, {recursive:true});
     await fs.writeFile(path.join(output, `web-${style}.png`), Buffer.from(bytes));

@@ -11,14 +11,17 @@ import time
 from functools import partial
 from pathlib import Path
 from unittest.mock import patch
+from zipfile import ZipFile
 
 import app
+import fitz
 import pytest
 import task_store
 from fastapi import BackgroundTasks, Request
 from fastapi.responses import Response
 from handright import Template
-from PIL import Image
+from ink_effects import InkEffects, composite
+from PIL import Image, ImageDraw
 from task_types import GenerateHandwritingParams
 
 
@@ -94,6 +97,56 @@ def test_uploaded_font_preserves_handwriting_in_prose_and_inline_math() -> None:
     assert expected
     assert json.loads(bytes(uploaded.body))["images"] == expected
     assert json.loads(bytes(different.body))["images"] != expected
+
+
+def test_layered_preview_matches_zip_and_pdf_without_filtering_paper() -> None:
+    paper = Image.new("RGB", (240, 240), (235, 222, 197))
+    draw = ImageDraw.Draw(paper)
+    draw.rectangle((4, 7, 30, 13), fill=(35, 50, 80))
+    draw.line((0, 69, 239, 69), fill=(90, 75, 61), width=2)
+    source = io.BytesIO()
+    paper.save(source, format="PNG")
+    raw = source.getvalue()
+    settings = parameters(
+        ink_layers="true",
+        ink_opacity="48",
+        ink_thickness="2",
+        ink_softness="1",
+        text=r"墨 x² \frac{a}{b}",
+        full_preview="false",
+        ink_depth_sigma="12",
+        perturb_x_sigma="2",
+        perturb_y_sigma="2",
+    ).model_copy(update={"width": None, "height": None})
+    with patch("app.psutil.cpu_percent", return_value=0):
+        preview = asyncio.run(app.generate_handwriting_impl(settings, raw))
+        zipped = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"preview": "false"}), raw)
+        )
+        pdf = asyncio.run(
+            app.generate_handwriting_impl(
+                settings.model_copy(update={"preview": "false", "pdf_save": "true"}), raw
+            )
+        )
+    assert preview.status_code == zipped.status_code == pdf.status_code == 200
+    result = json.loads(bytes(preview.body))
+    assert len(result["images"]) == len(result["ink_layers"]) == 1
+    with Image.open(io.BytesIO(base64.b64decode(result["images"][0]))) as decoded:
+        assert decoded.tobytes() == paper.tobytes()
+    with Image.open(io.BytesIO(base64.b64decode(result["ink_layers"][0]))) as mask:
+        alpha = mask.getchannel("A")
+    assert alpha.getbbox() is not None
+    expected = composite(paper, alpha, (12, 34, 56), InkEffects(48, 2, 1))
+    assert expected.tobytes() != paper.tobytes()
+    assert expected.getpixel((10, 10)) == paper.getpixel((10, 10))
+    with (
+        ZipFile(io.BytesIO(bytes(zipped.body))) as archive,
+        Image.open(io.BytesIO(archive.read("0.png"))) as png,
+    ):
+        assert png.convert("RGB").tobytes() == expected.tobytes()
+    with fitz.open(stream=bytes(pdf.body), filetype="pdf") as document:
+        rendered = document[0].get_pixmap(alpha=False)
+        assert rendered.samples == expected.tobytes()
 
 
 @pytest.mark.parametrize(

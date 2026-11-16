@@ -20,7 +20,7 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
-from functools import wraps
+from functools import partial, wraps
 from http import HTTPStatus
 from pathlib import Path
 from typing import Annotated, BinaryIO, Protocol, TypedDict, cast
@@ -58,6 +58,7 @@ from generation_cancellation import (
 from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
 from homework_layout import inset_homework_body
+from ink_effects import InkEffects, alpha_png, composite, new_layered_paper, require_layers
 from library_boundary import member
 from logging_setup import get_logger
 from math_page_layout import HomeworkTemplate, RuledTemplate
@@ -583,6 +584,7 @@ def handwrite_with_page_breaks(
     font_path: str | None = None,
     *,
     is_single_page_preview: bool = False,
+    seed: int | None = None,
 ) -> Iterable[Image.Image]:
     """Render text while honoring manual page-break, alignment markers, and font glyph fallback."""
     if font_path is None and hasattr(template, "get_font"):
@@ -593,9 +595,10 @@ def handwrite_with_page_breaks(
     normalized = normalize_text_for_font(text, font_path)
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
     aligned = apply_right_align(normalized, template)
+    render_text = handwrite if seed is None else partial(handwrite, seed=seed)
 
     if not _PAGE_BREAK_RE.search(aligned):
-        return render_inline_markdown_images(aligned, template, handwrite)
+        return render_inline_markdown_images(aligned, template, render_text)
 
     raw_chunks = _PAGE_BREAK_RE.split(aligned)
     chunks: list[str] = []
@@ -610,14 +613,14 @@ def handwrite_with_page_breaks(
     logger.info("manual page break detected: %s chunk(s)", len(chunks))
 
     if not chunks:
-        return render_inline_markdown_images("", template, handwrite)
+        return render_inline_markdown_images("", template, render_text)
 
     if is_single_page_preview:
         # 单页预览只需处理第 1 个 chunk
-        return render_inline_markdown_images(chunks[0], template, handwrite)
+        return render_inline_markdown_images(chunks[0], template, render_text)
 
     return itertools.chain.from_iterable(
-        render_inline_markdown_images(chunk, template, handwrite) for chunk in chunks
+        render_inline_markdown_images(chunk, template, render_text) for chunk in chunks
     )
 
 
@@ -747,15 +750,15 @@ async def _upload_bytes(source: UploadFile | str | bytes | None) -> bytes | None
     return source if isinstance(source, bytes) else None
 
 
-def _ink_color(source: str) -> int | tuple[int, int, int]:
-    # 2026-10-15：只解析数字和 RGB(A) 字面量；RGB 底图忽略输入颜色的 Alpha 通道。
+def _ink_color(source: str) -> tuple[tuple[int, int, int], int]:
+    # 2026-11-16：解析 RGB 和可选的墨色透明度。
     try:
         value: object = ast.literal_eval(source)
     except (ValueError, SyntaxError) as error:
         raise HTTPException(status_code=400, detail="Invalid ink color") from error
     maximum_channel = 255
     if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= maximum_channel:
-        return value
+        return (value, value, value), 255
     if isinstance(value, tuple | list):
         items = cast("Sequence[object]", value)
         channels = [
@@ -765,8 +768,10 @@ def _ink_color(source: str) -> int | tuple[int, int, int]:
             and not isinstance(channel, bool)
             and 0 <= channel <= maximum_channel
         ]
-        if len(channels) in (3, 4) and len(channels) == len(items):
-            return channels[0], channels[1], channels[2]
+        rgb_channels, rgba_channels = 3, 4
+        if len(channels) in (rgb_channels, rgba_channels) and len(channels) == len(items):
+            alpha = channels[3] if len(channels) == rgba_channels else maximum_channel
+            return (channels[0], channels[1], channels[2]), alpha
     raise HTTPException(
         status_code=400, detail="Ink color must contain RGB or RGBA channels in 0..255"
     )
@@ -840,7 +845,7 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
     template = template_type(
         background=background,
         font=font,
-        fill=_ink_color(data["fill"]),
+        fill=_ink_color(data["fill"])[0],
         line_spacing=int(data["line_spacing"]),
         left_margin=int(data["left_margin"]),
         top_margin=int(data["top_margin"]),
@@ -911,6 +916,33 @@ def _preview_response(
     return result
 
 
+def _layered_preview_response(
+    images: Iterable[Image.Image], background: Image.Image, *, single: bool, report: ReportProgress
+) -> Response:
+    pages = itertools.islice(images, 1) if single else images
+    papers: list[str] = []
+    inks: list[str] = []
+    for page in pages:
+        paper, alpha = require_layers(page)
+        papers.append(base64.b64encode(_png_bytes(paper)).decode("ascii"))
+        inks.append(base64.b64encode(_png_bytes(alpha_png(alpha))).decode("ascii"))
+    if not papers:
+        papers.append(base64.b64encode(_png_bytes(background)).decode("ascii"))
+        inks.append(
+            base64.b64encode(_png_bytes(Image.new("RGBA", background.size))).decode("ascii")
+        )
+    report("finalizing", "正在返回预览结果", 100)
+    return JSONResponse({"status": "success", "images": papers, "ink_layers": inks})
+
+
+def _filtered_pages(
+    images: Iterable[Image.Image], effects: InkEffects, color: tuple[int, int, int], alpha: int
+) -> Iterable[Image.Image]:
+    for page in images:
+        check_cancelled()
+        yield composite(*require_layers(page), color, effects, alpha)
+
+
 def _zip_response(images: Iterable[Image.Image], report: ReportProgress) -> Response:
     base = Path("temp")
     base.mkdir(exist_ok=True)
@@ -940,14 +972,16 @@ def _zip_response(images: Iterable[Image.Image], report: ReportProgress) -> Resp
     )
 
 
-def _pdf_response(images: Iterable[Image.Image], report: ReportProgress) -> Response:
+def _pdf_response(
+    images: Iterable[Image.Image], report: ReportProgress, *, lossless: bool = False
+) -> Response:
     # 2026-10-15：PDF 引擎只在实际导出时载入，保留桌面冷启动的惰性依赖。
     exporter = cast(
-        "Callable[[Iterable[Image.Image]], str | None]",
+        "Callable[..., str | None]",
         member(importlib.import_module("pdf"), "generate_pdf"),
     )
     report("packaging", "正在导出PDF文件", 92)
-    path = exporter(images)
+    path = exporter(images, lossless=True) if lossless else exporter(images)
     if path is None:
         return JSONResponse({"status": "error", "message": "PDF export failed"}, status_code=500)
     try:
@@ -960,6 +994,26 @@ def _pdf_response(images: Iterable[Image.Image], report: ReportProgress) -> Resp
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=images.pdf"},
     )
+
+
+def _deliver_images(
+    data: dict[str, str],
+    images: Iterable[Image.Image],
+    background: Image.Image,
+    report: ReportProgress,
+    effects: InkEffects | None,
+) -> Response:
+    pdf = data.get("pdf_save") == "true"
+    if data["preview"] == "true" and not pdf:
+        preview = _layered_preview_response if effects is not None else _preview_response
+        return preview(
+            images, background, single=data.get("full_preview") == "false", report=report
+        )
+    if effects is not None:
+        images = _filtered_pages(images, effects, *_ink_color(data["fill"]))
+        if pdf:
+            return _pdf_response(images, report, lossless=True)
+    return _pdf_response(images, report) if pdf else _zip_response(images, report)
 
 
 def _render_handwriting(
@@ -985,6 +1039,10 @@ def _render_handwriting(
         report("prepare_font", "正在加载字体", 30)
         font, path = _font_for(data, font_file)
         template = _template_for(data, background, font)
+        layered = data.get("ink_layers") == "true"
+        effects = InkEffects.from_form(data) if layered else None
+        if layered:
+            template.set_background(new_layered_paper(background))
         text = (
             _english_spacing(data["text"])
             if data.get("enableEnglishSpacing") == "true"
@@ -995,14 +1053,14 @@ def _render_handwriting(
         report("rendering", "正在生成手写图像", 45)
         images = checked_items(
             handwrite_with_page_breaks(
-                text, template, font_path=path, is_single_page_preview=single
+                text,
+                template,
+                font_path=path,
+                is_single_page_preview=single,
+                seed=20261116 if layered else None,
             )
         )
-        if pdf:
-            return _pdf_response(images, report)
-        if preview:
-            return _preview_response(images, background, single=single, report=report)
-        return _zip_response(images, report)
+        return _deliver_images(data, images, background, report, effects)
     except HTTPException as error:
         return JSONResponse(
             {"status": "fail", "message": str(error.detail)}, status_code=error.status_code

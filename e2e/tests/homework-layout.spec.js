@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { test, expect, openHome, openPaperSettings, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, openPaperSettings, previewPng, expectPreviewImageLoaded } = require('./fixtures');
 const OUTPUT = path.resolve(__dirname, '../../preview_outputs/homework-layout');
 
 const assignment = String.raw`# 离散数学 · 推理与证明
@@ -53,13 +53,12 @@ async function generate(page, name, style) {
   await fs.mkdir(OUTPUT, { recursive: true });
   let index = 1;
   do {
-    const bytes = await page.getByTestId('preview-image').evaluate(async (image) =>
-      Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())));
+    const bytes = await previewPng(page);
     await fs.writeFile(path.join(OUTPUT, `${name}-page-${index}.png`), Buffer.from(bytes));
     if (await page.getByTestId('preview-next-btn').isDisabled()) break;
-    const previous = await page.getByTestId('preview-image').getAttribute('src');
+    const previous = await page.getByTestId('preview-ink-layer').evaluate((node) => getComputedStyle(node).maskImage);
     await page.getByTestId('preview-next-btn').click();
-    await expect(page.getByTestId('preview-image')).not.toHaveAttribute('src', previous);
+    await expect(page.getByTestId('preview-ink-layer')).not.toHaveCSS('mask-image', previous);
     await expect.poll(() => page.getByTestId('preview-image').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
     index++;
     expect(index).toBeLessThan(10);
