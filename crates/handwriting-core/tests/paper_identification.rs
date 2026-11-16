@@ -142,6 +142,43 @@ fn printed_title_reserves_first_rule_as_a_separator() {
 }
 
 #[test]
+fn distant_header_and_registration_marks_do_not_consume_dotted_body_rows() {
+    let source = GrayImage::from_fn(800, 1000, |x, y| {
+        let header = (260..540).contains(&x)
+            && (153..181).contains(&y)
+            && ((x - 260) % 32 < 4 || (y < 158 && (x - 260) % 32 < 19));
+        let fields =
+            (220..=223).contains(&y) && ((280..370).contains(&x) || (480..540).contains(&x));
+        let sidebar = (105..109).contains(&x) && (385..821).contains(&y);
+        let ruled = x % 5 < 3
+            && (0..13).any(|i| {
+                let center = 310.
+                    + 38. * i as f32
+                    + (i * (i - 1) / 2) as f32
+                    + (x as f32 - 400.) * (i - 4) as f32 / 1000.;
+                (145 - i as u32..670 + i as u32).contains(&x) && (y as f32 - center).abs() <= 1.
+            });
+        let paper = 245 - x / 55 - y.saturating_sub(550) / 18;
+        Luma([if header || fields || sidebar {
+            24
+        } else {
+            (paper - 25 * u32::from(ruled)) as u8
+        }])
+    });
+    let result = imaging::identify(&DynamicImage::ImageLuma8(source)).unwrap();
+    assert!(result.margin_top.abs_diff(310) <= 2);
+    assert_eq!(
+        result.layout_top_margin + result.line_spacing,
+        result.margin_top
+    );
+    assert_eq!(result.line_spacing, 44);
+    assert!((140..=180).contains(&result.margin_left));
+    assert!((115..=150).contains(&result.margin_right));
+    assert!((145..=170).contains(&result.margin_bottom));
+    assert!(result.corrected_background.is_some());
+}
+
+#[test]
 fn curved_and_perspective_rulings_are_flattened_before_layout() {
     let source = GrayImage::from_fn(800, 1000, |x, y| {
         let u = (x as f32 - 400.) / 400.;

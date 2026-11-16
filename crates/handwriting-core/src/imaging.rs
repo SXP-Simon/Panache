@@ -205,7 +205,8 @@ fn projected_rows(points: &[(f32, f32)], h: u32, angle: f32) -> (f64, Vec<u32>) 
 fn has_printed_header(image: &RgbaImage, first: u32, spacing: u32) -> bool {
     use image::Pixel;
     let radius = (spacing / 6).max(2);
-    let start = radius.max(first.saturating_sub(spacing * 5 / 2));
+    // 2026-11-16：只有侵入首个书写格的标题才占用第一条横线。
+    let start = radius.max(first.saturating_sub(spacing));
     let end = first.saturating_sub(radius * 2);
     let left = image.width() * 15 / 100;
     let right = image.width() * 85 / 100;
