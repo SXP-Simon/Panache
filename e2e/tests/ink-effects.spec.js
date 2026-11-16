@@ -36,14 +36,14 @@ test('dragging ink controls updates only the ink layer and exports the chosen lo
   await expect(ink).toHaveCSS('opacity', String(Number(await value()) / 100));
   await page.mouse.up();
 
-  const thickness = await startDrag('ink-thickness', 0.98);
-  await expect(thickness).toHaveValue('2');
+  const thickness = await startDrag('ink-thickness', 0.66);
+  await expect(thickness).toHaveValue(/^0\.[5-9]$/);
   await expect(ink).not.toHaveCSS('mask-image', originalMask);
   await page.mouse.up();
 
   const thickMask = await mask();
-  const softness = await startDrag('ink-softness', 0.98);
-  await expect(softness).toHaveValue('2');
+  const softness = await startDrag('ink-softness', 0.22);
+  await expect(softness).toHaveValue(/^0\.[3-6]$/);
   await expect(ink).not.toHaveCSS('mask-image', thickMask);
   await page.mouse.up();
   await page.getByTestId('ink-color-input').fill('#254587');

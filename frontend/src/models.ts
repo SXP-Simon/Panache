@@ -140,11 +140,11 @@ export const inkFields = [
     key: 'ink_thickness',
     label: 'inkThickness',
     testId: 'ink-thickness',
-    step: 1,
+    step: 0.1,
     min: -2,
     max: 2,
   },
-  { key: 'ink_softness', label: 'inkSoftness', testId: 'ink-softness', step: 1, min: 0, max: 2 },
+  { key: 'ink_softness', label: 'inkSoftness', testId: 'ink-softness', step: 0.1, min: 0, max: 2 },
 ] as const;
 export const allFields = [
   ...mainFields,
@@ -167,7 +167,10 @@ const integerFields = new Set<NumericKey>([
 ]);
 export function validNumber(key: NumericKey, value: number): boolean {
   const ink = inkFields.find((item) => item.key === key);
-  if (ink) return Number.isInteger(value) && value >= ink.min && value <= ink.max;
+  if (ink)
+    return (
+      Number.isInteger(value * (ink.step === 1 ? 1 : 10)) && value >= ink.min && value <= ink.max
+    );
   const field = allFields.find((item) => item.key === key);
   const maximum = key === 'strikethrough_probability' ? 1 : key === 'font_size' ? 2048 : 10000;
   return Boolean(

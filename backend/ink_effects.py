@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Simon and Panache contributors.
 """2026-11-16：透明墨迹层和与预览共享的整数滤镜."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
@@ -21,21 +22,23 @@ class InkEffects:
     """Bound the same pixel operations used in both clients."""
 
     opacity: int
-    thickness: int
-    softness: int
+    thickness: float
+    softness: float
 
     @classmethod
     def from_form(cls, data: dict[str, str]) -> "InkEffects":
         """Parse bounded integer settings before allocating pixel buffers."""
         values = cls(
             int(data.get("ink_opacity", "100")),
-            int(data.get("ink_thickness", "0")),
-            int(data.get("ink_softness", "0")),
+            float(data.get("ink_thickness", "0")),
+            float(data.get("ink_softness", "0")),
         )
         if not (
             0 <= values.opacity <= FULL_OPACITY
             and abs(values.thickness) <= MAX_RADIUS
             and 0 <= values.softness <= MAX_RADIUS
+            and (values.thickness * 10).is_integer()
+            and (values.softness * 10).is_integer()
         ):
             msg = "Ink effects out of range"
             raise ValueError(msg)
@@ -81,6 +84,20 @@ def alpha_png(alpha: Image.Image) -> Image.Image:
     return image
 
 
+def _fractional_mask(
+    mask: InkMask, radius: float, transform: Callable[[InkMask, int], InkMask]
+) -> InkMask:
+    # 2026-11-16：在相邻整数半径的遮罩之间插值，客户端和导出共享舍入规则。
+    whole, weight = divmod(round(radius * 10), 10)
+    lower = transform(mask, whole) if whole else mask
+    if not weight:
+        return lower
+    upper = transform(mask, whole + 1)
+    return (
+        (lower.astype(np.uint16) * (10 - weight) + upper.astype(np.uint16) * weight + 5) // 10
+    ).astype(np.uint8)
+
+
 def _soften(mask: InkMask, radius: int) -> InkMask:
     size = 2 * radius + 1
     for kernel_size in ((size, 1), (1, size)):
@@ -110,14 +127,14 @@ def composite(
                 morph(source, kernel, borderType=cv2.BORDER_REPLICATE), dtype=np.uint8
             )
 
-        changed = stroke(mask, abs(effects.thickness))
+        changed = _fractional_mask(mask, abs(effects.thickness), stroke)
         if thin:
             changed = (
                 (changed.astype(np.uint16) * 7 + mask.astype(np.uint16) * 3 + 5) // 10
             ).astype(np.uint8)
         mask = changed
     if effects.softness:
-        mask = _soften(mask, effects.softness)
+        mask = _fractional_mask(mask, effects.softness, _soften)
     result = paper.copy()
     adjusted = (
         (np.asarray(mask, dtype=np.uint32) * effects.opacity * color_alpha + 12_750) // 25_500

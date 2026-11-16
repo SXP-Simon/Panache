@@ -110,8 +110,8 @@ def test_layered_preview_matches_zip_and_pdf_without_filtering_paper() -> None:
     settings = parameters(
         ink_layers="true",
         ink_opacity="48",
-        ink_thickness="2",
-        ink_softness="1",
+        ink_thickness="1.4",
+        ink_softness="0.3",
         text=r"墨 x² \frac{a}{b}",
         full_preview="false",
         ink_depth_sigma="12",
@@ -136,7 +136,7 @@ def test_layered_preview_matches_zip_and_pdf_without_filtering_paper() -> None:
     with Image.open(io.BytesIO(base64.b64decode(result["ink_layers"][0]))) as mask:
         alpha = mask.getchannel("A")
     assert alpha.getbbox() is not None
-    expected = composite(paper, alpha, (12, 34, 56), InkEffects(48, 2, 1))
+    expected = composite(paper, alpha, (12, 34, 56), InkEffects(48, 1.4, 0.3))
     assert expected.tobytes() != paper.tobytes()
     assert expected.getpixel((10, 10)) == paper.getpixel((10, 10))
     with (

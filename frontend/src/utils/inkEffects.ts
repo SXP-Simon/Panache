@@ -33,7 +33,17 @@ export function filterInk(
       }
       return result;
     };
-    return pass(pass(source, 1, width, radius), width, height, radius);
+    const at = (whole: number) =>
+      whole ? pass(pass(source, 1, width, whole), width, height, whole) : source;
+    const tenths = Math.round(radius * 10);
+    const low = Math.floor(tenths / 10);
+    const weight = tenths % 10;
+    const lower = at(low);
+    if (!weight) return lower;
+    const upper = at(low + 1);
+    return lower.map((value, i) =>
+      Math.round((value * (10 - weight) + (upper[i] ?? 0) * weight) / 10),
+    );
   };
   let mask = alpha;
   if (effects.thickness) {

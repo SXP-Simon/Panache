@@ -307,7 +307,7 @@ function InkSlider({ field }: { field: (typeof inkFields)[number] }) {
   return (
     <label className="field-label">
       <span>
-        {t(field.label)} {value}
+        {t(field.label)} {value.toFixed(field.step === 1 ? 0 : 1)}
         {field.key === 'ink_opacity' ? '%' : ' px'}
       </span>
       <input
