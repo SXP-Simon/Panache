@@ -201,6 +201,204 @@ fn projected_rows(points: &[(f32, f32)], h: u32, angle: f32) -> (f64, Vec<u32>) 
     let score = rows.iter().map(|n| f64::from(*n).powi(2)).sum();
     (score, rows)
 }
+
+fn strip_centers(rows: &[u32], threshold: u32) -> Vec<f32> {
+    let mut centers = Vec::new();
+    let mut count = 0.;
+    let mut weighted = 0.;
+    for (y, value) in rows.iter().copied().chain([0]).enumerate() {
+        if value >= threshold {
+            count += value as f32;
+            weighted += y as f32 * value as f32;
+        } else if count > 0. {
+            centers.push(weighted / count);
+            count = 0.;
+            weighted = 0.;
+        }
+    }
+    centers
+}
+
+// Track the same rulings across the page before applying any global rotation.
+fn flatten_rulings(
+    opaque: &RgbaImage,
+    points: &[(f32, f32)],
+    w: u32,
+    h: u32,
+    ratio: f32,
+) -> Result<Option<Identification>> {
+    use base64::Engine;
+    const STRIPS: usize = 5;
+    const MIN_TRACKED_LINES: usize = 6;
+    let columns: [f32; STRIPS] = std::array::from_fn(|i| w as f32 * (0.15 + i as f32 * 0.175));
+    let radius = (w / 30).max(8) as f32;
+    let mut rows = vec![[0; STRIPS]; h as usize];
+    for &(x, y) in points {
+        for (i, column) in columns.iter().enumerate() {
+            if (x + w as f32 / 2. - column).abs() < radius {
+                rows[(y + h as f32 / 2.) as usize][i] += 1;
+            }
+        }
+    }
+    let strips: [Vec<f32>; STRIPS] = std::array::from_fn(|index| {
+        let profile: Vec<_> = rows.iter().map(|row| row[index]).collect();
+        strip_centers(&profile, (radius * 1.1).ceil() as u32)
+    });
+    if strips.iter().any(|strip| strip.len() < MIN_TRACKED_LINES) {
+        return Ok(None);
+    }
+    let middle = &strips[2];
+    let mut gaps: Vec<_> = middle.windows(2).map(|pair| pair[1] - pair[0]).collect();
+    gaps.sort_by(f32::total_cmp);
+    let spacing = gaps[gaps.len() / 2];
+    if spacing < 6. {
+        return Ok(None);
+    }
+    let mut first = 0;
+    let mut best = &middle[..0];
+    for (i, pair) in middle.windows(2).enumerate() {
+        if (pair[1] - pair[0] - spacing).abs() > spacing * 0.18 {
+            if i + 1 - first > best.len() {
+                best = &middle[first..=i];
+            }
+            first = i + 1;
+        }
+    }
+    if middle.len() - first > best.len() {
+        best = &middle[first..];
+    }
+    if best.len() < MIN_TRACKED_LINES {
+        return Ok(None);
+    }
+    let spacing = (best[best.len() - 1] - best[0]) / (best.len() - 1) as f32;
+    let tracks = strips.each_ref().map(|strip| {
+        best.iter()
+            .map(|y| {
+                let next = strip.partition_point(|candidate| candidate < y);
+                let left = strip[next.saturating_sub(1)];
+                let right = strip[next.min(strip.len() - 1)];
+                if (y - left).abs() < (right - y).abs() {
+                    left
+                } else {
+                    right
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+    for track in &tracks {
+        if track
+            .iter()
+            .zip(best)
+            .any(|(y, reference)| (y - reference).abs() > spacing * 0.42)
+            || track
+                .windows(2)
+                .any(|pair| (pair[1] - pair[0] - spacing).abs() > spacing * 0.22)
+        {
+            return Ok(None);
+        }
+    }
+    // Leave flat or uniformly rotated paper on the existing affine path.
+    let slope = (tracks[4][0] - tracks[0][0]) / (columns[4] - columns[0]);
+    let nonlinear = tracks.iter().zip(columns).any(|(track, x)| {
+        track.iter().enumerate().any(|(i, y)| {
+            (y - (best[0] + spacing * i as f32 + slope * (x - columns[2]))).abs() > 3.
+        })
+    });
+    if !nonlinear {
+        return Ok(None);
+    }
+    let (ow, oh) = opaque.dimensions();
+    let geometry = |x: f32, i: usize| {
+        let j = columns
+            .partition_point(|column| *column < x)
+            .saturating_sub(1)
+            .min(STRIPS - 2);
+        let t = (x - columns[j]) / (columns[j + 1] - columns[j]);
+        tracks[j][i] + t * (tracks[j + 1][i] - tracks[j][i])
+    };
+    let step = (spacing / ratio).round() as u32;
+    let top = (best[0] / ratio).round() as u32;
+    let last = top + (best.len() - 1) as u32 * step;
+    if top == 0 || last >= oh - 1 {
+        return Ok(None);
+    }
+    let mut support = vec![vec![false; best.len()]; w as usize];
+    for &(x, y) in points {
+        let x = x + w as f32 / 2.;
+        let y = y + h as f32 / 2.;
+        let i = ((y - best[0]) / spacing).round() as usize;
+        // A slanted row can be closer to an adjacent row at the outer edges.
+        let column = &mut support[x as usize];
+        for (j, hit) in column
+            .iter_mut()
+            .enumerate()
+            .take(i + 2)
+            .skip(i.saturating_sub(1))
+        {
+            if (y - geometry(x, j)).abs() <= 3. {
+                *hit = true;
+            }
+        }
+    }
+    let supported =
+        |column: &Vec<bool>| column.iter().filter(|&&hit| hit).count() * 2 >= best.len();
+    let Some(left) = support.iter().position(supported) else {
+        return Ok(None);
+    };
+    let right = support.iter().rposition(supported).unwrap();
+    if right - left < w as usize / 2 {
+        return Ok(None);
+    }
+    let mut corrected = RgbaImage::new(ow, oh);
+    for x in 0..ow {
+        let source: Vec<_> = std::iter::once(0.)
+            .chain((0..best.len()).map(|i| geometry(x as f32 * ratio, i) / ratio))
+            .chain([(oh - 1) as f32])
+            .collect();
+        if source.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Ok(None);
+        }
+        let destination = |i: usize| match i {
+            0 => 0,
+            i if i > best.len() => oh - 1,
+            i => top + (i - 1) as u32 * step,
+        };
+        for (i, pair) in source.windows(2).enumerate() {
+            let start = destination(i);
+            let end = destination(i + 1);
+            for y in start..=end {
+                let weight = (y - start) as f32 / (end - start) as f32;
+                let source_y = (pair[0] + weight * (pair[1] - pair[0])).clamp(0., (oh - 1) as f32);
+                let before = source_y.floor() as u32;
+                let after = (before + 1).min(oh - 1);
+                let fraction = source_y - before as f32;
+                corrected[(x, y)] = Rgba(std::array::from_fn(|channel| {
+                    let a = opaque[(x, before)][channel] as f32;
+                    let b = opaque[(x, after)][channel] as f32;
+                    (a + fraction * (b - a)).round() as u8
+                }));
+            }
+        }
+    }
+    let bottom = oh - last;
+    let first_writable = if top >= step { top } else { top + step };
+    Ok(Some(Identification {
+        margin_left: (left as f32 / ratio).round() as u32,
+        margin_right: ((w as usize - 1 - right) as f32 / ratio).round() as u32,
+        margin_top: top,
+        margin_bottom: bottom,
+        layout_top_margin: first_writable - step,
+        layout_bottom_margin: bottom.saturating_sub(step.div_ceil(4)),
+        image_width: ow,
+        image_height: oh,
+        line_spacing: step,
+        deskew_angle_degrees: 0.,
+        confidence: 1.,
+        corrected_background: Some(
+            base64::engine::general_purpose::STANDARD.encode(crate::export::png(&corrected)?),
+        ),
+    }))
+}
 // 2026-10-24：分析坐标和返回的实际背景使用相同旋转，粗线按整条线带中心计距。
 pub fn identify(image: &DynamicImage) -> Result<Identification> {
     use base64::Engine;
@@ -226,6 +424,9 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
     );
     let (w, h) = gray.dimensions();
     let points = ruling_points(&gray);
+    if let Some(corrected) = flatten_rulings(&opaque, &points, w, h, ratio)? {
+        return Ok(corrected);
+    }
     let mut best = (0f64, 0f32, vec![0; h as usize]);
     for step in -24..=24 {
         let angle = (step as f32 * 0.5).to_radians();

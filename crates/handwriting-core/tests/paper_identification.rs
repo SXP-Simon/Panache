@@ -117,3 +117,34 @@ fn top_edge_line_uses_next_available_notebook_baseline() {
     assert_eq!(detected.layout_top_margin, 21);
     assert_eq!(detected.layout_top_margin + detected.line_spacing, 91);
 }
+
+#[test]
+fn curved_and_perspective_rulings_are_flattened_before_layout() {
+    let source = GrayImage::from_fn(800, 1000, |x, y| {
+        let u = (x as f32 - 400.) / 400.;
+        let ruled = (50..750).contains(&x)
+            && (0..15).any(|i| {
+                let center = 110. + 55. * i as f32 + 14. * u * u + (5. - i as f32) * u;
+                (y as f32 - center.round()).abs() <= 2.
+            });
+        let header = (180..580).contains(&x) && (22..60).contains(&y);
+        Luma([if ruled || header { 24 } else { 182 }])
+    });
+    let detected = imaging::identify(&DynamicImage::ImageLuma8(source)).unwrap();
+    assert_eq!(detected.line_spacing, 55);
+    assert!(detected.margin_top.abs_diff(110) <= 3);
+    assert!(detected.margin_bottom.abs_diff(120) <= 3);
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(detected.corrected_background.unwrap())
+        .unwrap();
+    let corrected = imaging::decode(&png, &Limits::default())
+        .unwrap()
+        .into_luma8();
+    assert_eq!(corrected.dimensions(), (800, 1000));
+    for x in [120, 400, 680] {
+        for row in [0, 7, 14] {
+            let y = detected.margin_top + row * detected.line_spacing;
+            assert!((y - 2..=y + 2).any(|y| corrected[(x, y)][0] < 80));
+        }
+    }
+}
