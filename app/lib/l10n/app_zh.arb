@@ -222,5 +222,9 @@
   "previewZoomIn": "放大",
   "previewZoomOut": "缩小",
   "previewZoomRatioHint": "相对于适合窗口尺寸的缩放比例",
-  "previewReaderHint": "滚轮或双指缩放 · 按住拖动 · 双击放大或还原"
+  "previewReaderHint": "滚轮或双指缩放 · 按住拖动 · 双击放大或还原",
+  "inkEffects": "字迹滤镜",
+  "inkOpacity": "浓淡",
+  "inkThickness": "笔画粗细",
+  "inkSoftness": "边缘柔化"
 }

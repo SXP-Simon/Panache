@@ -1,5 +1,6 @@
 //! 2026-10-31：共享渲染与导出编排；路径、任务提交和失败清理由平台入口管理。
 use crate::{Cancellation, Error, RenderRequest, Result, export, render};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use std::io::{Seek, Write};
 
 pub trait WriteSeek: Write + Seek {}
@@ -7,8 +8,15 @@ impl<T: Write + Seek> WriteSeek for T {}
 
 pub enum Output<'a> {
     Preview(&'a mut dyn FnMut(usize, Vec<u8>) -> Result<()>),
+    InkLayers(&'a mut dyn FnMut(usize, EncodedInkPage) -> Result<()>),
     Pdf(&'a mut dyn Write),
     Zip(&'a mut dyn WriteSeek),
+}
+
+#[derive(serde::Serialize)]
+pub struct EncodedInkPage {
+    pub paper: String,
+    pub ink: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,8 +47,25 @@ pub fn generate(
                 cancel.check()
             })?;
         }
+        Output::InkLayers(emit) => {
+            crate::render::render_pages(request, cancel, |index, paper, alpha| {
+                let alpha = alpha.ok_or_else(|| Error::new("invalid_parameter", "ink_layers"))?;
+                cancel.check()?;
+                let paper = STANDARD.encode(export::png(&paper)?);
+                cancel.check()?;
+                let ink =
+                    STANDARD.encode(export::png(&crate::ink_effects::transparent_mask(&alpha))?);
+                emit(index, EncodedInkPage { paper, ink })?;
+                progress(Event::PageReady(index + 1))?;
+                cancel.check()
+            })?;
+        }
         Output::Pdf(writer) => {
-            let mut pdf = export::PdfExport::new();
+            let mut pdf = if request.params.ink_layers {
+                export::PdfExport::lossless()
+            } else {
+                export::PdfExport::new()
+            };
             render(request, cancel, |index, image| {
                 cancel.check()?;
                 pdf.add(&image)?;

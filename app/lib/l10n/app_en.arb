@@ -222,5 +222,9 @@
   "previewZoomIn": "Zoom in",
   "previewZoomOut": "Zoom out",
   "previewZoomRatioHint": "Zoom relative to fit-to-window size",
-  "previewReaderHint": "Scroll or pinch to zoom · Drag to move · Double-click to zoom or reset"
+  "previewReaderHint": "Scroll or pinch to zoom · Drag to move · Double-click to zoom or reset",
+  "inkEffects": "Ink effects",
+  "inkOpacity": "Opacity",
+  "inkThickness": "Stroke thickness",
+  "inkSoftness": "Edge softness"
 }

@@ -416,3 +416,77 @@ fn image_compaction_preserves_literal_protection_order_and_original_marker_data(
             >= 3
     );
 }
+
+#[test]
+fn layered_preview_zip_and_pdf_keep_the_same_paper_and_ink() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use handwriting_core::generation::{self, Output};
+    use std::io::Read;
+
+    let mut request = request("墨迹测试 x² (a)/(b)");
+    let mut paper = RgbaImage::from_pixel(240, 180, Rgba([233, 221, 201, 255]));
+    for x in 0..240 {
+        paper.put_pixel(x, 92, Rgba([73, 62, 54, 255]));
+    }
+    request.background = Some(export::png(&paper).unwrap());
+    request.params.width = None;
+    request.params.height = None;
+    request.params.ink_layers = true;
+    request.params.fill = [12, 34, 56, 255];
+    request.params.ink_opacity = 48;
+    request.params.ink_thickness = 2;
+    request.params.ink_softness = 1;
+    request.params.ink_depth_sigma = 8.;
+    request.params.perturb_x_sigma = 1.;
+    let cancel = Cancellation::default();
+    let mut preview = Vec::new();
+    generation::generate(
+        &request,
+        &cancel,
+        Output::InkLayers(&mut |_, page| {
+            preview.push(page);
+            Ok(())
+        }),
+        |_| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(preview.len(), 1);
+    let decode = |source: &str| {
+        image::load_from_memory(&STANDARD.decode(source).unwrap())
+            .unwrap()
+            .into_rgba8()
+    };
+    assert!(decode(&preview[0].paper) == paper);
+    let mask = decode(&preview[0].ink);
+    assert!(mask.pixels().any(|p| p[3] > 0));
+    assert_eq!(mask[(5, 92)][3], 0);
+    let expected = pages(&request).remove(0);
+    assert_ne!(expected, paper);
+    assert_eq!(expected[(5, 92)], paper[(5, 92)]);
+
+    let mut archive = Cursor::new(Vec::new());
+    generation::generate(&request, &cancel, Output::Zip(&mut archive), |_| Ok(())).unwrap();
+    let mut zip = zip::ZipArchive::new(archive).unwrap();
+    let mut png = Vec::new();
+    zip.by_name("0.png").unwrap().read_to_end(&mut png).unwrap();
+    assert_eq!(
+        image::load_from_memory(&png).unwrap().into_rgba8(),
+        expected
+    );
+
+    let mut pdf = Vec::new();
+    generation::generate(&request, &cancel, Output::Pdf(&mut pdf), |_| Ok(())).unwrap();
+    let stream = b"stream\n";
+    let start = pdf
+        .windows(stream.len())
+        .position(|bytes| bytes == stream)
+        .unwrap();
+    let mut rgb = Vec::new();
+    flate2::read::ZlibDecoder::new(&pdf[start + stream.len()..])
+        .read_to_end(&mut rgb)
+        .unwrap();
+    assert_eq!(
+        &rgb,
+        DynamicImage::ImageRgba8(expected).into_rgb8().as_raw()
+    );
+}

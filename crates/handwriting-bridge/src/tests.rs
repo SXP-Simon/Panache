@@ -111,6 +111,7 @@ fn local_engine_lifecycle_and_abi() {
     };
     for mode in [
         "preview",
+        "layered",
         "math",
         "image",
         "text_limit",
@@ -132,6 +133,9 @@ fn local_engine_lifecycle_and_abi() {
         }
         if mode == "image" {
             fields.insert("text".into(), image_support::image_document());
+        }
+        if mode == "layered" {
+            fields.insert("ink_layers".into(), "true".into());
         }
         if mode == "text_limit" {
             fields.insert("text".into(), "字".repeat(20_001));
@@ -191,14 +195,24 @@ fn local_engine_lifecycle_and_abi() {
                         .is_some_and(|code| !code.is_empty())
                 );
             }
-            "preview" | "math" | "image" => {
+            "preview" | "math" | "image" | "layered" => {
                 assert_eq!(state["task_status"], "completed", "{state}");
                 assert_eq!(state["task_stage"], "completed");
                 assert_eq!(state["pages_completed"], 2);
                 assert!(state["error_code"].is_null());
                 assert_eq!(state["pages"].as_array().unwrap().len(), 2);
                 let bytes = std::fs::read(state["pages"][0].as_str().unwrap()).unwrap();
-                assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+                if mode == "layered" {
+                    use base64::{Engine, engine::general_purpose::STANDARD};
+
+                    let page: Value = serde_json::from_slice(&bytes).unwrap();
+                    for layer in ["paper", "ink"] {
+                        let png = STANDARD.decode(page[layer].as_str().unwrap()).unwrap();
+                        assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+                    }
+                } else {
+                    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+                }
             }
             _ => {
                 assert_eq!(state["task_status"], "completed", "{state}");

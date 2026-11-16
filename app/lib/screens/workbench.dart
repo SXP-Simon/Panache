@@ -521,7 +521,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     onColorSelected: (value) {
       w.settings.fill = value;
       settingsRevision++;
-      w.edit();
+      w.edit(inkOnly: true);
     },
     onUploadFont: () => action(() async {
       final file = await pick(['ttf', 'otf']);
@@ -589,6 +589,9 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Widget previewPanel() => WorkbenchPreview(
     pages: w.pages,
+    inkPages: w.inkPages,
+    inkLook: w.settings.inkLook,
+    onInkChanged: w.editInk,
     stale: w.previewStale,
     page: w.page,
     version: w.version,
@@ -598,7 +601,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       w.emit();
     },
     onSaveImage: () => action(
-      () => saveBytes(w.pages[w.page], 'png', name: 'Panache-${w.page + 1}'),
+      () async => saveBytes(
+        await w.currentPreviewImage(),
+        'png',
+        name: 'Panache-${w.page + 1}',
+      ),
     ),
     onSaveExport: w.exportBytes == null
         ? null

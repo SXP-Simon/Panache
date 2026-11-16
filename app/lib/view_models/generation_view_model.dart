@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/engine_failure.dart';
+import '../models/ink_page.dart';
 import '../services/engine_gateway.dart';
 
 class _GenerationOperation {
@@ -23,6 +24,7 @@ class GenerationViewModel extends ChangeNotifier {
   int progress = 0, page = 0;
   DateTime? retryAt;
   List<Uint8List> pages = [];
+  List<InkPage?> inkPages = [];
   Uint8List? exportBytes;
   String exportExtension = '';
   int? previewRevision;
@@ -100,7 +102,11 @@ class GenerationViewModel extends ChangeNotifier {
       if (preview) {
         final rendered = await engine.preview(submittedId);
         if (!current()) return false;
-        pages = rendered;
+        inkPages = rendered.map(InkPage.fromPacket).toList(growable: false);
+        pages = [
+          for (var i = 0; i < rendered.length; i++)
+            inkPages[i]?.paper ?? rendered[i],
+        ];
         previewRevision = revision;
         previewTaskId = submittedId;
         page = 0;

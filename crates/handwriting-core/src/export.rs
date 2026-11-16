@@ -13,6 +13,7 @@ pub fn png(image: &RgbaImage) -> Result<Vec<u8>> {
 pub struct PdfExport {
     pdf: Pdf,
     pages: Vec<Ref>,
+    lossless: bool,
 }
 impl Default for PdfExport {
     fn default() -> Self {
@@ -24,6 +25,13 @@ impl PdfExport {
         Self {
             pdf: Pdf::new(),
             pages: Vec::new(),
+            lossless: false,
+        }
+    }
+    pub fn lossless() -> Self {
+        Self {
+            lossless: true,
+            ..Self::new()
         }
     }
     pub fn add(&mut self, image: &RgbaImage) -> Result<()> {
@@ -33,18 +41,33 @@ impl PdfExport {
         let content_id = Ref::new(id + 2);
         let (w, h) = (image.width() as f32, image.height() as f32);
         let rgb = DynamicImage::ImageRgba8(image.clone()).to_rgb8();
-        let mut jpeg = Vec::new();
-        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, PDF_JPEG_QUALITY)
-            .encode_image(&rgb)
-            .map_err(|e| Error::new("encode_failed", e.to_string()))?;
+        let (encoded, filter) = if self.lossless {
+            let mut encoder =
+                flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+            encoder
+                .write_all(rgb.as_raw())
+                .map_err(|e| Error::new("encode_failed", e.to_string()))?;
+            (
+                encoder
+                    .finish()
+                    .map_err(|e| Error::new("encode_failed", e.to_string()))?,
+                Filter::FlateDecode,
+            )
+        } else {
+            let mut jpeg = Vec::new();
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, PDF_JPEG_QUALITY)
+                .encode_image(&rgb)
+                .map_err(|e| Error::new("encode_failed", e.to_string()))?;
+            (jpeg, Filter::DctDecode)
+        };
         let mut page = self.pdf.page(page_id);
         page.media_box(Rect::new(0., 0., w, h));
         page.parent(Ref::new(2));
         page.contents(content_id);
         page.resources().x_objects().pair(Name(b"Im"), image_id);
         page.finish();
-        let mut img = self.pdf.image_xobject(image_id, &jpeg);
-        img.filter(Filter::DctDecode);
+        let mut img = self.pdf.image_xobject(image_id, &encoded);
+        img.filter(filter);
         img.width(w as i32);
         img.height(h as i32);
         img.color_space().device_rgb();

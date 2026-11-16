@@ -51,6 +51,10 @@ pub struct Parameters {
     pub strikethrough_angle_sigma: f32,
     pub strikethrough_width: f32,
     pub ink_depth_sigma: f32,
+    pub ink_layers: bool,
+    pub ink_opacity: u8,
+    pub ink_thickness: i8,
+    pub ink_softness: u8,
     pub fill: [u8; 4],
     pub underlined: bool,
     pub background_ruled: bool,
@@ -86,6 +90,10 @@ impl Default for Parameters {
             strikethrough_angle_sigma: 2.,
             strikethrough_width: 8.,
             ink_depth_sigma: 30.,
+            ink_layers: false,
+            ink_opacity: 100,
+            ink_thickness: 0,
+            ink_softness: 0,
             fill: [0, 0, 0, 255],
             underlined: false,
             background_ruled: false,
@@ -124,6 +132,9 @@ impl Parameters {
             strikethrough_angle_sigma,
             strikethrough_width,
             ink_depth_sigma,
+            ink_opacity,
+            ink_thickness,
+            ink_softness,
             seed
         );
         fn boolean(f: &HashMap<String, String>, key: &str, default: bool) -> Result<bool> {
@@ -146,6 +157,10 @@ impl Parameters {
         p.preview = boolean(f, "preview", true)?;
         p.full_preview = boolean(f, "full_preview", true)?;
         p.pdf_save = boolean(f, "pdf_save", false)?;
+        p.ink_layers = boolean(f, "ink_layers", false)?;
+        if p.ink_opacity > 100 || p.ink_thickness.unsigned_abs() > 2 || p.ink_softness > 2 {
+            return Err(Error::new("invalid_parameter", "ink_effects"));
+        }
         p.width = f
             .get("width")
             .map(|s| s.parse::<u32>())

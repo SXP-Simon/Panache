@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings.dart';
+import '../models/ink_page.dart';
+import '../utils/ink_effects.dart';
 import '../utils/text_tools.dart';
 import '../utils/image_data.dart';
 import 'api.dart';
@@ -97,7 +99,17 @@ class Workspace extends ChangeNotifier {
   bool get busy => generation.busy;
   set busy(bool value) => generation.busy = value;
   List<Uint8List> get pages => generation.pages;
-  set pages(List<Uint8List> value) => generation.pages = value;
+  List<InkPage?> get inkPages => generation.inkPages;
+  set pages(List<Uint8List> value) {
+    generation.pages = value;
+    generation.inkPages = [];
+  }
+
+  Future<Uint8List> currentPreviewImage() async {
+    final ink = page < inkPages.length ? inkPages[page] : null;
+    return ink == null ? pages[page] : compositeInkPage(ink, settings.inkLook);
+  }
+
   Uint8List? get exportBytes => generation.exportBytes;
   set exportBytes(Uint8List? value) => generation.exportBytes = value;
   String get exportExtension => generation.exportExtension;
@@ -219,12 +231,23 @@ class Workspace extends ChangeNotifier {
     await connect();
   }
 
-  void edit() {
+  void edit({bool inkOnly = false}) {
     if (disposed) return;
-    ++_editRevision;
+    if (!inkOnly || !initialized) ++_editRevision;
+    if (inkOnly) exportBytes = null;
     saveTimer?.cancel();
     saveTimer = Timer(const Duration(milliseconds: 400), persist);
     emit();
+  }
+
+  void editInk(InkLook look) {
+    settings.values['ink_opacity'] = '${look.opacity}';
+    settings.values['ink_thickness'] = '${look.thickness}';
+    settings.values['ink_softness'] = '${look.softness}';
+    final color = look.color;
+    settings.fill =
+        '(${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}, ${(color >> 24) & 255})';
+    edit(inkOnly: true);
   }
 
   /// Flush immediately when the app becomes inactive or goes to background.

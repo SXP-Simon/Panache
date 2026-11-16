@@ -3,7 +3,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/ink_page.dart';
 import '../services/image_clipboard.dart';
+import '../utils/ink_effects.dart';
+import 'live_ink_preview.dart';
 import 'preview_image_actions.dart';
 import 'workbench_motion.dart';
 
@@ -19,6 +22,8 @@ class PreviewPager extends StatefulWidget {
     this.onOpen,
     this.copyImage = copyPreviewImage,
     this.readerMode = false,
+    this.inkPages = const [],
+    this.inkLook = defaultInkLook,
   }) : assert(pages.length > 0);
 
   final List<Uint8List> pages;
@@ -28,6 +33,8 @@ class PreviewPager extends StatefulWidget {
   final VoidCallback? onOpen;
   final ImageClipboardWriter copyImage;
   final bool readerMode;
+  final List<InkPage?> inkPages;
+  final InkLook inkLook;
 
   @override
   State<PreviewPager> createState() => _PreviewPagerState();
@@ -141,6 +148,10 @@ class _PreviewPagerState extends State<PreviewPager> {
                 itemBuilder: (context, index) => _ZoomablePage(
                   key: ValueKey((index, widget.pages[index])),
                   bytes: widget.pages[index],
+                  ink: index < widget.inkPages.length
+                      ? widget.inkPages[index]
+                      : null,
+                  look: widget.inkLook,
                   heroTag: (widget.heroOwner, index, widget.pages[index]),
                   active: index == _visible,
                   reset: _resetZoom,
@@ -206,6 +217,8 @@ class _ZoomablePage extends StatefulWidget {
     required this.onOpen,
     required this.copyImage,
     required this.readerMode,
+    required this.ink,
+    required this.look,
   });
   final Uint8List bytes;
   final Object heroTag;
@@ -215,6 +228,8 @@ class _ZoomablePage extends StatefulWidget {
   final VoidCallback? onOpen;
   final ImageClipboardWriter copyImage;
   final bool readerMode;
+  final InkPage? ink;
+  final InkLook look;
 
   @override
   State<_ZoomablePage> createState() => _ZoomablePageState();
@@ -303,6 +318,9 @@ class _ZoomablePageState extends State<_ZoomablePage>
 
   @override
   Widget build(BuildContext context) {
+    final ink = widget.ink;
+    final look = widget.look;
+    final copy = widget.copyImage;
     final l = AppLocalizations.of(context)!;
     final viewer = RepaintBoundary(
       child: Padding(
@@ -382,17 +400,26 @@ class _ZoomablePageState extends State<_ZoomablePage>
                           child: PreviewImageActions(
                             bytes: widget.bytes,
                             onOpen: widget.onOpen,
-                            copyImage: widget.copyImage,
+                            copyImage: ink == null
+                                ? copy
+                                : (_) async =>
+                                      copy(await compositeInkPage(ink, look)),
                             child: Semantics(
                               identifier: widget.active
                                   ? 'preview-image'
                                   : null,
-                              child: Image.memory(
-                                widget.bytes,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                semanticLabel: l.preview,
-                              ),
+                              child: ink != null
+                                  ? LiveInkPreview(
+                                      page: ink,
+                                      look: look,
+                                      label: l.preview,
+                                    )
+                                  : Image.memory(
+                                      widget.bytes,
+                                      fit: BoxFit.contain,
+                                      gaplessPlayback: true,
+                                      semanticLabel: l.preview,
+                                    ),
                             ),
                           ),
                         ),
@@ -465,6 +492,8 @@ Future<void> showFullscreenPreview(
   required Object heroOwner,
   required ValueChanged<int> onPageChanged,
   ImageClipboardWriter copyImage = copyPreviewImage,
+  List<InkPage?> inkPages = const [],
+  InkLook inkLook = defaultInkLook,
 }) => Navigator.of(context).push<void>(
   PageRouteBuilder<void>(
     transitionDuration: MediaQuery.disableAnimationsOf(context)
@@ -481,6 +510,8 @@ Future<void> showFullscreenPreview(
       heroOwner: heroOwner,
       onPageChanged: onPageChanged,
       copyImage: copyImage,
+      inkPages: inkPages,
+      inkLook: inkLook,
     ),
   ),
 );
@@ -492,12 +523,16 @@ class _FullscreenPreview extends StatefulWidget {
     required this.heroOwner,
     required this.onPageChanged,
     required this.copyImage,
+    required this.inkPages,
+    required this.inkLook,
   });
   final List<Uint8List> pages;
   final int initialPage;
   final Object heroOwner;
   final ValueChanged<int> onPageChanged;
   final ImageClipboardWriter copyImage;
+  final List<InkPage?> inkPages;
+  final InkLook inkLook;
 
   @override
   State<_FullscreenPreview> createState() => _FullscreenPreviewState();
@@ -524,6 +559,8 @@ class _FullscreenPreviewState extends State<_FullscreenPreview> {
             page: _page,
             heroOwner: widget.heroOwner,
             copyImage: widget.copyImage,
+            inkPages: widget.inkPages,
+            inkLook: widget.inkLook,
             onPageChanged: (page) {
               setState(() => _page = page);
               widget.onPageChanged(page);

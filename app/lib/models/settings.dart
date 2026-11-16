@@ -1,3 +1,5 @@
+import 'ink_page.dart';
+
 class Parameter {
   const Parameter(
     this.key,
@@ -23,6 +25,19 @@ class Parameter {
         (!integer || (n == n.roundToDouble() && !raw!.contains('.')));
   }
 }
+
+const inkParameters = [
+  Parameter('ink_opacity', '浓淡', 'Opacity', 100, maximum: 100),
+  Parameter(
+    'ink_thickness',
+    '笔画粗细',
+    'Stroke thickness',
+    0,
+    minimum: -2,
+    maximum: 2,
+  ),
+  Parameter('ink_softness', '边缘柔化', 'Edge softness', 0, maximum: 2),
+];
 
 const parameters = [
   Parameter('font_size', '字号', 'Font size', 124, minimum: 1),
@@ -127,13 +142,33 @@ class Settings {
   }
 
   final Map<String, String> values = {
-    for (final p in parameters) p.key: '${p.value}',
+    for (final p in [...parameters, ...inkParameters]) p.key: '${p.value}',
   };
   bool strikethroughEnabled = false;
   String fill = '(0, 0, 0, 255)';
   String layoutStyle = 'standard';
   String? font;
   bool underlined = true, englishSpacing = false, fullPreview = false;
+
+  InkLook get inkLook {
+    final rgb = fill
+        .replaceAll(RegExp(r'[()\[\]\s]'), '')
+        .split(',')
+        .map(int.tryParse)
+        .toList();
+    int channel(int index, [int fallback = 0]) =>
+        index < rgb.length ? (rgb[index] ?? fallback).clamp(0, 255) : fallback;
+    return (
+      opacity: int.parse(values['ink_opacity']!),
+      thickness: int.parse(values['ink_thickness']!),
+      softness: int.parse(values['ink_softness']!),
+      color:
+          (channel(3, 255) << 24) |
+          (channel(0) << 16) |
+          (channel(1) << 8) |
+          channel(2),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     ...values,
@@ -152,7 +187,7 @@ class Settings {
       for (final entry in legacyFields.entries)
         if (json.containsKey(entry.key)) entry.value: json[entry.key],
     };
-    for (final p in parameters) {
+    for (final p in [...parameters, ...inkParameters]) {
       final value = num.tryParse('${json[p.key]}');
       if (value != null &&
           value.isFinite &&
@@ -204,6 +239,7 @@ class Settings {
     'preview': '$preview',
     'pdf_save': '$pdf',
     'full_preview': '$fullPreview',
+    'ink_layers': 'true',
     'layout_style': layoutStyle,
     'isUnderlined': '$underlined',
     'enableEnglishSpacing': '$englishSpacing',
