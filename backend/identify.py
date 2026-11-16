@@ -174,7 +174,8 @@ def _has_printed_header(image: GrayImage, top: int, spacing: int) -> bool:
     """Recognize groups of printed strokes before the first physical ruling."""
     # 2026-11-16：在校正后的背景检查页眉，排除紧贴首条横线的墨迹和通栏边框。
     radius = max(2, spacing // 6)
-    start = max(radius, top - spacing * 5 // 2)
+    # 2026-11-16：标题只有侵入首个书写格时才占用首线。
+    start = max(radius, top - spacing)
     end = top - max(radius * 2, 3)
     if end <= start:
         return False
@@ -318,6 +319,50 @@ def _tracked_rulings(
     return np.asarray(rectified, dtype=np.uint8), map_y, target, spacing
 
 
+def _segmented_bands(
+    binary: GrayImage, centres: NDArray[np.float64]
+) -> list[tuple[float, int, int]]:
+    """Measure repeated rows with short gaps, including dotted ruling."""
+    # 2026-11-16：在已验证的每条轨迹附近统计横向支持，忽略远离正文的独立墨迹。
+    height, width = binary.shape
+    max_gap = max(3, width // 30)
+    min_span = width * 0.40
+    min_density = 0.30
+    bands: list[tuple[float, int, int]] = []
+    for centre in centres:
+        row = round(float(centre))
+        columns = np.flatnonzero(np.any(binary[max(0, row - 2) : min(height, row + 3)], axis=0))
+        groups = np.split(columns, np.flatnonzero(np.diff(columns) > max_gap) + 1)
+        support = max(groups, key=len)
+        if not support.size:
+            raise _no_rulings()
+        span = int(support[-1] - support[0] + 1)
+        if span < min_span or support.size < span * min_density:
+            raise _no_rulings()
+        trim = support.size // 40
+        bands.append((float(centre), int(support[trim]), int(support[-1 - trim])))
+    return bands
+
+
+def _measure_tracks(
+    rectified: GrayImage, target: NDArray[np.float64], spacing: int
+) -> list[tuple[float, int, int]]:
+    # 2026-11-16：保留实线的精确中心；对点线或虚线按同一轨迹的跨度和密度校验。
+    try:
+        bands = [
+            band
+            for band in _bands(rectified)
+            if np.min(np.abs(target - band[0])) <= max(2.0, spacing * 0.06)
+        ]
+        if len(bands) == len(target):
+            centres = np.array([band[0] for band in bands], dtype=np.float64)
+            if _spacing(centres) == spacing:
+                return bands
+    except ImageIdentificationError:
+        pass
+    return _segmented_bands(rectified, target)
+
+
 def identify_paper(filename: str) -> PaperMeasurement:
     """Measure line centres and optionally return a physically corrected PNG."""
     # 2026-10-24：OpenCV 在 Windows 上无法直接打开中文路径，先读取字节再解码。
@@ -340,17 +385,8 @@ def identify_paper(filename: str) -> PaperMeasurement:
         pixels = rotated
     except ImageIdentificationError:
         rectified, map_y, target, spacing = _tracked_rulings(_local_ruling_mask(pixels))
-        # 2026-11-16：排除校正后仍能投影成长横线的页眉装饰。
-        bands = [
-            band
-            for band in _bands(rectified)
-            if np.min(np.abs(target - band[0])) <= max(2.0, spacing * 0.06)
-        ]
-        if len(bands) != len(target):
-            raise _no_rulings() from None
+        bands = _measure_tracks(rectified, target, spacing)
         centres = np.array([band[0] for band in bands], dtype=np.float64)
-        if _spacing(centres) != spacing:
-            raise _no_rulings() from None
         map_x = np.broadcast_to(np.arange(pixels.shape[1], dtype=np.float32), map_y.shape).copy()
         pixels = np.asarray(cv2.remap(pixels, map_x, map_y, cv2.INTER_LINEAR), dtype=np.uint8)
         angle = 0.0

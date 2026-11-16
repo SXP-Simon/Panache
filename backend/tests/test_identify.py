@@ -240,3 +240,40 @@ def test_printed_title_reserves_first_rule_as_a_separator(tmp_path: Path) -> Non
     headed = identify_paper(str(path))
     assert headed.top == plain.top
     assert headed.first_baseline == headed.top + headed.spacing
+
+
+@pytest.mark.parametrize("body", ["dotted", "scattered"])
+def test_paper_uses_only_complete_body_rulings(tmp_path: Path, body: str) -> None:
+    y, x = np.indices((1000, 800))
+    shade = 245 - (x // 55) - (np.maximum(y - 550, 0) // 18)
+    source = np.repeat(shade.astype(np.uint8)[..., None], 3, axis=2)
+    for row in range(13):
+        centre = 310 + 38 * row + row * (row - 1) // 2
+        ruled = np.abs(y - (centre + (x - 400) * (row - 4) / 1000)) <= 1
+        if body == "dotted":
+            supported = (x >= 145 - row) & (x < 670 + row) & (x % 5 < 3)
+        else:
+            supported = np.abs((x - 176 + 28) % 56 - 28) <= 5
+        source[ruled & supported] -= 25
+    image = Image.fromarray(source)
+    draw = ImageDraw.Draw(image)
+    for column in range(260, 540, 32):
+        draw.line([(column, 180), (column, 153), (column + 19, 153)], fill=INK, width=5)
+    draw.line((280, 223, 370, 222), fill=INK, width=3)
+    draw.line((480, 222, 540, 222), fill=INK, width=3)
+    draw.line((113, 385, 103, 820), fill=INK, width=4)
+    draw.text((398, 940), "-1-", fill=INK)
+    file = tmp_path / f"{body}.png"
+    image.save(file)
+    if body == "scattered":
+        with pytest.raises(ImageIdentificationError):
+            identify_paper(str(file))
+        return
+    measured = identify_paper(str(file))
+    assert abs(measured.top - 310) <= 2
+    assert measured.first_baseline == measured.top
+    assert measured.spacing == 44
+    assert 140 <= measured.left <= 180
+    assert 115 <= measured.right <= 150
+    assert 145 <= measured.bottom <= 170
+    assert measured.corrected is not None
