@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from random import Random
 from typing import Protocol, cast
+from weakref import WeakKeyDictionary
 
 import handright._core as core
 from handright import Template
@@ -153,9 +154,13 @@ _UNIVERSAL_CANONICAL_MAP = {
 }
 
 # 缓存各字体的 cmap 码点集合
-_FONT_CMAP_CACHE: dict[str, set[int]] = {}
 _FALLBACK_FONTS_POOL: list[tuple[str, set[int]]] = []
 _CHAR_FALLBACK_CACHE: dict[int, str | None] = {}
+_MEMORY_FONT_CMAPS: WeakKeyDictionary[Font, set[int]] = WeakKeyDictionary()
+_MEMORY_FONT_VARIANTS: WeakKeyDictionary[
+    ImageFont.FreeTypeFont, dict[int, ImageFont.FreeTypeFont]
+] = WeakKeyDictionary()
+_MEMORY_FONT_LOCK = threading.RLock()
 
 
 @dataclass
@@ -176,6 +181,17 @@ MAX_FONT_VARIANTS = 256
 _FONT_VARIANTS: dict[tuple[ImageFont.FreeTypeFont, int], ImageFont.FreeTypeFont] = {}
 
 
+def _read_font_cmap(source: str | io.BytesIO) -> set[int]:
+    if ttfont_type is None:
+        return set()
+    font = ttfont_type(source, fontNumber=0)
+    try:
+        cmap = font.getBestCmap() or {}
+        return {cp for cp, name in cmap.items() if name != ".notdef"}
+    finally:
+        font.close()
+
+
 @functools.lru_cache(maxsize=128)
 def _get_font_cmap(font_source: object) -> set[int]:
     """获取或从缓存中读取字体的 cmap 码点集合，支持文件路径、BytesIO 或字节数据."""
@@ -189,10 +205,7 @@ def _get_font_cmap(font_source: object) -> set[int]:
                 return set()
             norm_path = str(Path(os.fsdecode(font_source)).resolve())
             # 2026-10-15：系统字体可能是 TTC 集合，明确读取首个字面。
-            f = ttfont_type(norm_path, fontNumber=0)
-            cmap = f.getBestCmap()
-            f.close()
-            return set(cmap.keys()) if cmap else set()
+            return _read_font_cmap(norm_path)
         except Exception as e:
             logger.debug("读取字体 cmap 失败 (%s): %s", font_source, e, exc_info=True)
             return set()
@@ -200,17 +213,49 @@ def _get_font_cmap(font_source: object) -> set[int]:
     # 2. BytesIO 或其他文件流
     try:
         if isinstance(font_source, io.BytesIO):
-            pos = font_source.tell()
-            font_source.seek(0)
-            f = ttfont_type(font_source)
-            cmap = f.getBestCmap()
-            f.close()
-            font_source.seek(pos)
-            return set(cmap.keys()) if cmap else set()
+            return _read_font_cmap(io.BytesIO(font_source.getvalue()))
     except Exception as e:
         logger.debug("读取内存流字体 cmap 失败: %s", e, exc_info=True)
 
     return set()
+
+
+def _memory_font_cmap(font: Font) -> set[int]:
+    # 2026-11-16：以实际上传的字体为主字体；缓存不延长上传字体及文件内容的生命周期。
+    with _MEMORY_FONT_LOCK:
+        cmap = _MEMORY_FONT_CMAPS.get(font)
+        if cmap is not None:
+            return cmap
+        data: object = getattr(font, "font_bytes", None)
+        path: object = getattr(font, "path", None)
+        if not isinstance(data, bytes) and isinstance(path, io.BytesIO):
+            data = path.getvalue()
+        cmap = set[int]()
+        if isinstance(data, bytes):
+            try:
+                cmap = _read_font_cmap(io.BytesIO(data))
+            except Exception:
+                logger.debug("读取上传字体 cmap 失败", exc_info=True)
+        _MEMORY_FONT_CMAPS[font] = cmap
+        return cmap
+
+
+def _resize_font(font: Font, size: int) -> Font:
+    if not isinstance(font, ImageFont.FreeTypeFont) or font.size == size:
+        return font
+    path = font_path_of(font)
+    if path is not None:
+        return _get_cached_image_font(path, size)
+    with _MEMORY_FONT_LOCK:
+        variants = _MEMORY_FONT_VARIANTS.setdefault(font, {})
+        variant = variants.get(size)
+        if variant is None:
+            variant = font.font_variant(size=size)
+            if len(variants) >= MAX_FONT_VARIANTS:
+                variants.clear()
+            variants[size] = variant
+            _MEMORY_FONT_CMAPS[variant] = _memory_font_cmap(font)
+        return variant
 
 
 @functools.lru_cache(maxsize=256)
@@ -916,12 +961,18 @@ def _get_char_glyph_and_bbox_cached(
     """Resolve the font, ink bounds, advance and fallback status for one glyph."""
     main = _get_cached_image_font(font_path, font_size) if font_path else None
     cmap = _get_font_cmap(font_path) if font_path else set[int]()
+    return _resolve_glyph(char, main, cmap, font_size)
+
+
+def _resolve_glyph(
+    char: str, main: Font | None, cmap: set[int], font_size: int
+) -> tuple[Font, BBox, int, bool]:
     if main is not None and (not cmap or ord(char) in cmap):
         bbox = font_bbox_of(main, char)
         if bbox[2] > bbox[0] and bbox[3] > bbox[1] and _font_has_visible_glyph(main, char):
             return main, bbox, max(1, bbox[2] - bbox[0] + 1), False
     fallback = _find_fallback_font_for_char(ord(char))
-    if fallback and fallback != font_path:
+    if fallback and (main is None or fallback != font_path_of(main)):
         font = _get_cached_image_font(fallback, font_size)
         bbox = font_bbox_of(font, char)
         if bbox[2] > bbox[0] and bbox[3] > bbox[1] and _font_has_visible_glyph(font, char):
@@ -930,13 +981,21 @@ def _get_char_glyph_and_bbox_cached(
     return main or ImageFont.load_default(), (0, 0, width, font_size), width, False
 
 
+def _resolve_primary_glyph(
+    char: str, font: Font, font_path: str | None = None
+) -> tuple[Font, BBox, int, bool]:
+    path = font_path or font_path_of(font)
+    size = font_size_of(font)
+    if path is not None:
+        return _get_char_glyph_and_bbox_cached(char, path, size)
+    return _resolve_glyph(char, font, _memory_font_cmap(font), size)
+
+
 def _get_char_glyph_and_bbox(
     char: str, font: Font, font_path: str | None = None
 ) -> tuple[Font, BBox, int]:
     """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance."""
-    f_path = font_path or font_path_of(font)
-    f_size = font_size_of(font)
-    fb_font, bb, adv, _ = _get_char_glyph_and_bbox_cached(char, f_path, f_size)
+    fb_font, bb, adv, _ = _resolve_primary_glyph(char, font, font_path)
     return (fb_font, bb, adv)
 
 
@@ -1002,7 +1061,7 @@ def _layout_script(
     content: str, font: Font, font_path: str | None, memo: _LayoutMemo, *, superscript: bool
 ) -> _MathBox:
     size = font_size_of(font)
-    small = _get_cached_image_font(font_path, max(8, round(size * 0.65)))
+    small = _resize_font(font, max(8, round(size * 0.65)))
     body = _layout_math_text(content, small, font_path, memo)
     _, base_bbox, _ = _get_char_glyph_and_bbox("x", font, font_path)
     if superscript:
@@ -1218,7 +1277,7 @@ def _layout_circuit(
                 for step in range(49)
             )
             paths.append((points, max(1, round(unit * 0.019))))
-    label_font = _get_cached_image_font(font_path, max(10, round(size * 0.78)))
+    label_font = _resize_font(font, max(10, round(size * 0.78)))
     children: list[BoxChild] = []
     for label in layout.labels:
         body = _layout_math_text(_normalize_math_content(label.text), label_font, font_path, memo)
@@ -1259,7 +1318,7 @@ def _layout_fallback_radical(
     if index:
         # 根指数先还原普通字符再缩小，不能对上标字形重复缩放。
         index_text = index.translate(_SUPER_TO_TEXT)
-        small = _get_cached_image_font(font_path, max(8, round(size * 0.46)))
+        small = _resize_font(font, max(8, round(size * 0.46)))
         idx = _layout_math_text(index_text, small, font_path, memo)
         index_bottom = top + round(height * 0.34)
         children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
@@ -1296,7 +1355,7 @@ def _layout_native_radical(
     offset = 0
     children: list[BoxChild] = []
     if index:
-        small = _get_cached_image_font(font_path, max(8, round(size * 0.46)))
+        small = _resize_font(font, max(8, round(size * 0.46)))
         idx = _layout_math_text(index.translate(_SUPER_TO_TEXT), small, font_path, memo)
         index_bottom = top + round((bottom - top) * 0.34)
         children.append((idx, -idx.bbox[0], index_bottom - idx.bbox[3]))
@@ -1347,7 +1406,7 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
     if char in _VULGAR_FRACTION_MAP:
         numerator, denominator = _VULGAR_FRACTION_MAP[char]
         # 2026-10-15：0.76 替代 0.58；嵌套仍保留手写可读的字高，由真实边界撑开分数。
-        small = _get_cached_image_font(font_path, max(10, round(size * 0.76)))
+        small = _resize_font(font, max(10, round(size * 0.76)))
         num = _layout_math_text(numerator, small, font_path, memo)
         den = _layout_math_text(denominator, small, font_path, memo)
         padding = max(3, round(size * 0.12))
@@ -1585,9 +1644,7 @@ def _fallback_draw_char(
         if is_math_glyph(char):
             return _draw_text_or_fraction(draw, char, xy, font, font_path_of(font))[0]
 
-        font_path = font_path_of(font)
-        font_size = font_size_of(font)
-        fb_font, _bb, adv, is_fallback = _get_char_glyph_and_bbox_cached(char, font_path, font_size)
+        fb_font, _bb, adv, is_fallback = _resolve_primary_glyph(char, font)
         if is_fallback:
             cast("MathDrawer", draw).text(xy, char, fill=MONOCHROME_WHITE, font=fb_font)
             return adv
@@ -1606,6 +1663,8 @@ def _cached_get_font(template: Template, rand: Random) -> Font:
     actual_font_size = max(int(rand.gauss(font.size, sigma)), 1)
     if actual_font_size == font.size:
         return font
+    if font_path_of(font) is None:
+        return _resize_font(font, actual_font_size)
 
     key = (font, actual_font_size)
     variant = _FONT_VARIANTS.get(key)

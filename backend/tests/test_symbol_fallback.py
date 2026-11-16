@@ -1,4 +1,5 @@
 # Copyright (c) 2026 Simon and Handwriting Web contributors.
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -242,6 +243,19 @@ def test_font_switching_no_fallback_leak():
 
     _, _, _, is_fb_2 = _get_char_glyph_and_bbox_cached("你", font_path_2, 30)
     assert not is_fb_2, "主字体2支持的字符绝不能被 fallback"
+
+
+def test_uploaded_font_falls_back_only_for_missing_glyphs():
+    upload = ImageFont.truetype(BytesIO(Path(_font_asset("华阳手写体.ttf")).read_bytes()), 36)
+    for char in "数据ID3":
+        chosen, _, _ = _get_char_glyph_and_bbox(char, upload)
+        assert chosen is upload
+    assert ord("ᵢ") not in symbols._memory_font_cmap(upload)
+    chosen, bbox, _ = _get_char_glyph_and_bbox("ᵢ", upload)
+    assert chosen is not upload
+    assert symbols._font_has_visible_glyph(chosen, "ᵢ")
+    assert bbox[2] > bbox[0]
+    assert bbox[3] > bbox[1]
 
 
 def test_large_font_and_heavy_rendering_no_oom():

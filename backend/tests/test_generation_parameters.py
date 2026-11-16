@@ -8,6 +8,7 @@ import io
 import json
 import threading
 import time
+from functools import partial
 from pathlib import Path
 from unittest.mock import patch
 
@@ -57,6 +58,42 @@ def test_real_png_uses_requested_ink_rgb() -> None:
     with Image.open(io.BytesIO(base64.b64decode(data["images"][0]))) as image:
         colors = set(image.convert("RGB").getdata()) - {(255, 255, 255)}
     assert colors == {(12, 34, 56)}
+
+
+def test_uploaded_font_preserves_handwriting_in_prose_and_inline_math() -> None:
+    name = "华阳手写体.ttf"
+    alternate = "霞鹜文楷.ttf"
+    assets = Path(__file__).resolve().parents[1] / "font_assets"
+    font = (assets / name).read_bytes()
+    settings = parameters(
+        font_option=name,
+        full_preview="true",
+        font_size_sigma="2",
+        text="简答题：数据预处理（Data Cleaning）\nID3 取值 aᵢ 与 Dᵢ，复杂度 O(n²) 或 O(n³)\n"
+        r"根式 \sqrt[3]{x}，分式 \frac{a}{b}，划分聚类 K-means",
+        width="900",
+        height="480",
+    )
+    with (
+        patch("app.psutil.cpu_percent", return_value=0),
+        patch.object(app, "font_assets_dir", str(assets)),
+        patch.object(app, "font_file_names", [name, alternate]),
+        patch.object(app, "handwrite", partial(app.handwrite, seed=20261116)),
+    ):
+        built_in = asyncio.run(app.generate_handwriting_impl(settings))
+        uploaded = asyncio.run(
+            app.generate_handwriting_impl(
+                settings.model_copy(update={"font_option": "课堂手写.ttf"}), font_file=font
+            )
+        )
+        different = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"font_option": alternate}))
+        )
+    assert built_in.status_code == uploaded.status_code == different.status_code == 200
+    expected = json.loads(bytes(built_in.body))["images"]
+    assert expected
+    assert json.loads(bytes(uploaded.body))["images"] == expected
+    assert json.loads(bytes(different.body))["images"] != expected
 
 
 @pytest.mark.parametrize(
