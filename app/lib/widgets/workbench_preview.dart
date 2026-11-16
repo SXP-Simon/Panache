@@ -220,22 +220,30 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
     Widget slider(
       String name,
       String key,
-      int value,
+      num value,
       int min,
       int max,
-      ValueChanged<int> set,
-    ) => Row(
+      ValueChanged<double> set, {
+      bool fractional = false,
+    }) => Row(
       children: [
-        Expanded(child: Text('$name $value')),
+        Expanded(
+          child: Text(
+            fractional
+                ? '$name ${value.toStringAsFixed(1)} px'
+                : '$name $value%',
+          ),
+        ),
         Expanded(
           child: Slider(
             key: ValueKey(key),
             min: min.toDouble(),
             max: max.toDouble(),
-            divisions: max - min,
+            divisions: (max - min) * (fractional ? 10 : 1),
             value: value.toDouble(),
-            label: '$value',
-            onChanged: (value) => set(value.round()),
+            label: value.toStringAsFixed(fractional ? 1 : 0),
+            onChanged: (value) =>
+                set(fractional ? (value * 10).round() / 10 : value),
           ),
         ),
       ],
@@ -249,7 +257,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
           0,
           100,
           (v) => change((
-            opacity: v,
+            opacity: v.round(),
             thickness: look.thickness,
             softness: look.softness,
             color: look.color,
@@ -267,6 +275,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
             softness: look.softness,
             color: look.color,
           )),
+          fractional: true,
         ),
         slider(
           l.inkSoftness,
@@ -280,6 +289,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
             softness: v,
             color: look.color,
           )),
+          fractional: true,
         ),
         Wrap(
           spacing: 6,

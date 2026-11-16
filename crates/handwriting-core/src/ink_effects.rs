@@ -65,18 +65,46 @@ fn pass(
     Ok(output)
 }
 
+// 2026-11-16：遮罩插值使用整数权重，和 Flutter 预览的舍入一致。
+fn blend_radius(
+    mask: &GrayImage,
+    radius: f64,
+    kernel: &Kernel,
+    cancel: &Cancellation,
+) -> Result<GrayImage> {
+    let tenths = (radius * 10.).round() as u16;
+    let whole = i32::from(tenths / 10);
+    let weight = tenths % 10;
+    let at = |r| {
+        pass(
+            &pass(mask, r, kernel, false, cancel)?,
+            r,
+            kernel,
+            true,
+            cancel,
+        )
+    };
+    let mut lower = if whole == 0 { mask.clone() } else { at(whole)? };
+    if weight != 0 {
+        let upper = at(whole + 1)?;
+        cancel.check()?;
+        for (a, b) in lower.pixels_mut().zip(upper.pixels()) {
+            a[0] = ((u16::from(a[0]) * (10 - weight) + u16::from(b[0]) * weight + 5) / 10) as u8;
+        }
+    }
+    Ok(lower)
+}
+
 pub fn composite(
     mut paper: RgbaImage,
     mut mask: GrayImage,
     p: &Parameters,
     cancel: &Cancellation,
 ) -> Result<RgbaImage> {
-    if p.ink_thickness != 0 {
-        let thin = p.ink_thickness < 0;
+    if p.ink_thickness != 0. {
+        let thin = p.ink_thickness < 0.;
         let kernel = if thin { Kernel::Min } else { Kernel::Max };
-        let radius = i32::from(p.ink_thickness.unsigned_abs());
-        let horizontal = pass(&mask, radius, &kernel, false, cancel)?;
-        let mut changed = pass(&horizontal, radius, &kernel, true, cancel)?;
+        let mut changed = blend_radius(&mask, p.ink_thickness.abs(), &kernel, cancel)?;
         if thin {
             for (after, before) in changed.pixels_mut().zip(mask.pixels()) {
                 after[0] = ((u16::from(after[0]) * 7 + u16::from(before[0]) * 3 + 5) / 10) as u8;
@@ -84,10 +112,8 @@ pub fn composite(
         }
         mask = changed;
     }
-    if p.ink_softness != 0 {
-        let radius = i32::from(p.ink_softness);
-        let horizontal = pass(&mask, radius, &Kernel::Mean, false, cancel)?;
-        mask = pass(&horizontal, radius, &Kernel::Mean, true, cancel)?;
+    if p.ink_softness != 0. {
+        mask = blend_radius(&mask, p.ink_softness, &Kernel::Mean, cancel)?;
     }
     for y in 0..paper.height() {
         cancel.check()?;

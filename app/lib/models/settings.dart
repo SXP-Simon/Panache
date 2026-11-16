@@ -15,13 +15,16 @@ class Parameter {
   bool get integer =>
       !key.startsWith('strikethrough_') &&
       key != 'ink_depth_sigma' &&
-      key != 'perturb_theta_sigma';
+      key != 'perturb_theta_sigma' &&
+      !fractionalInk;
+  bool get fractionalInk => key == 'ink_thickness' || key == 'ink_softness';
   bool accepts(String? raw) {
     final n = num.tryParse(raw ?? '');
     return n != null &&
         n.isFinite &&
         n >= minimum &&
         (maximum == null || n <= maximum!) &&
+        (!fractionalInk || n * 10 == (n * 10).round()) &&
         (!integer || (n == n.roundToDouble() && !raw!.contains('.')));
   }
 }
@@ -160,8 +163,8 @@ class Settings {
         index < rgb.length ? (rgb[index] ?? fallback).clamp(0, 255) : fallback;
     return (
       opacity: int.parse(values['ink_opacity']!),
-      thickness: int.parse(values['ink_thickness']!),
-      softness: int.parse(values['ink_softness']!),
+      thickness: double.parse(values['ink_thickness']!),
+      softness: double.parse(values['ink_softness']!),
       color:
           (channel(3, 255) << 24) |
           (channel(0) << 16) |
@@ -192,7 +195,8 @@ class Settings {
       if (value != null &&
           value.isFinite &&
           value >= p.minimum &&
-          (p.maximum == null || value <= p.maximum!)) {
+          (p.maximum == null || value <= p.maximum!) &&
+          (!p.fractionalInk || p.accepts('$value'))) {
         values[p.key] = p.integer ? '${value.toInt()}' : '$value';
       }
     }
