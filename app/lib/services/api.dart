@@ -31,6 +31,7 @@ class HandwritingApi {
       client = client ?? http.Client();
   final String base;
   final String accessToken;
+  bool get usesMobilePaperLimits => false;
   Map<String, String> get headers =>
       accessToken.isEmpty ? const {} : {'Authorization': 'Bearer $accessToken'};
   final http.Client client;

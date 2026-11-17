@@ -5,16 +5,21 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/services/api.dart';
+import 'package:handwriting_app/services/paper_background.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/services/workspace_documents.dart';
 
 class PaperApi extends HandwritingApi {
   PaperApi() : super('local://test');
   final requests = <Completer<Map<String, dynamic>>>[];
+  final files = <Upload>[];
+  @override
+  bool usesMobilePaperLimits = false;
   @override
   Future<Map<String, dynamic>> importFile(String path, Upload file) {
     final pending = Completer<Map<String, dynamic>>();
     requests.add(pending);
+    files.add(file);
     return pending.future;
   }
 }
@@ -26,6 +31,24 @@ Map<String, dynamic> result() => {
   'marginBottom': 30,
   'lineSpacing': 70,
 };
+
+Future<Uint8List> paperPng(int width, int height) async {
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder).drawColor(const ui.Color(0xffeeeeee), ui.BlendMode.src);
+  final picture = recorder.endRecording();
+  try {
+    final image = await picture.toImage(width, height);
+    try {
+      final png = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+      return png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes);
+    } finally {
+      image.dispose();
+    }
+  } finally {
+    picture.dispose();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late PaperApi api;
@@ -140,4 +163,62 @@ void main() {
       expect(workspace.settings.values['width'], '800');
     });
   });
+
+  testWidgets(
+    'mobile paper import keeps one bounded image for detection and rendering',
+    (tester) async {
+      await tester.runAsync(() async {
+        api.usesMobilePaperLimits = true;
+        final documents = WorkspaceDocuments(workspace);
+        final small = Upload('normal.png', await paperPng(720, 960));
+        expect(await documents.setPaperBackground(small), isTrue);
+        expect(workspace.background, same(small));
+
+        final large = Upload('large.png', await paperPng(3900, 3300));
+        expect(await documents.setPaperBackground(large), isTrue);
+        final fitted = workspace.background!;
+        expect(fitted, isNot(same(large)));
+        expect(fitted.bytes.length, lessThanOrEqualTo(mobileImageBytes));
+        final measuring = documents.detectBackground();
+        expect(api.files.single, same(fitted));
+        api.requests.single.complete(result());
+        expect(await measuring, isTrue);
+        expect(workspace.background, same(fitted));
+      });
+    },
+  );
+
+  testWidgets(
+    'mobile deskew output rescales its coordinates with the background',
+    (tester) async {
+      await tester.runAsync(() async {
+        api.usesMobilePaperLimits = true;
+        final corrected = await paperPng(3900, 3300);
+        final pending = WorkspaceDocuments(workspace).detectBackground();
+        api.requests.single.complete({
+          'imageWidth': 3900,
+          'imageHeight': 3300,
+          'marginLeft': 350,
+          'marginRight': 360,
+          'marginTop': 450,
+          'marginBottom': 200,
+          'layoutTopMargin': 300,
+          'layoutBottomMargin': 175,
+          'lineSpacing': 150,
+          'correctedBackground': base64Encode(corrected),
+        });
+        expect(await pending, isTrue);
+        final settings = workspace.settings.values;
+        int value(String key) => int.parse(settings[key]!);
+        final width = value('width');
+        final height = value('height');
+        expect(width * height, lessThanOrEqualTo(mobilePaperPixels));
+        expect(value('left_margin'), (350 * width / 3900).round());
+        expect(value('right_margin'), (360 * width / 3900).round());
+        expect(value('top_margin'), (300 * height / 3300).round());
+        expect(value('bottom_margin'), (175 * height / 3300).round());
+        expect(value('line_spacing'), (150 * height / 3300).round());
+      });
+    },
+  );
 }

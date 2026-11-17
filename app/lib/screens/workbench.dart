@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/engine_failure.dart';
 import 'dialogs/connection_dialog.dart';
 import 'dialogs/illustration_dialog.dart';
 import 'dialogs/paper_area_dialog.dart';
@@ -561,6 +562,13 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         setState(() => settingsRevision++);
         notify(l.paperIdentificationDone);
       }
+    } on EngineFailure catch (error) {
+      if (mounted) {
+        notify(switch (error.code) {
+          'image_limit' || 'upload_limit' => l.paperImageTooLarge,
+          _ => l.paperIdentificationFailed,
+        });
+      }
     } catch (_) {
       if (mounted) notify(l.paperIdentificationFailed);
     }
@@ -631,13 +639,15 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     }),
     onUploadBackground: () => action(() async {
       final file = await pick(['png', 'jpg', 'jpeg']);
-      if (file != null) {
-        w.background = file;
-        w.pages = [];
-        w.page = 0;
-        w.edit();
-        await detectPaper();
+      if (file == null) return;
+      try {
+        if (!await documents.setPaperBackground(file) || !mounted) return;
+      } on EngineFailure catch (error) {
+        if (error.code != 'image_limit') rethrow;
+        if (mounted) notify(l.paperImageTooLarge);
+        return;
       }
+      await detectPaper();
     }),
     onDetectBackground: () => action(detectPaper),
     onAdjustBackground: adjustPaperArea,

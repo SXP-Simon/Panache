@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import '../utils/text_tools.dart';
 import 'api.dart';
+import 'paper_background.dart';
 import 'workspace.dart';
 
 /// Document and preset operations are independent of dialogs and file pickers.
@@ -53,21 +53,33 @@ class WorkspaceDocuments {
     return true;
   }
 
+  Future<bool> setPaperBackground(Upload file) async {
+    final api = workspace.api;
+    final paper = api.usesMobilePaperLimits
+        ? (await preparePaperBackground(file, mobile: true)).file
+        : file;
+    if (workspace.disposed || !identical(workspace.api, api)) return false;
+    workspace.background = paper;
+    workspace.pages = [];
+    workspace.page = 0;
+    workspace.edit();
+    return true;
+  }
+
   Future<bool> detectBackground() async {
     final background = workspace.background;
     if (background == null) return false;
+    final api = workspace.api;
     final token = Object();
     _detections[workspace] = token;
     final settingsBefore = jsonEncode(workspace.settings.toJson());
     bool current() =>
         !workspace.disposed &&
+        identical(workspace.api, api) &&
         workspace.background == background &&
         _detections[workspace] == token &&
         jsonEncode(workspace.settings.toJson()) == settingsBefore;
-    final result = await workspace.api.importFile(
-      '/api/imagefileprocess',
-      background,
-    );
+    final result = await api.importFile('/api/imagefileprocess', background);
     if (!current()) return false;
     int number(String key, {int? fallback, bool positive = false}) {
       final value = result[key] ?? fallback;
@@ -80,20 +92,17 @@ class WorkspaceDocuments {
       return value.round();
     }
 
-    final spacing = number('lineSpacing', positive: true);
+    var spacing = number('lineSpacing', positive: true);
     final first = number('marginTop');
     final legacyTop = first >= spacing ? first - spacing : first;
-    final top = number('layoutTopMargin', fallback: legacyTop);
-    final bottom = number(
-      'layoutBottomMargin',
-      fallback: number('marginBottom'),
-    );
-    final left = number('marginLeft');
-    final right = number('marginRight');
-    final width = result.containsKey('imageWidth')
+    var top = number('layoutTopMargin', fallback: legacyTop);
+    var bottom = number('layoutBottomMargin', fallback: number('marginBottom'));
+    var left = number('marginLeft');
+    var right = number('marginRight');
+    var width = result.containsKey('imageWidth')
         ? number('imageWidth', positive: true)
         : null;
-    final height = result.containsKey('imageHeight')
+    var height = result.containsKey('imageHeight')
         ? number('imageHeight', positive: true)
         : null;
     if ((width == null) != (height == null) ||
@@ -112,31 +121,23 @@ class WorkspaceDocuments {
         throw const FormatException('Invalid corrected background');
       }
       final bytes = base64Decode(corrected);
-      final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-      try {
-        final descriptor = await ui.ImageDescriptor.encoded(buffer);
-        try {
-          if (descriptor.width != width ||
-              descriptor.height != height ||
-              width * height > 32000000) {
-            throw const FormatException(
-              'Invalid corrected background dimensions',
-            );
-          }
-          final codec = await descriptor.instantiateCodec();
-          try {
-            final frame = await codec.getNextFrame();
-            frame.image.dispose();
-          } finally {
-            codec.dispose();
-          }
-        } finally {
-          descriptor.dispose();
-        }
-      } finally {
-        buffer.dispose();
+      final prepared = await preparePaperBackground(
+        Upload('aligned-paper.png', bytes),
+        mobile: api.usesMobilePaperLimits,
+        correctedSize: (width: width, height: height),
+      );
+      if (prepared.width != width || prepared.height != height) {
+        final horizontal = prepared.width / width;
+        final vertical = prepared.height / height;
+        left = (left * horizontal).round();
+        right = (right * horizontal).round();
+        top = (top * vertical).round();
+        bottom = (bottom * vertical).round();
+        spacing = (spacing * vertical).round().clamp(1, prepared.height);
+        width = prepared.width;
+        height = prepared.height;
       }
-      replacement = Upload('aligned-paper.png', bytes);
+      replacement = prepared.file;
     }
     if (!current()) return false;
     final fontSize = num.tryParse(workspace.settings.values['font_size'] ?? '');

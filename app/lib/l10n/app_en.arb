@@ -243,5 +243,6 @@
   "paperAreaApply": "Apply writing area",
   "paperAreaApplied": "Writing area updated. Generate a preview to see the result.",
   "paperAreaLoadFailed": "Could not open this paper image. Upload it again.",
+  "paperImageTooLarge": "This paper image is too large to process on this device. Resize it and upload it again.",
   "paperSizeAndMargins": "Size and margins"
 }
