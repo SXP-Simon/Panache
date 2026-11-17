@@ -12,6 +12,8 @@ class WorkbenchShell extends StatelessWidget {
   const WorkbenchShell({
     super.key,
     this.themeColor = defaultThemeColor,
+    this.secondaryThemeColor = defaultSecondaryThemeColor,
+    this.onSecondaryThemeColorChanged,
     this.onThemeColorChanged,
     this.reduceMotion = false,
     this.onReduceMotionChanged,
@@ -27,10 +29,11 @@ class WorkbenchShell extends StatelessWidget {
     required this.workspaceBuilder,
     required this.informationBuilder,
   });
-  final Color themeColor;
+  final Color themeColor, secondaryThemeColor;
   final bool reduceMotion;
   final Future<bool> Function(bool)? onReduceMotionChanged;
-  final Future<bool> Function(Color)? onThemeColorChanged;
+  final Future<bool> Function(Color)? onThemeColorChanged,
+      onSecondaryThemeColorChanged;
   final bool updateAvailable;
   final int destination;
   final ValueChanged<int> onDestinationSelected;
@@ -92,11 +95,11 @@ class WorkbenchShell extends StatelessWidget {
                     label: Text(l.appPreferences),
                   ),
                 ] else ...[
-                  IconButton(
+                  TextButton.icon(
                     key: const ValueKey('app-preferences'),
-                    tooltip: l.appPreferences,
                     onPressed: () => preferencesSheet(context),
                     icon: const Icon(Icons.palette_outlined),
+                    label: Text(l.appPreferences),
                   ),
                   Tooltip(
                     message: l.connection,
@@ -174,6 +177,7 @@ class WorkbenchShell extends StatelessWidget {
                         ),
                     ],
                   ),
+                if (wide) const VerticalDivider(width: 1),
                 Expanded(child: content),
               ],
             );
@@ -258,6 +262,13 @@ class WorkbenchShell extends StatelessWidget {
                       onToggleTheme();
                     },
                   ),
+                  ThemeColorEditor(
+                    color: themeColor,
+                    secondaryColor: secondaryThemeColor,
+                    onSecondaryChanged:
+                        onSecondaryThemeColorChanged ?? (_) async => true,
+                    onChanged: onThemeColorChanged ?? (_) async => true,
+                  ),
                   for (final item in [
                     (1, l.guide, Icons.menu_book_outlined),
                     (2, l.about, Icons.info_outline),
@@ -289,10 +300,6 @@ class WorkbenchShell extends StatelessWidget {
                               }
                             },
                     ),
-                  ),
-                  ThemeColorEditor(
-                    color: themeColor,
-                    onChanged: onThemeColorChanged ?? (_) async => true,
                   ),
                   const ProjectSourceLink(),
                   const SizedBox(height: 16),

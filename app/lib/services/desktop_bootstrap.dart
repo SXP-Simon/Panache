@@ -173,6 +173,7 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
       theme: handwritingTheme(Brightness.light),
       darkTheme: handwritingTheme(Brightness.dark),
       themeMode: ThemeMode.system,
+      builder: handwritingBackdrop,
       home: Builder(
         builder: (context) {
           final l = AppLocalizations.of(context)!;
