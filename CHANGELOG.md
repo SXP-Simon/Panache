@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/SXP-Simon/Panache/compare/v1.11.0...v1.11.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* 更新 Flutter 正式安装包的构建来源 ([14f3fa4](https://github.com/SXP-Simon/Panache/commit/14f3fa4cbca3cac6eed536095efd54ef9a4e0737))
+
 # [1.11.0](https://github.com/SXP-Simon/Panache/compare/v1.10.1...v1.11.0) (2026-11-17)
 
 
