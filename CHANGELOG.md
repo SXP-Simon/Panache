@@ -1,3 +1,33 @@
+# [1.11.0](https://github.com/SXP-Simon/Panache/compare/v1.10.1...v1.11.0) (2026-11-17)
+
+
+### Bug Fixes
+
+* **be:** 保留 Web 上传字体的原始字形 ([3aa5beb](https://github.com/SXP-Simon/Panache/commit/3aa5bebe5a5cebce3f2452df45ba46464e62fe44))
+* **be:** 修复标准排版的空格误触发跳行 ([7155eba](https://github.com/SXP-Simon/Panache/commit/7155ebad04d0a81ee70d4babe347de9b4b5b90f9))
+* **be:** 在标准排版的行格内调整轻微越界墨迹 ([60533bb](https://github.com/SXP-Simon/Panache/commit/60533bb9b416334442a349e1d121a0dee0559eef))
+* **be:** 提升纸张透视和断线容错并保留页眉 ([f7eb828](https://github.com/SXP-Simon/Panache/commit/f7eb828a58b4ab3b5398e7e72b79c9ab1fdedded))
+* **be:** 校正弯曲纸张照片的横线 ([8262f5b](https://github.com/SXP-Simon/Panache/commit/8262f5bf0d3bf0050f34dbbd75ece3ebad91e747))
+* **be:** 识别纸张正文的点状横线并校准首行 ([a253da6](https://github.com/SXP-Simon/Panache/commit/a253da6e685d0075eb1fe1db3c07d9dfce06a86a))
+* **fe:** 修复纸张预览缩放和全屏查看 ([917467a](https://github.com/SXP-Simon/Panache/commit/917467a1c832086c6d320322c828812f4da1f217))
+* **fe:** 复制当前纸张和字迹的合成图 ([717e11c](https://github.com/SXP-Simon/Panache/commit/717e11c8167cdca8ff2a973f75ef208e004628c5))
+* **fe:** 将桌面预设操作固定在参数栏底部 ([67cd121](https://github.com/SXP-Simon/Panache/commit/67cd121ba19201235e3b9deae096a5fc379e8686))
+* **fe:** 按使用场景整理工作台参数 ([9460bbd](https://github.com/SXP-Simon/Panache/commit/9460bbd8084e599ee22772455d2e4cfcf7669f6c))
+* **fe:** 改善 Web 参数面板的交互提示和响应式布局 ([9e50c8a](https://github.com/SXP-Simon/Panache/commit/9e50c8a86ffcf22f9173570419c0b55a079c8fa1))
+* **fe:** 移除工作台顶部的重复标题和标语 ([6a149f7](https://github.com/SXP-Simon/Panache/commit/6a149f798ac40ec9fed6a118534a8c444ada33c2))
+* **fe:** 简化参数折叠组件的展开样式 ([b560fb6](https://github.com/SXP-Simon/Panache/commit/b560fb612a366e9de397f7a28e83dad999c9b833))
+* **scripts:** 避免发布列表缓存遗漏 Flutter 说明 ([977d193](https://github.com/SXP-Simon/Panache/commit/977d19324ee6a783389f6aee7800fb9ca682a80b))
+
+
+### Features
+
+* **fe:** 为窄屏工作台提供编辑优先的导航 ([e38d583](https://github.com/SXP-Simon/Panache/commit/e38d58359990bdc136140aeff05f67bf0c6e2efb))
+* **fe:** 支持在纸图上框选书写区域 ([4e06bf6](https://github.com/SXP-Simon/Panache/commit/4e06bf6408a26752838dea7f33216f116807ccb2))
+* **fe:** 更新 Panache 品牌图标 ([5ce256d](https://github.com/SXP-Simon/Panache/commit/5ce256d85c635eac7f8c3661287bd5dfab908037))
+* **fe:** 统一 Web 主题和公共界面组件 ([7cfa212](https://github.com/SXP-Simon/Panache/commit/7cfa212bfa8479a14a4c6869bed8bef1afc94688))
+* 为 Web 字迹形状滤镜增加小数步进 ([78363a6](https://github.com/SXP-Simon/Panache/commit/78363a6148d30f3ec9c89635cfcc699c14831e64))
+* 为 Web 预览和导出增加字迹滤镜 ([ecea472](https://github.com/SXP-Simon/Panache/commit/ecea472a06d92caec75159064f999812671d3090))
+
 ## [1.10.1](https://github.com/SXP-Simon/Panache/compare/v1.10.0...v1.10.1) (2026-11-03)
 
 
