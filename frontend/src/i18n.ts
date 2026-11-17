@@ -263,6 +263,22 @@ const words = {
   paperAndArea: ['纸张与书写区域', 'Paper and writing area'],
   paperDimensions: ['尺寸与边距', 'Size and margins'],
   advancedInk: ['高级笔迹', 'Advanced handwriting'],
+  paperAreaAction: ['不满意排版？', 'Adjust writing area'],
+  paperAreaTitle: ['框选书写区域', 'Select the writing area'],
+  paperAreaHelp: [
+    '在纸图上拖出选框，或拖动四角微调。上、下边对准第一条和最后一条可写横线，再检查行数。',
+    'Drag to draw a box, or move its corners. Align the top and bottom with the first and last writing lines, then check the row count.',
+  ],
+  paperAreaRows: ['书写行数', 'Writing rows'],
+  paperAreaInvalid: [
+    '请选出至少两行，并在首条线之上留出一行的位置。',
+    'Select at least two rows and leave a line of space above the first rule.',
+  ],
+  paperAreaApply: ['应用书写区域', 'Apply writing area'],
+  paperAreaApplied: [
+    '书写区域已更新。生成预览可查看效果。',
+    'Writing area updated. Generate a preview to see the result.',
+  ],
   background: ['上传纸张背景', 'Upload paper background'],
   removeBackground: ['移除背景', 'Remove background'],
   detect: ['识别边距与行距', 'Detect margins & spacing'],

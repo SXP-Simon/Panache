@@ -44,6 +44,40 @@ async function uploadAndDetect(page, file) {
   return detected;
 }
 
+test('框选纸张正文、调整行数并实际生成预览', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 890 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openHome(page);
+  await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[0]));
+  await page.getByTestId('detect-background-cancel').click();
+  await page.getByTestId('preview-adjust-paper-area').click();
+  const surface = page.getByTestId('paper-area-image');
+  await expect(page.getByTestId('paper-area-selection')).toBeVisible();
+  const box = await surface.boundingBox();
+  const photo = await surface.locator('img').boundingBox();
+  expect(box.width).toBeCloseTo(photo.width, 0);
+  expect(box.height).toBeCloseTo(photo.height, 0);
+  await page.mouse.move(box.x + box.width * .15, box.y + box.height * .3);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * .85, box.y + box.height * .72, { steps: 8 });
+  await page.mouse.up();
+  await page.getByTestId('paper-area-rows').fill('7');
+  await page.getByTestId('paper-area-apply').click();
+  expect(Math.abs(Number(await page.getByTestId('line-spacing-input').inputValue()) - 70)).toBeLessThanOrEqual(1);
+  await openPaperSettings(page);
+  for (const [id, value] of [
+    ['margin-left-input', 120],
+    ['margin-right-input', 120],
+    ['margin-top-input', 230],
+    ['margin-bottom-input', 262],
+  ]) {
+    expect(Math.abs(Number(await page.getByTestId(id).inputValue()) - value)).toBeLessThanOrEqual(3);
+  }
+  await page.getByTestId('text-input').fill('书写区域测试\n第二行');
+  await page.getByTestId('preview-btn').click();
+  await expectPreviewImageLoaded(page);
+});
+
 for (const options of cases) {
   test(`真实横线纸识别、对齐、重识别与出图：${options.name}`, async ({ page }) => {
     await page.addInitScript(() => {

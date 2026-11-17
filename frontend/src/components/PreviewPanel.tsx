@@ -12,6 +12,7 @@ import GenerateButton, { useGenerationAvailability } from './GenerateButton';
 import { useI18n } from '../i18n';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
+import PaperAreaControl from './PaperAreaControl';
 import {
   Eye,
   PenLine,
@@ -101,6 +102,11 @@ export default function PreviewPanel() {
           </Button>
         </div>
       </footer>
+      {background && (
+        <div className="preview-paper-action">
+          <PaperAreaControl inPreview />
+        </div>
+      )}
       <div className="export-bar">
         <label className="check-row">
           <input

@@ -11,6 +11,7 @@ import ParameterField from './ParameterField';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
 import Accordion from '../shared/ui/Accordion';
+import PaperAreaControl from './PaperAreaControl';
 import {
   SlidersHorizontal,
   Upload,
@@ -178,6 +179,7 @@ export default function SettingsPanel() {
                   <X size={14} />
                 </Button>
               </div>
+              <PaperAreaControl />
               <Button
                 size="small"
                 className="background-detect"

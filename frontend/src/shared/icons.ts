@@ -39,4 +39,5 @@ export {
   Undo2,
   MonitorDown,
   Copy,
+  ScanLine,
 } from 'lucide-react';
