@@ -17,7 +17,7 @@ export default function Accordion({
   const [hidden, setHidden] = useState(true);
   const reduced = useReducedMotion();
   return (
-    <section className="settings-accordion" data-state={open ? 'open' : 'closed'}>
+    <section className="settings-accordion">
       <button
         type="button"
         className="accordion-trigger"

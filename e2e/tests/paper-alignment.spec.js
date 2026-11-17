@@ -53,12 +53,16 @@ test('参数组在窄屏和中等窗口保留间距，展开状态清晰', async
   const textGroup = page.getByRole('region', { name: '文字与排版' });
   const paperGroup = page.getByRole('region', { name: '纸张与书写区域' });
   const toggle = page.getByTestId('paper-settings-toggle');
-  const paint = () => toggle.evaluate((node) => getComputedStyle(node).backgroundColor);
-  const closed = await paint();
+  const arrow = () => toggle.locator(':scope > [aria-hidden="true"]').evaluate((node) => getComputedStyle(node).transform);
+  const closed = await arrow();
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect.poll(paint).not.toBe(closed);
+  await expect(page.getByTestId('width-input')).toBeVisible();
+  await expect.poll(arrow).not.toBe(closed);
+  await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(toggle).toHaveCSS('box-shadow', 'none');
   await toggle.click();
+  await expect(page.getByTestId('width-input')).not.toBeVisible();
 
   for (const width of [1024, 768, 320, 1366]) {
     await page.setViewportSize({ width, height: 930 });

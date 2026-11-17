@@ -845,32 +845,34 @@ input[type='color'] {
 }
 .settings-accordion {
   border-top: 1px solid var(--border);
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 10px;
 }
 .accordion-trigger {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 550;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  min-height: 28px;
+  min-height: 44px;
   gap: 12px;
   border: 0;
-  border-radius: 6px;
-  padding: 4px 7px;
+  padding: 6px 4px;
   color: var(--foreground);
   text-align: left;
   background: transparent;
 }
-.accordion-trigger:hover {
+.accordion-trigger:hover,
+.accordion-trigger[aria-expanded='true'] {
   color: var(--accent-ink);
-  background: var(--surface-hover);
+}
+.accordion-trigger[aria-expanded='true'] {
+  font-weight: 650;
 }
 .accordion-chevron {
-  color: var(--muted-foreground);
+  display: inline-flex;
+  flex: none;
 }
 .accordion-content,
 .animated-reveal {
@@ -878,7 +880,7 @@ input[type='color'] {
 }
 .accordion-inner {
   display: flow-root;
-  padding: 0 7px 8px;
+  padding: 0 4px 8px;
 }
 .background-row {
   display: flex;
@@ -1376,28 +1378,8 @@ input[type='color'] {
 .settings-group-body > :first-child {
   margin-top: 0;
 }
-.settings-group .accordion-trigger {
-  min-height: 36px;
-  padding: 4px 8px;
-  color: var(--secondary-ink);
-  background: var(--secondary-wash);
-}
-.settings-group .accordion-trigger:hover {
-  background: var(--secondary-control-hover);
-}
-.settings-group .accordion-chevron {
-  display: grid;
-  place-items: center;
-  height: 24px;
-  width: 24px;
-  border-radius: var(--radius-control);
-  background: var(--secondary-wash);
-  color: inherit;
-}
-.settings-group .settings-accordion[data-state='open'] > .accordion-trigger {
-  background: var(--accent-wash);
-  color: var(--accent-ink);
-  box-shadow: inset 2px 0 var(--primary);
+.settings-group-body > .settings-accordion:first-child {
+  border-top: 0;
 }
 .settings-group .check-row {
   width: fit-content;
