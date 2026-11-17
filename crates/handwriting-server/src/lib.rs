@@ -1003,16 +1003,23 @@ mod tests {
         let (status, json) = send(s, "/api/generate_handwriting", &fields, None).await;
         assert_eq!(status, StatusCode::OK, "{json}");
         let id = json["task_id"].as_str().unwrap().to_string();
-        for _ in 0..500 {
-            let (_, data) = call(s, &format!("/api/generate_handwriting/task/{id}")).await;
-            let state: serde_json::Value = serde_json::from_slice(&data).unwrap();
-            if state["task_status"] == "completed" {
-                return id;
+        let path = format!("/api/generate_handwriting/task/{id}");
+        // 2026-11-17：共享 Windows CI 运行器并行加载字体和渲染时可能超过 10 秒。
+        tokio::time::timeout(Duration::from_secs(60), async {
+            loop {
+                let (_, data) = call(s, &path).await;
+                let state: serde_json::Value = serde_json::from_slice(&data).unwrap();
+                match state["task_status"].as_str() {
+                    Some("completed") => break,
+                    Some("pending" | "processing") => {}
+                    _ => panic!("任务 {id} 意外结束：{state}"),
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
             }
-            assert_ne!(state["task_status"], "failed", "{state}");
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-        panic!("任务超时")
+        })
+        .await
+        .unwrap_or_else(|_| panic!("任务 {id} 超时，生成参数：{extra:?}"));
+        id
     }
     mod image_support {
         include!(concat!(
