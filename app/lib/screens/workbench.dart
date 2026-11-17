@@ -575,9 +575,13 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       w.edit();
     },
     onColorSelected: (value) {
-      w.settings.fill = value;
-      settingsRevision++;
-      w.edit(inkOnly: true);
+      final ink = w.settings.inkLook;
+      w.editInk((
+        opacity: ink.opacity,
+        thickness: ink.thickness,
+        softness: ink.softness,
+        color: value.toARGB32(),
+      ));
     },
     onUploadFont: () => action(() async {
       final file = await pick(['ttf', 'otf']);
