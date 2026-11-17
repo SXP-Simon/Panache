@@ -77,7 +77,9 @@ void main() {
               reason: '${course.key}: ${w.error}',
             );
             expect(w.pages, isNotEmpty);
-            for (final png in w.pages) {
+            for (var page = 0; page < w.pages.length; page++) {
+              w.page = page;
+              final png = await w.currentPreviewImage();
               final codec = await ui.instantiateImageCodec(png);
               final image = (await codec.getNextFrame()).image;
               try {

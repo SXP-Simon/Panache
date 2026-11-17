@@ -106,7 +106,8 @@ void main() {
             expect(w.pages, isNotEmpty);
             if (fixture['valid'] == true) expect(w.pages, hasLength(1));
             for (var page = 0; page < w.pages.length; page++) {
-              final png = w.pages[page];
+              w.page = page;
+              final png = await w.currentPreviewImage();
               expect(png.take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
               final codec = await ui.instantiateImageCodec(png);
               final image = (await codec.getNextFrame()).image;
