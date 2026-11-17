@@ -72,11 +72,22 @@ class _HandwritingAppState extends State<HandwritingApp> {
       () => locale = Locale(locale?.languageCode == 'zh' ? 'en' : 'zh'),
     ),
     themeColor: themeColor,
+    secondaryThemeColor: appearance.secondaryColor,
+    onSecondaryThemeColorChanged: appearance.setSecondaryColor,
     reduceMotion: appearance.reduceMotion,
     onReduceMotionChanged: appearance.setReduceMotion,
     onThemeColorChanged: appearance.setColor,
     toggleTheme: () => setState(
-      () => mode = mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
+      () => mode =
+          (mode == ThemeMode.dark ||
+              (mode == ThemeMode.system &&
+                  WidgetsBinding
+                          .instance
+                          .platformDispatcher
+                          .platformBrightness ==
+                      Brightness.dark))
+          ? ThemeMode.light
+          : ThemeMode.dark,
     ),
   );
 
@@ -87,15 +98,23 @@ class _HandwritingAppState extends State<HandwritingApp> {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-    theme: handwritingTheme(Brightness.light, seedColor: themeColor),
-    darkTheme: handwritingTheme(Brightness.dark, seedColor: themeColor),
+    theme: handwritingTheme(
+      Brightness.light,
+      seedColor: themeColor,
+      secondaryColor: appearance.secondaryColor,
+    ),
+    darkTheme: handwritingTheme(
+      Brightness.dark,
+      seedColor: themeColor,
+      secondaryColor: appearance.secondaryColor,
+    ),
     themeMode: mode,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(
         disableAnimations:
             MediaQuery.disableAnimationsOf(context) || appearance.reduceMotion,
       ),
-      child: child!,
+      child: handwritingBackdrop(context, child),
     ),
     home: workbench(),
     routes: {

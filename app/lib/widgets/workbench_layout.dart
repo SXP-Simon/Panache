@@ -175,7 +175,9 @@ class WorkbenchLayout extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SizedBox(
-                          width: width >= 1300 ? 320 : 260,
+                          width: width >= 1300
+                              ? 340
+                              : (width >= 1100 ? 292 : 248),
                           child: settingsView,
                         ),
                         const SizedBox(width: 12),
@@ -218,15 +220,17 @@ class WorkbenchLayout extends StatelessWidget {
                     children: [
                       if (mobileTab == 0)
                         Wrap(
-                          alignment: WrapAlignment.spaceBetween,
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
-                            TextButton.icon(
+                            FilledButton.tonalIcon(
                               key: const ValueKey('open-paper'),
                               onPressed: () => onTabChanged(1),
                               icon: const Icon(Icons.tune),
                               label: Text(l.paperSettings),
                             ),
-                            TextButton.icon(
+                            FilledButton.tonalIcon(
                               key: const ValueKey('open-preview'),
                               onPressed: () => onTabChanged(2),
                               icon: const Icon(Icons.visibility_outlined),
@@ -234,6 +238,7 @@ class WorkbenchLayout extends StatelessWidget {
                             ),
                           ],
                         ),
+                      if (mobileTab == 0) const SizedBox(height: 4),
                       generateButton(context),
                       if (mobileTab == 2)
                         TextButton.icon(

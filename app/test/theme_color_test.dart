@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:handwriting_app/main.dart';
-import 'package:handwriting_app/widgets/theme_color_editor.dart';
-import 'package:handwriting_app/widgets/workbench_shell.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
+import 'package:handwriting_app/services/appearance_preferences.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/theme/handwriting_theme.dart';
+import 'package:handwriting_app/widgets/theme_color_editor.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
-    'settings sheet can apply and reset colors at 320px with large text and keyboard',
+    'theme swatches are selectable and validate hex in a narrow dialog',
     (tester) async {
       tester.view.physicalSize = const Size(320, 800);
       tester.view.devicePixelRatio = 1;
@@ -20,52 +21,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetViewInsets);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: WorkbenchShell(
-            destination: 0,
-            onDestinationSelected: (_) {},
-            connected: true,
-            managedBackend: true,
-            locked: false,
-            onConnection: () {},
-            onToggleLocale: () {},
-            onToggleTheme: () {},
-            workspaceBuilder: (_, _) => const SizedBox(),
-            informationBuilder: () => const SizedBox(),
-          ),
-        ),
-      );
-      await tester.tap(find.byKey(const ValueKey('app-preferences')));
-      await tester.pumpAndSettle();
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      await tester.pumpAndSettle();
-      final input = find.byKey(const ValueKey('theme-color-hex'));
-      await tester.ensureVisible(input);
-      await tester.enterText(input, '#2962A3');
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('apply-theme-color')),
-      );
-      await tester.tap(find.byKey(const ValueKey('apply-theme-color')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Restore green'));
-      await tester.tap(find.text('Restore green'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    },
-  );
-  testWidgets(
-    'open editor shows persistence failure and stays usable with narrow keyboard layout',
-    (tester) async {
-      tester.view.physicalSize = const Size(320, 800);
-      tester.view.devicePixelRatio = 1;
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetViewInsets);
+      Color? saved;
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
@@ -75,21 +31,46 @@ void main() {
             body: SingleChildScrollView(
               child: ThemeColorEditor(
                 color: defaultThemeColor,
-                onChanged: (_) async => false,
+                secondaryColor: defaultSecondaryThemeColor,
+                onChanged: (_) async => true,
+                onSecondaryChanged: (value) async {
+                  saved = value;
+                  return false;
+                },
               ),
             ),
           ),
         ),
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('theme-color-hex')),
-        '#2962A3',
+
+      await tester.tap(
+        find.byKey(const ValueKey('pick-secondary-theme-color')),
       );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('apply-theme-color')),
-      );
-      await tester.tap(find.byKey(const ValueKey('apply-theme-color')));
       await tester.pumpAndSettle();
+      final area = find.byKey(const ValueKey('secondary-theme-color-area'));
+      expect(area, findsOneWidget);
+      await tester.tapAt(tester.getCenter(area));
+      await tester.pumpAndSettle();
+      final input = find.byKey(const ValueKey('secondary-theme-color-hex'));
+      final apply = find.byKey(const ValueKey('secondary-theme-color-apply'));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(input);
+      await tester.enterText(input, '#NOPE');
+      await tester.ensureVisible(apply);
+      await tester.tap(apply);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Enter six hexadecimal digits, e.g. #3C96CA'),
+        findsOneWidget,
+      );
+      expect(saved, isNull);
+      await tester.ensureVisible(input);
+      await tester.enterText(input, '#168478');
+      await tester.ensureVisible(apply);
+      await tester.tap(apply);
+      await tester.pumpAndSettle();
+      expect(saved, const Color(0xFF168478));
       expect(
         find.text(
           'Color applied for this session. Unable to save it on this device.',
@@ -99,8 +80,9 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
   testWidgets(
-    'custom interface seed updates light and dark themes, survives restart, leaves paper unchanged',
+    'primary and secondary controls update and restore independently without changing paper',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -110,71 +92,63 @@ void main() {
       workspace.settings.font = 'test.ttf';
       final paper = workspace.settings.toJson();
       addTearDown(workspace.dispose);
-      await tester.pumpWidget(
-        HandwritingApp(locale: const Locale('en'), workspace: workspace),
+      final appWidget = HandwritingApp(
+        locale: const Locale('en'),
+        workspace: workspace,
       );
+      await tester.pumpWidget(appWidget);
       await tester.pumpAndSettle();
-      expect(find.byType(AppBar), findsOneWidget);
+
+      MaterialApp app() => tester.widget<MaterialApp>(find.byType(MaterialApp));
+      final initial = app().theme!.colorScheme;
       await tester.tap(find.byKey(const ValueKey('app-preferences')));
       await tester.pumpAndSettle();
-      final input = find.byKey(const ValueKey('theme-color-hex'));
-      await tester.ensureVisible(input);
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(input);
-      await tester.enterText(input, '#NOPE');
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('apply-theme-color')),
-      );
-      await tester.tap(find.byKey(const ValueKey('apply-theme-color')));
-      await tester.pumpAndSettle();
+
+      Future<void> choose(String role, String hex) async {
+        final row = find.byKey(ValueKey('pick-$role-theme-color'));
+        await tester.ensureVisible(row);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        final input = find.byKey(ValueKey('$role-theme-color-hex'));
+        await tester.ensureVisible(input);
+        await tester.enterText(input, hex);
+        final apply = find.byKey(ValueKey('$role-theme-color-apply'));
+        await tester.ensureVisible(apply);
+        await tester.tap(apply);
+        await tester.pumpAndSettle();
+      }
+
+      await choose('primary', '#7955A3');
+      final afterPrimary = app().theme!.colorScheme;
+      expect(afterPrimary.primary, isNot(initial.primary));
+      expect(afterPrimary.secondaryContainer, initial.secondaryContainer);
+      await choose('secondary', '#168478');
+      final light = app().theme!.colorScheme;
+      final dark = app().darkTheme!.colorScheme;
+      expect(light.primary, afterPrimary.primary);
+      expect(light.secondaryContainer, isNot(afterPrimary.secondaryContainer));
       expect(
-        find.text('Enter six hexadecimal digits, e.g. #62833A'),
-        findsOneWidget,
-      );
-      await tester.enterText(input, '#7955A3');
-      await tester.tap(find.byKey(const ValueKey('apply-theme-color')));
-      await tester.pumpAndSettle();
-      final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-      expect(
-        app.theme!.colorScheme,
-        handwritingTheme(
-          Brightness.light,
-          seedColor: const Color(0xFF7955A3),
-        ).colorScheme,
-      );
-      expect(
-        app.darkTheme!.colorScheme,
+        dark,
         handwritingTheme(
           Brightness.dark,
           seedColor: const Color(0xFF7955A3),
+          secondaryColor: const Color(0xFF168478),
         ).colorScheme,
       );
       expect(workspace.settings.toJson(), paper);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getInt(AppearancePreferences.colorKey), 0xFF7955A3);
       expect(
-        (await SharedPreferences.getInstance()).getInt('panache.themeColor'),
-        0xFF7955A3,
+        preferences.getInt(AppearancePreferences.secondaryColorKey),
+        0xFF168478,
       );
-      tester.view.resetViewInsets();
+
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
-      await tester.pumpWidget(
-        HandwritingApp(locale: const Locale('en'), workspace: workspace),
-      );
+      await tester.pumpWidget(appWidget);
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<MaterialApp>(find.byType(MaterialApp)).theme!.colorScheme,
-        app.theme!.colorScheme,
-      );
-      await tester.tap(find.byKey(const ValueKey('app-preferences')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Restore green'));
-      await tester.tap(find.text('Restore green'));
-      await tester.pumpAndSettle();
-      expect(
-        (await SharedPreferences.getInstance()).getInt('panache.themeColor'),
-        defaultThemeColor.toARGB32(),
-      );
+      expect(app().theme!.colorScheme, light);
+      expect(app().darkTheme!.colorScheme, dark);
     },
   );
 }

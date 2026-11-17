@@ -76,38 +76,66 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final hasPages = widget.pages.isNotEmpty;
+    final paperActions = widget.onAdjustBackground != null;
+    final inkActions = widget.onInkChanged != null;
     return WorkbenchPanel(
       title: l.previewTitle,
       icon: Icons.description_outlined,
       child: Column(
         children: [
-          if (widget.onInkChanged != null || widget.onAdjustBackground != null)
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: Wrap(
-                alignment: WrapAlignment.end,
-                children: [
-                  if (widget.onAdjustBackground != null)
-                    TextButton.icon(
-                      key: const ValueKey('preview-adjust-paper-area'),
-                      onPressed: widget.locked
-                          ? null
-                          : widget.onAdjustBackground,
-                      icon: const Icon(Icons.crop_free),
-                      label: Text(l.paperAreaAction),
-                    ),
-                  if (widget.onInkChanged != null)
-                    TextButton.icon(
-                      key: const ValueKey('preview-ink-effects'),
-                      onPressed: () =>
-                          setState(() => _inkExpanded = !_inkExpanded),
-                      icon: const Icon(Icons.tune),
-                      label: Text(l.inkEffects),
-                    ),
-                ],
+          if (paperActions || inkActions || hasPages)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (paperActions)
+                      FilledButton.tonalIcon(
+                        key: const ValueKey('preview-adjust-paper-area'),
+                        onPressed: widget.locked
+                            ? null
+                            : widget.onAdjustBackground,
+                        icon: const Icon(Icons.crop_free),
+                        label: Text(l.paperAreaAction),
+                      ),
+                    if (inkActions)
+                      Semantics(
+                        expanded: _inkExpanded,
+                        child: FilledButton.tonalIcon(
+                          style: _inkExpanded
+                              ? FilledButton.styleFrom(
+                                  backgroundColor: colors.primaryContainer,
+                                  foregroundColor: colors.onPrimaryContainer,
+                                )
+                              : null,
+                          key: const ValueKey('preview-ink-effects'),
+                          onPressed: () =>
+                              setState(() => _inkExpanded = !_inkExpanded),
+                          icon: Icon(
+                            _inkExpanded ? Icons.expand_less : Icons.tune,
+                          ),
+                          label: Text(l.inkEffects),
+                        ),
+                      ),
+                    if (hasPages)
+                      OutlinedButton.icon(
+                        key: const ValueKey('expand-preview'),
+                        onPressed: _expand,
+                        icon: const Icon(Icons.open_in_full),
+                        label: Text(l.expandPreview),
+                      ),
+                  ],
+                ),
               ),
             ),
-          if (_inkExpanded && widget.onInkChanged != null) _inkControls(l),
+          if (_inkExpanded && inkActions) _inkControls(l),
           if (widget.stale)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -116,22 +144,13 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                 key: const ValueKey('preview-stale'),
               ),
             ),
-          if (widget.pages.isNotEmpty)
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton.icon(
-                key: const ValueKey('expand-preview'),
-                onPressed: _expand,
-                icon: const Icon(Icons.open_in_full),
-                label: Text(l.expandPreview),
-              ),
-            ),
           Expanded(
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
+                color: colors.surfaceContainerLow,
+                border: Border.all(color: colors.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
               ),
               clipBehavior: Clip.antiAlias,
               child: widget.pages.isEmpty
@@ -141,22 +160,32 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                             fit: BoxFit.contain,
                           )
                         : Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    Icons.draw_outlined,
-                                    size: 56,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary,
+                                  DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: colors.surfaceContainerHigh,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: Icon(
+                                        Icons.description_outlined,
+                                        size: 24,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 12),
                                   Text(
                                     l.previewHint,
                                     textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -174,7 +203,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                     ),
             ),
           ),
-          if (widget.pages.isNotEmpty || widget.onCancel != null)
+          if (hasPages || widget.onCancel != null)
             Wrap(
               alignment: WrapAlignment.center,
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -185,7 +214,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                     icon: const Icon(Icons.cancel_outlined),
                     label: Text(l.cancel),
                   ),
-                if (widget.pages.isNotEmpty)
+                if (hasPages)
                   TextButton.icon(
                     onPressed: widget.locked ? null : widget.onSaveImage,
                     icon: const Icon(Icons.download),

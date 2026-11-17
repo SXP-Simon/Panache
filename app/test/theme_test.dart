@@ -4,7 +4,7 @@ import 'package:handwriting_app/services/desktop_bootstrap.dart';
 import 'package:handwriting_app/theme/handwriting_theme.dart';
 
 void main() {
-  test('shared UI themes use WenKai, green surfaces and Material 3', () {
+  test('shared UI themes use WenKai, neutral surfaces and Material 3', () {
     for (final brightness in Brightness.values) {
       final theme = handwritingTheme(brightness);
       expect(theme.useMaterial3, isTrue);
@@ -14,13 +14,18 @@ void main() {
         'packages/handwriting_assets/LXGW WenKai',
       );
       expect(
-        theme.colorScheme.primary,
-        ColorScheme.fromSeed(
-          seedColor: const Color(0xFF62833A),
-          brightness: brightness,
-        ).primary,
+        theme.scaffoldBackgroundColor,
+        brightness == Brightness.light ? Colors.white : const Color(0x6B000000),
       );
-      expect(theme.cardTheme.color, theme.colorScheme.surfaceContainerLow);
+      expect(theme.colorScheme.surfaceTint, Colors.transparent);
+      expect(
+        theme.navigationRailTheme.selectedLabelTextStyle!.fontFamily,
+        theme.textTheme.labelMedium!.fontFamily,
+      );
+      expect(
+        theme.navigationRailTheme.unselectedLabelTextStyle!.fontFamily,
+        theme.textTheme.labelMedium!.fontFamily,
+      );
     }
   });
 

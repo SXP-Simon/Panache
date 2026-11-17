@@ -22,7 +22,20 @@ class WorkbenchPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(7),
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -33,12 +46,96 @@ class WorkbenchPanel extends StatelessWidget {
               ...actions,
             ],
           ),
-          const SizedBox(height: 12),
+          const Divider(height: 20),
           Expanded(child: child),
         ],
       ),
     ),
   );
+}
+
+/// Presents both static settings sections and expandable groups.
+class SettingsGroup extends StatelessWidget {
+  const SettingsGroup({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.children,
+    this.initiallyExpanded,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+  final bool? initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    const corners = BorderRadius.all(Radius.circular(12));
+    final expanded = initiallyExpanded;
+    final body = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Card.outlined(
+        color: colors.surfaceContainerLow,
+        clipBehavior: Clip.antiAlias,
+        child: expanded == null
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                    child: Row(
+                      children: [
+                        Icon(icon, color: colors.onSurfaceVariant, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(title, style: theme.textTheme.titleSmall),
+                        ),
+                      ],
+                    ),
+                  ),
+                  body,
+                ],
+              )
+            : ExpansionTile(
+                key: const PageStorageKey('expansion'),
+                leading: Icon(icon, size: 19),
+                title: Text(title),
+                tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                initiallyExpanded: expanded,
+                maintainState: true,
+                collapsedShape: const RoundedRectangleBorder(
+                  borderRadius: corners,
+                ),
+                shape: const RoundedRectangleBorder(borderRadius: corners),
+                collapsedBackgroundColor: colors.secondaryContainer,
+                collapsedIconColor: colors.onSecondaryContainer,
+                collapsedTextColor: colors.onSecondaryContainer,
+                iconColor: colors.primary,
+                textColor: colors.onPrimaryContainer,
+                expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
+                    ? AnimationStyle.noAnimation
+                    : null,
+                children: [
+                  Divider(
+                    height: 1,
+                    color: colors.primary.withValues(alpha: .55),
+                  ),
+                  body,
+                ],
+              ),
+      ),
+    );
+  }
 }
 
 class EditorAction {
