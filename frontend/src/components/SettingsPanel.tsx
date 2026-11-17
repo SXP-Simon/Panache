@@ -214,52 +214,52 @@ export default function SettingsPanel() {
             </div>
           </Accordion>
         </SettingsGroup>
-        <SettingsGroup title={t('presets')} className="presets-section">
-          <div className="preset-controls">
-            <SelectField
-              label={t('presets')}
-              value={settings.selectedPreset}
-              data-testid="builtin-preset-select"
-              onChange={(event) => applyPreset(event.currentTarget.value)}
-            >
-              <option value="" disabled>
-                {t('presetChoose')}
-              </option>
-              <option value="smallUnderlined">{t('presetSmall')}</option>
-              <option value="natural">{t('presetNatural')}</option>
-              <option value="clean">{t('presetClean')}</option>
-            </SelectField>
-            <div className="preset-actions">
-              <Button
-                size="small"
-                data-testid="save-settings-btn"
-                title={t('save')}
-                onClick={() => void saveSettings()}
-              >
-                <Save size={15} />
-                {t('save')}
-              </Button>
-              <Button
-                size="small"
-                data-testid="load-settings-btn"
-                title={t('load')}
-                onClick={() => void loadSettings()}
-              >
-                <FolderOpen size={15} />
-                {t('load')}
-              </Button>
-              <Button
-                size="icon"
-                data-testid="reset-settings-btn"
-                aria-label={t('reset')}
-                onClick={resetSettings}
-              >
-                <RotateCcw size={15} />
-              </Button>
-            </div>
-          </div>
-        </SettingsGroup>
       </div>
+      <SettingsGroup title={t('presets')} className="presets-section">
+        <div className="preset-controls">
+          <SelectField
+            label={t('presets')}
+            value={settings.selectedPreset}
+            data-testid="builtin-preset-select"
+            onChange={(event) => applyPreset(event.currentTarget.value)}
+          >
+            <option value="" disabled>
+              {t('presetChoose')}
+            </option>
+            <option value="smallUnderlined">{t('presetSmall')}</option>
+            <option value="natural">{t('presetNatural')}</option>
+            <option value="clean">{t('presetClean')}</option>
+          </SelectField>
+          <div className="preset-actions">
+            <Button
+              size="small"
+              data-testid="save-settings-btn"
+              title={t('save')}
+              onClick={() => void saveSettings()}
+            >
+              <Save size={15} />
+              {t('save')}
+            </Button>
+            <Button
+              size="small"
+              data-testid="load-settings-btn"
+              title={t('load')}
+              onClick={() => void loadSettings()}
+            >
+              <FolderOpen size={15} />
+              {t('load')}
+            </Button>
+            <Button
+              size="icon"
+              data-testid="reset-settings-btn"
+              aria-label={t('reset')}
+              onClick={resetSettings}
+            >
+              <RotateCcw size={15} />
+            </Button>
+          </div>
+        </div>
+      </SettingsGroup>
       <AnimatePresence>
         {detectOpen && (
           <Modal

@@ -750,6 +750,8 @@ progress {
   align-items: start;
 }
 .settings-panel {
+  display: flex;
+  flex-direction: column;
   container: settings-panel / inline-size;
 }
 .field-label {
@@ -906,8 +908,9 @@ input[type='color'] {
   font-size: 12px;
   word-break: break-all;
 }
-.presets-section {
-  grid-column: 1 / -1;
+.settings-panel > .presets-section {
+  flex-shrink: 0;
+  margin: 0 12px 12px;
 }
 .layout-preset {
   border-top: 1px solid var(--border);
@@ -1128,6 +1131,16 @@ input[type='color'] {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@media (min-width: 1101px) {
+  .settings-panel {
+    max-height: max(360px, calc(100dvh - 160px));
+  }
+  .settings-body {
+    min-height: 0;
+    grid-auto-rows: max-content;
+    overflow-y: auto;
   }
 }
 @media (min-width: 1500px) {
