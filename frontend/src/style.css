@@ -1407,6 +1407,28 @@ input[type='color'] {
   mask-mode: alpha;
   pointer-events: none;
 }
+.preview-image-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 4px;
+  max-width: min(240px, calc(100vw - 16px));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.preview-image-menu:popover-open {
+  display: grid;
+}
+.preview-image-menu .button {
+  justify-content: flex-start;
+}
+.preview-image-menu [role='status'] {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
 .mobile-settings-button {
   display: none;
 }

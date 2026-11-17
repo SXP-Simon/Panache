@@ -1,10 +1,10 @@
 import type { DownloadMode } from './types.ts';
 
-export function downloadResult(blob: Blob, mode: DownloadMode): () => void {
+export function downloadResult(blob: Blob, mode: DownloadMode | 'png'): () => void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = mode === 'pdf' ? 'images.pdf' : 'images.zip';
+  link.download = `images.${mode}`;
   document.body.append(link);
   link.click();
   link.remove();

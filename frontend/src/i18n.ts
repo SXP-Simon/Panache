@@ -335,6 +335,14 @@ const words = {
   ],
   backgroundLoaded: ['背景图片已加载。', 'Paper background loaded.'],
   previewLoaded: ['预览图像已加载。', 'Preview images loaded.'],
+  copyPreviewImage: ['复制图片', 'Copy image'],
+  savePreviewImage: ['保存图片', 'Save image'],
+  previewImageCopied: ['已复制图片', 'Image copied'],
+  previewImageCopyFailed: [
+    '复制失败，可以重试或保存图片。',
+    'Could not copy. Retry or save the image.',
+  ],
+  previewImageSaveFailed: ['保存图片失败，请重试。', 'Could not save the image. Please retry.'],
   downloadBrowser: [
     '文件已下载，请到浏览器的「下载」文件夹中查看。',
     'Downloaded. Find the file in your browser’s Downloads folder.',

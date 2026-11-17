@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSettingsStore } from '@/features/settings/store';
 import type { InkShape } from '@/utils/inkEffects';
 
-export default function InkPreview({ source, testId }: { source: string; testId: string }) {
-  const ink = useSettingsStore((state) => state.ink);
-  const opacity = useSettingsStore((state) => state.numbers.ink_opacity);
-  const thickness = useSettingsStore((state) => state.numbers.ink_thickness);
-  const softness = useSettingsStore((state) => state.numbers.ink_softness);
+export function useInkMask(source: string | undefined, { thickness, softness }: InkShape) {
   const [mask, setMask] = useState(source);
   const send = useRef<((shape: InkShape) => void) | null>(null);
 
   useEffect(() => {
-    const worker = new Worker(new URL('../workers/ink-preview.ts', import.meta.url), {
+    if (!source) return;
+    const worker = new Worker(new URL('../../workers/ink-preview.ts', import.meta.url), {
       type: 'module',
     });
     let pending: InkShape | null = null;
@@ -58,12 +54,5 @@ export default function InkPreview({ source, testId }: { source: string; testId:
     send.current?.({ thickness, softness });
   }, [source, thickness, softness]);
 
-  return (
-    <div
-      className="preview-ink-layer"
-      aria-hidden="true"
-      data-testid={testId}
-      style={{ backgroundColor: ink, opacity: opacity / 100, maskImage: `url("${mask}")` }}
-    />
-  );
+  return source && (mask ?? source);
 }

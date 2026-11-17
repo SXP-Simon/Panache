@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreviewStore } from '@/features/preview/store';
+import { useInkMask } from '@/features/preview/useInkMask';
+import { compositePreview } from '@/features/preview/compositePreview';
+import { downloadResult } from '@/api/download';
 import { useSettingsStore } from '@/features/settings/store';
 import { useGenerationState } from '@/features/generation/state';
 import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
@@ -9,7 +12,6 @@ import GenerateButton, { useGenerationAvailability } from './GenerateButton';
 import { useI18n } from '../i18n';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
-import InkPreview from './InkPreview';
 import {
   Eye,
   PenLine,
@@ -22,6 +24,7 @@ import {
   LoaderCircle,
   Download,
   FileDown,
+  Copy,
 } from '../shared/icons';
 export default function PreviewPanel() {
   const { images, inkLayers, currentPage, setPage } = usePreviewStore(
@@ -77,7 +80,7 @@ export default function PreviewPanel() {
             <GenerateButton compact />
           </div>
         ) : (
-          <PreviewSheet key={image} image={image} ink={ink} zoom={zoom} />
+          <PreviewSheet key={ink ?? image} image={image} ink={ink} zoom={zoom} />
         )}
         <PreviewProgress />
       </div>
@@ -256,7 +259,7 @@ function ExpandedPreview({
       className="preview-modal"
     >
       <div className="preview-canvas" data-testid="expanded-preview-viewport">
-        <PreviewSheet key={image} image={image} ink={ink} zoom={zoom} expanded />
+        <PreviewSheet key={ink ?? image} image={image} ink={ink} zoom={zoom} expanded />
       </div>
       <footer className="preview-tools">
         {count > 1 && (
@@ -284,9 +287,51 @@ function PreviewSheet({
   const { t } = useI18n();
   const [loaded, setLoaded] = useState(false);
   const [aspect, setAspect] = useState(1);
+  const [imageActionStatus, setImageActionStatus] = useState('');
+  const paper = useRef<HTMLImageElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const color = useSettingsStore((state) => state.ink);
+  const opacity = useSettingsStore((state) => state.numbers.ink_opacity) / 100;
+  const thickness = useSettingsStore((state) => state.numbers.ink_thickness);
+  const softness = useSettingsStore((state) => state.numbers.ink_softness);
+  const mask = useInkMask(ink, { thickness, softness });
   const reduced = useReducedMotion();
   const prefix = expanded ? 'expanded-preview' : 'preview';
   const width = expanded ? `calc(min(100cqw, ${aspect * 100}cqh) * ${zoom / 100})` : `${zoom}%`;
+
+  function openImageMenu(x: number, y: number) {
+    const element = menu.current;
+    if (!element) return;
+    setImageActionStatus('');
+    element.showPopover();
+    element.style.left = `${Math.max(8, Math.min(x, window.innerWidth - element.offsetWidth - 8))}px`;
+    element.style.top = `${Math.max(8, Math.min(y, window.innerHeight - element.offsetHeight - 8))}px`;
+    element.querySelector('button')?.focus();
+  }
+
+  async function handleImageAction(action: 'copy' | 'save') {
+    const background = paper.current;
+    if (!background || !mask) return;
+    try {
+      if (action === 'copy') {
+        if (!navigator.clipboard || typeof ClipboardItem !== 'function') {
+          throw new Error('Image clipboard unavailable');
+        }
+        // Start the write within the click; the PNG can finish encoding asynchronously.
+        const png = compositePreview(background, mask, color, opacity);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+        setImageActionStatus(t('previewImageCopied'));
+      } else {
+        downloadResult(await compositePreview(background, mask, color, opacity), 'png');
+        menu.current?.hidePopover();
+      }
+    } catch {
+      setImageActionStatus(
+        t(action === 'copy' ? 'previewImageCopyFailed' : 'previewImageSaveFailed'),
+      );
+    }
+  }
+
   return (
     <motion.div
       className="preview-sheet"
@@ -296,6 +341,7 @@ function PreviewSheet({
       transition={{ duration: reduced ? 0 : 0.2 }}
     >
       <img
+        ref={paper}
         src={image}
         data-testid={`${prefix}-image`}
         className="preview-image"
@@ -304,9 +350,54 @@ function PreviewSheet({
           if (expanded && naturalHeight) setAspect(naturalWidth / naturalHeight);
           setLoaded(true);
         }}
+        tabIndex={mask ? 0 : undefined}
+        onContextMenu={(event) => {
+          if (!mask) return;
+          event.preventDefault();
+          openImageMenu(event.clientX, event.clientY);
+        }}
+        onKeyDown={(event) => {
+          if (!mask || (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')))
+            return;
+          event.preventDefault();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          openImageMenu(bounds.left, bounds.top);
+        }}
         alt={t('preview')}
       />
-      {ink && <InkPreview key={ink} source={ink} testId={`${prefix}-ink-layer`} />}
+      {mask && (
+        <>
+          <div
+            className="preview-ink-layer"
+            aria-hidden="true"
+            data-testid={`${prefix}-ink-layer`}
+            style={{ backgroundColor: color, opacity, maskImage: `url("${mask}")` }}
+          />
+          <div ref={menu} className="preview-image-menu" popover="auto">
+            <Button
+              variant="ghost"
+              size="small"
+              data-testid={`${prefix}-copy-image`}
+              onClick={() => void handleImageAction('copy')}
+            >
+              <Copy size={16} />
+              {t('copyPreviewImage')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="small"
+              data-testid={`${prefix}-save-image`}
+              onClick={() => void handleImageAction('save')}
+            >
+              <Download size={16} />
+              {t('savePreviewImage')}
+            </Button>
+            <span role="status" hidden={!imageActionStatus}>
+              {imageActionStatus}
+            </span>
+          </div>
+        </>
+      )}
     </motion.div>
   );
 }
