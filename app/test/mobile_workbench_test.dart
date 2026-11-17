@@ -9,6 +9,7 @@ import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
+import 'package:handwriting_app/widgets/workbench_settings.dart';
 
 class MobileTestApi extends HandwritingApi {
   MobileTestApi() : super('local://test-engine');
@@ -154,18 +155,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('changing layout preserves fields inside an expanded group', (
-    tester,
-  ) async {
+  testWidgets('changing layout preserves the paper fields', (tester) async {
     final workspace = await openWorkbench(tester, size: const Size(375, 800));
     final l = labels(tester);
     final before = Map<String, String>.of(workspace.settings.values);
     await tester.tap(find.byKey(const ValueKey('open-paper')));
     await tester.pumpAndSettle();
     final group = find.byKey(const PageStorageKey('settings-layout'));
-    await tester.ensureVisible(group);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(l.marginsLayout));
+    final settingsList = find
+        .descendant(
+          of: find.byType(WorkbenchSettings),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(group, 150, scrollable: settingsList);
     await tester.pumpAndSettle();
     for (final label in [l.layoutHomework, l.layoutStandard]) {
       final option = find.text(label);

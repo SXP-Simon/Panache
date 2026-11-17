@@ -89,8 +89,6 @@ void main() {
             .first;
         final group = find.byKey(const PageStorageKey('settings-layout'));
         await tester.scrollUntilVisible(group, 150, scrollable: scrollable);
-        await tester.tap(find.text('边距与排版'));
-        await tester.pumpAndSettle();
         final selector = find.byKey(const ValueKey('layout-style'));
         await tester.scrollUntilVisible(selector, 150, scrollable: scrollable);
         await tester.drag(scrollable, const Offset(0, 80));
