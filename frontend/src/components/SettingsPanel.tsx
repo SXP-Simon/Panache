@@ -57,7 +57,6 @@ export default function SettingsPanel() {
     <aside className="panel settings-panel" data-testid="settings-panel">
       <header className="panel-heading">
         <div>
-          <p className="eyebrow">02 / {t('settingsHint')}</p>
           <h2>
             <SlidersHorizontal size={18} />
             {t('settings')}
@@ -65,98 +64,88 @@ export default function SettingsPanel() {
         </div>
       </header>
       <div className="settings-body">
-        <label className="field-label">
-          {t('font')}
-          <select
-            value={settings.selectedFont}
-            onChange={(event) => settings.patch({ selectedFont: event.currentTarget.value })}
-            data-testid="font-select"
-          >
-            {fonts.map((font) => (
-              <option key={font} value={font}>
-                {font}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="file-button upload-control">
-          <Upload size={15} />
-          {t('fontUpload')}
-          <input
-            data-testid="font-file-input"
-            type="file"
-            accept=".ttf,.otf,.ttc"
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
-              if (file) void uploadFont(file);
-              event.currentTarget.value = '';
-            }}
-          />
-        </label>
-        {settings.fontFile && <p className="file-name">{settings.fontFile.name}</p>}
-        <div className="layout-preset">
+        <section className="settings-group settings-group--text">
+          <h3>{t('textAndLayout')}</h3>
           <label className="field-label">
-            {t('layoutPreset')}
+            {t('font')}
             <select
-              value={settings.layoutStyle}
-              data-testid="layout-style-select"
-              aria-describedby="layout-preset-help"
-              onChange={(event) =>
-                settings.patch({
-                  layoutStyle: event.currentTarget.value === 'homework' ? 'homework' : 'standard',
-                })
-              }
+              value={settings.selectedFont}
+              onChange={(event) => settings.patch({ selectedFont: event.currentTarget.value })}
+              data-testid="font-select"
             >
-              <option value="standard">{t('layoutStandard')}</option>
-              <option value="homework">{t('layoutHomework')}</option>
+              {fonts.map((font) => (
+                <option key={font} value={font}>
+                  {font}
+                </option>
+              ))}
             </select>
           </label>
-          <p
-            id="layout-preset-help"
-            className="layout-preset-help"
-            data-testid="layout-preset-help"
-          >
-            {t(settings.layoutStyle === 'homework' ? 'layoutHomeworkHelp' : 'layoutStandardHelp')}
-          </p>
-        </div>
-        <div className="field-grid">
-          {mainFields.map((field) => (
-            <ParameterField key={field.key} field={field} />
-          ))}
-        </div>
-        <Accordion title={t('inkEffects')} testId="ink-effects-toggle">
-          {inkFields.map((field) => (
-            <InkSlider key={field.key} field={field} />
-          ))}
-          <label className="color-field">
-            <span>{t('ink')}</span>
+          <label className="file-button upload-control">
+            <Upload size={15} />
+            {t('fontUpload')}
             <input
-              value={settings.ink}
-              onChange={(event) => settings.patch({ ink: event.currentTarget.value })}
-              type="color"
-              data-testid="ink-color-input"
+              data-testid="font-file-input"
+              type="file"
+              accept=".ttf,.otf,.ttc"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void uploadFont(file);
+                event.currentTarget.value = '';
+              }}
             />
           </label>
-        </Accordion>
-        <label className="check-row">
-          <input
-            checked={settings.underlined}
-            onChange={(event) => settings.patch({ underlined: event.currentTarget.checked })}
-            type="checkbox"
-            data-testid="underlined-checkbox"
-          />
-          <span>{t('underline')}</span>
-        </label>
-        <label className="check-row">
-          <input
-            checked={settings.englishSpacing}
-            onChange={(event) => settings.patch({ englishSpacing: event.currentTarget.checked })}
-            type="checkbox"
-            data-testid="english-spacing-checkbox"
-          />
-          <span>{t('englishSpacing')}</span>
-        </label>
-        <Accordion title={t('paper')} testId="paper-settings-toggle">
+          {settings.fontFile && <p className="file-name">{settings.fontFile.name}</p>}
+          <div className="layout-preset">
+            <label className="field-label">
+              {t('layoutPreset')}
+              <select
+                value={settings.layoutStyle}
+                data-testid="layout-style-select"
+                aria-describedby="layout-preset-help"
+                onChange={(event) =>
+                  settings.patch({
+                    layoutStyle: event.currentTarget.value === 'homework' ? 'homework' : 'standard',
+                  })
+                }
+              >
+                <option value="standard">{t('layoutStandard')}</option>
+                <option value="homework">{t('layoutHomework')}</option>
+              </select>
+            </label>
+            <p
+              id="layout-preset-help"
+              className="layout-preset-help"
+              data-testid="layout-preset-help"
+            >
+              {t(settings.layoutStyle === 'homework' ? 'layoutHomeworkHelp' : 'layoutStandardHelp')}
+            </p>
+          </div>
+          <div className="field-grid">
+            {mainFields.map((field) => (
+              <ParameterField key={field.key} field={field} />
+            ))}
+          </div>
+          <label className="check-row">
+            <input
+              checked={settings.englishSpacing}
+              onChange={(event) => settings.patch({ englishSpacing: event.currentTarget.checked })}
+              type="checkbox"
+              data-testid="english-spacing-checkbox"
+            />
+            <span>{t('englishSpacing')}</span>
+          </label>
+        </section>
+        <section className="settings-group settings-group--paper">
+          <h3>{t('paperAndArea')}</h3>
+          <label className="check-row">
+            <input
+              checked={settings.underlined}
+              onChange={(event) => settings.patch({ underlined: event.currentTarget.checked })}
+              type="checkbox"
+              data-testid="underlined-checkbox"
+            />
+            <span>{t('underline')}</span>
+          </label>
           <label className="file-button upload-control">
             <ImagePlus size={15} />
             {t('background')}
@@ -202,26 +191,47 @@ export default function SettingsPanel() {
               </Button>
             </>
           )}
-          <div className="field-grid">
-            {paperFields.map((field) => (
-              <ParameterField key={field.key} field={field} />
+          <Accordion title={t('paperDimensions')} testId="paper-settings-toggle">
+            <div className="field-grid">
+              {paperFields.map((field) => (
+                <ParameterField key={field.key} field={field} />
+              ))}
+            </div>
+          </Accordion>
+        </section>
+        <section className="settings-group settings-group--ink">
+          <label className="color-field">
+            <span>{t('ink')}</span>
+            <input
+              value={settings.ink}
+              onChange={(event) => settings.patch({ ink: event.currentTarget.value })}
+              type="color"
+              data-testid="ink-color-input"
+            />
+          </label>
+          <Accordion title={t('inkEffects')} testId="ink-effects-toggle">
+            {inkFields.map((field) => (
+              <InkSlider key={field.key} field={field} />
             ))}
-          </div>
-        </Accordion>
-        <Accordion title={t('variation')} testId="variation-settings-toggle">
-          <div className="field-grid">
-            {variationFields.map((field) => (
-              <ParameterField key={field.key} field={field} />
-            ))}
-          </div>
-        </Accordion>
-        <Accordion title={t('strikethrough')} testId="strike-settings-toggle">
-          <div className="field-grid">
-            {strikeFields.map((field) => (
-              <ParameterField key={field.key} field={field} />
-            ))}
-          </div>
-        </Accordion>
+          </Accordion>
+        </section>
+        <section className="settings-group settings-group--advanced">
+          <h3>{t('advancedInk')}</h3>
+          <Accordion title={t('variation')} testId="variation-settings-toggle">
+            <div className="field-grid">
+              {variationFields.map((field) => (
+                <ParameterField key={field.key} field={field} />
+              ))}
+            </div>
+          </Accordion>
+          <Accordion title={t('strikethrough')} testId="strike-settings-toggle">
+            <div className="field-grid">
+              {strikeFields.map((field) => (
+                <ParameterField key={field.key} field={field} />
+              ))}
+            </div>
+          </Accordion>
+        </section>
         <div className="presets-section">
           <label className="field-label">
             {t('presets')}
