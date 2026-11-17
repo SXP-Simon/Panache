@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
@@ -9,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import 'dialogs/connection_dialog.dart';
 import 'dialogs/illustration_dialog.dart';
+import 'dialogs/paper_area_dialog.dart';
 import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
 import 'dialogs/text_tools_dialogs.dart';
@@ -505,6 +507,60 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> adjustPaperArea() async {
+    final paper = w.background;
+    if (paper == null || locked) return;
+    late final Size size;
+    try {
+      final buffer = await ui.ImmutableBuffer.fromUint8List(paper.bytes);
+      try {
+        final image = await ui.ImageDescriptor.encoded(buffer);
+        try {
+          size = Size(image.width.toDouble(), image.height.toDouble());
+        } finally {
+          image.dispose();
+        }
+      } finally {
+        buffer.dispose();
+      }
+    } catch (_) {
+      if (mounted) notify(l.paperAreaLoadFailed);
+      return;
+    }
+    if (!mounted || locked || !identical(w.background, paper)) return;
+    if (size.shortestSide < 16) {
+      notify(l.paperAreaLoadFailed);
+      return;
+    }
+    final layout = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (_) => PaperAreaDialog(
+        bytes: paper.bytes,
+        size: size,
+        values: Map.of(w.settings.values),
+      ),
+    );
+    if (!mounted ||
+        locked ||
+        layout == null ||
+        !identical(w.background, paper)) {
+      return;
+    }
+    settingsRevision++;
+    if (documents.applyPaperArea(paper, layout)) notify(l.paperAreaApplied);
+  }
+
+  Future<void> detectPaper() async {
+    try {
+      if (await documents.detectBackground() && mounted) {
+        setState(() => settingsRevision++);
+        notify(l.paperIdentificationDone);
+      }
+    } catch (_) {
+      if (mounted) notify(l.paperIdentificationFailed);
+    }
+  }
+
   Widget settingsPanel() => WorkbenchSettings(
     settings: w.settings,
     fonts: w.fonts,
@@ -568,22 +624,19 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       final file = await pick(['png', 'jpg', 'jpeg']);
       if (file != null) {
         w.background = file;
-        w.emit();
+        w.pages = [];
+        w.page = 0;
+        w.edit();
+        await detectPaper();
       }
     }),
-    onDetectBackground: () => action(() async {
-      try {
-        if (await documents.detectBackground()) {
-          settingsRevision++;
-          notify(l.paperIdentificationDone);
-        }
-      } catch (_) {
-        notify(l.paperIdentificationFailed);
-      }
-    }),
+    onDetectBackground: () => action(detectPaper),
+    onAdjustBackground: adjustPaperArea,
     onRemoveBackground: () {
       w.background = null;
-      w.emit();
+      w.pages = [];
+      w.page = 0;
+      w.edit();
     },
   );
 
@@ -596,6 +649,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     page: w.page,
     version: w.version,
     locked: locked,
+    backgroundBytes: w.background?.bytes,
+    onAdjustBackground: w.background == null ? null : adjustPaperArea,
     onPageChanged: (page) {
       w.page = page;
       w.emit();

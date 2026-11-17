@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -175,6 +176,67 @@ void main() {
       expect(workspace.settings.values, before);
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('dragging the writing area updates the current paper layout', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(430, 890));
+    final png = await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.white, BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(800, 1000);
+      try {
+        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer
+            .asUint8List();
+      } finally {
+        image.dispose();
+        picture.dispose();
+      }
+    });
+    final paper = Upload('paper.png', png!);
+    workspace.background = paper;
+    workspace.emit();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-preview')));
+    await tester.pumpAndSettle();
+    final adjust = find.byKey(const ValueKey('preview-adjust-paper-area'));
+    await tester.runAsync(() async {
+      await tester.tap(adjust);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    final surface = find.byKey(const ValueKey('paper-area-image'));
+    final box = tester.getRect(surface);
+    await tester.timedDragFrom(
+      Offset(box.left + box.width * .15, box.top + box.height * .30),
+      Offset(box.width * .70, box.height * .42),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pumpAndSettle();
+    await tester.timedDragFrom(
+      Offset(box.left + box.width * .85, box.top + box.height * .72),
+      Offset(0, box.height * .06),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('paper-area-rows')), '7');
+    await tester.pumpAndSettle();
+    final apply = find.byKey(const ValueKey('paper-area-apply'));
+    await tester.ensureVisible(apply);
+    expect(tester.widget<FilledButton>(apply).enabled, isTrue);
+    await tester.tap(apply);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(apply, findsNothing);
+    expect(workspace.background, same(paper));
+    expect(workspace.backgroundRuled, isTrue);
+    expect(workspace.settings.values, containsPair('line_spacing', '80'));
+    expect(workspace.settings.values, containsPair('left_margin', '120'));
+    expect(workspace.settings.values, containsPair('top_margin', '220'));
+    expect(workspace.settings.values, containsPair('bottom_margin', '200'));
   });
 
   testWidgets('system back preserves editor scrolling and undo history', (
