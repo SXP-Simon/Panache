@@ -314,8 +314,6 @@ input[type='range'] {
 .brand-mark {
   width: 38px;
   height: 38px;
-  background: var(--primary);
-  color: var(--primary-foreground);
   border-radius: 12px;
   display: flex;
   align-items: center;

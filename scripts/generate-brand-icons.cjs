@@ -11,19 +11,31 @@ const { chromium } = createRequire(path.join(root, "e2e/package.json"))("@playwr
 
 async function main() {
   const svg = await fs.readFile(path.join(root, "frontend/src/assets/brand.svg"), "utf8");
+  const flutterRoot = process.argv[2] && path.resolve(process.argv[2]);
+  // Flutter maintains its own mark and Android adaptive icon on its own branch.
+  const flutterSvg = flutterRoot
+    ? await fs.readFile(path.join(flutterRoot, "app/assets/branding/panache.svg"), "utf8")
+    : null;
+  const paths = flutterSvg && [...flutterSvg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+  if (paths && paths.length !== 3) throw new Error("Expected the three paths of the Flutter feather mark");
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
-    async function png(size, square = false) {
-      const source = square ? svg.replace('rx="60"', 'rx="0"') : svg;
-      const result = await page.evaluate(async ({ source, size, square }) => {
+    async function png(size, { source = svg, square = false, inset = 0 } = {}) {
+      const encodedSvg = Buffer.from(source, "utf8").toString("base64");
+      const result = await page.evaluate(async ({ encodedSvg, size, square, inset }) => {
         const img = new Image();
-        img.src = `data:image/svg+xml;base64,${btoa(source)}`;
+        img.src = `data:image/svg+xml;base64,${encodedSvg}`;
         await img.decode();
         const canvas = document.createElement("canvas");
         canvas.width = canvas.height = size;
         const context = canvas.getContext("2d", { alpha: !square });
-        context.drawImage(img, 0, 0, size, size);
+        if (inset) {
+          context.fillStyle = "#fffdf6";
+          context.fillRect(0, 0, size, size);
+        }
+        const edge = size * inset;
+        context.drawImage(img, edge, edge, size - 2 * edge, size - 2 * edge);
         // Apple 的商店图标要求文件无 alpha 通道，而不只是每个像素恰好不透明。
         if (!square) return canvas.toDataURL("image/png").split(",")[1];
         const pixels = context.getImageData(0, 0, size, size).data;
@@ -34,7 +46,7 @@ async function main() {
           reader.readAsDataURL(new Blob([pixels]));
         });
         return { pixels: encoded };
-      }, { source, size, square });
+      }, { encodedSvg, size, square, inset });
       if (typeof result === "string") return Buffer.from(result, "base64");
       const pixels = Buffer.from(result.pixels, "base64");
       const chunk = (type, data) => {
@@ -62,9 +74,9 @@ async function main() {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, bytes);
     }
-    async function ico() {
+    async function ico(source = svg) {
       const sizes = [16, 24, 32, 48, 64, 128, 256];
-      const images = await Promise.all(sizes.map((size) => png(size)));
+      const images = await Promise.all(sizes.map((size) => png(size, { source })));
       const header = Buffer.alloc(6 + 16 * images.length);
       header.writeUInt16LE(1, 2);
       header.writeUInt16LE(images.length, 4);
@@ -85,21 +97,24 @@ async function main() {
     for (const [name, size] of [["favicon-96x96.png", 96], ["apple-touch-icon.png", 180], ["web-app-manifest-192x192.png", 192], ["web-app-manifest-512x512.png", 512]])
       await write(`frontend/public/${name}`, await png(size));
     await write("frontend/public/favicon.ico", await ico());
+    await write("frontend/public/web-app-manifest-maskable-512x512.png", await png(512, { inset: 0.22 }));
     const version = createHash("sha256").update(svg).digest("hex").slice(0, 12);
     for (const name of ["frontend/index.html", "frontend/public/manifest.json", "frontend/public/site.webmanifest"]) {
       const file = path.join(root, name);
       await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace(/\?v=[0-9a-f]{12}/g, `?v=${version}`));
     }
-    const flutterRoot = process.argv[2] && path.resolve(process.argv[2]);
     if (flutterRoot) {
       const save = (name, bytes) => write(name, bytes, flutterRoot);
-      await save("app/assets/branding/panache.svg", svg);
-      await save("app/assets/branding/panache.png", await png(512));
-      await save("app/windows/runner/resources/app_icon.ico", await ico());
-      await save("app/web/favicon.png", await png(48));
+      const flutterPng = (size, square = false) => png(size, {
+        source: square ? flutterSvg.replace('rx="60"', 'rx="0"') : flutterSvg,
+        square,
+      });
+      await save("app/assets/branding/panache.png", await flutterPng(512));
+      await save("app/windows/runner/resources/app_icon.ico", await ico(flutterSvg));
+      await save("app/web/favicon.png", await flutterPng(48));
       for (const size of [192, 512]) {
-        await save(`app/web/icons/Icon-${size}.png`, await png(size));
-        await save(`app/web/icons/Icon-maskable-${size}.png`, await png(size, true));
+        await save(`app/web/icons/Icon-${size}.png`, await flutterPng(size));
+        await save(`app/web/icons/Icon-maskable-${size}.png`, await flutterPng(size, true));
       }
       for (const platform of ["ios", "macos"]) {
         const dir = `app/${platform}/Runner/Assets.xcassets/AppIcon.appiconset`;
@@ -107,12 +122,11 @@ async function main() {
         for (const image of contents.images) {
           if (!image.filename) continue;
           const size = Math.round(Number.parseFloat(image.size) * Number.parseFloat(image.scale));
-          await save(`${dir}/${image.filename}`, await png(size, platform === "ios"));
+          await save(`${dir}/${image.filename}`, await flutterPng(size, platform === "ios"));
         }
       }
       for (const [density, size] of [["mdpi", 48], ["hdpi", 72], ["xhdpi", 96], ["xxhdpi", 144], ["xxxhdpi", 192]])
-        await save(`app/android/app/src/main/res/mipmap-${density}/ic_launcher.png`, await png(size));
-      const paths = [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+        await save(`app/android/app/src/main/res/mipmap-${density}/ic_launcher.png`, await flutterPng(size));
       const vector = (color) => `<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="256" android:viewportHeight="256"><group android:scaleX="0.72" android:scaleY="0.72" android:translateX="35.84" android:translateY="35.84"><path android:fillColor="${color}" android:fillType="evenOdd" android:pathData="${paths[0]} ${paths[2]}"/><path android:fillColor="${color}" android:pathData="${paths[1]}"/></group></vector>\n`;
       await save("app/android/app/src/main/res/drawable/ic_panache_foreground.xml", vector("#205C36"));
       await save("app/android/app/src/main/res/drawable/ic_panache_monochrome.xml", vector("#FFFFFFFF"));

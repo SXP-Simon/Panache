@@ -21,6 +21,7 @@ export default defineConfig({
           'apple-touch-icon.png',
           'web-app-manifest-192x192.png',
           'web-app-manifest-512x512.png',
+          'web-app-manifest-maskable-512x512.png',
           ...readdirSync(fileURLToPath(new URL('./public/fonts/lxgw-wenkai', import.meta.url)))
             .filter((name) => /\.(?:woff2|css|txt|md)$/.test(name))
             .map((name) => `fonts/lxgw-wenkai/${name}`),

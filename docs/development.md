@@ -166,4 +166,4 @@ uv tool run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --stri
 
 ## 品牌资源
 
-产品名称为 Panache，羽毛笔图标的矢量源位于 `frontend/src/assets/brand.svg`。安装开发依赖与 Playwright Chromium 后，运行 `node scripts/generate-brand-icons.cjs` 更新站点、PWA 与文档图标；带上 Flutter 工作树的绝对路径可同步生成其平台图标。图标引用的内容哈希随生成更新，旧缓存可正确迁移。包标识、存储键与签名身份独立于显示名称。
+产品名称为 Panache，站点与 Electron 图标的矢量源位于 `frontend/src/assets/brand.svg`。安装开发依赖与 Playwright Chromium 后，运行 `node scripts/generate-brand-icons.cjs` 更新站点、PWA 与文档图标；可传入 Flutter 工作树的绝对路径，按该分支自己的矢量源重新生成 Flutter 平台图标。图标引用的内容哈希随生成更新，旧缓存可正确迁移。包标识、存储键与签名身份独立于显示名称。

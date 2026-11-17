@@ -12,19 +12,25 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/web-app-manifest-192x192.png?v=d5198921d452",
+      "src": "/web-app-manifest-192x192.png?v=3ab3325793ca",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/web-app-manifest-512x512.png?v=d5198921d452",
+      "src": "/web-app-manifest-512x512.png?v=3ab3325793ca",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/icon.svg?v=d5198921d452",
+      "src": "/icon.svg?v=3ab3325793ca",
       "sizes": "any",
       "type": "image/svg+xml"
+    },
+    {
+      "src": "/web-app-manifest-maskable-512x512.png?v=3ab3325793ca",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["productivity", "utilities", "education"],
