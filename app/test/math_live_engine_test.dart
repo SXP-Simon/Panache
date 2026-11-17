@@ -82,13 +82,15 @@ void main() {
           await w.generate();
           expect(w.error, isEmpty, reason: 'grid=$grid');
           expect(w.pages.length, greaterThanOrEqualTo(2));
-          for (final png in w.pages) {
+          for (var page = 0; page < w.pages.length; page++) {
+            w.page = page;
+            final png = await w.currentPreviewImage();
             const output = String.fromEnvironment('MATH_RENDER_OUTPUT');
             if (output.isNotEmpty) {
               final destination = Directory(output);
               await destination.create(recursive: true);
               await File(
-                '${destination.path}/math-grid-$grid-page-${w.pages.indexOf(png) + 1}.png',
+                '${destination.path}/math-grid-$grid-page-${page + 1}.png',
               ).writeAsBytes(png);
             }
             expect(png.take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
