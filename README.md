@@ -11,14 +11,14 @@ Panache 是手写体生成应用，本分支为自用定制基准分支。基于
 <table>
   <thead>
     <tr>
-      <th width="35%">云烟体横线纸效果</th>
-      <th width="65%">自定义背景与生成效果</th>
+      <th width="45%">云烟体横线纸效果</th>
+      <th width="55%">自定义背景与生成效果</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td align="center" valign="top"><a href="./docs/assets/images/panache-showcase.webp"><img src="./docs/assets/images/panache-showcase.webp" width="294" alt="Panache 云烟体横线纸上的电路、矩阵、概率表格、化学式与微积分作业"></a></td>
-      <td align="center" valign="top"><a href="./docs/assets/images/panache-custom-background.webp"><img src="./docs/assets/images/panache-custom-background.webp" width="546" alt="南昌大学横线纸和武汉理工大学点线纸，左列是上传的背景图，右列是生成的手写效果"></a></td>
+      <td align="center" valign="top"><a href="./docs/assets/images/panache-showcase.webp"><img src="./docs/assets/images/panache-showcase.webp" width="380" alt="Panache 云烟体横线纸上的电路、矩阵、概率表格、化学式与微积分作业"></a></td>
+      <td align="center" valign="top"><a href="./docs/assets/images/panache-custom-background.webp"><img src="./docs/assets/images/panache-custom-background.webp" width="460" alt="南昌大学横线纸和武汉理工大学点线纸，左列是上传的背景图，右列是生成的手写效果"></a></td>
     </tr>
   </tbody>
 </table>
