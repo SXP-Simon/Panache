@@ -79,6 +79,39 @@ fn assert_inside(images: &[RgbaImage], margin: u32) {
     }
 }
 #[test]
+fn standard_ruled_inline_subscripts_use_consecutive_rows() {
+    let source = "O₁(1,1)：d₁²=0，d₂²=32→ 簇 1\n\
+                  O₂(2,2)：d₁²=2，d₂²=18→ 簇 1\n\
+                  O₃(3,4)：d₁²=13，d₂²=5→ 簇 2\n\
+                  O₄(4,4)：d₁²=18，d₂²=2→ 簇 2\n\
+                  O₅(5,5)：d₁²=32，d₂²=0→ 簇 2";
+    for spacing in [62, 78] {
+        let mut r = request(source, 1440, 800);
+        r.params.font_size = 56.;
+        r.params.line_spacing = spacing as f32;
+        r.params.word_spacing = 1.;
+        r.params.background_ruled = true;
+        let images = pages(&r);
+        assert_eq!(images.len(), 1);
+        let page = &images[0];
+        let mut previous = false;
+        let mut rows = Vec::new();
+        for y in 0..page.height() {
+            let ink = (15..31).any(|x| page.get_pixel(x, y)[0] < 128);
+            if ink && !previous {
+                rows.push(y);
+            }
+            previous = ink;
+        }
+        assert_eq!(rows.len(), 5, "{rows:?}");
+        assert!(
+            rows.windows(2)
+                .all(|pair| (pair[1] - pair[0]).abs_diff(spacing) <= 2),
+            "{rows:?}"
+        );
+    }
+}
+#[test]
 fn distribution_tables_fit_narrow_pages_and_move_as_complete_rows() {
     let x = "⟦ X | 0  1  2  3 ; ── ; P | (8)/(15)  (4)/(15)  (2)/(15)  (1)/(15) ⟧";
     let y = "⟦ Y | 1  2  3 ; ── ; P | ⅓  ⅓  ⅓ ⟧";
