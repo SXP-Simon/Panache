@@ -55,7 +55,7 @@ export default function PreviewPanel() {
   const image = images[currentPage] ?? backgroundUrl;
   const ink = inkLayers[currentPage];
   return (
-    <Card className="preview-panel" data-testid="preview-panel">
+    <Card className="preview-panel" id="workspace-panel-preview" data-testid="preview-panel">
       <CardHeader title={t('preview')} icon={<Eye size={18} />}>
         <span className="preview-size">
           {background ? background.name : `${width} × ${height}`}

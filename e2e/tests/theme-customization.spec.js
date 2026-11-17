@@ -79,7 +79,7 @@ test('mobile appearance edits persist and stay separate from paper ink', async (
   await openHome(page);
   await expect(page.getByTestId('app-header')).not.toBeVisible();
   const panel = await page.getByTestId('text-panel').boundingBox();
-  expect(panel.y).toBeLessThan(85);
+  expect(panel.y).toBeLessThan(150);
   const ink = await page.getByTestId('ink-color-input').inputValue();
   await fillText(page, 'Panache · 自定义配色\n界面随心，纸张与笔迹保持原样。');
   await page.getByTestId('mobile-settings-btn').click();

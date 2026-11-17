@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { test, expect, openHome, openPaperSettings, previewPng, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, openPaperSettings, openWorkspacePane, previewPng, expectPreviewImageLoaded } = require('./fixtures');
 const OUTPUT = path.resolve(__dirname, '../../preview_outputs/homework-layout');
 
 const assignment = String.raw`# 离散数学 · 推理与证明
@@ -163,6 +163,7 @@ for (const theme of ['light', 'dark']) {
       await page.getByTestId('appearance-modal-close').click();
       await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
     }
+    await openWorkspacePane(page, 'paper');
     await expect(page.getByTestId('layout-style-select')).toHaveValue('homework');
     await expect(page.getByTestId('layout-preset-help')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

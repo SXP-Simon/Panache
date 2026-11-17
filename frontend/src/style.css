@@ -1171,94 +1171,36 @@ input[type='color'] {
   }
 }
 @media (max-width: 720px) {
-  .app-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    height: auto;
-    padding: 10px 12px;
-    gap: 6px;
-  }
-  .brand {
-    grid-column: 1 / -1;
-    min-width: 0;
-    flex: 1;
-    gap: 8px;
-    margin-right: auto;
-  }
-  .brand > span:last-child {
-    min-width: 0;
-  }
-  .brand-home {
-    font-size: 15px;
-    line-height: 1.2;
-    letter-spacing: 0;
-  }
-
-  .brand-mark {
-    width: 34px;
-    height: 34px;
-    flex-shrink: 0;
-    border-radius: 12px;
-  }
-  .header-nav {
-    gap: 0;
-    margin: 0;
-  }
-  .header-nav .nav-active {
-    display: none;
-  }
-  .header-nav .button {
-    font-size: 0;
-    gap: 0;
-    width: 30px;
-    padding: 0;
-  }
-  .header-nav .button svg {
-    width: 18px;
-    height: 18px;
-  }
-  .header-actions {
-    padding-left: 4px;
-    gap: 0;
-  }
-  .header-actions .button {
-    width: 30px;
-    padding: 0;
-    font-size: 0;
-    gap: 0;
-  }
   .workspace-content {
     padding: 16px 14px 12px;
   }
   .workspace-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
+    display: block;
   }
-  .panel {
-    width: 100%;
-  }
-  .editor-panel {
-    order: 0;
-  }
-  .settings-panel {
-    order: 1;
-  }
-  .preview-panel {
-    order: 2;
+  .workspace-grid:not([data-pane='edit']) > .editor-panel,
+  .workspace-grid:not([data-pane='paper']) > .settings-panel,
+  .workspace-grid:not([data-pane='preview']) > .preview-panel {
+    display: none;
   }
   .document-input {
-    min-height: 220px;
-    height: 240px;
-    padding: 12px 16px;
+    min-height: 248px;
+    height: clamp(248px, calc(100dvh - 340px), 560px);
+    resize: none;
+    padding: 12px 14px;
+    font-size: 16px;
+    line-height: 1.75;
+  }
+  .editor-options select,
+  .settings-panel :is(select, input[type='number']) {
+    font-size: 16px;
   }
   .panel-heading {
-    padding: 12px 16px;
-    min-height: 64px;
+    padding: 10px 12px;
+    min-height: 52px;
   }
   .preview-canvas {
-    height: 340px;
-    min-height: 300px;
+    height: clamp(240px, calc(100dvh - 355px), 540px);
+    min-height: 240px;
   }
   .export-bar {
     padding: 13px;
@@ -1272,9 +1214,8 @@ input[type='color'] {
   .modal-fields {
     grid-template-columns: 1fr;
   }
-  .editor-toolbar .button {
-    font-size: 11px;
-    padding: 0 7px;
+  .editor-toolbar :is(.button, .icon-button) {
+    min-height: 40px;
   }
   .symbol-strip {
     gap: 1px;
@@ -1575,7 +1516,8 @@ input[type='color'] {
     margin-top: 0;
   }
 }
-.mobile-settings-button {
+.mobile-settings-button,
+.mobile-workspace-nav {
   display: none;
 }
 .theme-editor h3 {
@@ -1645,6 +1587,46 @@ input[type='color'] {
     min-height: 40px;
     padding: 0 12px;
     font-size: 13px;
+  }
+  .mobile-workspace-nav {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: stretch;
+    gap: clamp(12px, 4vw, 24px);
+    padding-inline: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--popover);
+  }
+  .mobile-workspace-nav .button {
+    position: relative;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 6px;
+    border-radius: 0;
+    border: 0;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    line-height: 1.25;
+  }
+  .mobile-workspace-nav .button:hover,
+  .mobile-workspace-nav .button:active {
+    color: var(--foreground);
+    background: transparent;
+    transform: none;
+  }
+  .mobile-workspace-nav .button[aria-pressed='true'] {
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .mobile-workspace-nav .button[aria-pressed='true']::after {
+    content: '';
+    position: absolute;
+    inset: auto 6px -1px;
+    height: 2px;
+    background: var(--primary);
   }
 }
 

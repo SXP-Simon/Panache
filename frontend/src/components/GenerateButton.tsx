@@ -14,9 +14,11 @@ export function useGenerationAvailability() {
 export default function GenerateButton({
   testId,
   compact = false,
+  onGenerate,
 }: {
   testId?: string;
   compact?: boolean;
+  onGenerate?: () => void;
 }) {
   const { t } = useI18n();
   const { generate } = useWorkspaceActions();
@@ -26,7 +28,7 @@ export default function GenerateButton({
       variant="primary"
       data-testid={testId}
       disabled={disabled}
-      onClick={() => void generate('preview')}
+      onClick={onGenerate ?? (() => void generate('preview'))}
     >
       {busy ? (
         <LoaderCircle className="spin" size={compact ? 16 : 17} />

@@ -218,6 +218,7 @@ export default function EditorPanel() {
   return (
     <Card
       className="editor-panel"
+      id="workspace-panel-edit"
       data-testid="text-panel"
       onKeyDown={(event) => {
         if (

@@ -12,12 +12,7 @@ import type { MessageKey } from './i18n';
 import { getPwaState, subscribePwa, installPwa } from './pwa';
 import { usePreferencesStore } from './features/preferences/store';
 import { reportFailure } from './features/workspace/reportFailure';
-import WorkspaceStatus from './components/WorkspaceStatus';
-import WorkspaceFooter from './components/WorkspaceFooter';
-import GenerateButton from './components/GenerateButton';
-import EditorPanel from './components/EditorPanel';
-import SettingsPanel from './components/SettingsPanel';
-import PreviewPanel from './components/PreviewPanel';
+import WorkspaceLayout from './components/WorkspaceLayout';
 import Button from './shared/ui/Button';
 import Modal from './shared/ui/Modal';
 import GitHubIcon from './shared/ui/GitHubIcon';
@@ -166,24 +161,7 @@ function Studio() {
         animate={{ opacity: 1 }}
         transition={{ duration: reduced ? 0 : 0.2 }}
       >
-        <div className="workspace-actions">
-          <Button
-            className="mobile-settings-button"
-            variant="ghost"
-            data-testid="mobile-settings-btn"
-            onClick={() => setAppearance(true)}
-          >
-            {t('appearance')}
-          </Button>
-          <GenerateButton testId="preview-btn" />
-        </div>
-        <WorkspaceStatus />
-        <div className="workspace-grid" data-testid="workspace">
-          <EditorPanel />
-          <PreviewPanel />
-          <SettingsPanel />
-        </div>
-        <WorkspaceFooter />
+        <WorkspaceLayout openAppearance={() => setAppearance(true)} />
       </motion.main>
       <AnimatePresence>
         {updatePrompt && <UpdatePrompt key={updatePrompt.key} prompt={updatePrompt} />}

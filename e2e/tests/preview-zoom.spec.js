@@ -1,4 +1,4 @@
-const { test, expect, openHome, fillText, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, fillText, useSmallCanvas, openWorkspacePane, expectPreviewImageLoaded } = require('./fixtures');
 
 test('layered preview zooms without clipping the left edge and opens the image viewer', async ({ page }) => {
   await openHome(page);
@@ -47,7 +47,7 @@ test('paper-only preview opens the image viewer on a narrow viewport', async ({ 
   await openHome(page);
   const fullscreen = page.getByTestId('expand-preview');
   await expect(fullscreen).toBeDisabled();
-  await page.getByTestId('paper-settings-toggle').click();
+  await openWorkspacePane(page, 'paper');
   await page.getByTestId('background-image-input').setInputFiles({
     name: 'plain.png',
     mimeType: 'image/png',
@@ -62,6 +62,7 @@ test('paper-only preview opens the image viewer on a narrow viewport', async ({ 
     }), 'base64'),
   });
   await page.getByTestId('detect-background-cancel').click();
+  await openWorkspacePane(page, 'preview');
   await expect(fullscreen).toBeEnabled();
   await fullscreen.click();
   const viewer = page.getByTestId('fullscreen-preview');

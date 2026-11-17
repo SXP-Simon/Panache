@@ -58,7 +58,12 @@ export default function SettingsPanel() {
   const [detectOpen, setDetectOpen] = useState(false);
   const detecting = useIsMutating({ mutationKey: ['documents', 'detect-background'] }) > 0;
   return (
-    <Card as="aside" className="settings-panel" data-testid="settings-panel">
+    <Card
+      as="aside"
+      className="settings-panel"
+      id="workspace-panel-paper"
+      data-testid="settings-panel"
+    >
       <CardHeader title={t('settings')} icon={<SlidersHorizontal size={18} />} tone="secondary" />
       <div className="settings-body">
         <SettingsGroup title={t('textAndLayout')}>

@@ -20,7 +20,14 @@ async function openHome(page) {
   await page.evaluate(() => document.fonts.ready);
 }
 
+async function openWorkspacePane(page, pane) {
+  const entry = page.getByTestId('workspace-pane-' + pane);
+  if (await entry.isVisible() && await entry.getAttribute('aria-pressed') !== 'true')
+    await entry.click();
+}
+
 async function fillText(page, text) {
+  await openWorkspacePane(page, 'edit');
   await page.getByTestId('text-input').fill(text);
 }
 
@@ -29,6 +36,7 @@ async function setNumber(page, testId, value) {
 }
 
 async function openPaperSettings(page) {
+  await openWorkspacePane(page, 'paper');
   if (!(await page.getByTestId('width-input').isVisible()))
     await page.getByTestId('paper-settings-toggle').click();
 }
@@ -92,6 +100,7 @@ module.exports = {
   setNumber,
   useSmallCanvas,
   openPaperSettings,
+  openWorkspacePane,
   expectPreviewImageLoaded,
   previewPng,
 };

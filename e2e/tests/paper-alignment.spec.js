@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { test, expect, openHome, openPaperSettings, previewPng, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, openPaperSettings, openWorkspacePane, fillText, previewPng, expectPreviewImageLoaded } = require('./fixtures');
 const OUTPUT = path.resolve(__dirname, '../../preview_outputs/paper-alignment');
 
 const cases = [
@@ -62,6 +62,7 @@ test('参数组在窄屏和中等窗口保留间距，展开状态清晰', async
 
   for (const width of [1024, 768, 320, 1366]) {
     await page.setViewportSize({ width, height: 930 });
+    await openWorkspacePane(page, 'paper');
     const text = await textGroup.boundingBox();
     const paper = await paperGroup.boundingBox();
     if (width === 1024 || width === 768) {
@@ -82,8 +83,10 @@ test('框选纸张正文、调整行数并实际生成预览', async ({ page }) 
   await page.setViewportSize({ width: 430, height: 890 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openHome(page);
+  await openWorkspacePane(page, 'paper');
   await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[0]));
   await page.getByTestId('detect-background-cancel').click();
+  await openWorkspacePane(page, 'preview');
   await page.getByTestId('preview-adjust-paper-area').click();
   const surface = page.getByTestId('paper-area-image');
   await expect(page.getByTestId('paper-area-selection')).toBeVisible();
@@ -107,9 +110,10 @@ test('框选纸张正文、调整行数并实际生成预览', async ({ page }) 
   ]) {
     expect(Math.abs(Number(await page.getByTestId(id).inputValue()) - value)).toBeLessThanOrEqual(3);
   }
-  await page.getByTestId('text-input').fill('书写区域测试\n第二行');
+  await fillText(page, '书写区域测试\n第二行');
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);
+  await expect(page.getByTestId('preview-image')).toBeVisible();
 });
 
 for (const options of cases) {

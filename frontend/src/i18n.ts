@@ -161,6 +161,9 @@ const words = {
   themeColorApply: ['应用', 'Apply'],
   themePresets: ['预设颜色', 'Preset colors'],
 
+  workspaceEdit: ['编辑', 'Edit'],
+  workspacePaper: ['纸张参数', 'Paper settings'],
+  workspacePreview: ['预览', 'Preview'],
   document: ['文字与公式', 'Text & formulas'],
   editorPlaceholder: [
     '在这里输入或粘贴文字…\n\n支持 LaTeX 公式、Markdown 与插图。',
