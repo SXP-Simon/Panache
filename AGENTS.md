@@ -86,8 +86,8 @@ pnpm run test:desktop
 Flutter/Rust 附属安装包使用[固定来源发布流程](docs/flutter-release.md)，同一版本的源 SHA 由 Release manifest 固定，正式 Android 签名未就绪时跳过 APK。
 
 本地 `pnpm install` 自动安装 Lefthook；需要重装时运行 `pnpm run hooks:install`。
-Lefthook 与 CI 共享 `scripts/change-impact.cjs`，根据真实 Git 改动路径选择必要检查；提交前检查暂存区，推送前检查全部待推送 ref 的提交范围。缺失比较基线时执行完整检查。
-手动完整检查入口保留 `quality:check`、`test:all` 与独立的 `test:desktop`；CI 不安装本机 hooks，始终运行范围规划与汇总门禁。
+Lefthook 与 CI 共用 `scripts/change-impact.cjs`。单笔提交检查暂存区空白和提交说明。推送前合并全部待推送 ref 的改动，执行相关静态检查和单元测试。缺失比较基线或涉及共享输入时执行较完整的按需检查。
+手动完整检查入口保留 `quality:check`、`test:all` 与独立的 `test:desktop`；浏览器、离线升级和打包桌面集成验证仍由适用的 CI 门禁覆盖。
 已有自定义 hooks 必须先整合，不能通过覆盖或跳过检查安装新 hooks。
 
 ## 开发约定

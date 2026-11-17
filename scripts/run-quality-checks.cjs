@@ -3,7 +3,7 @@
 
 const { spawnSync } = require("node:child_process");
 const { planChanges, readPlan } = require("./plan-checks.cjs");
-const { git, dirtyPaths } = require("./git-change-set.cjs");
+const { git } = require("./git-change-set.cjs");
 
 const FRONTEND_CHECKS = [
   "pnpm --filter handwrite run typecheck",
@@ -58,12 +58,9 @@ function main(args) {
   if (!args.length || (args.length === 1 && args[0] === "--all")) return runQualityChecks();
   if (args.length !== 1 || args[0] !== "--staged") throw new Error("Use --staged or --all");
   const plan = readPlan(args);
-  const commands = qualityCommands(plan);
-  // Commit-time checks must represent the index, not a newer unstaged implementation.
-  if (commands.length) assertCleanInputs(plan, dirtyPaths(), ["frontend", "python", "hooks", "unit_desktop"]);
   git(["diff", "--cached", "--check"]);
-  console.log(`暂存区范围：${plan.scopes.join(", ") || "无文件变化"}；选择 ${commands.length} 项检查。`);
-  return runQualityChecks(undefined, undefined, commands);
+  console.log(`暂存区范围：${plan.scopes.join(", ") || "无文件变化"}；空白检查通过。`);
+  return 0;
 }
 if (require.main === module) {
   try { process.exitCode = main(process.argv.slice(2)); }

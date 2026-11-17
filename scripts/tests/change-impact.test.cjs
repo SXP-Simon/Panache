@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { FLAGS, planChanges } = require("../change-impact.cjs");
 const { qualityCommands, assertCleanInputs } = require("../run-quality-checks.cjs");
-const { testCommands } = require("../run-affected-tests.cjs");
+const { testCommands, prePushChecks } = require("../run-affected-tests.cjs");
 
 function selected(plan) {
   return FLAGS.filter((flag) => plan[flag]).sort();
@@ -144,4 +144,35 @@ test("拒绝检查相关未暂存输入，允许不影响所选门禁的文档�
   assert.throws(() => assertCleanInputs(planChanges(["desktop/main.js"]), ["desktop/preload.js"]), /未提交|未暂存/u);
   assert.doesNotThrow(() => assertCleanInputs(planChanges([], { full: true }), ["docs/development.md"],
     ["frontend", "python", "hooks", "unit_desktop"]));
+});
+
+test("普通推送合并静态检查和单元测试，集成测试可显式运行", () => {
+  const plan = planChanges(["frontend/src/style.css", "frontend/src/components/Editor.tsx"]);
+  assert.deepEqual(prePushChecks(plan).commands, [
+    "pnpm --filter handwrite run typecheck",
+    "pnpm --filter handwrite run lint",
+    "pnpm --filter handwrite run format:check",
+    "pnpm run test:frontend",
+  ]);
+  assert.ok(!prePushChecks(plan).inputs.includes("e2e"));
+  assert.ok(testCommands(plan).includes("pnpm --filter handwriting-web-e2e run test"));
+  assert.deepEqual(prePushChecks(planChanges(["e2e/tests/layout.spec.js"])).commands, []);
+});
+
+test("推送跨层改动时去重，缺少基线或共享配置仍运行必要集成检查", () => {
+  const mixed = planChanges(["desktop/main.js", "backend/app.py", "frontend/src/App.tsx"]);
+  const { commands } = prePushChecks(mixed);
+  assert.equal(commands.filter((command) => command === "pnpm run test:desktop-storage").length, 1);
+  assert.ok(commands.includes("uv run --extra dev python -m pytest backend/tests"));
+  assert.ok(!commands.includes("node scripts/run-desktop-tests.cjs"));
+  for (const plan of [
+    planChanges(["pnpm-lock.yaml"]),
+    planChanges(["future/unknown.toml"]),
+    planChanges([], { full: true }),
+  ]) {
+    const checks = prePushChecks(plan);
+    assert.ok(checks.commands.includes("pnpm --filter handwriting-web-e2e run test"));
+    assert.ok(checks.commands.includes("node scripts/run-desktop-tests.cjs"));
+    assert.equal(checks.inputs, undefined);
+  }
 });

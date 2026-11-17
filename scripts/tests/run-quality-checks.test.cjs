@@ -9,7 +9,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { findBash } = require("../run-desktop-tests.cjs");
 
-test("提交前完整执行前端与 Python 检查，即使早期检查失败也报告全部门禁", () => {
+test("手动完整检查执行前端与 Python 检查，即使早期检查失败也报告全部门禁", () => {
   const commands = [];
   const output = [];
   const status = runQualityChecks((command) => {
@@ -73,4 +73,26 @@ test("真实 Lefthook script 配置保留 Git pre-push stdin 的全部引用", (
     { cwd: directory, input: refs, encoding: "utf8", timeout: 15000 });
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.equal(fs.readFileSync(path.join(directory, "captured.txt"), "utf8"), refs);
+});
+
+test("轻量提交检查读取暂存区，不受同一文件的未暂存内容影响", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "panache-staged-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const git = (...args) => assert.equal(spawnSync("git", args, { cwd: directory }).status, 0);
+  git("init");
+  const frontend = path.join(directory, "frontend");
+  fs.mkdirSync(frontend);
+  const source = path.join(frontend, "component.ts");
+  fs.writeFileSync(source, "export const value = 1;\n");
+  git("add", "frontend/component.ts");
+  fs.writeFileSync(source, "export const value = 2;  \n");
+  const check = () => spawnSync(process.execPath, [path.resolve(__dirname, "../run-quality-checks.cjs"), "--staged"],
+    { cwd: directory, encoding: "utf8" });
+  const cleanIndex = check();
+  assert.equal(cleanIndex.status, 0, cleanIndex.stderr);
+  assert.match(cleanIndex.stdout, /空白检查通过/u);
+  git("add", "frontend/component.ts");
+  const invalidIndex = check();
+  assert.equal(invalidIndex.status, 1);
+  assert.match(invalidIndex.stderr, /trailing whitespace/u);
 });

@@ -7,7 +7,7 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i;
 
 function git(args, cwd = process.cwd()) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-  if (result.status !== 0) throw new Error(result.stderr || `git ${args[0]} failed`);
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout || `git ${args[0]} failed`);
   return result.stdout;
 }
 const paths = (output) => output.split("\0").filter(Boolean);
