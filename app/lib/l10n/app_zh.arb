@@ -244,5 +244,6 @@
   "paperAreaApply": "应用书写区域",
   "paperAreaApplied": "书写区域已更新。生成预览可查看效果。",
   "paperAreaLoadFailed": "无法打开纸张图片，请重新上传。",
+  "paperImageTooLarge": "纸张图片太大，无法在此设备上处理。请缩小图片后重新上传。",
   "paperSizeAndMargins": "尺寸与边距"
 }

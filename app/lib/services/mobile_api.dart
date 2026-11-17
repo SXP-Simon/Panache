@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'api.dart';
+import 'paper_background.dart';
 
 typedef _CallNative = Pointer<Utf8> Function(Pointer<Utf8>);
 typedef _CallDart = Pointer<Utf8> Function(Pointer<Utf8>);
@@ -50,6 +51,8 @@ class MobileHandwritingApi extends HandwritingApi {
   final String dataDirectory, fontDirectory;
   final String? libraryPath;
   bool _closed = false;
+  @override
+  bool get usesMobilePaperLimits => true;
 
   static Future<MobileHandwritingApi> bundled() async {
     final root = await getTemporaryDirectory();
@@ -148,7 +151,7 @@ class MobileHandwritingApi extends HandwritingApi {
     final paths = <String, dynamic>{};
     try {
       for (final entry in uploads.entries) {
-        if (entry.value.bytes.length > 16 * 1024 * 1024) {
+        if (entry.value.bytes.length > mobileImageBytes) {
           throw ApiException('文件超过移动端限制 / File exceeds mobile limit');
         }
         final path = '${directory.path}/${paths.length}.bin';
