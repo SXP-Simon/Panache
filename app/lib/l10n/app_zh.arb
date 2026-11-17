@@ -226,5 +226,15 @@
   "inkEffects": "字迹滤镜",
   "inkOpacity": "浓淡",
   "inkThickness": "笔画粗细",
-  "inkSoftness": "边缘柔化"
+  "inkSoftness": "边缘柔化",
+  "paperAreaAction": "不满意排版？",
+  "paperAreaTitle": "框选书写区域",
+  "paperAreaHelp": "在纸图上拖出选框，或拖动四角微调。上、下边对准第一条和最后一条可写横线，再检查行数。",
+  "paperAreaRows": "书写行数",
+  "paperAreaInvalid": "选出至少两行，并在首条线之上留出一行的位置。",
+  "paperAreaSpacing": "行距 {pixels} px",
+  "@paperAreaSpacing": {"placeholders": {"pixels": {"type": "String"}}},
+  "paperAreaApply": "应用书写区域",
+  "paperAreaApplied": "书写区域已更新。生成预览可查看效果。",
+  "paperAreaLoadFailed": "无法打开纸张图片，请重新上传。"
 }

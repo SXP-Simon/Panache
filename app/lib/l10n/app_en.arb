@@ -226,5 +226,14 @@
   "inkEffects": "Ink effects",
   "inkOpacity": "Opacity",
   "inkThickness": "Stroke thickness",
-  "inkSoftness": "Edge softness"
+  "inkSoftness": "Edge softness",
+  "paperAreaAction": "Adjust writing area",
+  "paperAreaTitle": "Select the writing area",
+  "paperAreaHelp": "Drag to draw a box, or move its corners. Align the top and bottom with the first and last writing lines, then check the row count.",
+  "paperAreaRows": "Writing rows",
+  "paperAreaInvalid": "Select at least two rows and leave a line of space above the first rule.",
+  "paperAreaSpacing": "Line spacing {pixels} px",
+  "paperAreaApply": "Apply writing area",
+  "paperAreaApplied": "Writing area updated. Generate a preview to see the result.",
+  "paperAreaLoadFailed": "Could not open this paper image. Upload it again."
 }

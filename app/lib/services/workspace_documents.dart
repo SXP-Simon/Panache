@@ -35,6 +35,24 @@ class WorkspaceDocuments {
     workspace.edit();
   }
 
+  bool applyPaperArea(Upload paper, Map<String, String> layout) {
+    if (workspace.disposed || !identical(workspace.background, paper)) {
+      return false;
+    }
+    _detections[workspace] = Object();
+    final spacing = double.parse(layout['line_spacing']!);
+    final font = double.tryParse(workspace.settings.values['font_size'] ?? '');
+    workspace.settings.values.addAll(layout);
+    if (font != null && font > spacing) {
+      workspace.settings.values['font_size'] = '${(spacing * .72).floor()}';
+    }
+    workspace.backgroundRuled = true;
+    workspace.pages = [];
+    workspace.page = 0;
+    workspace.edit();
+    return true;
+  }
+
   Future<bool> detectBackground() async {
     final background = workspace.background;
     if (background == null) return false;

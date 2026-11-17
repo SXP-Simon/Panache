@@ -26,6 +26,8 @@ class WorkbenchPreview extends StatefulWidget {
     this.inkPages = const [],
     this.inkLook = defaultInkLook,
     this.onInkChanged,
+    this.backgroundBytes,
+    this.onAdjustBackground,
   });
   final List<Uint8List> pages;
   final int page;
@@ -38,6 +40,8 @@ class WorkbenchPreview extends StatefulWidget {
   final List<InkPage?> inkPages;
   final InkLook inkLook;
   final ValueChanged<InkLook>? onInkChanged;
+  final Uint8List? backgroundBytes;
+  final VoidCallback? onAdjustBackground;
 
   @override
   State<WorkbenchPreview> createState() => _WorkbenchPreviewState();
@@ -103,14 +107,30 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
       icon: Icons.description_outlined,
       child: Column(
         children: [
-          if (widget.onInkChanged != null)
+          if (widget.onInkChanged != null || widget.onAdjustBackground != null)
             Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: TextButton.icon(
-                key: const ValueKey('preview-ink-effects'),
-                onPressed: () => setState(() => _inkExpanded = !_inkExpanded),
-                icon: const Icon(Icons.tune),
-                label: Text(l.inkEffects),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                children: [
+                  if (widget.onAdjustBackground != null)
+                    TextButton.icon(
+                      key: const ValueKey('preview-adjust-paper-area'),
+                      onPressed: widget.locked
+                          ? null
+                          : widget.onAdjustBackground,
+                      icon: const Icon(Icons.crop_free),
+                      label: Text(l.paperAreaAction),
+                    ),
+                  if (widget.onInkChanged != null)
+                    TextButton.icon(
+                      key: const ValueKey('preview-ink-effects'),
+                      onPressed: () =>
+                          setState(() => _inkExpanded = !_inkExpanded),
+                      icon: const Icon(Icons.tune),
+                      label: Text(l.inkEffects),
+                    ),
+                ],
               ),
             ),
           if (_inkExpanded && widget.onInkChanged != null) _inkControls(l),
@@ -141,23 +161,33 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
               ),
               clipBehavior: Clip.antiAlias,
               child: widget.pages.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.draw_outlined,
-                              size: 56,
-                              color: Theme.of(context).colorScheme.primary,
+                  ? widget.backgroundBytes != null
+                        ? Image.memory(
+                            widget.backgroundBytes!,
+                            fit: BoxFit.contain,
+                          )
+                        : Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.draw_outlined,
+                                    size: 56,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    l.previewHint,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 24),
-                            Text(l.previewHint, textAlign: TextAlign.center),
-                          ],
-                        ),
-                      ),
-                    )
+                          )
                   : PreviewPager(
                       pages: widget.pages,
                       page: widget.page,

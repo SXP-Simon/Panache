@@ -29,6 +29,7 @@ class WorkbenchSettings extends StatelessWidget {
     required this.onImportPreset,
     required this.onUploadBackground,
     required this.onDetectBackground,
+    this.onAdjustBackground,
     required this.onRemoveBackground,
   });
   final Settings settings;
@@ -50,6 +51,7 @@ class WorkbenchSettings extends StatelessWidget {
       onRemoveBackground;
   final ValueChanged<String?> onSelectFont;
   final ValueChanged<String> onColorSelected;
+  final VoidCallback? onAdjustBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +104,13 @@ class WorkbenchSettings extends StatelessWidget {
               if (background != null)
                 Wrap(
                   children: [
+                    if (onAdjustBackground != null)
+                      TextButton.icon(
+                        key: const ValueKey('adjust-paper-area'),
+                        onPressed: locked ? null : onAdjustBackground,
+                        icon: const Icon(Icons.crop_free),
+                        label: Text(l.paperAreaAction),
+                      ),
                     TextButton.icon(
                       key: const ValueKey('identify-paper'),
                       onPressed: locked ? null : onDetectBackground,
