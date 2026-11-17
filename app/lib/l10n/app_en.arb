@@ -235,5 +235,6 @@
   "paperAreaSpacing": "Line spacing {pixels} px",
   "paperAreaApply": "Apply writing area",
   "paperAreaApplied": "Writing area updated. Generate a preview to see the result.",
-  "paperAreaLoadFailed": "Could not open this paper image. Upload it again."
+  "paperAreaLoadFailed": "Could not open this paper image. Upload it again.",
+  "paperSizeAndMargins": "Size and margins"
 }

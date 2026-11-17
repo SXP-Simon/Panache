@@ -61,88 +61,6 @@ class WorkbenchSettings extends StatelessWidget {
       icon: Icons.tune,
       child: ListView(
         children: [
-          Text(l.presets, style: Theme.of(context).textTheme.titleSmall),
-          Wrap(
-            spacing: 4,
-            children: [
-              for (final preset in [
-                (l.defaultPreset, onDefaultPreset),
-                (l.smallPreset, onSmallPreset),
-                (l.savePreset, onSavePreset),
-                (l.loadPreset, onLoadPreset),
-                (l.exportPreset, onExportPreset),
-                (l.importPreset, onImportPreset),
-              ])
-                ActionChip(
-                  label: Text(preset.$1),
-                  onPressed: locked ? null : preset.$2,
-                ),
-            ],
-          ),
-          const Divider(),
-          section(
-            context,
-            'paper',
-            l.paperBackground,
-            Icons.description_outlined,
-            [
-              Text(l.background, style: Theme.of(context).textTheme.titleSmall),
-              if (background != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(
-                    background!.bytes,
-                    height: 120,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              TextButton.icon(
-                onPressed: locked ? null : onUploadBackground,
-                icon: const Icon(Icons.image_outlined),
-                label: Text(background?.name ?? l.uploadBackground),
-              ),
-              if (background != null)
-                Wrap(
-                  children: [
-                    if (onAdjustBackground != null)
-                      TextButton.icon(
-                        key: const ValueKey('adjust-paper-area'),
-                        onPressed: locked ? null : onAdjustBackground,
-                        icon: const Icon(Icons.crop_free),
-                        label: Text(l.paperAreaAction),
-                      ),
-                    TextButton.icon(
-                      key: const ValueKey('identify-paper'),
-                      onPressed: locked ? null : onDetectBackground,
-                      icon: const Icon(Icons.format_line_spacing),
-                      label: Text(l.detectBackground),
-                    ),
-                    TextButton(
-                      onPressed: locked ? null : onRemoveBackground,
-                      child: Text(l.remove),
-                    ),
-                  ],
-                ),
-              parameterGrid(
-                context,
-                parameters
-                    .where((p) => {'width', 'height'}.contains(p.key))
-                    .toList(),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l.underlined),
-                value: settings.underlined,
-                onChanged: locked
-                    ? null
-                    : (v) {
-                        settings.underlined = v;
-                        onEdited();
-                      },
-              ),
-            ],
-            expanded: true,
-          ),
           section(context, 'font', l.fontInk, Icons.font_download_outlined, [
             Semantics(
               identifier: 'font-select',
@@ -223,26 +141,16 @@ class WorkbenchSettings extends StatelessWidget {
                 },
               ),
             ),
-          ], expanded: MediaQuery.sizeOf(context).width >= 900),
-          section(context, 'spacing', l.sizeSpacing, Icons.format_size, [
-            parameterGrid(context, parameters.take(3).toList()),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l.englishSpacing),
-              value: settings.englishSpacing,
-              onChanged: locked
-                  ? null
-                  : (v) {
-                      settings.englishSpacing = v;
-                      onEdited();
-                    },
-            ),
-          ], expanded: MediaQuery.sizeOf(context).width >= 900),
-          section(context, 'layout', l.marginsLayout, Icons.space_bar, [
-            SettingsFieldLabel(
-              label: l.layoutPreset,
-              child: SegmentedButton<String>(
+          ], collapsible: false),
+          section(context, 'layout', l.layoutPreset, Icons.space_bar, [
+            LayoutBuilder(
+              builder: (context, constraints) => SegmentedButton<String>(
                 key: const ValueKey('layout-style'),
+                direction:
+                    constraints.maxWidth <
+                        MediaQuery.textScalerOf(context).scale(170)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 segments: [
                   ButtonSegment(
                     value: 'standard',
@@ -269,11 +177,97 @@ class WorkbenchSettings extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-            parameterGrid(
-              context,
-              parameters.where((p) => p.key.endsWith('_margin')).toList(),
+          ], collapsible: false),
+          section(context, 'spacing', l.sizeSpacing, Icons.format_size, [
+            parameterGrid(context, parameters.take(3).toList()),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l.englishSpacing),
+              value: settings.englishSpacing,
+              onChanged: locked
+                  ? null
+                  : (v) {
+                      settings.englishSpacing = v;
+                      onEdited();
+                    },
             ),
-          ], expanded: MediaQuery.sizeOf(context).width >= 900),
+          ], collapsible: false),
+          section(
+            context,
+            'paper',
+            l.paperBackground,
+            Icons.description_outlined,
+            [
+              Text(l.background, style: Theme.of(context).textTheme.titleSmall),
+              if (background != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    background!.bytes,
+                    height: 120,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: locked ? null : onUploadBackground,
+                icon: const Icon(Icons.image_outlined),
+                label: Text(background?.name ?? l.uploadBackground),
+              ),
+              if (background != null)
+                Wrap(
+                  children: [
+                    if (onAdjustBackground != null)
+                      TextButton.icon(
+                        key: const ValueKey('adjust-paper-area'),
+                        onPressed: locked ? null : onAdjustBackground,
+                        icon: const Icon(Icons.crop_free),
+                        label: Text(l.paperAreaAction),
+                      ),
+                    TextButton.icon(
+                      key: const ValueKey('identify-paper'),
+                      onPressed: locked ? null : onDetectBackground,
+                      icon: const Icon(Icons.format_line_spacing),
+                      label: Text(l.detectBackground),
+                    ),
+                    TextButton(
+                      onPressed: locked ? null : onRemoveBackground,
+                      child: Text(l.remove),
+                    ),
+                  ],
+                ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l.underlined),
+                value: settings.underlined,
+                onChanged: locked
+                    ? null
+                    : (v) {
+                        settings.underlined = v;
+                        onEdited();
+                      },
+              ),
+            ],
+            collapsible: false,
+          ),
+          section(
+            context,
+            'dimensions',
+            l.paperSizeAndMargins,
+            Icons.space_bar,
+            [
+              parameterGrid(
+                context,
+                parameters
+                    .where(
+                      (p) =>
+                          p.key == 'width' ||
+                          p.key == 'height' ||
+                          p.key.endsWith('_margin'),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
           section(context, 'variation', l.variation, Icons.gesture, [
             parameterGrid(
               context,
@@ -306,6 +300,25 @@ class WorkbenchSettings extends StatelessWidget {
                   .toList(),
             ),
           ], expanded: false),
+          const Divider(),
+          Text(l.presets, style: Theme.of(context).textTheme.titleSmall),
+          Wrap(
+            spacing: 4,
+            children: [
+              for (final preset in [
+                (l.defaultPreset, onDefaultPreset),
+                (l.smallPreset, onSmallPreset),
+                (l.savePreset, onSavePreset),
+                (l.loadPreset, onLoadPreset),
+                (l.exportPreset, onExportPreset),
+                (l.importPreset, onImportPreset),
+              ])
+                ActionChip(
+                  label: Text(preset.$1),
+                  onPressed: locked ? null : preset.$2,
+                ),
+            ],
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(l.fullPreview),
@@ -329,19 +342,52 @@ class WorkbenchSettings extends StatelessWidget {
     IconData icon,
     List<Widget> children, {
     bool expanded = false,
-  }) => ExpansionTile(
-    key: PageStorageKey('settings-$id'),
-    leading: Icon(icon),
-    title: Text(title),
-    initiallyExpanded: expanded,
-    maintainState: true,
-    tilePadding: EdgeInsets.zero,
-    expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
-        ? AnimationStyle.noAnimation
-        : null,
-    childrenPadding: const EdgeInsets.only(bottom: 16),
-    children: children,
-  );
+    bool collapsible = true,
+  }) {
+    if (!collapsible) {
+      return Padding(
+        key: PageStorageKey('settings-$id'),
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...children,
+            const Divider(height: 24),
+          ],
+        ),
+      );
+    }
+    return ExpansionTile(
+      key: PageStorageKey('settings-$id'),
+      leading: Icon(icon),
+      title: Text(title),
+      initiallyExpanded: expanded,
+      maintainState: true,
+      tilePadding: EdgeInsets.zero,
+      expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
+      childrenPadding: const EdgeInsets.only(bottom: 16),
+      children: children,
+    );
+  }
 
   Widget parameterGrid(
     BuildContext context,

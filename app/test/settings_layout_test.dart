@@ -66,8 +66,6 @@ void main() {
             180,
             scrollable: scrollable,
           );
-          await tester.tap(find.text(l.fontInk));
-          await tester.pumpAndSettle();
           await tester.scrollUntilVisible(
             find.text(l.font),
             100,
@@ -93,14 +91,6 @@ void main() {
                 .descendant(of: viewport, matching: find.byType(Scrollable))
                 .first,
           );
-          await tester.pumpAndSettle();
-          await tester.tap(layout);
-          await tester.pump(const Duration(milliseconds: 80));
-          expect(tester.takeException(), isNull);
-          await tester.pumpAndSettle();
-          await tester.tap(layout);
-          await tester.pumpAndSettle();
-          await tester.tap(layout);
           await tester.pumpAndSettle();
           final input = find.byKey(const ValueKey('font_size-0'));
           await tester.ensureVisible(input);
