@@ -146,7 +146,9 @@ const words = {
   language: ['切换语言', 'Switch language'],
   theme: ['切换主题', 'Switch theme'],
   appearance: ['外观与设置', 'Appearance & settings'],
-  themeColor: ['主题色', 'Theme color'],
+  themeColor: ['主题配色', 'Theme colors'],
+  themePrimaryColor: ['主色', 'Primary color'],
+  themeSecondaryColor: ['辅助色', 'Secondary color'],
   themeColorHint: [
     '仅改变界面配色，不影响纸张与墨水颜色。',
     'Changes the interface only, leaving paper and ink unchanged.',
@@ -160,7 +162,6 @@ const words = {
   themePresets: ['预设颜色', 'Preset colors'],
 
   document: ['文字与公式', 'Text & formulas'],
-  documentHint: ['从一段文字开始', 'Start with your words'],
   editorPlaceholder: [
     '在这里输入或粘贴文字…\n\n支持 LaTeX 公式、Markdown 与插图。',
     'Type or paste your text here…\n\nLaTeX, Markdown and inline images are welcome.',
@@ -235,7 +236,6 @@ const words = {
   clear: ['清空正文', 'Clear text'],
   symbols: ['常用符号', 'Quick symbols'],
   preview: ['手写预览', 'Preview'],
-  previewHint: ['看看文字在纸上的样子', 'See your words on paper'],
   emptyPreview: ['纸张已准备好', 'Your page is ready'],
   emptyPreviewHint: [
     '写下文字，调整笔迹，然后生成预览。',
@@ -254,7 +254,6 @@ const words = {
   expandPreview: ['全屏预览', 'Fullscreen preview'],
   page: ['页', 'page'],
   settings: ['笔迹与纸张', 'Handwriting & paper'],
-  settingsHint: ['调整到你喜欢的样子', 'Make it feel like you'],
   font: ['手写字体', 'Handwriting font'],
   fontUpload: ['上传字体', 'Upload font'],
   fontHelp: ['支持 TTF、OTF 字体文件', 'TTF and OTF font files'],

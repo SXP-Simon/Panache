@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_THEME_COLOR } from './themeColors';
+import { DEFAULT_SECONDARY_COLOR, DEFAULT_THEME_COLOR } from './themeColors';
 import type { Locale } from '@/i18n';
 import type { TableMode } from '@/utils/cleanMarkdown';
 
@@ -8,6 +8,7 @@ export interface PreferencesData {
   theme: 'light' | 'dark';
   tableMode: TableMode;
   themeColor: string;
+  secondaryColor: string;
   autoCheckUpdates: boolean;
 }
 interface PreferencesState extends PreferencesData {
@@ -20,6 +21,7 @@ export const usePreferencesStore = create<PreferencesState>()((set) => ({
   theme: 'light',
   tableMode: 'latex',
   themeColor: DEFAULT_THEME_COLOR,
+  secondaryColor: DEFAULT_SECONDARY_COLOR,
   autoCheckUpdates: true,
   patch: (values) => set(values),
   toggleLocale: () => set((state) => ({ locale: state.locale === 'cn' ? 'en' : 'cn' })),

@@ -10,6 +10,7 @@ import { useGenerationState } from '@/features/generation/state';
 import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import GenerateButton, { useGenerationAvailability } from './GenerateButton';
 import { useI18n } from '../i18n';
+import { Card, CardHeader } from '../shared/ui/Card';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
 import PaperAreaControl from './PaperAreaControl';
@@ -54,19 +55,12 @@ export default function PreviewPanel() {
   const image = images[currentPage] ?? backgroundUrl;
   const ink = inkLayers[currentPage];
   return (
-    <section className="panel preview-panel" data-testid="preview-panel">
-      <header className="panel-heading">
-        <div>
-          <p className="eyebrow">03 / {t('previewHint')}</p>
-          <h2>
-            <Eye size={18} />
-            {t('preview')}
-          </h2>
-        </div>
+    <Card className="preview-panel" data-testid="preview-panel">
+      <CardHeader title={t('preview')} icon={<Eye size={18} />}>
         <span className="preview-size">
           {background ? background.name : `${width} × ${height}`}
         </span>
-      </header>
+      </CardHeader>
       <div className={`preview-canvas ${image ? '' : 'is-empty'}`} data-testid="preview-viewport">
         {!image ? (
           <div className="empty-preview">
@@ -120,6 +114,7 @@ export default function PreviewPanel() {
         <div>
           <Button
             data-testid="generate-image-btn"
+            variant="tonal"
             disabled={disabled}
             onClick={() => void generate('zip')}
           >
@@ -149,7 +144,7 @@ export default function PreviewPanel() {
           />
         )}
       </AnimatePresence>
-    </section>
+    </Card>
   );
 }
 

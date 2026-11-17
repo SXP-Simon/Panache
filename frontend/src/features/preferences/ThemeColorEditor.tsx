@@ -3,23 +3,60 @@ import { usePreferencesStore } from './store';
 import { useI18n } from '@/i18n';
 import Button from '@/shared/ui/Button';
 
-import { DEFAULT_THEME_COLOR } from './themeColors';
-const presets = [DEFAULT_THEME_COLOR, '#16866c', '#2563eb', '#8b5cf6', '#d15c37', '#d43779'];
+import { DEFAULT_SECONDARY_COLOR, DEFAULT_THEME_COLOR } from './themeColors';
+
 export default function ThemeColorEditor() {
   const { t } = useI18n();
-  const color = usePreferencesStore((state) => state.themeColor);
+  const primary = usePreferencesStore((state) => state.themeColor);
+  const secondary = usePreferencesStore((state) => state.secondaryColor);
   const patch = usePreferencesStore((state) => state.patch);
-  const [draft, setDraft] = useState(color);
-  const [error, setError] = useState(false);
-  const apply = (next: string) => {
-    setDraft(next);
-    setError(false);
-    patch({ themeColor: next.toLowerCase() });
-  };
   return (
     <section className="theme-editor" data-testid="theme-color-editor">
       <h3>{t('themeColor')}</h3>
       <p className="help-text">{t('themeColorHint')}</p>
+      <ThemeColorField
+        label={t('themePrimaryColor')}
+        id="theme-color"
+        color={primary}
+        defaultColor={DEFAULT_THEME_COLOR}
+        onChange={(themeColor) => patch({ themeColor })}
+      />
+      <ThemeColorField
+        label={t('themeSecondaryColor')}
+        id="theme-secondary-color"
+        color={secondary}
+        defaultColor={DEFAULT_SECONDARY_COLOR}
+        onChange={(secondaryColor) => patch({ secondaryColor })}
+      />
+    </section>
+  );
+}
+
+function ThemeColorField({
+  label,
+  id,
+  color,
+  defaultColor,
+  onChange,
+}: {
+  label: string;
+  id: string;
+  color: string;
+  defaultColor: string;
+  onChange: (color: string) => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(color);
+  const [error, setError] = useState(false);
+  const presets = [defaultColor, '#477696', '#538577', '#81668f', '#ac6c55'];
+  const apply = (next: string) => {
+    setDraft(next);
+    setError(false);
+    onChange(next.toLowerCase());
+  };
+  return (
+    <fieldset className="theme-color-group">
+      <legend>{label}</legend>
       <div className="theme-swatches" role="group" aria-label={t('themePresets')}>
         {presets.map((preset) => (
           <button
@@ -29,7 +66,7 @@ export default function ThemeColorEditor() {
             style={{ background: preset }}
             aria-label={preset}
             aria-pressed={color === preset}
-            data-testid={`theme-preset-${preset.slice(1)}`}
+            data-testid={`${id}-preset-${preset.slice(1)}`}
             onClick={() => apply(preset)}
           />
         ))}
@@ -45,40 +82,40 @@ export default function ThemeColorEditor() {
         <input
           type="color"
           value={color}
-          aria-label={t('themeColor')}
-          data-testid="theme-color-picker"
+          aria-label={label}
+          data-testid={`${id}-picker`}
           onChange={(event) => apply(event.target.value)}
         />
         <input
           type="text"
           value={draft}
-          aria-label="HEX"
+          aria-label={`${label} HEX`}
           spellCheck={false}
           maxLength={7}
           aria-invalid={error}
-          aria-describedby={error ? 'theme-color-error' : undefined}
-          data-testid="theme-color-hex"
+          aria-describedby={error ? `${id}-error` : undefined}
+          data-testid={`${id}-hex`}
           onChange={(event) => {
             setDraft(event.target.value);
             setError(false);
           }}
         />
-        <Button type="submit" variant="primary" data-testid="theme-color-apply">
+        <Button
+          type="submit"
+          variant={id === 'theme-color' ? 'primary' : 'tonal'}
+          data-testid={`${id}-apply`}
+        >
           {t('themeColorApply')}
         </Button>
       </form>
       {error && (
-        <p id="theme-color-error" role="alert">
+        <p id={`${id}-error`} role="alert">
           {t('themeColorInvalid')}
         </p>
       )}
-      <Button
-        variant="ghost"
-        data-testid="theme-color-reset"
-        onClick={() => apply(DEFAULT_THEME_COLOR)}
-      >
+      <Button variant="ghost" data-testid={`${id}-reset`} onClick={() => apply(defaultColor)}>
         {t('themeColorReset')}
       </Button>
-    </section>
+    </fieldset>
   );
 }

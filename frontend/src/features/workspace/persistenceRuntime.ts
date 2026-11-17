@@ -1,5 +1,9 @@
 import * as v from 'valibot';
-import { DEFAULT_THEME_COLOR } from '@/features/preferences/themeColors';
+import {
+  DEFAULT_SECONDARY_COLOR,
+  DEFAULT_THEME_COLOR,
+  restoreThemeColor,
+} from '@/features/preferences/themeColors';
 import { readRecord, writeRecord } from '@/persistence';
 import type { RecordKey } from '@/persistence';
 import { useDocumentStore } from '@/features/document/store';
@@ -37,6 +41,10 @@ const preferencesSchema = v.object({
   themeColor: v.optional(
     v.fallback(v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/)), DEFAULT_THEME_COLOR),
     DEFAULT_THEME_COLOR,
+  ),
+  secondaryColor: v.optional(
+    v.fallback(v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/)), DEFAULT_SECONDARY_COLOR),
+    DEFAULT_SECONDARY_COLOR,
   ),
   tableMode: v.optional(v.picklist(['latex', 'list', 'aligned', 'raw_pipe', 'clean']), 'latex'),
 });
@@ -90,7 +98,10 @@ async function hydrateCheckpoint(raw: string): Promise<void> {
   });
   useSettingsStore.getState().patch({ ...configuration.settings, fontFile: assets.fontFile });
   changeBackground(assets.background, configuration.settings.backgroundRuled);
-  usePreferencesStore.getState().patch(checkpoint.preferences);
+  usePreferencesStore.getState().patch({
+    ...checkpoint.preferences,
+    themeColor: restoreThemeColor(checkpoint.preferences.themeColor),
+  });
   restoredAssets = checkpoint.assets;
   legacyFontIndex = checkpoint.legacyFontIndex;
   lastCheckpoint = raw;
@@ -235,6 +246,7 @@ export function startWorkspacePersistence(): () => void {
           locale: preferences.locale,
           theme: preferences.theme,
           themeColor: preferences.themeColor,
+          secondaryColor: preferences.secondaryColor,
           autoCheckUpdates: preferences.autoCheckUpdates,
           tableMode: preferences.tableMode,
         },

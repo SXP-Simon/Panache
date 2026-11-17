@@ -33,6 +33,7 @@ export default function Modal({
   }, []);
   return (
     <motion.dialog
+      data-slot="dialog-content"
       ref={dialog}
       className={className ? `modal ${className}` : 'modal'}
       data-present={present}

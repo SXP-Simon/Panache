@@ -8,6 +8,8 @@ import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import { useI18n } from '../i18n';
 import { mainFields, paperFields, variationFields, strikeFields, inkFields } from '../models';
 import ParameterField from './ParameterField';
+import { Card, CardHeader } from '../shared/ui/Card';
+import { FileField, SelectField } from '../shared/ui/Field';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
 import Accordion from '../shared/ui/Accordion';
@@ -55,64 +57,46 @@ export default function SettingsPanel() {
   const [detectOpen, setDetectOpen] = useState(false);
   const detecting = useIsMutating({ mutationKey: ['documents', 'detect-background'] }) > 0;
   return (
-    <aside className="panel settings-panel" data-testid="settings-panel">
-      <header className="panel-heading">
-        <div>
-          <h2>
-            <SlidersHorizontal size={18} />
-            {t('settings')}
-          </h2>
-        </div>
-      </header>
+    <Card as="aside" className="settings-panel" data-testid="settings-panel">
+      <CardHeader title={t('settings')} icon={<SlidersHorizontal size={18} />} tone="secondary" />
       <div className="settings-body">
         <section className="settings-group settings-group--text">
           <h3>{t('textAndLayout')}</h3>
-          <label className="field-label">
-            {t('font')}
-            <select
-              value={settings.selectedFont}
-              onChange={(event) => settings.patch({ selectedFont: event.currentTarget.value })}
-              data-testid="font-select"
-            >
-              {fonts.map((font) => (
-                <option key={font} value={font}>
-                  {font}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="file-button upload-control">
-            <Upload size={15} />
-            {t('fontUpload')}
-            <input
-              data-testid="font-file-input"
-              type="file"
-              accept=".ttf,.otf,.ttc"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                if (file) void uploadFont(file);
-                event.currentTarget.value = '';
-              }}
-            />
-          </label>
+          <SelectField
+            label={t('font')}
+            value={settings.selectedFont}
+            onChange={(event) => settings.patch({ selectedFont: event.currentTarget.value })}
+            data-testid="font-select"
+          >
+            {fonts.map((font) => (
+              <option key={font} value={font}>
+                {font}
+              </option>
+            ))}
+          </SelectField>
+          <FileField
+            label={t('fontUpload')}
+            icon={<Upload size={15} />}
+            accept=".ttf,.otf,.ttc"
+            testId="font-file-input"
+            onPick={(file) => void uploadFont(file)}
+          />
           {settings.fontFile && <p className="file-name">{settings.fontFile.name}</p>}
           <div className="layout-preset">
-            <label className="field-label">
-              {t('layoutPreset')}
-              <select
-                value={settings.layoutStyle}
-                data-testid="layout-style-select"
-                aria-describedby="layout-preset-help"
-                onChange={(event) =>
-                  settings.patch({
-                    layoutStyle: event.currentTarget.value === 'homework' ? 'homework' : 'standard',
-                  })
-                }
-              >
-                <option value="standard">{t('layoutStandard')}</option>
-                <option value="homework">{t('layoutHomework')}</option>
-              </select>
-            </label>
+            <SelectField
+              label={t('layoutPreset')}
+              value={settings.layoutStyle}
+              data-testid="layout-style-select"
+              aria-describedby="layout-preset-help"
+              onChange={(event) =>
+                settings.patch({
+                  layoutStyle: event.currentTarget.value === 'homework' ? 'homework' : 'standard',
+                })
+              }
+            >
+              <option value="standard">{t('layoutStandard')}</option>
+              <option value="homework">{t('layoutHomework')}</option>
+            </SelectField>
             <p
               id="layout-preset-help"
               className="layout-preset-help"
@@ -147,24 +131,17 @@ export default function SettingsPanel() {
             />
             <span>{t('underline')}</span>
           </label>
-          <label className="file-button upload-control">
-            <ImagePlus size={15} />
-            {t('background')}
-            <input
-              data-testid="background-image-input"
-              type="file"
-              accept="image/*"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                if (file) {
-                  void uploadBackground(file).then((applied) => {
-                    if (applied) setDetectOpen(true);
-                  });
-                }
-                event.currentTarget.value = '';
-              }}
-            />
-          </label>
+          <FileField
+            label={t('background')}
+            icon={<ImagePlus size={15} />}
+            accept="image/*"
+            testId="background-image-input"
+            onPick={(file) => {
+              void uploadBackground(file).then((applied) => {
+                if (applied) setDetectOpen(true);
+              });
+            }}
+          />
           {settings.background && (
             <>
               <div className="background-row">
@@ -235,21 +212,19 @@ export default function SettingsPanel() {
           </Accordion>
         </section>
         <div className="presets-section">
-          <label className="field-label">
-            {t('presets')}
-            <select
-              value={settings.selectedPreset}
-              data-testid="builtin-preset-select"
-              onChange={(event) => applyPreset(event.currentTarget.value)}
-            >
-              <option value="" disabled>
-                {t('presetChoose')}
-              </option>
-              <option value="smallUnderlined">{t('presetSmall')}</option>
-              <option value="natural">{t('presetNatural')}</option>
-              <option value="clean">{t('presetClean')}</option>
-            </select>
-          </label>
+          <SelectField
+            label={t('presets')}
+            value={settings.selectedPreset}
+            data-testid="builtin-preset-select"
+            onChange={(event) => applyPreset(event.currentTarget.value)}
+          >
+            <option value="" disabled>
+              {t('presetChoose')}
+            </option>
+            <option value="smallUnderlined">{t('presetSmall')}</option>
+            <option value="natural">{t('presetNatural')}</option>
+            <option value="clean">{t('presetClean')}</option>
+          </SelectField>
           <div className="preset-actions">
             <Button
               size="small"
@@ -308,7 +283,7 @@ export default function SettingsPanel() {
           </Modal>
         )}
       </AnimatePresence>
-    </aside>
+    </Card>
   );
 }
 

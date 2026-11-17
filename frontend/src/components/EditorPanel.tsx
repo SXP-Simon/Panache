@@ -20,6 +20,7 @@ import {
 import { prepareInlineImage } from '@/utils/prepareInlineImage';
 import { prepareTextInWorker } from '@/utils/textPreparationJob';
 import type { TableMode } from '@/utils/cleanMarkdown';
+import { Card, CardHeader } from '../shared/ui/Card';
 import Button from '../shared/ui/Button';
 import ActionHint from '../shared/ui/ActionHint';
 import Modal from '../shared/ui/Modal';
@@ -215,8 +216,8 @@ export default function EditorPanel() {
     });
   }
   return (
-    <section
-      className="panel editor-panel"
+    <Card
+      className="editor-panel"
       data-testid="text-panel"
       onKeyDown={(event) => {
         if (
@@ -232,14 +233,7 @@ export default function EditorPanel() {
         }
       }}
     >
-      <header className="panel-heading">
-        <div>
-          <p className="eyebrow">01 / {t('documentHint')}</p>
-          <h2>
-            <FileText size={18} />
-            {t('document')}
-          </h2>
-        </div>
+      <CardHeader title={t('document')} icon={<FileText size={18} />} tone="secondary">
         <label className="icon-button upload-control" title={t('import')}>
           <Upload size={18} />
           <span className="sr-only">{t('import')}</span>
@@ -257,7 +251,7 @@ export default function EditorPanel() {
             }}
           />
         </label>
-      </header>
+      </CardHeader>
       <div className="editor-toolbar">
         <ActionHint id="prepare-text-hint" text={t('prepareTextHint')} label={t('prepareTextHelp')}>
           <Button
@@ -568,6 +562,6 @@ export default function EditorPanel() {
           </Modal>
         )}
       </AnimatePresence>
-    </section>
+    </Card>
   );
 }

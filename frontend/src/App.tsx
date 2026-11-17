@@ -4,7 +4,7 @@ import UpdateSettings from './features/updates/UpdateSettings';
 import { useInitializeUpdates } from './features/updates/runtime';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import ThemeColorEditor from './features/preferences/ThemeColorEditor';
-import { applyThemeColor } from './features/preferences/themeColors';
+import { applyThemeColors } from './features/preferences/themeColors';
 import brandIcon from './assets/brand.svg';
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { I18nContext, translate, useI18n } from './i18n';
@@ -56,6 +56,7 @@ function Studio() {
   const pwa = useSyncExternalStore(subscribePwa, getPwaState);
   const [appearance, setAppearance] = useState(false);
   const themeColor = usePreferencesStore((state) => state.themeColor);
+  const secondaryColor = usePreferencesStore((state) => state.secondaryColor);
   const [guide, setGuide] = useState(false);
   const [desktop, setDesktop] = useState(false);
   useInitializeUpdates(appearance || guide || desktop);
@@ -64,8 +65,11 @@ function Studio() {
   const dark = theme === 'dark';
   useEffect(() => {
     document.documentElement.dataset['theme'] = dark ? 'dark' : 'light';
-    applyThemeColor(themeColor, dark);
-  }, [dark, themeColor]);
+    applyThemeColors(themeColor, secondaryColor);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', dark ? '#101010' : '#ffffff');
+  }, [dark, themeColor, secondaryColor]);
   return (
     <div className="app-shell">
       <header className="app-header" data-testid="app-header">

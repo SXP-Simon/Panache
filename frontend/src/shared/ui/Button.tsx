@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react';
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'tonal' | 'ghost' | 'destructive';
   size?: 'normal' | 'small' | 'icon';
 }
 export default function Button({
@@ -12,6 +12,8 @@ export default function Button({
 }: Props) {
   return (
     <button
+      data-slot="button"
+      data-variant={variant}
       type={type}
       className={`button button--${variant} button--${size} ${className}`}
       {...props}
