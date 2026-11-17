@@ -14,7 +14,7 @@ export default function PaperAreaControl({ inPreview = false }: { inPreview?: bo
     <>
       <Button
         size="small"
-        variant="ghost"
+        variant="tonal"
         data-testid={inPreview ? 'preview-adjust-paper-area' : 'adjust-paper-area'}
         onClick={() => setOpen(true)}
       >

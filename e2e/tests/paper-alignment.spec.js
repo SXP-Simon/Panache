@@ -44,6 +44,40 @@ async function uploadAndDetect(page, file) {
   return detected;
 }
 
+test('参数组在窄屏和中等窗口保留间距，展开状态清晰', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1024, height: 930 });
+  await openHome(page);
+  await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[0]));
+  await page.getByTestId('detect-background-cancel').click();
+  const textGroup = page.getByRole('region', { name: '文字与排版' });
+  const paperGroup = page.getByRole('region', { name: '纸张与书写区域' });
+  const toggle = page.getByTestId('paper-settings-toggle');
+  const paint = () => toggle.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const closed = await paint();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(paint).not.toBe(closed);
+  await toggle.click();
+
+  for (const width of [1024, 768, 320, 1366]) {
+    await page.setViewportSize({ width, height: 930 });
+    const text = await textGroup.boundingBox();
+    const paper = await paperGroup.boundingBox();
+    if (width === 1024 || width === 768) {
+      expect(paper.x - (text.x + text.width)).toBeGreaterThanOrEqual(12);
+      expect(Math.abs(paper.y - text.y)).toBeLessThanOrEqual(1);
+    } else {
+      expect(paper.y - (text.y + text.height)).toBeGreaterThanOrEqual(12);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByTestId('redetect-background-btn')).toBeVisible();
+    if (width === 1024 || width === 320) {
+      await page.getByTestId('settings-panel').screenshot({ path: testInfo.outputPath(`settings-${width}.png`) });
+    }
+  }
+});
+
 test('框选纸张正文、调整行数并实际生成预览', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 890 });
   await page.emulateMedia({ reducedMotion: 'reduce' });

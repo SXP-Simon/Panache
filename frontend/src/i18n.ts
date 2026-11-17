@@ -262,6 +262,7 @@ const words = {
   paperAndArea: ['纸张与书写区域', 'Paper and writing area'],
   paperDimensions: ['尺寸与边距', 'Size and margins'],
   advancedInk: ['高级笔迹', 'Advanced handwriting'],
+  inkSettings: ['墨色与笔画', 'Ink and strokes'],
   paperAreaAction: ['不满意排版？', 'Adjust writing area'],
   paperAreaTitle: ['框选书写区域', 'Select the writing area'],
   paperAreaHelp: [

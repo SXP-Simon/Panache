@@ -13,6 +13,7 @@ import { FileField, SelectField } from '../shared/ui/Field';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
 import Accordion from '../shared/ui/Accordion';
+import SettingsGroup from '../shared/ui/SettingsGroup';
 import PaperAreaControl from './PaperAreaControl';
 import {
   SlidersHorizontal,
@@ -60,8 +61,7 @@ export default function SettingsPanel() {
     <Card as="aside" className="settings-panel" data-testid="settings-panel">
       <CardHeader title={t('settings')} icon={<SlidersHorizontal size={18} />} tone="secondary" />
       <div className="settings-body">
-        <section className="settings-group settings-group--text">
-          <h3>{t('textAndLayout')}</h3>
+        <SettingsGroup title={t('textAndLayout')}>
           <SelectField
             label={t('font')}
             value={settings.selectedFont}
@@ -105,7 +105,7 @@ export default function SettingsPanel() {
               {t(settings.layoutStyle === 'homework' ? 'layoutHomeworkHelp' : 'layoutStandardHelp')}
             </p>
           </div>
-          <div className="field-grid">
+          <div className="field-grid field-grid--compact">
             {mainFields.map((field) => (
               <ParameterField key={field.key} field={field} />
             ))}
@@ -119,9 +119,8 @@ export default function SettingsPanel() {
             />
             <span>{t('englishSpacing')}</span>
           </label>
-        </section>
-        <section className="settings-group settings-group--paper">
-          <h3>{t('paperAndArea')}</h3>
+        </SettingsGroup>
+        <SettingsGroup title={t('paperAndArea')}>
           <label className="check-row">
             <input
               checked={settings.underlined}
@@ -156,18 +155,23 @@ export default function SettingsPanel() {
                   <X size={14} />
                 </Button>
               </div>
-              <PaperAreaControl />
-              <Button
-                size="small"
-                className="background-detect"
-                data-testid="redetect-background-btn"
-                disabled={detecting}
-                title={t('detectHelp')}
-                onClick={() => void detectBackground()}
-              >
-                {detecting ? <LoaderCircle size={15} className="spin" /> : <RotateCcw size={15} />}
-                {t(detecting ? 'detectingBackground' : 'redetectBackground')}
-              </Button>
+              <div className="background-actions">
+                <PaperAreaControl />
+                <Button
+                  size="small"
+                  data-testid="redetect-background-btn"
+                  disabled={detecting}
+                  title={t('detectHelp')}
+                  onClick={() => void detectBackground()}
+                >
+                  {detecting ? (
+                    <LoaderCircle size={15} className="spin" />
+                  ) : (
+                    <RotateCcw size={15} />
+                  )}
+                  {t(detecting ? 'detectingBackground' : 'redetectBackground')}
+                </Button>
+              </div>
             </>
           )}
           <Accordion title={t('paperDimensions')} testId="paper-settings-toggle">
@@ -177,8 +181,8 @@ export default function SettingsPanel() {
               ))}
             </div>
           </Accordion>
-        </section>
-        <section className="settings-group settings-group--ink">
+        </SettingsGroup>
+        <SettingsGroup title={t('inkSettings')}>
           <label className="color-field">
             <span>{t('ink')}</span>
             <input
@@ -193,9 +197,8 @@ export default function SettingsPanel() {
               <InkSlider key={field.key} field={field} />
             ))}
           </Accordion>
-        </section>
-        <section className="settings-group settings-group--advanced">
-          <h3>{t('advancedInk')}</h3>
+        </SettingsGroup>
+        <SettingsGroup title={t('advancedInk')}>
           <Accordion title={t('variation')} testId="variation-settings-toggle">
             <div className="field-grid">
               {variationFields.map((field) => (
@@ -210,50 +213,52 @@ export default function SettingsPanel() {
               ))}
             </div>
           </Accordion>
-        </section>
-        <div className="presets-section">
-          <SelectField
-            label={t('presets')}
-            value={settings.selectedPreset}
-            data-testid="builtin-preset-select"
-            onChange={(event) => applyPreset(event.currentTarget.value)}
-          >
-            <option value="" disabled>
-              {t('presetChoose')}
-            </option>
-            <option value="smallUnderlined">{t('presetSmall')}</option>
-            <option value="natural">{t('presetNatural')}</option>
-            <option value="clean">{t('presetClean')}</option>
-          </SelectField>
-          <div className="preset-actions">
-            <Button
-              size="small"
-              data-testid="save-settings-btn"
-              title={t('save')}
-              onClick={() => void saveSettings()}
+        </SettingsGroup>
+        <SettingsGroup title={t('presets')} className="presets-section">
+          <div className="preset-controls">
+            <SelectField
+              label={t('presets')}
+              value={settings.selectedPreset}
+              data-testid="builtin-preset-select"
+              onChange={(event) => applyPreset(event.currentTarget.value)}
             >
-              <Save size={15} />
-              {t('save')}
-            </Button>
-            <Button
-              size="small"
-              data-testid="load-settings-btn"
-              title={t('load')}
-              onClick={() => void loadSettings()}
-            >
-              <FolderOpen size={15} />
-              {t('load')}
-            </Button>
-            <Button
-              size="icon"
-              data-testid="reset-settings-btn"
-              aria-label={t('reset')}
-              onClick={resetSettings}
-            >
-              <RotateCcw size={15} />
-            </Button>
+              <option value="" disabled>
+                {t('presetChoose')}
+              </option>
+              <option value="smallUnderlined">{t('presetSmall')}</option>
+              <option value="natural">{t('presetNatural')}</option>
+              <option value="clean">{t('presetClean')}</option>
+            </SelectField>
+            <div className="preset-actions">
+              <Button
+                size="small"
+                data-testid="save-settings-btn"
+                title={t('save')}
+                onClick={() => void saveSettings()}
+              >
+                <Save size={15} />
+                {t('save')}
+              </Button>
+              <Button
+                size="small"
+                data-testid="load-settings-btn"
+                title={t('load')}
+                onClick={() => void loadSettings()}
+              >
+                <FolderOpen size={15} />
+                {t('load')}
+              </Button>
+              <Button
+                size="icon"
+                data-testid="reset-settings-btn"
+                aria-label={t('reset')}
+                onClick={resetSettings}
+              >
+                <RotateCcw size={15} />
+              </Button>
+            </div>
           </div>
-        </div>
+        </SettingsGroup>
       </div>
       <AnimatePresence>
         {detectOpen && (

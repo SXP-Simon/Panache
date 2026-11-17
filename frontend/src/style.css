@@ -743,7 +743,14 @@ progress {
   gap: 6px;
 }
 .settings-body {
-  padding: 0 16px 16px;
+  padding: 0 12px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.settings-panel {
+  container: settings-panel / inline-size;
 }
 .field-label {
   display: flex;
@@ -863,16 +870,6 @@ input[type='color'] {
 .accordion-chevron {
   color: var(--muted-foreground);
 }
-.settings-accordion[data-state='open'] {
-  border-top-color: var(--accent-border);
-}
-.settings-accordion[data-state='open'] > .accordion-trigger,
-.settings-accordion[data-state='open'] .accordion-chevron {
-  color: var(--accent-ink);
-}
-.settings-accordion[data-state='open'] > .accordion-trigger {
-  background: var(--accent-wash);
-}
 .accordion-content,
 .animated-reveal {
   overflow: hidden;
@@ -895,9 +892,14 @@ input[type='color'] {
   overflow: hidden;
   white-space: nowrap;
 }
-.background-detect {
-  margin-top: 8px;
-  width: 100%;
+.background-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.background-actions > .button {
+  flex: 1 1 auto;
 }
 .file-name {
   color: var(--muted-foreground);
@@ -905,9 +907,7 @@ input[type='color'] {
   word-break: break-all;
 }
 .presets-section {
-  border-top: 1px solid var(--border);
-  margin-top: 12px;
-  padding-top: 12px;
+  grid-column: 1 / -1;
 }
 .layout-preset {
   border-top: 1px solid var(--border);
@@ -1147,18 +1147,6 @@ input[type='color'] {
   .settings-panel {
     grid-column: 1/-1;
   }
-  .presets-section {
-    grid-column: 1/-1;
-    display: flex;
-    align-items: end;
-    gap: 18px;
-  }
-  .presets-section > .field-label {
-    flex: 1;
-  }
-  .preset-actions {
-    margin: 0;
-  }
   .app-header {
     padding: 0 24px;
   }
@@ -1254,12 +1242,6 @@ input[type='color'] {
   .panel-heading {
     padding: 12px 16px;
     min-height: 64px;
-  }
-  .presets-section {
-    display: block;
-  }
-  .preset-actions {
-    margin-top: 12px;
   }
   .preview-canvas {
     height: 340px;
@@ -1420,22 +1402,67 @@ input[type='color'] {
   padding: 4px 8px;
   font-size: 0.8rem;
 }
-.settings-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
 .settings-group {
   min-width: 0;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
-.settings-group h3 {
-  margin: 0 0 10px;
+.settings-group-heading {
+  margin: 0;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
   font-size: 14px;
   font-weight: 650;
 }
-.settings-group--text .field-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.settings-group-body {
+  padding: 10px 12px 12px;
+}
+.settings-group-body > :first-child {
+  margin-top: 0;
+}
+.settings-group .accordion-trigger {
+  min-height: 36px;
+  padding: 4px 8px;
+  color: var(--secondary-ink);
+  background: var(--secondary-wash);
+}
+.settings-group .accordion-trigger:hover {
+  background: var(--secondary-control-hover);
+}
+.settings-group .accordion-chevron {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  width: 24px;
+  border-radius: var(--radius-control);
+  background: var(--secondary-wash);
+  color: inherit;
+}
+.settings-group .settings-accordion[data-state='open'] > .accordion-trigger {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  box-shadow: inset 2px 0 var(--primary);
+}
+.settings-group .check-row {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 6px;
+  border-radius: var(--radius-control);
+}
+.settings-group .check-row:has(input:checked) {
+  color: var(--accent-ink);
+  background: var(--accent-wash);
+}
+.settings-group :is(.field-label, .number-field):focus-within {
+  color: var(--accent-ink);
+}
+.settings-group .number-field:focus-within > span {
+  color: inherit;
+}
+.field-grid--compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(76px, 100%), 1fr));
 }
 .preview-paper-action {
   display: flex;
@@ -1521,9 +1548,18 @@ input[type='color'] {
   grid-column: 1/-1;
   margin-top: 0;
 }
-@media (min-width: 721px) and (max-width: 1100px) {
+@container settings-panel (min-width: 680px) {
   .settings-body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .preset-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+  }
+  .preset-actions {
+    margin-top: 0;
   }
 }
 .mobile-settings-button {
