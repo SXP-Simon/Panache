@@ -1,11 +1,12 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/models/ink_page.dart';
-import 'package:handwriting_app/utils/ink_effects.dart';
+import 'package:handwriting_app/utils/ink_effects.dart' show decodeInkImage;
 import 'package:handwriting_app/widgets/workbench_preview.dart';
 
 Future<Uint8List> png(void Function(Canvas) draw) async {
@@ -46,6 +47,7 @@ void main() {
     final pages = [paper];
     final layers = [InkPage(paper, ink)];
     var look = defaultInkLook;
+    Uint8List? copied;
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -62,6 +64,7 @@ void main() {
               locked: false,
               onPageChanged: (_) {},
               onSaveImage: () {},
+              copyImage: (bytes) async => copied = bytes,
             ),
           ),
         ),
@@ -130,9 +133,24 @@ void main() {
     await tester.pump();
     expect(current().color!.r, closeTo(37 / 255, .001));
 
+    Future<Uint8List> copyPreview() async {
+      copied = null;
+      await tester.tap(overlay, buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('copy-preview-image')));
+      for (var i = 0; i < 100 && copied == null; i++) {
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      expect(copied, isNotNull);
+      return copied!;
+    }
+
+    final normalCopy = await copyPreview();
     final result = (await tester.runAsync(() async {
-      final bytes = await compositeInkPage(layers.single, look);
-      final image = await decodeInkImage(bytes);
+      final image = await decodeInkImage(normalCopy);
       try {
         return (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
       } finally {
@@ -148,6 +166,9 @@ void main() {
       expect(result.getUint8(inkPixel + index), closeTo(expected, 2));
     }
 
+    ScaffoldMessenger.of(tester.element(find.byType(WorkbenchPreview)))
+        .removeCurrentSnackBar();
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('expand-preview')));
     await tester.pumpAndSettle();
     final reader = find.byKey(const ValueKey('fullscreen-preview'));
@@ -166,5 +187,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('reader-zoom-out')));
     await tester.pumpAndSettle();
     expect(transform.value.getMaxScaleOnAxis(), closeTo(1, .001));
+    expect(await copyPreview(), normalCopy);
   });
 }
