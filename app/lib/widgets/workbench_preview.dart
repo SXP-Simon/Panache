@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ink_page.dart';
 import '../services/image_clipboard.dart';
+import 'ink_color_control.dart';
 import 'preview_image_actions.dart';
 import 'workbench_controls.dart';
 import 'preview_pager.dart';
@@ -49,34 +50,7 @@ class WorkbenchPreview extends StatefulWidget {
 
 class _WorkbenchPreviewState extends State<WorkbenchPreview> {
   final _heroOwner = Object();
-  late final _inkColor = TextEditingController(text: _colorHex(widget.inkLook));
   bool _inkExpanded = false;
-
-  static String _colorHex(InkLook look) =>
-      '#${(look.color & 0xffffff).toRadixString(16).padLeft(6, '0')}';
-
-  static int? _parseHex(String input) {
-    final hex = input.trim().replaceFirst(RegExp(r'^#'), '');
-    return RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)
-        ? int.parse(hex, radix: 16)
-        : null;
-  }
-
-  @override
-  void didUpdateWidget(WorkbenchPreview oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final color = widget.inkLook.color;
-    if (oldWidget.inkLook.color != color &&
-        _parseHex(_inkColor.text) != (color & 0xffffff)) {
-      _inkColor.text = _colorHex(widget.inkLook);
-    }
-  }
-
-  @override
-  void dispose() {
-    _inkColor.dispose();
-    super.dispose();
-  }
 
   void _expand() {
     final source = widget.pages;
@@ -241,12 +215,6 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
   Widget _inkControls(AppLocalizations l) {
     final look = widget.inkLook;
     final change = widget.onInkChanged!;
-    void selectColor(int color) => change((
-      opacity: look.opacity,
-      thickness: look.thickness,
-      softness: look.softness,
-      color: color,
-    ));
     Widget slider(
       String name,
       String key,
@@ -321,37 +289,20 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
           )),
           fractional: true,
         ),
-        Wrap(
-          spacing: 6,
-          children: [
-            for (final (label, color) in [
-              (l.black, 0xff000000),
-              (l.blue, 0xff003399),
-              (l.red, 0xffb40000),
-            ])
-              ChoiceChip(
-                label: Text(label),
-                selected: look.color == color,
-                onSelected: (_) => selectColor(color),
-              ),
-            SizedBox(
-              width: 116,
-              child: TextField(
-                key: const ValueKey('preview-ink-color'),
-                controller: _inkColor,
-                decoration: InputDecoration(
-                  labelText: l.ink,
-                  hintText: '#000000',
-                  isDense: true,
-                ),
-                onChanged: (input) {
-                  if (_parseHex(input) case final rgb?) {
-                    selectColor(0xff000000 | rgb);
-                  }
+        InkColorControl(
+          key: const ValueKey('preview-ink-color'),
+          color: Color(look.color),
+          onChanged: widget.locked
+              ? null
+              : (color) {
+                  final current = widget.inkLook;
+                  widget.onInkChanged?.call((
+                    opacity: current.opacity,
+                    thickness: current.thickness,
+                    softness: current.softness,
+                    color: color.toARGB32(),
+                  ));
                 },
-              ),
-            ),
-          ],
         ),
       ],
     );

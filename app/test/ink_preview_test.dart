@@ -126,12 +126,26 @@ void main() {
     expect(look.softness, inInclusiveRange(.3, .6));
     await waitForMask(thick);
     await soften.up();
+    final picker = find.byKey(const ValueKey('preview-ink-color'));
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    final area = tester.getRect(find.byKey(const ValueKey('ink-color-area')));
+    await tester.tapAt(Offset(area.right - 20, area.top + 20));
+    await tester.pumpAndSettle();
+    expect(current().color!.r, greaterThan(.75));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(current().color!.r, 0);
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
     await tester.enterText(
-      find.byKey(const ValueKey('preview-ink-color')),
+      find.byKey(const ValueKey('ink-color-hex')),
       '#254587',
     );
     await tester.pump();
     expect(current().color!.r, closeTo(37 / 255, .001));
+    await tester.tap(find.byKey(const ValueKey('ink-color-apply')));
+    await tester.pumpAndSettle();
 
     Future<Uint8List> copyPreview() async {
       copied = null;

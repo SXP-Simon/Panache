@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../models/settings.dart';
 import '../services/api.dart';
+import 'ink_color_control.dart';
 import 'workbench_controls.dart';
 
 /// Parameter presentation only. File, network and preset actions are supplied
@@ -50,7 +51,7 @@ class WorkbenchSettings extends StatelessWidget {
       onDetectBackground,
       onRemoveBackground;
   final ValueChanged<String?> onSelectFont;
-  final ValueChanged<String> onColorSelected;
+  final ValueChanged<Color> onColorSelected;
   final VoidCallback? onAdjustBackground;
 
   @override
@@ -98,47 +99,12 @@ class WorkbenchSettings extends StatelessWidget {
                 onPressed: locked ? null : onRemoveFont,
                 child: Text(l.remove),
               ),
-            Text(l.ink),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final color in [
-                  (l.black, '(0, 0, 0, 255)'),
-                  (l.blue, '(0, 51, 153, 255)'),
-                  (l.red, '(180, 0, 0, 255)'),
-                ])
-                  ChoiceChip(
-                    label: Text(color.$1),
-                    selected: settings.fill == color.$2,
-                    onSelected: locked
-                        ? null
-                        : (_) {
-                            onColorSelected(color.$2);
-                          },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SettingsFieldLabel(
-              key: const PageStorageKey('parameter-fill'),
-              label: l.customColor,
-              child: TextFormField(
-                key: ValueKey('fill-$settingsRevision'),
-                initialValue: settings.fill,
-                enabled: !locked,
-                validator: (s) =>
-                    RegExp(r'^\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$')
-                            .hasMatch(s ?? '') &&
-                        (s!
-                            .replaceAll(RegExp(r'[()\s]'), '')
-                            .split(',')
-                            .every((c) => int.parse(c) <= 255))
-                    ? null
-                    : l.validation,
-                onChanged: (s) {
-                  settings.fill = s;
-                  onEdited();
-                },
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: InkColorControl(
+                key: const ValueKey('settings-ink-color'),
+                color: Color(settings.inkLook.color),
+                onChanged: locked ? null : onColorSelected,
               ),
             ),
           ], collapsible: false),
