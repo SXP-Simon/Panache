@@ -1,3 +1,23 @@
+# [1.12.0](https://github.com/SXP-Simon/Panache/compare/v1.11.1...v1.12.0) (2026-11-18)
+
+
+### Bug Fixes
+
+* **be:** 从后端目录查找随包字体 ([b08b3e7](https://github.com/SXP-Simon/Panache/commit/b08b3e7d1a48ea882f2cf55a13075608df6bce45))
+* **fe/src/features/workspace:** 记住即时预览开关 ([002907c](https://github.com/SXP-Simon/Panache/commit/002907cfc65f5d881e8e842828a6d09a13fd4eec))
+* 更新 Flutter 安装包构建来源 ([a1338a0](https://github.com/SXP-Simon/Panache/commit/a1338a0fc6f8a8c1484c30c0d0c58c96c47b1868))
+
+
+### Features
+
+* **be:** 扩展混排字迹与纸张渲染 ([eca2fad](https://github.com/SXP-Simon/Panache/commit/eca2fad5bf5d22aaa403bf5a08a347b05b34862e))
+* **fe:** 打造带即时预览的自适应工作台 ([2079bbf](https://github.com/SXP-Simon/Panache/commit/2079bbfaf0c90839135a13a93c59622bcf015cd8))
+
+
+### Performance Improvements
+
+* **scripts:** 减少本地 Git 钩子的重复检查 ([d137d56](https://github.com/SXP-Simon/Panache/commit/d137d56dfcf9409168c7ac64f642fc2943a7c88d))
+
 ## [1.11.1](https://github.com/SXP-Simon/Panache/compare/v1.11.0...v1.11.1) (2026-11-17)
 
 
