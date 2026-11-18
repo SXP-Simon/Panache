@@ -275,6 +275,8 @@
   "fineScale": "Size",
   "fineAngle": "Rotation",
   "fineOpacity": "Opacity",
+  "fineThickness": "Stroke weight",
+  "fineSoftness": "Edge softness",
   "fineColor": "Local ink",
   "fineSnap": "Snap to lines",
   "fineReset": "Reset selection",

@@ -85,6 +85,8 @@ void main() {
         'top_margin': '20',
         'bottom_margin': '20',
         'strikethrough_probability': '0',
+        'ink_thickness': '0.3',
+        'ink_softness': '0.8',
       });
       expect(await w.enterFineEdit(), isTrue, reason: w.error);
       final page = w.inkPages.single!;
@@ -98,6 +100,8 @@ void main() {
           angle: -17,
           opacity: 72,
           color: 0xff1240d0,
+          thickness: 7,
+          softness: -3,
         ),
       ]);
       expect(w.canFineUndo, isTrue);

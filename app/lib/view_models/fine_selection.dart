@@ -97,6 +97,8 @@ class FineSelection {
         angle: v.angle,
         opacity: v.opacity,
         color: v.color,
+        thickness: v.thickness,
+        softness: v.softness,
       ),
     );
   }

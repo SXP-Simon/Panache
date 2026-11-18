@@ -41,15 +41,24 @@ Future<ui.Image> _image(Uint8List bytes, int width, int height) {
   return result.future;
 }
 
+typedef _Shape = ({double thickness, double softness});
+
+_Shape _shape(InkLook look, FineAdjustment? edit) => (
+  thickness: (look.thickness + (edit?.thickness ?? 0) / 10).clamp(-2.0, 2.0),
+  softness: (look.softness + (edit?.softness ?? 0) / 10).clamp(0.0, 2.0),
+);
+
 /// The atlas is decoded once while moving glyphs. Clipboard and exports use
 /// identical integer compositing in page pixels, independent of device zoom.
 class FineRaster {
-  FineRaster._(this.paper, this.page, this._pixels, this._width);
+  FineRaster._(this.paper, this.page, this._pixels, this._width)
+    : _displayPixels = Uint8List(_pixels.length * 4);
   final ui.Image paper;
   final FinePage page;
   final Uint8List _pixels;
   final int _width;
-  final _masks = <int, Uint8List>{};
+  final Uint8List _displayPixels;
+  final _masks = <int, ({_Shape shape, Uint8List pixels})>{};
   InkLook? _look;
   ui.Image? _displayAtlas;
   bool _disposed = false;
@@ -66,13 +75,14 @@ class FineRaster {
             throw const FormatException('Glyph outside fine edit atlas');
           }
         }
-        final data = await atlas.toByteData(format: ui.ImageByteFormat.rawRgba);
-        return FineRaster._(
-          paper,
-          model,
-          data!.buffer.asUint8List(),
-          atlas.width,
-        );
+        final raw = (await atlas.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!.buffer.asUint8List();
+        final coverage = Uint8List(atlas.width * atlas.height);
+        for (var i = 0; i < coverage.length; i++) {
+          coverage[i] = raw[i * 4];
+        }
+        return FineRaster._(paper, model, coverage, atlas.width);
       } finally {
         atlas.dispose();
       }
@@ -82,18 +92,16 @@ class FineRaster {
     }
   }
 
-  Uint8List _mask(FineGlyph glyph, InkLook look) {
+  Uint8List _mask(FineGlyph glyph, InkLook look, _Shape shape) {
     final mask = Uint8List(glyph.width * glyph.height);
     for (var y = 0; y < glyph.height; y++) {
-      final start = ((glyph.ay + y) * _width + glyph.ax) * 4;
-      for (var x = 0; x < glyph.width; x++) {
-        mask[y * glyph.width + x] = _pixels[start + x * 4];
-      }
+      final start = (glyph.ay + y) * _width + glyph.ax;
+      mask.setRange(y * glyph.width, (y + 1) * glyph.width, _pixels, start);
     }
     final shaped = shapeInkAlpha(
       (alpha: mask, width: glyph.width, height: glyph.height),
-      look.thickness,
-      look.softness,
+      shape.thickness,
+      shape.softness,
     );
     final opacity = look.opacity * (look.color >> 24 & 255);
     if (opacity != 25500) {
@@ -105,29 +113,34 @@ class FineRaster {
     return shaped;
   }
 
-  Future<void> prepare(InkLook look) async {
-    if (_look == look) return;
-    final pixels = Uint8List(_pixels.length);
-    final masks = <int, Uint8List>{};
+  Future<void> prepare(InkLook look, Map<int, FineAdjustment> edits) async {
+    final rebuild = _look != look;
+    var changed = rebuild;
     for (final glyph in page.glyphs) {
-      final mask = masks[glyph.id] = _mask(glyph, look);
+      final shape = _shape(look, edits[glyph.id]);
+      if (!rebuild && _masks[glyph.id]?.shape == shape) continue;
+      final mask = _mask(glyph, look, shape);
+      _masks[glyph.id] = (shape: shape, pixels: mask);
+      changed = true;
       for (var y = 0; y < glyph.height; y++) {
         final start = ((glyph.ay + y) * _width + glyph.ax) * 4;
         for (var x = 0; x < glyph.width; x++) {
-          pixels[start + x * 4 + 3] = mask[y * glyph.width + x];
+          _displayPixels[start + x * 4 + 3] = mask[y * glyph.width + x];
         }
       }
     }
-    final atlas = await _image(pixels, _width, pixels.length ~/ (_width * 4));
+    if (!changed) return;
+    final atlas = await _image(
+      _displayPixels,
+      _width,
+      _displayPixels.length ~/ (_width * 4),
+    );
     if (_disposed) {
       atlas.dispose();
       return;
     }
     _displayAtlas?.dispose();
     _displayAtlas = atlas;
-    _masks
-      ..clear()
-      ..addAll(masks);
     _look = look;
   }
 
@@ -175,8 +188,11 @@ class FineRaster {
       final right = math.min(width, rect.right.ceil());
       final color = edit?.color ?? look.color;
       final opacity = edit?.opacity ?? 100;
-      final mask =
-          (_look == look ? _masks[glyph.id] : null) ?? _mask(glyph, look);
+      final shape = _shape(look, edit);
+      final cached = _masks[glyph.id];
+      final mask = _look == look && cached?.shape == shape
+          ? cached!.pixels
+          : _mask(glyph, look, shape);
       for (
         var y = math.max(0, rect.top.floor());
         y < math.min(height, rect.bottom.ceil());
