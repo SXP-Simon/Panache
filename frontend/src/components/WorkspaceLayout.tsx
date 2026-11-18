@@ -9,7 +9,6 @@ import EditorPanel from './EditorPanel';
 import GenerateButton from './GenerateButton';
 import PreviewPanel from './PreviewPanel';
 import SettingsPanel from './SettingsPanel';
-import WorkspaceFooter from './WorkspaceFooter';
 import WorkspaceStatus from './WorkspaceStatus';
 
 const narrowViewport = '(max-width: 720px)';
@@ -88,7 +87,6 @@ export default function WorkspaceLayout({ openAppearance }: { openAppearance: ()
         <PreviewPanel />
         <SettingsPanel />
       </div>
-      <WorkspaceFooter />
     </>
   );
 }

@@ -6,6 +6,7 @@ import { usePreferencesStore } from '@/features/preferences/store';
 import { useWorkspaceActions } from '@/features/workspace/WorkspaceProvider';
 import { useNotificationStore } from '@/features/notifications/store';
 import { updateResources } from '@/features/workspace/resourceUpdates';
+import { useSaveStatus } from '@/features/workspace/saveStatus';
 import { useI18n } from '../i18n';
 import {
   extractLetterEnding,
@@ -48,6 +49,9 @@ export default function EditorPanel() {
   const setTableMode = (value: TableMode) =>
     usePreferencesStore.getState().patch({ tableMode: value });
   const { t } = useI18n();
+  const saveStatus = useSaveStatus((state) => state.status);
+  const saveMessage =
+    saveStatus === 'saved' ? '' : t(saveStatus === 'saving' ? 'savingDraft' : 'failedDraft');
   const input = useRef<HTMLTextAreaElement>(null);
   const [letter, setLetter] = useState<{
     body: string;
@@ -423,11 +427,18 @@ export default function EditorPanel() {
           ),
         )}
       </div>
-      <footer className="editor-footer">
+      <footer className="editor-footer" data-testid="draft-save-status" data-state={saveStatus}>
         <span>
           {text.length.toLocaleString()} {t('characters')}
         </span>
-        <span data-testid="text-file-name">{textFileName}</span>
+        <div className="editor-footer-details">
+          <span data-testid="text-file-name" title={textFileName}>
+            {textFileName}
+          </span>
+          <span role="status" title={saveMessage}>
+            {saveMessage}
+          </span>
+        </div>
         <Button size="icon" variant="ghost" aria-label={t('clear')} onClick={() => editText('')}>
           <Trash2 size={15} />
         </Button>

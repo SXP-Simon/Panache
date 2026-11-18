@@ -35,7 +35,7 @@ test.describe("桌面版启动与打包完整性", () => {
     expect(license.replaceAll("\r\n", "\n").trim()).toBe(source.replaceAll("\r\n", "\n").trim());
   });
 
-  test("窗口加载真实站点：字体来自打包资源，页脚版本号是打包版本", async ({ desktop }) => {
+  test("窗口加载真实站点：字体来自打包资源，设置里的版本号是打包版本", async ({ desktop }) => {
     await resetHome(desktop);
 
     // 字体文件是随包发的资源（FONT_ASSETS_BUNDLED_DIR），少了它们生成会直接失败
@@ -56,8 +56,10 @@ test.describe("桌面版启动与打包完整性", () => {
       expect(face.status).toBe("loaded");
     }
 
-    // 页脚显示的是 /api/version 的结果，链路是 app.getVersion() → 后端 → 前端
-    await expect(desktop.page.getByTestId("app-version")).toContainText(PACKAGED_VERSION);
+    await desktop.page.getByTestId("appearance-btn").click();
+    const updates = desktop.page.getByTestId("appearance-modal").getByTestId("update-settings");
+    await expect(updates.getByTestId("app-version")).toHaveText(`v${PACKAGED_VERSION}`);
+    await desktop.page.keyboard.press("Escape");
   });
 
   test("数据目录落在平台默认位置：握手端口与站点一致，sqlite 已初始化", async ({ desktop }) => {

@@ -205,7 +205,7 @@ async function resetHome(desktop) {
   // 先等已有保存结束，再阻止卸载补写。直接删记录后 reload 会把旧快照写回。
   await desktop.page.waitForFunction(() => {
     const status = document.querySelector('[data-testid="draft-save-status"]');
-    return !status || !/正在保存|Saving on this device/i.test(status.textContent ?? '');
+    return status?.getAttribute('data-state') !== 'saving';
   });
   await desktop.page.evaluate(async (keys) => {
     const stopFlush = (event) => event.stopImmediatePropagation();

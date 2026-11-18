@@ -1,4 +1,5 @@
 import { useI18n } from '@/i18n';
+import { useVersionQuery } from '@/api/catalog';
 import { usePreferencesStore } from '@/features/preferences/store';
 import Button from '@/shared/ui/Button';
 import { checkUpdates, showUpdatePrompt, updateAction, useUpdateState } from './runtime';
@@ -7,6 +8,7 @@ import { summarizeReleaseNotes } from './releaseSummary';
 export default function UpdateSettings() {
   const { t } = useI18n();
   const state = useUpdateState();
+  const version = useVersionQuery().data ?? state.current;
   const auto = usePreferencesStore((value) => value.autoCheckUpdates);
   const patch = usePreferencesStore((value) => value.patch);
   const desktop = Boolean(window.handwritingDesktop);
@@ -32,9 +34,9 @@ export default function UpdateSettings() {
         />
         {t('updateAuto')}
       </label>
-      {state.current && (
+      {version && (
         <p>
-          {t('updateInstalledVersion')} {state.current}
+          {t('updateInstalledVersion')} <span data-testid="app-version">v{version}</span>
         </p>
       )}
       <p role="status" data-testid="update-status">

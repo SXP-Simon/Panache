@@ -10,7 +10,7 @@ for (const exit of ['window.close', 'app.quit']) {
     try {
       const editor = desktop.page.getByTestId('text-input');
       await editor.fill('已经正常保存的旧正文');
-      await expect(desktop.page.getByTestId('draft-save-status')).toContainText('已保存到本机');
+      await expect(desktop.page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
       if (exit === 'window.close') window = await desktop.app.browserWindow(desktop.page);
       const closed = desktop.app.waitForEvent('close', { timeout: 45_000 });
       const latest = `已经正常保存的旧正文\n尚未等待防抖的末尾字符 ${exit} XYZ987完整。`;

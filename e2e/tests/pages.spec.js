@@ -1,8 +1,11 @@
 const { test, expect, openHome } = require('./fixtures');
 
-test('首页版本号来自后端', async ({ page }) => {
+test('外观与设置里的版本号来自后端', async ({ page }) => {
   await openHome(page);
-  await expect(page.getByTestId('app-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
+  await expect(page.getByTestId('app-version')).toHaveCount(0);
+  await page.getByTestId('appearance-btn').click();
+  const updates = page.getByTestId('appearance-modal').getByTestId('update-settings');
+  await expect(updates.getByTestId('app-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
 });
 
 test('指南和桌面下载入口使用有效对话框', async ({ page }) => {
