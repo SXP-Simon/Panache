@@ -11,6 +11,8 @@ import { useSettingsStore } from '@/features/settings/store';
 import { usePreferencesStore } from '@/features/preferences/store';
 import { useNotificationStore } from '@/features/notifications/store';
 import { changeBackground } from '@/features/preview/resources';
+import { fineEditsSchema } from '@/features/preview/fineEditModel';
+import { useFineEditStore } from '@/features/preview/fineEditStore';
 import { parseConfiguration, serializeConfiguration } from '@/features/settings/configuration';
 import { migrateLegacySettings } from '@/features/settings/legacy';
 import { registerPresetResources } from '@/features/settings/presetRepository';
@@ -56,6 +58,7 @@ const workspaceSchema = v.object({
   assets: assetSnapshotSchema,
   preferences: preferencesSchema,
   legacyFontIndex: v.nullable(v.number()),
+  fineEdits: v.optional(v.fallback(v.nullable(fineEditsSchema), null)),
 });
 let restoredGeneration: GenerationRecord | null = null;
 let legacyFontIndex: number | null = null;
@@ -97,6 +100,7 @@ async function hydrateCheckpoint(raw: string): Promise<void> {
     imageStore: draft.imageStore,
     textFileName: configuration.textFileName ?? '',
   });
+  useFineEditStore.getState().restore(checkpoint.fineEdits ?? null);
   useSettingsStore.getState().patch({ ...configuration.settings, fontFile: assets.fontFile });
   changeBackground(assets.background, configuration.settings.backgroundRuled);
   usePreferencesStore.getState().patch({
@@ -231,6 +235,7 @@ export function startWorkspacePersistence(): () => void {
     const document = useDocumentStore.getState();
     const settings = useSettingsStore.getState();
     const preferences = usePreferencesStore.getState();
+    const fineEdits = useFineEditStore.getState().saved;
     const saveAssets =
       !assetSnapshot ||
       document.imageStore !== previousImages ||
@@ -253,6 +258,7 @@ export function startWorkspacePersistence(): () => void {
           tableMode: preferences.tableMode,
         },
         legacyFontIndex,
+        ...(fineEdits?.glyphs.length ? { fineEdits } : {}),
       });
       const pending =
         serialized === lastCheckpoint
@@ -310,6 +316,9 @@ export function startWorkspacePersistence(): () => void {
     useDocumentStore.subscribe(schedule),
     useSettingsStore.subscribe(schedule),
     usePreferencesStore.subscribe(schedule),
+    useFineEditStore.subscribe((state, previous) => {
+      if (state.saved !== previous.saved) schedule();
+    }),
   ];
   const visibility = () => {
     if (document.visibilityState === 'hidden') flushEvent();

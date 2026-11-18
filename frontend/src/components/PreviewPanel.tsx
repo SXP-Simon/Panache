@@ -1,10 +1,15 @@
-import { useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreviewStore } from '@/features/preview/store';
 import { useInkMask } from '@/features/preview/useInkMask';
 import { compositePreview } from '@/features/preview/compositePreview';
+import FineEditCanvas from '@/features/preview/FineEditCanvas';
+import { useFineEditStore } from '@/features/preview/fineEditStore';
+import { useDocumentStore } from '@/features/document/store';
+import type { FinePage } from '@/features/preview/fineEditModel';
+import { sameFineLayout } from '@/features/preview/fineEditModel';
 import { downloadResult } from '@/api/download';
 import { useSettingsStore } from '@/features/settings/store';
 import { useGenerationState } from '@/features/generation/state';
@@ -29,7 +34,10 @@ import {
   Download,
   FileDown,
   Copy,
+  ScanLine,
 } from '../shared/icons';
+
+type FineSheet = { page: FinePage; key: string; text: string | null };
 export default function PreviewPanel({
   keepVisible = false,
   headingActions,
@@ -37,15 +45,18 @@ export default function PreviewPanel({
   keepVisible?: boolean;
   headingActions?: ReactNode;
 }) {
-  const { images, inkLayers, latinInkLayers, currentPage, setPage } = usePreviewStore(
-    useShallow((state) => ({
-      images: state.images,
-      inkLayers: state.inkLayers,
-      latinInkLayers: state.latinInkLayers,
-      currentPage: state.currentPage,
-      setPage: state.setPage,
-    })),
-  );
+  const { images, inkLayers, latinInkLayers, currentPage, setPage, fineEdit, revision } =
+    usePreviewStore(
+      useShallow((state) => ({
+        images: state.images,
+        inkLayers: state.inkLayers,
+        latinInkLayers: state.latinInkLayers,
+        currentPage: state.currentPage,
+        setPage: state.setPage,
+        fineEdit: state.fineEdit,
+        revision: state.revision,
+      })),
+    );
   const { width, height, background, backgroundUrl, fullPreview, patch } = useSettingsStore(
     useShallow((state) => ({
       width: state.numbers.width,
@@ -61,6 +72,24 @@ export default function PreviewPanel({
   const { t } = useI18n();
   const [zoom, setZoom] = useState(100);
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [inspector, setInspector] = useState<HTMLDivElement | null>(null);
+  const draft = useDocumentStore();
+  const { text } = draft;
+  const finePage = fineEdit?.pages[currentPage];
+  const fine =
+    fineEdit && finePage ? { page: finePage, key: fineEdit.key, text: fineEdit.text } : undefined;
+  const current = fine?.text === text;
+  const settings = useSettingsStore();
+  const source = usePreviewStore((state) => state.source);
+  const needsRefresh = Boolean(
+    fine &&
+    (!current ||
+      (source &&
+        (source.draft.imageStore !== draft.imageStore ||
+          !sameFineLayout(source.settings, settings)))),
+  );
+  const kickPreview = () => void generate('preview');
   const image = images[currentPage] ?? backgroundUrl;
   const ink = inkLayers[currentPage];
   const latinInk = latinInkLayers[currentPage] ?? undefined;
@@ -72,14 +101,30 @@ export default function PreviewPanel({
   return (
     <Card className="preview-panel" id="workspace-panel-preview" data-testid="preview-panel">
       <CardHeader title={t('preview')} icon={<Eye size={18} />}>
-        {headingActions ? (
-          <div className="preview-heading-actions">
-            {sizeLabel}
-            {headingActions}
-          </div>
-        ) : (
-          sizeLabel
-        )}
+        <div className="preview-heading-actions">
+          {sizeLabel}
+          {headingActions}
+          <Button
+            size="small"
+            variant={editing ? 'tonal' : 'ghost'}
+            aria-pressed={editing}
+            data-testid="fine-edit-toggle"
+            aria-label={t('fineEdit')}
+            title={t('fineEdit')}
+            className="fine-edit-toggle"
+            disabled={!text.trim() || (disabled && !editing)}
+            onClick={() => {
+              setEditing(!editing);
+              if (!editing && (!current || needsRefresh)) {
+                useFineEditStore.getState().enable();
+                kickPreview();
+              }
+            }}
+          >
+            <ScanLine size={15} />
+            <span>{t('fineEdit')}</span>
+          </Button>
+        </div>
       </CardHeader>
       {headingActions && (
         <div className="canvas-status">
@@ -101,15 +146,28 @@ export default function PreviewPanel({
           </div>
         ) : (
           <PreviewSheet
-            key={ink ?? image}
+            key={fine ? `${currentPage}:${revision}` : (ink ?? image)}
             image={image}
             ink={ink}
             latinInk={latinInk}
             zoom={zoom}
             fitPage={keepVisible}
+            fine={fine}
+            editing={editing && current && !needsRefresh}
+            inspector={expanded ? null : inspector}
           />
         )}
         {!(keepVisible && image) && <PreviewProgress />}
+      </div>
+      <div className="fine-inspector-slot" ref={setInspector}>
+        {((editing && !current) || needsRefresh) && (
+          <p className="fine-inspector-note" role="status">
+            {t('fineRefresh')}
+            <Button size="small" variant="ghost" disabled={disabled} onClick={kickPreview}>
+              {t('previewAction')}
+            </Button>
+          </p>
+        )}
       </div>
       <footer className="preview-tools">
         <PreviewPages page={currentPage} count={images.length} setPage={setPage} />
@@ -148,7 +206,7 @@ export default function PreviewPanel({
           <Button
             data-testid="generate-image-btn"
             variant="tonal"
-            disabled={disabled}
+            disabled={disabled || needsRefresh}
             onClick={() => void generate('zip')}
           >
             <Download size={16} />
@@ -157,7 +215,7 @@ export default function PreviewPanel({
           <Button
             variant="primary"
             data-testid="generate-pdf-btn"
-            disabled={disabled}
+            disabled={disabled || needsRefresh}
             onClick={() => void generate('pdf')}
           >
             <FileDown size={16} />
@@ -176,6 +234,8 @@ export default function PreviewPanel({
             image={image}
             ink={ink}
             latinInk={latinInk}
+            fine={fine}
+            revision={revision}
             page={currentPage}
             count={images.length}
             setPage={setPage}
@@ -277,6 +337,8 @@ function ExpandedPreview({
   image,
   ink,
   latinInk,
+  fine,
+  revision,
   page,
   count,
   setPage,
@@ -285,6 +347,8 @@ function ExpandedPreview({
   image: string;
   ink: string | undefined;
   latinInk: string | undefined;
+  fine: FineSheet | undefined;
+  revision: number;
   page: number;
   count: number;
   setPage: (page: number) => void;
@@ -302,12 +366,13 @@ function ExpandedPreview({
     >
       <div className="preview-canvas" data-testid="expanded-preview-viewport">
         <PreviewSheet
-          key={ink ?? image}
+          key={fine ? `${page}:${revision}` : (ink ?? image)}
           image={image}
           ink={ink}
           latinInk={latinInk}
           zoom={zoom}
           expanded
+          fine={fine}
         />
       </div>
       <footer className="preview-tools">
@@ -329,6 +394,9 @@ function PreviewSheet({
   zoom,
   expanded = false,
   fitPage = false,
+  fine,
+  editing = false,
+  inspector = null,
 }: {
   image: string;
   ink: string | undefined;
@@ -336,10 +404,20 @@ function PreviewSheet({
   zoom: number;
   expanded?: boolean;
   fitPage?: boolean;
+  fine?: FineSheet | undefined;
+  editing?: boolean;
+  inspector?: HTMLElement | null;
 }) {
   const { t } = useI18n();
   const [loaded, setLoaded] = useState(false);
   const [aspect, setAspect] = useState(1);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [fineReady, setFineReady] = useState(false);
+  const fineHandle = useRef<{ png: () => Promise<Blob> }>(null);
+  const registerFineHandle = useCallback((handle: { png: () => Promise<Blob> } | null) => {
+    fineHandle.current = handle;
+    setFineReady(Boolean(handle));
+  }, []);
   const [imageActionStatus, setImageActionStatus] = useState('');
   const paper = useRef<HTMLImageElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -370,6 +448,7 @@ function PreviewSheet({
   const prefix = expanded ? 'expanded-preview' : 'preview';
   const width =
     expanded || fitPage ? `calc(min(100cqw, ${aspect * 100}cqh) * ${zoom / 100})` : `${zoom}%`;
+  const canCopy = Boolean(mask) || fineReady;
 
   function openImageMenu(x: number, y: number) {
     const element = menu.current;
@@ -383,20 +462,20 @@ function PreviewSheet({
 
   async function handleImageAction(action: 'copy' | 'save') {
     const background = paper.current;
-    if (!background || !mask) return;
-    const inks = [{ mask, color, opacity }];
+    if (!background || (!mask && !fineHandle.current)) return;
+    const inks = mask ? [{ mask, color, opacity }] : [];
     if (latinMask) inks.push({ mask: latinMask, color: latinColor, opacity: latinOpacity });
+    const png = () => fineHandle.current?.png() ?? compositePreview(background, inks);
     try {
       if (action === 'copy') {
         if (!navigator.clipboard || typeof ClipboardItem !== 'function') {
           throw new Error('Image clipboard unavailable');
         }
         // Start the write within the click; the PNG can finish encoding asynchronously.
-        const png = compositePreview(background, inks);
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png() })]);
         setImageActionStatus(t('previewImageCopied'));
       } else {
-        downloadResult(await compositePreview(background, inks), 'png');
+        downloadResult(await png(), 'png');
         menu.current?.hidePopover();
       }
     } catch {
@@ -404,6 +483,20 @@ function PreviewSheet({
         t(action === 'copy' ? 'previewImageCopyFailed' : 'previewImageSaveFailed'),
       );
     }
+  }
+
+  function onContextMenu(event: MouseEvent<HTMLElement | SVGElement>) {
+    if (!canCopy) return;
+    event.preventDefault();
+    openImageMenu(event.clientX, event.clientY);
+  }
+
+  function onMenuKey(event: KeyboardEvent<HTMLElement | SVGElement>) {
+    if (!canCopy || (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')))
+      return;
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    openImageMenu(bounds.left, bounds.top);
   }
 
   return (
@@ -422,23 +515,29 @@ function PreviewSheet({
         onLoad={(event) => {
           const { naturalWidth, naturalHeight } = event.currentTarget;
           if ((expanded || fitPage) && naturalHeight) setAspect(naturalWidth / naturalHeight);
+          setSize({ width: naturalWidth, height: naturalHeight });
           setLoaded(true);
         }}
-        tabIndex={mask ? 0 : undefined}
-        onContextMenu={(event) => {
-          if (!mask) return;
-          event.preventDefault();
-          openImageMenu(event.clientX, event.clientY);
-        }}
-        onKeyDown={(event) => {
-          if (!mask || (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')))
-            return;
-          event.preventDefault();
-          const bounds = event.currentTarget.getBoundingClientRect();
-          openImageMenu(bounds.left, bounds.top);
-        }}
+        tabIndex={canCopy && !editing ? 0 : undefined}
+        onContextMenu={onContextMenu}
+        onKeyDown={onMenuKey}
         alt={t('preview')}
       />
+      {fine && (
+        <FineEditCanvas
+          page={fine.page}
+          paper={paper}
+          size={size}
+          modelKey={fine.key}
+          text={fine.text}
+          editing={editing}
+          inspector={inspector}
+          handle={registerFineHandle}
+          onContextMenu={onContextMenu}
+          onMenuKey={onMenuKey}
+          prefix={prefix}
+        />
+      )}
       {mask && (
         <>
           <div
@@ -459,30 +558,32 @@ function PreviewSheet({
               }}
             />
           )}
-          <div ref={menu} className="preview-image-menu" popover="auto">
-            <Button
-              variant="ghost"
-              size="small"
-              data-testid={`${prefix}-copy-image`}
-              onClick={() => void handleImageAction('copy')}
-            >
-              <Copy size={16} />
-              {t('copyPreviewImage')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="small"
-              data-testid={`${prefix}-save-image`}
-              onClick={() => void handleImageAction('save')}
-            >
-              <Download size={16} />
-              {t('savePreviewImage')}
-            </Button>
-            <span role="status" hidden={!imageActionStatus}>
-              {imageActionStatus}
-            </span>
-          </div>
         </>
+      )}
+      {canCopy && (
+        <div ref={menu} className="preview-image-menu" popover="auto">
+          <Button
+            variant="ghost"
+            size="small"
+            data-testid={`${prefix}-copy-image`}
+            onClick={() => void handleImageAction('copy')}
+          >
+            <Copy size={16} />
+            {t('copyPreviewImage')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="small"
+            data-testid={`${prefix}-save-image`}
+            onClick={() => void handleImageAction('save')}
+          >
+            <Download size={16} />
+            {t('savePreviewImage')}
+          </Button>
+          <span role="status" hidden={!imageActionStatus}>
+            {imageActionStatus}
+          </span>
+        </div>
       )}
     </motion.div>
   );

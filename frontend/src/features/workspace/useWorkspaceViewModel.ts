@@ -5,6 +5,8 @@ import { useGenerationState } from '@/features/generation/state';
 import { usePreferencesStore } from '@/features/preferences/store';
 import { clearPreview } from '@/features/preview/resources';
 import { usePreviewStore } from '@/features/preview/store';
+import { useFineEditStore } from '@/features/preview/fineEditStore';
+import { sameFineLayout } from '@/features/preview/fineEditModel';
 import { useSettingsStore } from '@/features/settings/store';
 import { useWorkspaceActions } from './WorkspaceProvider';
 
@@ -82,7 +84,13 @@ export function useLivePreview(active: boolean) {
   const draft = useDocumentStore();
   const settings = useSettingsStore();
   const hasPreview = usePreviewStore((state) => state.images.length > 0);
-  const submitted = useRef<{ draft: typeof draft; settings: typeof settings } | null>(null);
+  const source = usePreviewStore((state) => state.source);
+  const fine = useFineEditStore((state) => state.enabled);
+  const submitted = useRef<{
+    draft: typeof draft;
+    settings: typeof settings;
+    fine: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!active) return;
@@ -94,17 +102,25 @@ export function useLivePreview(active: boolean) {
     if (
       blocked ||
       !fonts.data?.length ||
-      (submitted.current?.draft === draft && submitted.current.settings === settings)
+      (source?.draft === draft &&
+        source.fine === fine &&
+        (source.settings === settings ||
+          (fine &&
+            source.settings.fullPreview === settings.fullPreview &&
+            sameFineLayout(source.settings, settings)))) ||
+      (submitted.current?.draft === draft &&
+        submitted.current.settings === settings &&
+        submitted.current.fine === fine)
     )
       return;
 
     const timer = window.setTimeout(
       () => {
-        submitted.current = { draft, settings };
+        submitted.current = { draft, settings, fine };
         void generate('preview', true);
       },
       settings.fullPreview ? 750 : 300,
     );
     return () => window.clearTimeout(timer);
-  }, [active, blocked, draft, fonts.data, generate, hasPreview, settings]);
+  }, [active, blocked, draft, fine, fonts.data, generate, hasPreview, settings, source]);
 }

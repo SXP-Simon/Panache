@@ -6,6 +6,8 @@ import { readGenerationState } from '@/features/generation/state';
 import { useDocumentStore } from '@/features/document/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { usePreviewStore } from '@/features/preview/store';
+import type { PreviewSource } from '@/features/preview/store';
+import { useFineEditStore } from '@/features/preview/fineEditStore';
 import { replacePreview } from '@/features/preview/resources';
 import { useNotificationStore } from '@/features/notifications/store';
 import { ApiError } from '@/api/client';
@@ -23,7 +25,12 @@ export function useGenerationActions() {
   const mounted = useRef(true);
   const sequence = useRef(0);
   const complete = useCallback(
-    async (pending: Promise<GenerationResult>, token: number, current?: () => boolean) => {
+    async (
+      pending: Promise<GenerationResult>,
+      token: number,
+      options?: { current: () => boolean; source: PreviewSource; live: boolean },
+    ) => {
+      const current = options?.current;
       try {
         const result = await pending;
         if (!mounted.current || token !== sequence.current) return;
@@ -46,10 +53,14 @@ export function useGenerationActions() {
           replacePreview(
             result.type === 'images' ? result.images : [URL.createObjectURL(result.blob)],
             result.type === 'images' ? result.inkLayers : undefined,
-            Boolean(current),
+            Boolean(options?.live) || Boolean(result.type === 'images' && result.fineEdit),
             result.type === 'images' ? result.latinInkLayers : undefined,
+            result.type === 'images' && result.fineEdit
+              ? { ...result.fineEdit, text: options?.source.draft.text ?? null }
+              : undefined,
+            options?.source,
           );
-          if (!current) useNotificationStore.getState().inform('previewLoaded');
+          if (!options?.live) useNotificationStore.getState().inform('previewLoaded');
         }
         await removeRecord('studio.generation');
       } catch (cause) {
@@ -125,7 +136,8 @@ export function useGenerationActions() {
       if (current.busy || current.retrySeconds > 0) return;
       const settings = useSettingsStore.getState();
       const document = useDocumentStore.getState();
-      const snapshot = { ...settings, ...document };
+      const fine = useFineEditStore.getState();
+      const snapshot = { ...settings, ...document, fineEdit: fine.enabled, fineEdits: fine.saved };
       const invalid = validateGeneration(snapshot);
       if (invalid) {
         if (!live) useNotificationStore.getState().fail(invalid);
@@ -153,9 +165,16 @@ export function useGenerationActions() {
           },
         }),
         ++sequence.current,
-        live
-          ? () =>
-              settings === useSettingsStore.getState() && document === useDocumentStore.getState()
+        mode === 'preview'
+          ? {
+              live,
+              source: { draft: document, settings, fine: fine.enabled },
+              current: () =>
+                (!live && !fine.enabled) ||
+                (settings === useSettingsStore.getState() &&
+                  document === useDocumentStore.getState() &&
+                  fine.enabled === useFineEditStore.getState().enabled),
+            }
           : undefined,
       );
     },

@@ -1,6 +1,7 @@
 import type { defaultNumbers } from '../models.ts';
 import type { DigitFont, LatinFont, PaperPattern } from '../models.ts';
 import type { ImageStore } from '../utils/inlineImageManager.ts';
+import type { FineEdits, FinePreview } from '../features/preview/fineEditModel.ts';
 
 export type GenerationMode = 'preview' | 'zip' | 'pdf';
 export type DownloadMode = Exclude<GenerationMode, 'preview'>;
@@ -24,9 +25,17 @@ export interface GenerationSnapshot {
   ink: string;
   separateLatinInk?: boolean;
   latinInk?: string;
+  fineEdit?: boolean;
+  fineEdits?: FineEdits | null;
 }
 export type GenerationResult =
-  | { type: 'images'; images: string[]; inkLayers?: string[]; latinInkLayers?: (string | null)[] }
+  | {
+      type: 'images';
+      images: string[];
+      inkLayers?: string[];
+      latinInkLayers?: (string | null)[];
+      fineEdit?: FinePreview;
+    }
   | { type: 'image'; blob: Blob }
   | { type: 'download'; mode: DownloadMode; blob: Blob };
 export interface BackgroundMargins {

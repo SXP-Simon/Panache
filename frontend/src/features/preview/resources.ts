@@ -1,5 +1,7 @@
 import { useSettingsStore } from '@/features/settings/store';
 import { usePreviewStore } from './store';
+import type { PreviewSource } from './store';
+import type { FinePreview } from './fineEditModel';
 
 export function clearPreview(): void {
   replacePreview([]);
@@ -9,9 +11,18 @@ export function replacePreview(
   inkLayers?: string[],
   keepPage = false,
   latinInkLayers?: (string | null)[],
+  fineEdit?: FinePreview & { text: string | null },
+  source?: PreviewSource,
 ): void {
   const previous = usePreviewStore.getState();
-  previous.setImages(images, inkLayers, keepPage ? previous.currentPage : 0, latinInkLayers);
+  previous.setImages(
+    images,
+    inkLayers,
+    keepPage ? previous.currentPage : 0,
+    latinInkLayers,
+    fineEdit,
+    source,
+  );
   for (const url of previous.images)
     if (url.startsWith('blob:') && !images.includes(url)) URL.revokeObjectURL(url);
 }

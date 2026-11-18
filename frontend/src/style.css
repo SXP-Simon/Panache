@@ -1320,6 +1320,130 @@ input[type='color'] {
   mask-mode: alpha;
   pointer-events: none;
 }
+.fine-raster,
+.fine-selection {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.fine-raster {
+  pointer-events: none;
+  border-radius: 6px;
+}
+.fine-selection {
+  touch-action: none;
+  cursor: crosshair;
+  outline: none;
+}
+@media (pointer: coarse) {
+  .fine-selection {
+    touch-action: pan-y pinch-zoom;
+  }
+  .fine-selection:not([data-touch-tool='pan']) {
+    touch-action: none;
+  }
+}
+.fine-touch-tools {
+  display: none;
+}
+@media (pointer: coarse) {
+  .fine-touch-tools {
+    display: flex;
+    gap: 4px;
+    margin-block-end: 8px;
+  }
+  .fine-touch-tools .button {
+    min-width: 54px;
+    min-height: 36px;
+    touch-action: manipulation;
+  }
+}
+.fine-selection rect {
+  fill: color-mix(in srgb, var(--primary) 15%, transparent);
+  stroke: var(--primary);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+.fine-selection rect.fine-selection-outline {
+  fill: none;
+  pointer-events: none;
+}
+.fine-selection rect.fine-marquee {
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+.fine-inspector-slot:empty {
+  display: none;
+}
+.fine-inspector,
+.fine-inspector-note {
+  padding: 7px 14px;
+  font-size: 12px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+.fine-inspector-head,
+.fine-fields,
+.fine-history,
+.fine-nudges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fine-inspector-head {
+  justify-content: space-between;
+  color: var(--muted-foreground);
+}
+.fine-inspector-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+}
+.fine-history,
+.fine-nudges {
+  gap: 2px;
+}
+.fine-fields {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.fine-fields > label:has(input[type='range']) {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 85px;
+  min-width: 74px;
+}
+.fine-fields input[type='range'] {
+  width: 100%;
+}
+.fine-fields output {
+  color: var(--muted-foreground);
+  margin-inline-start: 3px;
+}
+.fine-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fine-color input {
+  width: 34px;
+  height: 27px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--background);
+}
+.fine-history .button,
+.fine-nudges .button {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+}
 .preview-image-menu {
   position: fixed;
   inset: auto;
@@ -1932,6 +2056,9 @@ input[type='color'] {
   .preview-heading-actions .preview-size {
     display: none;
   }
+  .fine-edit-toggle span {
+    display: none;
+  }
 }
 
 @media (min-width: 1101px) {
@@ -2008,6 +2135,12 @@ input[type='color'] {
 }
 
 @media (max-width: 720px) {
+  .fine-edit-toggle span {
+    display: none;
+  }
+  .preview-heading-actions:has(.fine-edit-toggle) .preview-size {
+    display: none;
+  }
   .mobile-workspace-nav.mobile-workspace-tools {
     gap: 0;
     overflow-x: auto;

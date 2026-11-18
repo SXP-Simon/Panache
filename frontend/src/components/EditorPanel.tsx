@@ -24,6 +24,7 @@ import type { TableMode } from '@/utils/cleanMarkdown';
 import { Card, CardHeader } from '../shared/ui/Card';
 import Button from '../shared/ui/Button';
 import ActionHint from '../shared/ui/ActionHint';
+import { useFineEditStore } from '@/features/preview/fineEditStore';
 import Modal from '../shared/ui/Modal';
 import {
   FileText,
@@ -355,6 +356,12 @@ export default function EditorPanel() {
         className="document-input"
         placeholder={t('editorPlaceholder')}
         aria-label={t('document')}
+        onSelect={(event) => {
+          const { selectionStart: start, selectionEnd: end } = event.currentTarget;
+          if (start < end) useFineEditStore.getState().selectSource({ text, start, end });
+          else if (useFineEditStore.getState().sourceSelection)
+            useFineEditStore.getState().selectSource(null);
+        }}
         spellCheck={false}
         onPaste={(event) => {
           const files = Array.from(event.clipboardData.items)

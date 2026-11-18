@@ -3,6 +3,7 @@ import * as v from 'valibot';
 import { expandInlineImages } from '../utils/inlineImageManager.ts';
 import { ApiError, fetchApi, parsePayload, readJson } from './client.ts';
 import type { GenerationMode, GenerationResult, GenerationSnapshot } from './types.ts';
+import { finePreviewSchema } from '../features/preview/fineEditModel.ts';
 
 const nullableCount = v.optional(v.nullable(v.pipe(v.number(), v.finite(), v.minValue(0))));
 export const taskSchema = v.object({
@@ -54,6 +55,13 @@ export function generationFormData(snapshot: GenerationSnapshot, mode: Generatio
   }
   body.append('preview', String(mode === 'preview'));
   body.append('ink_layers', 'true');
+  if (snapshot.fineEdit) {
+    body.append('fine_edit', 'true');
+    if (snapshot.fineEdits?.text === snapshot.text && mode !== 'preview') {
+      const { key, glyphs } = snapshot.fineEdits;
+      body.append('fine_edits', JSON.stringify({ key, glyphs }));
+    }
+  }
   body.append('pdf_save', String(mode === 'pdf'));
   body.append('full_preview', String(mode === 'preview' && snapshot.fullPreview));
   body.append('isUnderlined', String(snapshot.underlined));
@@ -149,17 +157,20 @@ export async function getGenerationResult(
           images: v.array(v.string()),
           ink_layers: v.optional(v.array(v.string())),
           latin_ink_layers: v.optional(v.array(v.nullable(v.string()))),
+          fine_edit: v.optional(finePreviewSchema),
         }),
         await readJson(response),
       );
       if (
         (value.ink_layers && value.ink_layers.length !== value.images.length) ||
-        (value.latin_ink_layers && value.latin_ink_layers.length !== value.images.length)
+        (value.latin_ink_layers && value.latin_ink_layers.length !== value.images.length) ||
+        (value.fine_edit && value.fine_edit.pages.length !== value.images.length)
       )
         throw new ApiError('invalidResponse');
       return {
         type: 'images',
         images: value.images.map((image) => `data:image/png;base64,${image}`),
+        ...(value.fine_edit ? { fineEdit: value.fine_edit } : {}),
         ...(value.ink_layers
           ? { inkLayers: value.ink_layers.map((image) => `data:image/png;base64,${image}`) }
           : {}),
