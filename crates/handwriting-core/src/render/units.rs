@@ -1,4 +1,5 @@
 //! 2026-10-15：基底及其脚标是同一个换行单元，防止窄纸把化学价态/积分上下限单独放到下一行。
+use crate::Parameters;
 use crate::text::Node;
 pub(super) fn layout_units(nodes: &[Node]) -> Vec<&[Node]> {
     let mut units = Vec::new();
@@ -25,4 +26,15 @@ pub(super) fn layout_units(nodes: &[Node]) -> Vec<&[Node]> {
 pub(super) fn keeps_grid_cell(nodes: &[Node]) -> bool {
     matches!(nodes, [Node::Char(c)] if !super::glyph::is_circled(*c) && matches!(*c as u32,
         0x2e80..=0xa4cf | 0xac00..=0xd7af | 0xf900..=0xfaff | 0xff00..=0xffef | 0x20000..=0x323af))
+}
+
+pub(super) fn fixed_cell(nodes: &[Node], p: &Parameters) -> Option<f32> {
+    if !p.monospaced {
+        return None;
+    }
+    match nodes {
+        [Node::Char(c)] if c.is_ascii() => Some((p.font_size / 2.).max(1.)),
+        _ if keeps_grid_cell(nodes) => Some(p.font_size),
+        _ => None,
+    }
 }

@@ -260,7 +260,8 @@ mod tests {
                 perturb_theta_sigma: 0.05,
                 ..Parameters::default()
             },
-        );
+        )
+        .unwrap();
         assert!(quiet.native_stroke('√', 54.).is_none());
         let a = quiet.radical_stroke(54., 0, 25, -50, 0, 180).unwrap();
         let b = natural.radical_stroke(54., 0, 25, -50, 0, 180).unwrap();
@@ -299,7 +300,8 @@ mod tests {
                                 perturb_theta_sigma: strength * 0.05,
                                 ..Parameters::default()
                             },
-                        );
+                        )
+                        .unwrap();
                         let g = gs
                             .radical_stroke(size, 4, stem, top, 0, stem + size as i32 * 4)
                             .unwrap();
