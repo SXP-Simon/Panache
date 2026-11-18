@@ -1,3 +1,20 @@
+# [1.13.0](https://github.com/SXP-Simon/Panache/compare/v1.12.0...v1.13.0) (2026-11-18)
+
+
+### Bug Fixes
+
+* 固定通过 PNG 样本修复的 Flutter 来源 ([869f732](https://github.com/SXP-Simon/Panache/commit/869f732fbc77c3bbd5c2c40efa19584bd2c1bec9))
+* 更新 Flutter 安装包构建来源 ([03776bb](https://github.com/SXP-Simon/Panache/commit/03776bb1938bc2bf7014465b0466c700cc2e5fa2))
+
+
+### Features
+
+* **be:** 导出选中字迹的粗细和柔化调整 ([30f97d9](https://github.com/SXP-Simon/Panache/commit/30f97d9ba9691cf47232439ca0a210c3413afb09))
+* **be:** 支持逐字墨迹与局部排版导出 ([968a0e7](https://github.com/SXP-Simon/Panache/commit/968a0e7bfe70af3d756e943092579724d72f8c4b))
+* **be:** 暴露原始字形蒙版和正文选区坐标 ([e01caa8](https://github.com/SXP-Simon/Panache/commit/e01caa820698190d55c8552fc8dc34fa788a25d1))
+* **fe:** 在手写预览中点选框选与拖动字迹 ([7f36086](https://github.com/SXP-Simon/Panache/commit/7f36086688d7d09ba9e06b848e38873334f9f5fd))
+* **fe:** 增加选区滤镜并整理预览操作栏 ([dcdb74b](https://github.com/SXP-Simon/Panache/commit/dcdb74b7cda0d8779bb445652240da09d22292b1))
+
 # [1.12.0](https://github.com/SXP-Simon/Panache/compare/v1.11.1...v1.12.0) (2026-11-18)
 
 
