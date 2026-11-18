@@ -53,6 +53,7 @@ class _IllustrationDialogState extends State<_IllustrationDialog> {
     _stream = provider.resolve(createLocalImageConfiguration(context));
     _listener = ImageStreamListener(
       (info, synchronousCall) {
+        info.dispose();
         if (mounted) setState(() => _decoded = true);
       },
       onError: (Object error, StackTrace? stack) {

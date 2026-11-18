@@ -35,6 +35,23 @@ void main() {
     );
   });
 
+  test(
+    'large illustration payloads decode and collapse without overflowing',
+    () {
+      final payload = 'A' * 4500000;
+      final source = 'data:image/png;base64,$payload';
+      expect(decodeImageData(source), hasLength(3375000));
+      final images = <String, String>{};
+      expect(
+        collapseImages('前\n![图|75%]($source)\n后', images),
+        '前\n![插图 1|75%]\n后',
+      );
+      expect(images['1'], source);
+      expect(cleanMarkdown('![图]($source)'), '![图]($source)');
+      expect(decodeImageData('data:image/png;base64, Q Q = =\n'), [65]);
+      expect(decodeImageData('data:image/png;base64,%41A=='), isNull);
+    },
+  );
   testWidgets('normalization validates, downsizes and preserves transparency', (
     tester,
   ) async {

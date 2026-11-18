@@ -1,4 +1,5 @@
 import 'math_segments.dart';
+import 'image_data.dart';
 import 'image_markers.dart';
 import 'markdown_literals.dart';
 
@@ -14,20 +15,41 @@ String expandImages(String text, Map<String, String> images) {
   return result;
 }
 
+String _replaceEmbeddedImages(
+  String text,
+  String? Function(RegExpMatch match, int end) replacement,
+) {
+  final opening = RegExp(r'!\[([^\]]*)\]\((data:image/[^;)\s]+;base64,)');
+  final result = StringBuffer();
+  var cursor = 0;
+  for (final match in opening.allMatches(text)) {
+    if (match.start < cursor) continue;
+    final end = text.indexOf(')', match.end);
+    if (end < 0) break;
+    final value = replacement(match, end);
+    if (value == null) continue;
+    result
+      ..write(text.substring(cursor, match.start))
+      ..write(value);
+    cursor = end + 1;
+  }
+  if (cursor == 0) return text;
+  result.write(text.substring(cursor));
+  return result.toString();
+}
+
 String collapseImages(String text, Map<String, String> images) =>
-    text.replaceAllMapped(
-      RegExp(r'!\[([^\]]*)\]\((data:image/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)'),
-      (m) {
-        final data = m[2]!.replaceAll(RegExp(r'\s'), '');
-        final existing = images.entries
-            .where((e) => e.value == data)
-            .firstOrNull;
-        final id = existing?.key ?? nextIllustrationId(images, text);
-        images[id] = data;
-        final scale = m[1]!.contains('|') ? '|${m[1]!.split('|').last}' : '';
-        return '![插图 $id$scale]';
-      },
-    );
+    _replaceEmbeddedImages(text, (match, end) {
+      final payload = compactImagePayload(text.substring(match.end, end));
+      if (payload == null) return null;
+      final data = '${match[2]}$payload';
+      final existing = images.entries.where((e) => e.value == data).firstOrNull;
+      final id = existing?.key ?? nextIllustrationId(images, text);
+      images[id] = data;
+      final alt = match[1]!;
+      final scale = alt.contains('|') ? '|${alt.split('|').last}' : '';
+      return '![插图 $id$scale]';
+    });
 
 String cleanMarkdown(
   String text, {
@@ -103,10 +125,14 @@ String cleanMarkdown(
     cursor = end;
   }
   bareMath.write(s.substring(cursor));
-  s = bareMath.toString();
+  final unprotectedImages = bareMath.toString();
+  s = _replaceEmbeddedImages(
+    unprotectedImages,
+    (match, end) => protect(unprotectedImages.substring(match.start, end + 1)),
+  );
   s = s.replaceAllMapped(
     RegExp(
-      r'!\[[^\]]*\]\((?:data:image/[^)]+|img:?_?\d+)\)|!\[插图(?:[ \t]*[#:_-]?[ \t]*\d+)?(?:\|[^\]]+)?\](?!\()',
+      r'!\[[^\]]*\]\(img:?_?\d+\)|!\[插图(?:[ \t]*[#:_-]?[ \t]*\d+)?(?:\|[^\]]+)?\](?!\()',
     ),
     (m) {
       return protect(m[0]!);
