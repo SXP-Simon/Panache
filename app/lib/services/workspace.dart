@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings.dart';
 import '../models/ink_page.dart';
+import '../models/fine_edit.dart';
 import '../utils/ink_effects.dart';
+import '../utils/fine_raster.dart';
 import '../utils/text_tools.dart';
 import '../utils/image_data.dart';
 import 'api.dart';
@@ -43,6 +45,72 @@ class Workspace extends ChangeNotifier {
   HandwritingApi api;
   Settings settings;
   String text = '', version = '';
+  bool fineEnabled = false;
+  String? _fineText;
+  FineEdits? _fineEdits;
+  final _fineUndo = <FineEdits?>[];
+  final _fineRedo = <FineEdits?>[];
+  bool get _currentFineHistory =>
+      _fineEdits != null &&
+      _fineText == text &&
+      _fineEdits!.key == inkPages.elementAtOrNull(page)?.fine?.key;
+  bool get canFineUndo => _fineUndo.isNotEmpty && _currentFineHistory;
+  bool get canFineRedo => _fineRedo.isNotEmpty && _currentFineHistory;
+
+  Map<int, FineAdjustment> fineAdjustments(FinePage page) =>
+      _fineEdits?.key == page.key ? _fineEdits!.glyphs : const {};
+
+  Future<bool> enterFineEdit() async {
+    if (!api.supportsFineEdit || !generation.available) return false;
+    if (fineEnabled &&
+        !previewStale &&
+        inkPages.elementAtOrNull(page)?.fine != null) {
+      return true;
+    }
+    fineEnabled = true;
+    ++_editRevision;
+    return generate(live: true);
+  }
+
+  void applyFineEdits(FinePage page, List<FineAdjustment> values) {
+    if (busy ||
+        previewStale ||
+        inkPages.elementAtOrNull(this.page)?.fine?.key != page.key) {
+      return;
+    }
+    final previous = _fineEdits?.key == page.key && _fineText == text
+        ? _fineEdits
+        : null;
+    final next = <int, FineAdjustment>{...?previous?.glyphs};
+    var changed = false;
+    for (final value in values) {
+      if (value == defaultFineAdjustment(value.id)) {
+        changed = next.remove(value.id) != null || changed;
+      } else if (next[value.id] != value) {
+        next[value.id] = value;
+        changed = true;
+      }
+    }
+    if (!changed || next.length > 10000) return;
+    if (previous == null && _fineEdits != null) _fineUndo.clear();
+    if (_fineUndo.length >= 50) _fineUndo.removeAt(0);
+    _fineUndo.add(previous);
+    _fineRedo.clear();
+    _fineText = text;
+    _fineEdits = FineEdits(page.key, next);
+    edit(inkOnly: true);
+  }
+
+  void stepFineHistory({required bool redo}) {
+    if (busy || previewStale || !_currentFineHistory) return;
+    final from = redo ? _fineRedo : _fineUndo;
+    final to = redo ? _fineUndo : _fineRedo;
+    if (from.isEmpty) return;
+    to.add(_fineEdits);
+    _fineEdits = from.removeLast() ?? FineEdits(_fineEdits!.key, const {});
+    edit(inkOnly: true);
+  }
+
   final generation = GenerationViewModel();
   List<String> fonts = [];
   Map<String, String> images = {};
@@ -75,6 +143,7 @@ class Workspace extends ChangeNotifier {
   String? get previewTaskId => generation.previewTaskId;
   bool get previewStale =>
       pages.isNotEmpty && generation.previewRevision != _editRevision;
+  bool get finePreviewNeedsRefresh => fineEnabled && previewStale;
   bool _initializing = false;
   bool get stopping => generation.stopping;
   Timer? saveTimer;
@@ -108,6 +177,9 @@ class Workspace extends ChangeNotifier {
 
   Future<Uint8List> currentPreviewImage() async {
     final ink = page < inkPages.length ? inkPages[page] : null;
+    if (ink?.fine case final fine?) {
+      return compositeFinePage(ink!, fineAdjustments(fine), settings.inkLook);
+    }
     return ink == null ? pages[page] : compositeInkPage(ink, settings.inkLook);
   }
 
@@ -149,6 +221,17 @@ class Workspace extends ChangeNotifier {
                   decodeImageData(entry.value as String) != null)
                 entry.key as String: entry.value as String,
           };
+        }
+        if (data['fineEdits'] case final Map<String, dynamic> edits) {
+          try {
+            _fineEdits = FineEdits.fromJson(edits);
+            _fineText = text;
+            fineEnabled = true;
+          } on FormatException {
+            _fineEdits = null;
+          } on TypeError {
+            _fineEdits = null;
+          }
         }
       } catch (_) {
         /* Leave invalid drafts untouched until the next edit. */
@@ -264,6 +347,8 @@ class Workspace extends ChangeNotifier {
       'settings': settings.toJson(),
       'images': images,
       'uploadedFont': font != null || _fontRestorePending,
+      if (_fineText == text && (_fineEdits?.glyphs.isNotEmpty ?? false))
+        'fineEdits': _fineEdits!.toJson(),
     });
     return _write(
       'flutter.workspace',
@@ -343,6 +428,13 @@ class Workspace extends ChangeNotifier {
       preview: preview,
       pdf: pdf,
     );
+    if (fineEnabled && api.supportsFineEdit) {
+      fields['fine_edit'] = 'true';
+      fields['seed'] = '0';
+      if (!preview && _fineText == text && _fineEdits != null) {
+        fields['fine_edits'] = jsonEncode(_fineEdits!.toJson());
+      }
+    }
     if (background != null) {
       fields.remove('width');
       fields.remove('height');

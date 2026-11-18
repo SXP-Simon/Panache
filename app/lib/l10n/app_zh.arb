@@ -263,5 +263,22 @@
   "latinFontScale": "英文字号比例",
   "digitsLatin": "数字跟随英文字体",
   "indentFirstLine": "段首空两格",
-  "fixedWidthText": "中英文等宽"
+  "fixedWidthText": "中英文等宽",
+  "fineEdit": "精细编辑",
+  "fineHint": "点选单字，或从空白处拖框。",
+  "fineSelected": "已选 {count} 项",
+  "@fineSelected": {"placeholders": {"count": {"type": "int"}}},
+  "fineUndo": "撤销局部修改",
+  "fineRedo": "重做局部修改",
+  "fineTap": "点选",
+  "fineBox": "框选",
+  "fineMove": "移动",
+  "finePan": "平移画布",
+  "fineScale": "大小",
+  "fineAngle": "旋转",
+  "fineOpacity": "浓淡",
+  "fineColor": "局部墨色",
+  "fineSnap": "吸附横线",
+  "fineReset": "恢复选区",
+  "fineUnavailable": "无法打开此页的精细编辑画布。"
 }

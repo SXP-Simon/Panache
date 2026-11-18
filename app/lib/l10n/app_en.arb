@@ -262,5 +262,21 @@
   "latinFontScale": "English font scale",
   "digitsLatin": "Use English font for digits",
   "indentFirstLine": "Indent first line by two characters",
-  "fixedWidthText": "Fixed-width text"
+  "fixedWidthText": "Fixed-width text",
+  "fineEdit": "Fine edit",
+  "fineHint": "Tap a character or draw a box from a blank area.",
+  "fineSelected": "{count} selected",
+  "fineUndo": "Undo local edit",
+  "fineRedo": "Redo local edit",
+  "fineTap": "Select",
+  "fineBox": "Box select",
+  "fineMove": "Move",
+  "finePan": "Pan canvas",
+  "fineScale": "Size",
+  "fineAngle": "Rotation",
+  "fineOpacity": "Opacity",
+  "fineColor": "Local ink",
+  "fineSnap": "Snap to lines",
+  "fineReset": "Reset selection",
+  "fineUnavailable": "Could not open this page for fine editing."
 }

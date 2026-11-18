@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'fine_edit.dart';
+
 typedef InkLook = ({int opacity, double thickness, double softness, int color});
 
 const defaultInkLook = (
@@ -17,12 +19,21 @@ Color composeInkColor(InkLook look) {
 }
 
 class InkPage {
-  const InkPage(this.paper, this.ink);
-  final Uint8List paper, ink;
+  const InkPage(this.paper, this.ink, {this.fine});
+  final Uint8List paper;
+  final Uint8List? ink;
+  final FinePage? fine;
 
   factory InkPage.fromJson(Map<String, dynamic> json) => InkPage(
     base64Decode(json['paper'] as String),
-    base64Decode(json['ink'] as String),
+    switch (json['ink']) {
+      final String value => base64Decode(value),
+      _ => null,
+    },
+    fine: switch (json['fine']) {
+      final Map<String, dynamic> value => FinePage.fromJson(value),
+      _ => null,
+    },
   );
 
   // The HTTP and FFI transports both pass a page packet through the existing byte API.

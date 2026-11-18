@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/ink_page.dart';
+import '../models/fine_edit.dart';
 import '../services/image_clipboard.dart';
 import '../utils/ink_effects.dart';
 import 'live_ink_preview.dart';
+import 'fine_preview.dart';
 import 'preview_image_actions.dart';
 import 'workbench_motion.dart';
 
@@ -24,6 +26,7 @@ class PreviewPager extends StatefulWidget {
     this.readerMode = false,
     this.inkPages = const [],
     this.inkLook = defaultInkLook,
+    this.fineEdits = const [],
   }) : assert(pages.length > 0);
 
   final List<Uint8List> pages;
@@ -35,6 +38,7 @@ class PreviewPager extends StatefulWidget {
   final bool readerMode;
   final List<InkPage?> inkPages;
   final InkLook inkLook;
+  final List<Map<int, FineAdjustment>> fineEdits;
 
   @override
   State<PreviewPager> createState() => _PreviewPagerState();
@@ -152,6 +156,8 @@ class _PreviewPagerState extends State<PreviewPager> {
                       ? widget.inkPages[index]
                       : null,
                   look: widget.inkLook,
+                  fineEdits:
+                      widget.fineEdits.elementAtOrNull(index) ?? const {},
                   heroTag: (widget.heroOwner, index, widget.pages[index]),
                   active: index == _visible,
                   reset: _resetZoom,
@@ -219,6 +225,7 @@ class _ZoomablePage extends StatefulWidget {
     required this.readerMode,
     required this.ink,
     required this.look,
+    required this.fineEdits,
   });
   final Uint8List bytes;
   final Object heroTag;
@@ -230,6 +237,7 @@ class _ZoomablePage extends StatefulWidget {
   final bool readerMode;
   final InkPage? ink;
   final InkLook look;
+  final Map<int, FineAdjustment> fineEdits;
 
   @override
   State<_ZoomablePage> createState() => _ZoomablePageState();
@@ -397,31 +405,41 @@ class _ZoomablePageState extends State<_ZoomablePage>
                         child: Hero(
                           tag: widget.heroTag,
                           transitionOnUserGestures: true,
-                          child: PreviewImageActions(
-                            bytes: widget.bytes,
-                            onOpen: widget.onOpen,
-                            copyImage: ink == null
-                                ? copy
-                                : (_) async =>
-                                      copy(await compositeInkPage(ink, look)),
-                            child: Semantics(
-                              identifier: widget.active
-                                  ? 'preview-image'
-                                  : null,
-                              child: ink != null
-                                  ? LiveInkPreview(
-                                      page: ink,
-                                      look: look,
-                                      label: l.preview,
-                                    )
-                                  : Image.memory(
-                                      widget.bytes,
-                                      fit: BoxFit.contain,
-                                      gaplessPlayback: true,
-                                      semanticLabel: l.preview,
-                                    ),
-                            ),
-                          ),
+                          child: ink?.fine != null
+                              ? SizedBox.expand(
+                                  child: FinePreview(
+                                    page: ink!,
+                                    look: look,
+                                    edits: widget.fineEdits,
+                                    copyImage: copy,
+                                  ),
+                                )
+                              : PreviewImageActions(
+                                  bytes: widget.bytes,
+                                  onOpen: widget.onOpen,
+                                  copyImage: ink == null
+                                      ? copy
+                                      : (_) async => copy(
+                                          await compositeInkPage(ink, look),
+                                        ),
+                                  child: Semantics(
+                                    identifier: widget.active
+                                        ? 'preview-image'
+                                        : null,
+                                    child: ink != null
+                                        ? LiveInkPreview(
+                                            page: ink,
+                                            look: look,
+                                            label: l.preview,
+                                          )
+                                        : Image.memory(
+                                            widget.bytes,
+                                            fit: BoxFit.contain,
+                                            gaplessPlayback: true,
+                                            semanticLabel: l.preview,
+                                          ),
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -494,6 +512,7 @@ Future<void> showFullscreenPreview(
   ImageClipboardWriter copyImage = copyPreviewImage,
   List<InkPage?> inkPages = const [],
   InkLook inkLook = defaultInkLook,
+  List<Map<int, FineAdjustment>> fineEdits = const [],
 }) => Navigator.of(context).push<void>(
   PageRouteBuilder<void>(
     transitionDuration: MediaQuery.disableAnimationsOf(context)
@@ -512,6 +531,7 @@ Future<void> showFullscreenPreview(
       copyImage: copyImage,
       inkPages: inkPages,
       inkLook: inkLook,
+      fineEdits: fineEdits,
     ),
   ),
 );
@@ -525,6 +545,7 @@ class _FullscreenPreview extends StatefulWidget {
     required this.copyImage,
     required this.inkPages,
     required this.inkLook,
+    required this.fineEdits,
   });
   final List<Uint8List> pages;
   final int initialPage;
@@ -533,6 +554,7 @@ class _FullscreenPreview extends StatefulWidget {
   final ImageClipboardWriter copyImage;
   final List<InkPage?> inkPages;
   final InkLook inkLook;
+  final List<Map<int, FineAdjustment>> fineEdits;
 
   @override
   State<_FullscreenPreview> createState() => _FullscreenPreviewState();
@@ -561,6 +583,7 @@ class _FullscreenPreviewState extends State<_FullscreenPreview> {
             copyImage: widget.copyImage,
             inkPages: widget.inkPages,
             inkLook: widget.inkLook,
+            fineEdits: widget.fineEdits,
             onPageChanged: (page) {
               setState(() => _page = page);
               widget.onPageChanged(page);

@@ -39,8 +39,8 @@ Uint8List _pass(
 }
 
 // Interpolate masks at neighboring integer radii like the export engine.
-Uint8List _shape(_ShapeJob job) {
-  final (alpha: alpha, width: w, height: h) = job.mask;
+Uint8List shapeInkAlpha(InkMask source, double thickness, double softness) {
+  final (alpha: alpha, width: w, height: h) = source;
   Uint8List transform(Uint8List mask, double radius, _Kernel mode) {
     Uint8List at(int whole) => whole == 0
         ? mask
@@ -59,11 +59,11 @@ Uint8List _shape(_ShapeJob job) {
   }
 
   var mask = alpha;
-  if (job.thickness != 0) {
-    final thin = job.thickness < 0;
+  if (thickness != 0) {
+    final thin = thickness < 0;
     mask = transform(
       alpha,
-      job.thickness.abs(),
+      thickness.abs(),
       thin ? _Kernel.minimum : _Kernel.maximum,
     );
     if (thin) {
@@ -72,7 +72,12 @@ Uint8List _shape(_ShapeJob job) {
       }
     }
   }
-  if (job.softness != 0) mask = transform(mask, job.softness, _Kernel.mean);
+  if (softness != 0) mask = transform(mask, softness, _Kernel.mean);
+  return mask;
+}
+
+Uint8List _shape(_ShapeJob job) {
+  final mask = shapeInkAlpha(job.mask, job.thickness, job.softness);
   final rgba = Uint8List(mask.length * 4);
   for (var i = 0; i < mask.length; i++) {
     rgba[i * 4 + 3] = mask[i];
@@ -123,7 +128,7 @@ Future<ui.Image> shapeInk(InkMask source, InkLook look) async {
 Future<Uint8List> compositeInkPage(InkPage page, InkLook look) async {
   final paper = await decodeInkImage(page.paper);
   try {
-    final ink = await shapeInk(await decodeInkMask(page.ink), look);
+    final ink = await shapeInk(await decodeInkMask(page.ink!), look);
     try {
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);

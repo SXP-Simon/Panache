@@ -1,15 +1,17 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/ink_page.dart';
+import '../models/fine_edit.dart';
 import '../services/image_clipboard.dart';
 import 'ink_parameter_controls.dart';
 import 'preview_image_actions.dart';
 import 'workbench_controls.dart';
 import 'preview_pager.dart';
+import 'fine_preview.dart';
 
 class WorkbenchPreview extends StatefulWidget {
   const WorkbenchPreview({
@@ -30,6 +32,14 @@ class WorkbenchPreview extends StatefulWidget {
     this.backgroundBytes,
     this.onAdjustBackground,
     this.toolbar,
+    this.onFineEdit,
+    this.fineAdjustments,
+    this.onFineChanged,
+    this.onFineHistory,
+    this.canFineUndo = false,
+    this.canFineRedo = false,
+    this.fineSource,
+    this.onFineCanvasSelect,
   });
   final List<Uint8List> pages;
   final int page;
@@ -45,6 +55,13 @@ class WorkbenchPreview extends StatefulWidget {
   final Uint8List? backgroundBytes;
   final VoidCallback? onAdjustBackground;
   final Widget? toolbar;
+  final Future<bool> Function()? onFineEdit;
+  final Map<int, FineAdjustment> Function(FinePage)? fineAdjustments;
+  final void Function(FinePage, List<FineAdjustment>)? onFineChanged;
+  final ValueChanged<bool>? onFineHistory;
+  final bool canFineUndo, canFineRedo;
+  final ValueListenable<FineRange?>? fineSource;
+  final VoidCallback? onFineCanvasSelect;
 
   @override
   State<WorkbenchPreview> createState() => _WorkbenchPreviewState();
@@ -53,6 +70,7 @@ class WorkbenchPreview extends StatefulWidget {
 class _WorkbenchPreviewState extends State<WorkbenchPreview> {
   final _heroOwner = Object();
   bool _inkExpanded = false;
+  bool _fineEditing = false;
 
   void _expand() {
     final source = widget.pages;
@@ -65,6 +83,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
         copyImage: widget.copyImage,
         inkPages: widget.inkPages,
         inkLook: widget.inkLook,
+        fineEdits: _fineEdits(),
         onPageChanged: (page) {
           // A viewer of an old result must not change a newly generated result.
           if (mounted && identical(source, widget.pages)) {
@@ -75,6 +94,39 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
     );
   }
 
+  List<Map<int, FineAdjustment>> _fineEdits() => [
+    for (final page in widget.inkPages)
+      if (page?.fine case final fine?)
+        widget.fineAdjustments?.call(fine) ?? const {}
+      else
+        const {},
+  ];
+
+  Widget _editor(InkPage page, FinePage fine) {
+    Widget canvas(FineRange? source) => FinePreview(
+      key: ObjectKey(fine),
+      page: page,
+      look: widget.inkLook,
+      edits: widget.fineAdjustments?.call(fine) ?? const {},
+      copyImage: widget.copyImage,
+      editing: !widget.stale && !widget.locked,
+      toolbar: true,
+      onEdit: (values) => widget.onFineChanged?.call(fine, values),
+      onHistory: widget.onFineHistory,
+      canUndo: widget.canFineUndo,
+      canRedo: widget.canFineRedo,
+      source: source,
+      onCanvasSelect: widget.onFineCanvasSelect,
+    );
+    final source = widget.fineSource;
+    return source == null
+        ? canvas(null)
+        : ValueListenableBuilder(
+            valueListenable: source,
+            builder: (_, value, _) => canvas(value),
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -83,13 +135,18 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
     final hasPages = widget.pages.isNotEmpty;
     final paperActions = widget.onAdjustBackground != null;
     final inkActions = widget.onInkChanged != null;
+    final current = widget.inkPages.elementAtOrNull(widget.page);
+    final fine = current?.fine;
     return WorkbenchPanel(
       title: l.previewTitle,
       icon: Icons.description_outlined,
       toolbar: widget.toolbar,
       child: Column(
         children: [
-          if (paperActions || inkActions || hasPages)
+          if (paperActions ||
+              inkActions ||
+              hasPages ||
+              widget.onFineEdit != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Align(
@@ -99,6 +156,24 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                   spacing: 6,
                   runSpacing: 4,
                   children: [
+                    if (widget.onFineEdit != null)
+                      FilterChip(
+                        key: const ValueKey('fine-edit-toggle'),
+                        label: Text(l.fineEdit),
+                        avatar: const Icon(Icons.select_all, size: 17),
+                        selected: _fineEditing,
+                        onSelected: widget.locked
+                            ? null
+                            : (selected) async {
+                                if (!selected) {
+                                  setState(() => _fineEditing = false);
+                                  return;
+                                }
+                                if (await widget.onFineEdit!() && mounted) {
+                                  setState(() => _fineEditing = true);
+                                }
+                              },
+                      ),
                     if (paperActions)
                       FilledButton.tonalIcon(
                         key: const ValueKey('preview-adjust-paper-area'),
@@ -199,6 +274,37 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                               ),
                             ),
                           )
+                  : _fineEditing && fine != null && current != null
+                  ? Column(
+                      children: [
+                        Expanded(child: _editor(current, fine)),
+                        if (widget.pages.length > 1)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                tooltip: l.previousPage,
+                                onPressed: widget.page > 0
+                                    ? () =>
+                                          widget.onPageChanged(widget.page - 1)
+                                    : null,
+                                icon: const Icon(Icons.chevron_left),
+                              ),
+                              Text(
+                                '${widget.page + 1} / ${widget.pages.length}',
+                              ),
+                              IconButton(
+                                tooltip: l.nextPage,
+                                onPressed: widget.page + 1 < widget.pages.length
+                                    ? () =>
+                                          widget.onPageChanged(widget.page + 1)
+                                    : null,
+                                icon: const Icon(Icons.chevron_right),
+                              ),
+                            ],
+                          ),
+                      ],
+                    )
                   : PreviewPager(
                       pages: widget.pages,
                       page: widget.page,
@@ -207,6 +313,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                       copyImage: widget.copyImage,
                       inkPages: widget.inkPages,
                       inkLook: widget.inkLook,
+                      fineEdits: _fineEdits(),
                       onPageChanged: widget.onPageChanged,
                     ),
             ),

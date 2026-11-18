@@ -15,12 +15,14 @@ class PreviewImageActions extends StatelessWidget {
     required this.child,
     this.onOpen,
     this.copyImage = copyPreviewImage,
+    this.longPress = true,
   });
 
   final Uint8List bytes;
   final Widget child;
   final VoidCallback? onOpen;
   final ImageClipboardWriter copyImage;
+  final bool longPress;
 
   Future<void> _menu(BuildContext context, Offset position) async {
     final l = AppLocalizations.of(context)!;
@@ -75,7 +77,9 @@ class PreviewImageActions extends StatelessWidget {
     child: GestureDetector(
       onTap: onOpen,
       onSecondaryTapUp: (details) => _menu(context, details.globalPosition),
-      onLongPressStart: (details) => _menu(context, details.globalPosition),
+      onLongPressStart: longPress
+          ? (details) => _menu(context, details.globalPosition)
+          : null,
       child: child,
     ),
   );

@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/models/settings.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
+import 'package:handwriting_app/utils/fine_raster.dart';
+import 'package:handwriting_app/utils/ink_effects.dart' show decodeInkImage;
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   const base = String.fromEnvironment('LIVE_API_BASE');
@@ -59,5 +63,73 @@ void main() {
     skip: base.isEmpty
         ? '通过 --dart-define=LIVE_API_BASE=http://127.0.0.1:5006 启用'
         : false,
+  );
+  test(
+    'Rust exports the exact pixels from the Flutter fine-edit compositor',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      HttpOverrides.global = null;
+      SharedPreferences.setMockInitialValues({});
+      final w = Workspace(api: HandwritingApi(base));
+      addTearDown(w.dispose);
+      await w.initialize();
+      expect(w.api.supportsFineEdit, isTrue);
+      w.text = 'Wave 中文';
+      w.settings.values.addAll({
+        'font_size': '28',
+        'line_spacing': '38',
+        'width': '300',
+        'height': '230',
+        'left_margin': '20',
+        'right_margin': '20',
+        'top_margin': '20',
+        'bottom_margin': '20',
+        'strikethrough_probability': '0',
+      });
+      expect(await w.enterFineEdit(), isTrue, reason: w.error);
+      final page = w.inkPages.single!;
+      final model = page.fine!;
+      w.applyFineEdits(model, [
+        (
+          id: model.glyphs.first.id,
+          dx: 50,
+          dy: 53,
+          scale: 125,
+          angle: -17,
+          opacity: 72,
+          color: 0xff1240d0,
+        ),
+      ]);
+      expect(w.canFineUndo, isTrue);
+      expect(w.previewStale, isFalse);
+      final png = await compositeFinePage(
+        page,
+        w.fineAdjustments(model),
+        w.settings.inkLook,
+      );
+      final image = await decodeInkImage(png);
+      addTearDown(image.dispose);
+      final raw = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!
+          .buffer
+          .asUint8List();
+      expect(
+        await w.generate(preview: false, pdf: true),
+        isTrue,
+        reason: w.error,
+      );
+      final pdf = w.exportBytes!;
+      final structure = latin1.decode(pdf);
+      final tag = structure.indexOf('/Subtype /Image');
+      final start = structure.indexOf('\nstream\n', tag) + 8;
+      final end = structure.indexOf('\nendstream', start);
+      expect(structure.substring(tag, start), contains('/FlateDecode'));
+      final pixels = zlib.decode(pdf.sublist(start, end));
+      final rgb = [
+        for (var i = 0; i < raw.length; i++)
+          if (i % 4 != 3) raw[i],
+      ];
+      expect(pixels, orderedEquals(rgb));
+    },
+    skip: base.isEmpty ? 'Requires the local Rust engine' : false,
   );
 }
