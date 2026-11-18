@@ -227,8 +227,10 @@ for directory in (output_path, "textfileprocess", "imagefileprocess"):
     Path(directory).mkdir(exist_ok=True)
 
 
-font_assets_dir = get_environment_value("FONT_ASSETS_DIR", "./font_assets")
-font_assets_bundled_dir = get_environment_value("FONT_ASSETS_BUNDLED_DIR", "./font_assets")
+# 2026-11-18：从仓库根目录启动或测试时，也使用后端随包的字体资源。
+default_font_assets = str(Path(__file__).resolve().with_name("font_assets"))
+font_assets_dir = get_environment_value("FONT_ASSETS_DIR", default_font_assets)
+font_assets_bundled_dir = get_environment_value("FONT_ASSETS_BUNDLED_DIR", default_font_assets)
 
 
 def sync_font_assets(source_dir: str, target_dir: str) -> None:

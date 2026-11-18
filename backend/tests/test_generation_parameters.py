@@ -199,12 +199,8 @@ def test_single_page_preview_setting_does_not_truncate_exports() -> None:
 @pytest.mark.parametrize(
     "latin_font", ["handlee", "patrick_hand", "indie_flower", "kalam", "shadows_into_light"]
 )
-def test_independent_latin_font_changes_only_english_line(
-    monkeypatch: pytest.MonkeyPatch, latin_font: str
-) -> None:
-    """2026-11-18：实际渲染验证英文字体独立，且两项并发任务不共享选择."""
-    assets = Path(__file__).resolve().parents[1] / "font_assets"
-    monkeypatch.setattr(app, "font_assets_bundled_dir", str(assets))
+def test_independent_latin_font_changes_only_english_line(latin_font: str) -> None:
+    """2026-11-18：实际渲染验证独立英文字体从随包目录加载，且并发任务不共享选择."""
     settings = parameters(
         ink_layers="true",
         font_option="云烟体.ttf",
