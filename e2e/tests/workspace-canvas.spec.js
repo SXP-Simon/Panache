@@ -8,6 +8,7 @@ test('wide workspace docks panels beside the tools and warns only for a long all
   await expect(previewPanel.getByTestId('preview-btn')).toBeVisible();
   await expect(previewPanel.getByTestId('live-preview-toggle')).toBeVisible();
   const live = page.getByTestId('live-preview-toggle').getByRole('checkbox');
+  await expect(live).toBeChecked();
   await live.uncheck();
   await page.getByTestId('canvas-pane-paper').click();
   await page.getByTestId('width-input').fill('720');
@@ -67,6 +68,7 @@ test('wide workspace docks panels beside the tools and warns only for a long all
 
   await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
   await page.reload();
+  await expect(live).toBeChecked();
   await page.getByTestId('canvas-pane-layout').click();
   await expect(latinFont).toHaveValue('kalam');
   await expect(scale).toHaveValue('115');

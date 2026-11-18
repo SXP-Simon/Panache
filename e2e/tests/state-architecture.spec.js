@@ -6,7 +6,6 @@ const {
   openHome,
   openPaperSettings,
   useSmallCanvas,
-  disableLivePreview,
   expectPreviewImageLoaded,
 } = require('./fixtures');
 
@@ -75,7 +74,6 @@ test('连续输入和插图刷新后完整恢复，生成仍提交原始图片�
   await page.reload();
   await expect(editor).toHaveValue(expected);
   await expect(page.locator('.inline-image-row img')).toHaveCount(1);
-  await disableLivePreview(page);
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);
   expect(transport.forms).toHaveLength(1);

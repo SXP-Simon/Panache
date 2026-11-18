@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFontsQuery } from '@/api/catalog';
 import { useDocumentStore } from '@/features/document/store';
 import { useGenerationState } from '@/features/generation/state';
+import { usePreferencesStore } from '@/features/preferences/store';
 import { clearPreview } from '@/features/preview/resources';
 import { usePreviewStore } from '@/features/preview/store';
 import { useSettingsStore } from '@/features/settings/store';
@@ -18,8 +19,12 @@ export function useWorkspaceViewModel() {
   const [canvas] = useState(
     () => new URLSearchParams(window.location.search).get('studio') !== 'classic',
   );
-  const [live, setLive] = useState(canvas);
+  const live = usePreferencesStore((state) => state.livePreview);
   const navigation = useRef(0);
+
+  function setLive(livePreview: boolean) {
+    usePreferencesStore.getState().patch({ livePreview });
+  }
 
   function selectPane(next: WorkspacePane) {
     navigation.current += 1;

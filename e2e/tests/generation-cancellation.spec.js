@@ -126,12 +126,14 @@ test('cancel preserves the previous preview and retries stopping after reload',a
  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('studio.generation')).cancelling)).toBe(true);
  await page.screenshot({path:path.join(__dirname,'../../preview_outputs/generation-stop-retry.png'),fullPage:true});
  await page.reload();
+ await expect(page.getByTestId('live-preview-toggle').getByRole('checkbox')).not.toBeChecked();
  await expect.poll(server.cancels).toBe(2);
  await expect(page.getByTestId('message-info')).toContainText('正在停止');
  await expect(page.getByTestId('preview-btn')).toBeDisabled();
  server.finish();
  await expect(page.getByTestId('preview-btn')).toBeEnabled();
  await expect.poll(()=>page.evaluate(()=>localStorage.getItem('studio.generation'))).toBeNull();
+ expect(server.count()).toBe(2);
  expect(server.resultCalls()).toBe(1);
 });
 

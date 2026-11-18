@@ -10,6 +10,7 @@ export interface PreferencesData {
   themeColor: string;
   secondaryColor: string;
   autoCheckUpdates: boolean;
+  livePreview: boolean;
 }
 interface PreferencesState extends PreferencesData {
   patch: (values: Partial<PreferencesData>) => void;
@@ -23,6 +24,7 @@ export const usePreferencesStore = create<PreferencesState>()((set) => ({
   themeColor: DEFAULT_THEME_COLOR,
   secondaryColor: DEFAULT_SECONDARY_COLOR,
   autoCheckUpdates: true,
+  livePreview: true,
   patch: (values) => set(values),
   toggleLocale: () => set((state) => ({ locale: state.locale === 'cn' ? 'en' : 'cn' })),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
