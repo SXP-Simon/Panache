@@ -41,13 +41,21 @@ pub mod circuit;
 mod table;
 
 pub fn normalize(text: &str, english_spacing: bool) -> String {
+    normalize_for_layout(text, english_spacing, false)
+}
+
+pub(crate) fn normalize_for_layout(
+    text: &str,
+    english_spacing: bool,
+    preserve_indent: bool,
+) -> String {
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
     let mut s = String::new();
     for c in text.chars() {
         match c {
             '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}' => (),
             '\u{a0}' | '\u{2002}' | '\u{2003}' | '\u{2009}' | '\u{202f}' => s.push(' '),
-            '\u{3000}' => s.push_str("  "),
+            '\u{3000}' if !preserve_indent => s.push_str("  "),
             '∣' => s.push('|'),
             '∥' => s.push_str("||"),
             '∶' => s.push(':'),

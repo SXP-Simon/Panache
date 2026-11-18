@@ -540,7 +540,8 @@ mod tests {
                 perturb_theta_sigma: 100.,
                 ..crate::Parameters::default()
             },
-        );
+        )
+        .unwrap();
         for source in ["⟦ A | 1 | 2; B | 3 | 4 ⟧", "⟦ matrix: 1  0 ; 0  1 ⟧"] {
             let nodes = crate::text::parse(source);
             assert_eq!(

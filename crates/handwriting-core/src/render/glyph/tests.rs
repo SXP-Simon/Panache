@@ -332,7 +332,8 @@ fn natural_math_paths_do_not_move_numerators_denominators_or_radicands() {
                     perturb_theta_sigma: 100.,
                     ..Parameters::default()
                 },
-            );
+            )
+            .unwrap();
             let x = quiet.glyph('x', size).unwrap();
             let axis = (x.top + x.bottom()) / 2;
             let fraction = Node::Fraction(text::parse("AB²"), text::parse("CDₙ"));

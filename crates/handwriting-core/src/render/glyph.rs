@@ -44,7 +44,11 @@ impl Glyph {
         self
     }
     pub(super) fn step(&self, unit: &[Node], p: &Parameters, extra: f32, compound: bool) -> f32 {
-        if p.grid_layout && super::units::keeps_grid_cell(unit) {
+        if (p.first_line_indent || p.monospaced) && matches!(unit, [Node::Char('\u{3000}')]) {
+            p.font_size
+        } else if let Some(cell) = super::units::fixed_cell(unit, p) {
+            cell
+        } else if p.grid_layout && super::units::keeps_grid_cell(unit) {
             (p.font_size + p.word_spacing).max(1.)
         } else {
             let step = self.advance + p.word_spacing + extra;
@@ -54,6 +58,12 @@ impl Glyph {
                 step.max(1.)
             }
         }
+    }
+    pub(super) fn place_in_cell(self, cell: f32) -> Self {
+        let mut glyph = self.fit(cell, f32::INFINITY);
+        glyph.left = ((cell - glyph.mask.width() as f32) / 2.).round().max(0.) as i32;
+        glyph.advance = cell;
+        glyph
     }
     pub fn fit(mut self, width: f32, height: f32) -> Self {
         let footprint = self.advance.max(self.right() as f32) - self.left.min(0) as f32;
@@ -80,6 +90,9 @@ impl Glyph {
 }
 pub(super) struct Glyphs<'a> {
     pub book: &'a FontBook,
+    latin_font: Option<&'static fontdue::Font>,
+    latin_digits: bool,
+    latin_scale: f32,
     cache: HashMap<(char, u32), Glyph>,
     cache_bytes: usize,
     pen: pen::MathPen,
@@ -89,26 +102,48 @@ impl<'a> Glyphs<'a> {
     pub fn new(book: &'a FontBook) -> Self {
         Self {
             book,
+            latin_font: None,
+            latin_digits: false,
+            latin_scale: 1.,
             cache: HashMap::new(),
             cache_bytes: 0,
             pen: pen::MathPen::sample(book.primary()),
         }
     }
-    pub fn with_parameters(book: &'a FontBook, p: &Parameters) -> Self {
+    pub fn with_parameters(book: &'a FontBook, p: &Parameters) -> Result<Self> {
         let mut glyphs = Self::new(book);
+        glyphs.latin_font = p
+            .latin_font
+            .map(crate::fonts::LatinFont::load)
+            .transpose()?;
+        glyphs.latin_digits = p.latin_digits;
+        glyphs.latin_scale = f32::from(p.latin_font_scale) / 100.;
         glyphs.pen.naturalness =
             ((p.perturb_theta_sigma / 0.05 + (p.perturb_x_sigma + p.perturb_y_sigma) / 6.) / 2.)
                 .clamp(0., 1.);
         glyphs.pen.seed = p.seed;
-        glyphs
+        Ok(glyphs)
     }
     pub fn glyph(&mut self, c: char, size: f32) -> Result<Glyph> {
+        if c == '\u{3000}' {
+            return Ok(Glyph::empty(size));
+        }
+        let uses_latin = c.is_ascii_alphabetic() || (self.latin_digits && c.is_ascii_digit());
+        let size = if uses_latin {
+            size * self.latin_scale
+        } else {
+            size
+        };
         let size = size.clamp(1., 2048.).round();
         let key = (c, size as u32);
         if let Some(g) = self.cache.get(&key) {
             return Ok(g.clone());
         }
-        let (m, data) = self.book.for_char(c).rasterize(c, size);
+        let selected = match self.latin_font {
+            Some(font) if uses_latin && crate::fonts::visible_glyph(font, c) => font,
+            _ => self.book.for_char(c),
+        };
+        let (m, data) = selected.rasterize(c, size);
         let advance = m.advance_width.max((m.xmin + m.width as i32) as f32);
         let mut glyph = if m.width == 0 || m.height == 0 {
             Glyph::empty(advance)

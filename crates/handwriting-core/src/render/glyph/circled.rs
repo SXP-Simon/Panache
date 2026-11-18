@@ -236,7 +236,7 @@ mod tests {
                         perturb_theta_sigma: strength * 0.05,
                         ..Parameters::default()
                     };
-                    let mut gs = Glyphs::with_parameters(&book, &p);
+                    let mut gs = Glyphs::with_parameters(&book, &p).unwrap();
                     for c in ['⓪', '①', '⑧', '⑩', '⑪', '⑳', '㉑', '㉟', '㊱', '㊿']
                     {
                         let g = gs.fallback_circled(number(c).unwrap(), size).unwrap();

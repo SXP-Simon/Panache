@@ -10,7 +10,7 @@ pub use inline_document::validate as validate_document;
 mod parameters;
 pub mod render;
 pub mod text;
-pub use parameters::{LayoutStyle, Limits, Parameters};
+pub use parameters::{LayoutStyle, Limits, PaperPattern, Parameters};
 pub use render::{Cancellation, FontBook, RenderRequest, render};
 use thiserror::Error;
 pub const ENGINE_NAME: &str = "handwriting-core";

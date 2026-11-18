@@ -1,3 +1,4 @@
+use crate::fonts::LatinFont;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,10 +29,33 @@ pub enum LayoutStyle {
     Standard,
     Homework,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaperPattern {
+    Grid,
+    Dots,
+}
+
+fn default_latin_scale() -> u8 {
+    100
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameters {
     #[serde(default)]
     pub layout_style: LayoutStyle,
+    #[serde(default)]
+    pub paper_pattern: Option<PaperPattern>,
+    #[serde(default)]
+    pub latin_font: Option<LatinFont>,
+    #[serde(default)]
+    pub latin_digits: bool,
+    #[serde(default = "default_latin_scale")]
+    pub latin_font_scale: u8,
+    #[serde(default)]
+    pub first_line_indent: bool,
+    #[serde(default)]
+    pub monospaced: bool,
     pub font_size: f32,
     pub line_spacing: f32,
     pub word_spacing: f32,
@@ -71,6 +95,12 @@ impl Default for Parameters {
     fn default() -> Self {
         Self {
             layout_style: LayoutStyle::Standard,
+            paper_pattern: None,
+            latin_font: None,
+            latin_digits: false,
+            latin_font_scale: default_latin_scale(),
+            first_line_indent: false,
+            monospaced: false,
             font_size: 124.,
             line_spacing: 200.,
             word_spacing: 1.,
@@ -135,6 +165,7 @@ impl Parameters {
             ink_opacity,
             ink_thickness,
             ink_softness,
+            latin_font_scale,
             seed
         );
         fn boolean(f: &HashMap<String, String>, key: &str, default: bool) -> Result<bool> {
@@ -151,6 +182,26 @@ impl Parameters {
             _ => return Err(Error::new("invalid_parameter", "layout_style")),
         };
         p.underlined = boolean(f, "isUnderlined", false)?;
+        p.paper_pattern = match f.get("paper_pattern").map(String::as_str) {
+            None => None,
+            Some("grid") => Some(PaperPattern::Grid),
+            Some("dots") => Some(PaperPattern::Dots),
+            _ => return Err(Error::new("invalid_parameter", "paper_pattern")),
+        };
+        p.latin_font = f
+            .get("latin_font_option")
+            .map(|value| LatinFont::from_id(value))
+            .transpose()?;
+        p.latin_digits = match f.get("digit_font").map(String::as_str) {
+            None | Some("primary") => false,
+            Some("latin") => true,
+            _ => return Err(Error::new("invalid_parameter", "digit_font")),
+        };
+        if !(50..=150).contains(&p.latin_font_scale) {
+            return Err(Error::new("invalid_parameter", "latin_font_scale"));
+        }
+        p.first_line_indent = boolean(f, "first_line_indent", false)?;
+        p.monospaced = boolean(f, "monospaced", false)?;
         p.background_ruled = boolean(f, "background_ruled", false)?;
         p.english_spacing = boolean(f, "enableEnglishSpacing", false)?;
         p.grid_layout = boolean(f, "grid_layout", false)?;

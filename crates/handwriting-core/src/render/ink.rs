@@ -1,6 +1,6 @@
 //! 2026-10-15：墨迹掩码合成与连通区域扰动，独立于行布局和分页。
 use super::Cancellation;
-use crate::{Parameters, Result};
+use crate::{PaperPattern, Parameters, Result};
 use image::{GrayImage, Luma, Rgba, RgbaImage};
 use rand_chacha::ChaCha8Rng;
 use rand_distr::{Distribution, StandardNormal};
@@ -100,6 +100,10 @@ pub(super) fn perturb(
 // 2026-10-15：空白纸张与横线只负责背景像素，不参与分页。
 pub(super) fn blank_paper(w: u32, h: u32, p: &Parameters) -> RgbaImage {
     let mut bg = RgbaImage::from_pixel(w, h, Rgba([255, 255, 255, 255]));
+    if let Some(pattern) = p.paper_pattern {
+        draw_paper_pattern(&mut bg, p, pattern);
+        return bg;
+    }
     if p.underlined {
         // 2026-10-18：纸张缩入 Word 后仍保留横线覆盖率，不使用固定单像素线。
         let thickness = w.div_ceil(600).max(1);
@@ -122,6 +126,64 @@ pub(super) fn blank_paper(w: u32, h: u32, p: &Parameters) -> RgbaImage {
         }
     }
     bg
+}
+
+fn draw_paper_pattern(paper: &mut RgbaImage, p: &Parameters, pattern: PaperPattern) {
+    use imageproc::drawing::{draw_filled_circle_mut, draw_filled_rect_mut};
+    use imageproc::rect::Rect;
+
+    // 2026-11-18：底纹和正文共享行距相位，自定义图片仍走原有解码路径。
+    let left = p.left_margin as i32;
+    let right = (paper.width() as f32 - p.right_margin) as i32;
+    if left > right {
+        return;
+    }
+    let top = p.top_margin as i32;
+    let bottom = (paper.height() as f32 - p.bottom_margin).ceil() as i32;
+    let thickness = paper.width().div_ceil(600).max(1);
+    let grid_color = Rgba([190, 195, 201, 255]);
+    let rows: Vec<_> = (1..)
+        .map(|row| p.top_margin + row as f32 * p.line_spacing)
+        .take_while(|y| *y < paper.height() as f32 - p.bottom_margin)
+        .map(|y| y as i32)
+        .collect();
+    let Some(&last) = rows.last() else { return };
+    let columns = (0..)
+        .map(|column| p.left_margin + column as f32 * p.line_spacing)
+        .take_while(|x| *x <= right as f32)
+        .map(|x| x as i32);
+
+    if pattern == PaperPattern::Grid {
+        for y in std::iter::once(top).chain(rows) {
+            draw_filled_rect_mut(
+                paper,
+                Rect::at(left, y).of_size(
+                    (right - left + 1) as u32,
+                    thickness.min((bottom - y) as u32),
+                ),
+                grid_color,
+            );
+        }
+        for x in columns.chain(std::iter::once(right)) {
+            draw_filled_rect_mut(
+                paper,
+                Rect::at(x, top).of_size(
+                    thickness.min((right - x + 1) as u32),
+                    (last - top + 1) as u32,
+                ),
+                grid_color,
+            );
+        }
+    } else {
+        let radius = (thickness as i32 / 2).min((p.line_spacing as i32 - 1) / 2);
+        let color = Rgba([150, 157, 166, 255]);
+        for x in columns {
+            for &y in &rows {
+                let radius = radius.min(x - left).min(right - x).min(bottom - 1 - y);
+                draw_filled_circle_mut(paper, (x, y), radius, color);
+            }
+        }
+    }
 }
 
 mod rigid;

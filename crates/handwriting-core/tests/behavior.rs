@@ -418,7 +418,73 @@ fn image_compaction_preserves_literal_protection_order_and_original_marker_data(
 }
 
 #[test]
+fn latin_fonts_and_scaling_leave_cjk_and_main_digits_unchanged() {
+    let mut request = request("中\n1234\nWavy");
+    let original = pages(&request).remove(0);
+    for id in [
+        "handlee",
+        "patrick_hand",
+        "indie_flower",
+        "kalam",
+        "shadows_into_light",
+    ] {
+        let settings =
+            Parameters::from_form(&HashMap::from([("latin_font_option".into(), id.into())]))
+                .unwrap();
+        request.params.latin_font = settings.latin_font;
+        request.params.latin_font_scale = 100;
+        request.params.latin_digits = false;
+        let changed = pages(&request).remove(0);
+        let crop = |im: &RgbaImage, y| image::imageops::crop_imm(im, 0, y, 240, 36).to_image();
+        assert_eq!(crop(&original, 10), crop(&changed, 10), "{id}");
+        assert_eq!(crop(&original, 46), crop(&changed, 46), "{id}");
+        assert_ne!(crop(&original, 82), crop(&changed, 82), "{id}");
+        request.params.latin_digits = true;
+        request.params.latin_font_scale = 115;
+        let scaled = pages(&request).remove(0);
+        assert_eq!(crop(&original, 10), crop(&scaled, 10), "{id}");
+        assert_ne!(crop(&original, 46), crop(&scaled, 46), "{id}");
+        assert_ne!(crop(&changed, 82), crop(&scaled, 82), "{id}");
+        let baseline = |im: &RgbaImage| {
+            crop(im, 82)
+                .enumerate_pixels()
+                .filter(|(_, _, pixel)| pixel[0] < 200)
+                .map(|(_, row, _)| row)
+                .max()
+                .unwrap()
+        };
+        assert!(baseline(&scaled).abs_diff(baseline(&changed)) <= 3, "{id}");
+    }
+}
+
+#[test]
+fn opt_in_paragraph_indent_uses_two_cells_and_keeps_explicit_indent() {
+    let original = request("中\n　　中");
+    let reference = pages(&original).remove(0);
+    let mut indented = original;
+    indented.params.first_line_indent = true;
+    indented.params.monospaced = true;
+    let actual = pages(&indented).remove(0);
+    let left = |image: &RgbaImage, start, end| {
+        image
+            .enumerate_pixels()
+            .filter(|(_, y, pixel)| *y >= start && *y < end && pixel[0] < 200)
+            .map(|(x, _, _)| x)
+            .min()
+            .unwrap()
+    };
+    assert!(left(&actual, 10, 46) >= left(&reference, 10, 46) + 46);
+    assert_eq!(left(&actual, 10, 46), left(&actual, 46, 82));
+}
+
+#[test]
 fn layered_preview_zip_and_pdf_keep_the_same_paper_and_ink() {
+    for pattern in [None, Some(PaperPattern::Grid), Some(PaperPattern::Dots)] {
+        assert_layered_export_parity(pattern);
+    }
+}
+
+fn assert_layered_export_parity(pattern: Option<PaperPattern>) {
     use base64::{Engine, engine::general_purpose::STANDARD};
     use handwriting_core::generation::{self, Output};
     use std::io::Read;
@@ -428,9 +494,16 @@ fn layered_preview_zip_and_pdf_keep_the_same_paper_and_ink() {
     for x in 0..240 {
         paper.put_pixel(x, 92, Rgba([73, 62, 54, 255]));
     }
-    request.background = Some(export::png(&paper).unwrap());
-    request.params.width = None;
-    request.params.height = None;
+    if pattern.is_none() {
+        request.background = Some(export::png(&paper).unwrap());
+        request.params.width = None;
+        request.params.height = None;
+    } else {
+        request.params.paper_pattern = pattern;
+        request.params.latin_font = Some(fonts::LatinFont::Kalam);
+        request.params.latin_font_scale = 110;
+        request.params.latin_digits = true;
+    }
     request.params.ink_layers = true;
     request.params.fill = [12, 34, 56, 255];
     request.params.ink_opacity = 48;
@@ -456,13 +529,24 @@ fn layered_preview_zip_and_pdf_keep_the_same_paper_and_ink() {
             .unwrap()
             .into_rgba8()
     };
-    assert!(decode(&preview[0].paper) == paper);
+    let decoded = decode(&preview[0].paper);
+    if let Some(style) = pattern {
+        let blank = Rgba([255, 255, 255, 255]);
+        assert_eq!(decoded[(5, 46)], blank);
+        assert_eq!(decoded[(46, 5)], blank);
+        assert_ne!(decoded[(46, 46)], blank);
+        assert_ne!(decoded[(46, 82)], blank);
+        assert_eq!(decoded[(30, 46)] != blank, style == PaperPattern::Grid);
+        assert_eq!(decoded[(46, 56)] != blank, style == PaperPattern::Grid);
+    } else {
+        assert_eq!(decoded, paper);
+    }
     let mask = decode(&preview[0].ink);
     assert!(mask.pixels().any(|p| p[3] > 0));
     assert_eq!(mask[(5, 92)][3], 0);
     let expected = pages(&request).remove(0);
-    assert_ne!(expected, paper);
-    assert_eq!(expected[(5, 92)], paper[(5, 92)]);
+    assert_ne!(expected, decoded);
+    assert_eq!(expected[(5, 92)], decoded[(5, 92)]);
 
     let mut archive = Cursor::new(Vec::new());
     generation::generate(&request, &cancel, Output::Zip(&mut archive), |_| Ok(())).unwrap();

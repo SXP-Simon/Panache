@@ -17,6 +17,61 @@ pub const FALLBACK_FONT_NAMES: [&str; 4] = [
 ];
 const CALLIGRAPHIC_CAPITALS: &str = "𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵";
 
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LatinFont {
+    Handlee,
+    PatrickHand,
+    IndieFlower,
+    Kalam,
+    ShadowsIntoLight,
+}
+
+impl LatinFont {
+    pub(crate) fn from_id(id: &str) -> Result<Self> {
+        match id {
+            "handlee" => Ok(Self::Handlee),
+            "patrick_hand" => Ok(Self::PatrickHand),
+            "indie_flower" => Ok(Self::IndieFlower),
+            "kalam" => Ok(Self::Kalam),
+            "shadows_into_light" => Ok(Self::ShadowsIntoLight),
+            _ => Err(Error::new("invalid_parameter", "latin_font_option")),
+        }
+    }
+
+    pub(crate) fn load(self) -> Result<&'static Font> {
+        // 2026-11-18：随共享引擎编译，桌面 HTTP 与 Android/iOS FFI 使用相同字库。
+        type Slot = OnceLock<std::result::Result<Arc<Font>, Error>>;
+        static HANDLEE: Slot = OnceLock::new();
+        static PATRICK_HAND: Slot = OnceLock::new();
+        static INDIE_FLOWER: Slot = OnceLock::new();
+        static KALAM: Slot = OnceLock::new();
+        static SHADOWS_INTO_LIGHT: Slot = OnceLock::new();
+        let (slot, bytes): (&Slot, &[u8]) = match self {
+            Self::Handlee => (
+                &HANDLEE,
+                include_bytes!("../assets/latin/Handlee-Regular.ttf"),
+            ),
+            Self::PatrickHand => (
+                &PATRICK_HAND,
+                include_bytes!("../assets/latin/PatrickHand-Regular.ttf"),
+            ),
+            Self::IndieFlower => (
+                &INDIE_FLOWER,
+                include_bytes!("../assets/latin/IndieFlower-Regular.ttf"),
+            ),
+            Self::Kalam => (&KALAM, include_bytes!("../assets/latin/Kalam-Regular.ttf")),
+            Self::ShadowsIntoLight => (
+                &SHADOWS_INTO_LIGHT,
+                include_bytes!("../assets/latin/ShadowsIntoLight.ttf"),
+            ),
+        };
+        slot.get_or_init(|| FontBook::load(bytes))
+            .as_deref()
+            .map_err(|error| Error::new(error.code, &error.message))
+    }
+}
+
 #[derive(Clone)]
 pub struct FontBook {
     fonts: Vec<Arc<Font>>,
@@ -24,7 +79,7 @@ pub struct FontBook {
 }
 
 // 2026-10-15：部分手写字体把数学符号映射到空白轮廓；cmap 存在不等于实际可写。
-fn visible_glyph(font: &Font, c: char) -> bool {
+pub(crate) fn visible_glyph(font: &Font, c: char) -> bool {
     font.lookup_glyph_index(c) != 0
         && (c.is_whitespace() || font.rasterize(c, 36.).1.iter().any(|alpha| *alpha >= 128))
 }

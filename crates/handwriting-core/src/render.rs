@@ -39,7 +39,7 @@ mod ink;
 mod units;
 use glyph::{Glyph, Glyphs};
 use ink::{blank_paper, normal, paint_math_unit, paste_mask, perturb};
-use units::{keeps_grid_cell, layout_units};
+use units::{fixed_cell, keeps_grid_cell, layout_units};
 // 2026-10-15：先缓存整行，知道最高根式/最低分母后再统一落笔，避免后出现的公式撞进上一行。
 struct LineUnit {
     glyph: Glyph,
@@ -113,7 +113,9 @@ impl<F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>> Pages<'_, F> {
         let top = self.p.top_margin;
         let bottom = self.canvas.height() as f32 - self.p.bottom_margin;
         let available = (bottom - top).max(1.);
-        let ruled = (self.p.underlined && self.p.width.is_some()) || self.p.background_ruled;
+        let ruled = ((self.p.underlined || self.p.paper_pattern.is_some())
+            && self.p.width.is_some())
+            || self.p.background_ruled;
         let standard_ruled = ruled && self.p.layout_style == LayoutStyle::Standard;
         let mut gap = (self.p.font_size * 0.12).round().max(2.);
         if standard_ruled {
@@ -383,13 +385,17 @@ pub(crate) fn render_pages(
     }
     let p = &layout;
     p.validate(w, h, &r.limits)?;
-    let nodes = text::parse(&text::normalize(&r.text, p.english_spacing));
+    let nodes = text::parse(&text::normalize_for_layout(
+        &r.text,
+        p.english_spacing,
+        p.first_line_indent || p.monospaced,
+    ));
     let units = if homework_mode {
         homework::units(&nodes)
     } else {
         layout_units(&nodes)
     };
-    let mut glyphs = Glyphs::with_parameters(&r.fonts, p);
+    let mut glyphs = Glyphs::with_parameters(&r.fonts, p)?;
     let mut pages = Pages {
         canvas: background.clone(),
         ink_layer: p.ink_layers.then(|| RgbaImage::new(w, h)),
@@ -419,7 +425,15 @@ pub(crate) fn render_pages(
         if homework_mode && paragraph_start && !matches!(units[i][0], Node::Newline | Node::Break) {
             let style = homework::paragraph(&units[i..], p.font_size);
             let available = right - p.left_margin;
-            let indent = style.indent.min(available * 0.15);
+            let indent = if p.first_line_indent
+                && !matches!(
+                    units[i][0],
+                    Node::RightAlign | Node::Char(' ' | '\t' | '\u{3000}')
+                ) {
+                (2. * p.font_size).min(available - p.font_size)
+            } else {
+                style.indent.min(available * 0.15)
+            };
             let prefix: Vec<_> = units[i..]
                 .iter()
                 .flat_map(|u| u.iter())
@@ -445,6 +459,19 @@ pub(crate) fn render_pages(
                 section_line_start = pages.written_lines;
             }
             paragraph_start = false;
+        } else if !homework_mode
+            && paragraph_start
+            && !matches!(units[i][0], Node::Newline | Node::Break)
+        {
+            if p.first_line_indent
+                && !matches!(
+                    units[i][0],
+                    Node::RightAlign | Node::Char(' ' | '\t' | '\u{3000}')
+                )
+            {
+                pages.x = (p.left_margin + 2. * p.font_size).min(right - p.font_size);
+            }
+            paragraph_start = false;
         }
         match &units[i][0] {
             Node::Break => {
@@ -462,7 +489,10 @@ pub(crate) fn render_pages(
                 let mut cursor = 0f32;
                 let mut width = 0f32;
                 for unit in rest {
-                    let g = glyphs.unit(unit, p.font_size)?;
+                    let mut g = glyphs.unit(unit, p.font_size)?;
+                    if let Some(cell) = fixed_cell(unit, p) {
+                        g = g.place_in_cell(cell);
+                    }
                     width = width.max(cursor + g.right() as f32);
                     cursor += g.step(
                         unit,
@@ -529,7 +559,8 @@ pub(crate) fn render_pages(
                 let mut compound = units[i].len() > 1
                     || !matches!(node, Node::Char(_))
                     || matches!(node,Node::Char(c) if glyph::is_circled(*c));
-                if pages.rng.random::<f32>() < p.strikethrough_probability
+                if !p.monospaced
+                    && pages.rng.random::<f32>() < p.strikethrough_probability
                     && !matches!(node,Node::Char(c) if c.is_whitespace())
                 {
                     let candidates: Vec<_> = r
@@ -588,8 +619,12 @@ pub(crate) fn render_pages(
                         p.left_margin
                     };
                 let usable_height = h as f32 - p.top_margin - p.bottom_margin;
+                let cell = fixed_cell(units[i], p);
                 g = g.fit(usable_width, usable_height);
-                let jitter_x = if p.grid_layout && keeps_grid_cell(units[i]) {
+                if let Some(cell) = cell {
+                    g = g.place_in_cell(cell);
+                }
+                let jitter_x = if cell.is_none() && p.grid_layout && keeps_grid_cell(units[i]) {
                     normal(&mut pages.rng, p.word_spacing_sigma)
                 } else {
                     0.
@@ -597,7 +632,8 @@ pub(crate) fn render_pages(
                 let mut x = (pages.x + jitter_x)
                     .round()
                     .max(p.left_margin - g.left as f32);
-                if !pages.line.is_empty() && x + g.right() as f32 > right {
+                let footprint = cell.unwrap_or_else(|| g.right() as f32);
+                if !pages.line.is_empty() && x + footprint > right {
                     if homework_mode {
                         pages.homework_wrap(continuation, right)?;
                         if !pages.line.is_empty() && pages.x + g.right() as f32 > right {
@@ -630,7 +666,7 @@ pub(crate) fn render_pages(
                 pages.x = x + advance;
                 pages.line.push(LineUnit {
                     glyph: g,
-                    rigid: compound,
+                    rigid: compound || cell.is_some(),
                     x: x.round() as i32,
                     dy,
                     break_after: homework_mode && homework::break_after(units[i]),
