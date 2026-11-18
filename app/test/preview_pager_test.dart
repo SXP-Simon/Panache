@@ -13,6 +13,41 @@ Uint8List picture() => base64Decode(
 );
 
 void main() {
+  testWidgets('wide workbench starts enlarged and Fit page stays applied', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 700,
+              height: 400,
+              child: PreviewPager(
+                pages: [picture()],
+                page: 0,
+                heroOwner: Object(),
+                enlargeInitially: true,
+                onPageChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final viewer = tester.widget<InteractiveViewer>(
+      find.byType(InteractiveViewer),
+    );
+    final transform = viewer.transformationController!;
+    expect(transform.value.getMaxScaleOnAxis(), greaterThan(2));
+    await tester.tap(find.byKey(const ValueKey('preview-reset-zoom')));
+    await tester.pumpAndSettle();
+    expect(transform.value, Matrix4.identity());
+  });
+
   for (final reduced in [false, true]) {
     testWidgets(
       'reader zooms at the pointer, drags and resets (reduce=$reduced)',

@@ -13,6 +13,32 @@ import '../utils/fine_raster.dart';
 import '../view_models/fine_selection.dart';
 import 'color_picker_dialog.dart';
 import 'preview_image_actions.dart';
+import 'preview_zoom.dart';
+import 'workbench_controls.dart';
+
+typedef FineInspector = ({
+  Object owner,
+  WidgetBuilder build,
+  VoidCallback close,
+  VoidCallback fitPage,
+  bool hasSelection,
+});
+
+class FineInspectorSlot extends ValueNotifier<FineInspector?> {
+  FineInspectorSlot() : super(null);
+
+  bool _disposed = false;
+
+  void clear(Object owner) {
+    if (!_disposed && identical(value?.owner, owner)) value = null;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
 
 class FinePreview extends StatefulWidget {
   const FinePreview({
@@ -29,6 +55,7 @@ class FinePreview extends StatefulWidget {
     this.onHistory,
     this.source,
     this.onCanvasSelect,
+    this.inspector,
   });
 
   final InkPage page;
@@ -40,6 +67,7 @@ class FinePreview extends StatefulWidget {
   final ValueChanged<bool>? onHistory;
   final FineRange? source;
   final VoidCallback? onCanvasSelect;
+  final FineInspectorSlot? inspector;
 
   @override
   State<FinePreview> createState() => _FinePreviewState();
@@ -68,6 +96,9 @@ class _FinePreviewState extends State<FinePreview> {
   bool _moved = false, _painting = false, _pending = false, _failed = false;
   bool _awaitingPixels = false;
   bool _shapeDraft = false;
+  bool? _zoomLayout;
+  bool _manualZoom = false;
+  Size? _defaultZoomViewport;
   Size _viewport = Size.zero;
   final _retired = <ui.Image>{};
 
@@ -93,6 +124,9 @@ class _FinePreviewState extends State<FinePreview> {
   @override
   void didUpdateWidget(FinePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.inspector != widget.inspector) {
+      _detachInspector(oldWidget.inspector);
+    }
     if (oldWidget.source != widget.source && widget.source != null) {
       _sourceSelection();
     }
@@ -173,6 +207,7 @@ class _FinePreviewState extends State<FinePreview> {
 
   @override
   void dispose() {
+    _detachInspector(widget.inspector);
     _focus.dispose();
     _zoom.dispose();
     _raster?.dispose();
@@ -182,6 +217,53 @@ class _FinePreviewState extends State<FinePreview> {
     }
     _retired.clear();
     super.dispose();
+  }
+
+  void _detachInspector(FineInspectorSlot? slot) {
+    if (slot == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      slot.clear(this);
+    });
+  }
+
+  void _publishInspector() {
+    final slot = widget.inspector;
+    if (slot == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && identical(widget.inspector, slot)) {
+        slot.value = (
+          owner: this,
+          build: (context) => _sideInspector(context),
+          close: _clearSelection,
+          fitPage: _fitPage,
+          hasSelection: _selection.selected.isNotEmpty,
+        );
+      }
+    });
+  }
+
+  Widget _sideInspector(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return WorkbenchPanel(
+      title: l.fineEdit,
+      icon: Icons.select_all,
+      actions: [
+        IconButton(
+          tooltip: l.close,
+          onPressed: _clearSelection,
+          icon: const Icon(Icons.close),
+        ),
+      ],
+      child: LayoutBuilder(
+        builder: (context, bounds) => Align(
+          alignment: Alignment.topCenter,
+          child: IgnorePointer(
+            ignoring: !widget.editing || _committed == null,
+            child: _inspector(context, bounds.maxHeight, sidebar: true),
+          ),
+        ),
+      ),
+    );
   }
 
   void _down(PointerDownEvent event, double fit) {
@@ -298,6 +380,11 @@ class _FinePreviewState extends State<FinePreview> {
     _cancelGesture();
   }
 
+  void _fitPage() {
+    _manualZoom = true;
+    _zoom.value = Matrix4.identity();
+  }
+
   void _finish(List<FineAdjustment> values) {
     if (values.isNotEmpty) widget.onEdit?.call(values);
   }
@@ -404,6 +491,7 @@ class _FinePreviewState extends State<FinePreview> {
   }
 
   void _zoomBy(double factor) {
+    _manualZoom = true;
     final scale = (_zoom.value.getMaxScaleOnAxis() * factor).clamp(1.0, 4.0);
     final center = _viewport.center(Offset.zero);
     final translation = center - _zoom.toScene(center) * scale;
@@ -431,6 +519,33 @@ class _FinePreviewState extends State<FinePreview> {
           bounds.maxHeight / _size.height,
         );
         if (fit <= 0 || !fit.isFinite) return const SizedBox.shrink();
+        if (widget.toolbar) {
+          final wide = widget.inspector != null;
+          if (_zoomLayout != wide) {
+            _zoomLayout = wide;
+            _manualZoom = false;
+            _defaultZoomViewport = null;
+          }
+          if (!_manualZoom &&
+              (_defaultZoomViewport == null ||
+                  wide && _defaultZoomViewport != _viewport)) {
+            _defaultZoomViewport = _viewport;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _zoomLayout != wide || _manualZoom) return;
+              final top = model.glyphs.fold<double>(
+                _size.height,
+                (top, glyph) => math.min(top, glyph.y.toDouble()),
+              );
+              _zoom.value = wide
+                  ? initialPreviewZoom(
+                      _viewport,
+                      _size,
+                      contentTop: model.glyphs.isEmpty ? 0 : top,
+                    )
+                  : Matrix4.identity();
+            });
+          }
+        }
         final surface = SizedBox.fromSize(
           size: _size * fit,
           child: PreviewImageActions(
@@ -468,9 +583,10 @@ class _FinePreviewState extends State<FinePreview> {
             ),
           ),
         );
-        return widget.editing
+        return widget.toolbar
             ? InteractiveViewer(
                 transformationController: _zoom,
+                onInteractionStart: (_) => _manualZoom = true,
                 scaleEnabled:
                     _selection.tool == FineTool.select ||
                     _selection.tool == FineTool.pan,
@@ -485,7 +601,11 @@ class _FinePreviewState extends State<FinePreview> {
     );
   }
 
-  Widget _inspector(BuildContext context, double maxHeight) {
+  Widget _inspector(
+    BuildContext context,
+    double maxHeight, {
+    bool sidebar = false,
+  }) {
     final l = AppLocalizations.of(context)!;
     final selection = _selection.selected;
     final first = selection.firstOrNull;
@@ -494,7 +614,7 @@ class _FinePreviewState extends State<FinePreview> {
       first == null ? l.fineHint : l.fineSelected(selection.length),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      textAlign: _compact ? TextAlign.center : TextAlign.start,
+      textAlign: _compact || sidebar ? TextAlign.center : TextAlign.start,
       style: Theme.of(context).textTheme.bodySmall,
     );
     return ConstrainedBox(
@@ -510,11 +630,11 @@ class _FinePreviewState extends State<FinePreview> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_compact) summary,
+                    if (_compact || sidebar) summary,
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (!_compact) Flexible(child: summary),
+                        if (!_compact && !sidebar) Flexible(child: summary),
                         Flexible(
                           child: Wrap(
                             alignment: WrapAlignment.center,
@@ -746,6 +866,7 @@ class _FinePreviewState extends State<FinePreview> {
 
   @override
   Widget build(BuildContext context) {
+    _publishInspector();
     if (!widget.toolbar) return _paper(context);
     return Focus(
       focusNode: _focus,
@@ -759,7 +880,9 @@ class _FinePreviewState extends State<FinePreview> {
                 child: _paper(context),
               ),
             ),
-            if (widget.editing && _committed != null)
+            if (widget.inspector == null &&
+                widget.editing &&
+                _committed != null)
               _inspector(context, bounds.maxHeight * .6),
           ],
         ),

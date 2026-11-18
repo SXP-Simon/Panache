@@ -25,6 +25,7 @@ import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
 import '../services/text_preparation/prepare.dart';
 import '../widgets/workbench_controls.dart';
+import '../widgets/fine_preview.dart';
 import '../widgets/workbench_editor.dart';
 import '../widgets/workbench_preview.dart';
 import '../widgets/workbench_layout.dart';
@@ -204,6 +205,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     if (widget.workspace == null) w.dispose();
     editor.dispose();
     fineSource.dispose();
+    fineInspector.dispose();
     editorFocus.dispose();
     undo.dispose();
     super.dispose();
@@ -284,6 +286,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   }
 
   final fineSource = ValueNotifier<FineRange?>(null);
+  final fineInspector = FineInspectorSlot();
 
   Future<bool> enterFineEdit() async {
     w.text = editor.text;
@@ -536,7 +539,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     formKey: form,
     editorView: editorPanel(),
     settingsView: settingsPanel(wide),
-    buildPreview: previewPanel,
+    buildPreview: (toolbar) => previewPanel(toolbar, wide: wide),
+    fineInspector: fineInspector,
     onDismissError: () {
       w.error = '';
       w.emit();
@@ -781,43 +785,45 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     },
   );
 
-  Widget previewPanel(Widget? toolbar) => WorkbenchPreview(
-    key: previewPane,
-    toolbar: toolbar,
-    pages: w.pages,
-    inkPages: w.inkPages,
-    inkLook: w.settings.inkLook,
-    onFineEdit: w.api.supportsFineEdit && editor.text.trim().isNotEmpty
-        ? enterFineEdit
-        : null,
-    fineAdjustments: w.fineAdjustments,
-    onFineChanged: w.applyFineEdits,
-    onFineHistory: (redo) => w.stepFineHistory(redo: redo),
-    canFineUndo: w.canFineUndo,
-    canFineRedo: w.canFineRedo,
-    fineSource: fineSource,
-    onFineCanvasSelect: () => fineSource.value = null,
-    stale: w.previewStale,
-    page: w.page,
-    version: '',
-    locked: locked,
-    backgroundBytes: w.background?.bytes,
-    onAdjustBackground: w.background == null ? null : adjustPaperArea,
-    onPageChanged: (page) {
-      w.page = page;
-      w.emit();
-    },
-    onSaveImage: () => action(
-      () async => saveBytes(
-        await w.currentPreviewImage(),
-        'png',
-        name: 'Panache-${w.page + 1}',
-      ),
-    ),
-    onSaveExport: w.exportBytes == null
-        ? null
-        : () => action(() => saveBytes(w.exportBytes!, w.exportExtension)),
-  );
+  Widget previewPanel(Widget? toolbar, {required bool wide}) =>
+      WorkbenchPreview(
+        key: previewPane,
+        toolbar: toolbar,
+        pages: w.pages,
+        inkPages: w.inkPages,
+        inkLook: w.settings.inkLook,
+        onFineEdit: w.api.supportsFineEdit && editor.text.trim().isNotEmpty
+            ? enterFineEdit
+            : null,
+        fineAdjustments: w.fineAdjustments,
+        onFineChanged: w.applyFineEdits,
+        onFineHistory: (redo) => w.stepFineHistory(redo: redo),
+        canFineUndo: w.canFineUndo,
+        canFineRedo: w.canFineRedo,
+        fineSource: fineSource,
+        fineInspector: wide ? fineInspector : null,
+        onFineCanvasSelect: () => fineSource.value = null,
+        stale: w.previewStale,
+        page: w.page,
+        version: '',
+        locked: locked,
+        backgroundBytes: w.background?.bytes,
+        onAdjustBackground: w.background == null ? null : adjustPaperArea,
+        onPageChanged: (page) {
+          w.page = page;
+          w.emit();
+        },
+        onSaveImage: () => action(
+          () async => saveBytes(
+            await w.currentPreviewImage(),
+            'png',
+            name: 'Panache-${w.page + 1}',
+          ),
+        ),
+        onSaveExport: w.exportBytes == null
+            ? null
+            : () => action(() => saveBytes(w.exportBytes!, w.exportExtension)),
+      );
 
   Future<void> connectionDialog() async {
     final base = await showConnectionDialog(context, initialBase: w.api.base);
