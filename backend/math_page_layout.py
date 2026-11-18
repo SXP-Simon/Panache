@@ -8,7 +8,7 @@ import os
 import re
 import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from random import Random
 from typing import Protocol, cast
@@ -19,12 +19,14 @@ from PIL import Image, ImageChops, ImageDraw
 from PIL.ImageFont import FreeTypeFont, ImageFont
 
 if __package__:
+    from .fine_edit import DraftGlyph, remember_draft, start_draft
     from .generation_cancellation import check_cancelled
     from .homework_layout import ParagraphStyle, bracket_depth, paragraph_style, preferred_break
     from .library_boundary import install_member, member
     from .math_ink import remember_math_ink
     from .math_pen import template_pen
 else:
+    from fine_edit import DraftGlyph, remember_draft, start_draft
     from generation_cancellation import check_cancelled
     from homework_layout import ParagraphStyle, bracket_depth, paragraph_style, preferred_break
     from library_boundary import install_member, member
@@ -36,7 +38,6 @@ type Font = FreeTypeFont | ImageFont
 
 type BBox = tuple[int, int, int, int]
 type Raster = tuple[Image.Image, BBox, int]
-type Unit = tuple[Image.Image, BBox, int, int, bool]
 type DrawPage = Callable[[Page, str, int, Template, Random], int]
 type SplitGlyph = Callable[
     [tuple[ImageDraw.ImageDraw, ImageDraw.ImageDraw], str, tuple[int, int], Font], int
@@ -53,6 +54,7 @@ class TextLayoutTemplate(Template):
     monospaced = False
     split_latin_ink = False
     scaled_latin = False
+    fine_offset: int | None = None
 
     @property
     def custom_layout(self) -> bool:
@@ -378,6 +380,16 @@ class _Correction:
 
 
 @dataclass
+class _Unit:
+    image: Image.Image
+    bbox: BBox
+    x: int
+    dy: int
+    rigid: bool
+    index: int
+
+
+@dataclass
 class _Glyph:
     raster: Raster
     font: Font
@@ -386,9 +398,9 @@ class _Glyph:
     jitter_y: int
     corrected: bool = False
 
-    def unit(self, *, rigid: bool) -> Unit:
+    def unit(self, index: int, *, rigid: bool) -> _Unit:
         image, bbox, _ = self.raster
-        return image, bbox, self.x, self.jitter_y, rigid
+        return _Unit(image, bbox, self.x, self.jitter_y, rigid, index)
 
 
 @dataclass
@@ -408,12 +420,18 @@ class _PageRenderer:
     custom_layout: bool = field(init=False)
     monospaced: bool = field(init=False)
     split: bool = field(init=False)
+    fine_offset: int | None = field(init=False)
 
     def __post_init__(self) -> None:
         self.metrics = _Metrics.create(self.page, self.tpl, self.layout.api)
         self.custom_layout = isinstance(self.tpl, TextLayoutTemplate) and self.tpl.custom_layout
         self.monospaced = isinstance(self.tpl, TextLayoutTemplate) and self.tpl.monospaced
         self.split = isinstance(self.tpl, TextLayoutTemplate) and self.tpl.split_latin_ink
+        self.fine_offset = (
+            self.tpl.fine_offset if isinstance(self.tpl, TextLayoutTemplate) else None
+        )
+        if self.fine_offset is not None:
+            start_draft(self.page.image)
         self.draw = self.page.draw()
         self.correction = _Correction(self.layout, self.tpl, self.rand, self.metrics.area)
         self.previous_bottom = self.metrics.top - self.metrics.gap
@@ -507,7 +525,9 @@ class _PageRenderer:
 
     def _line_start(self, start: int, *, homework: bool) -> tuple[int, int, bool]:
         indent = self._paragraph(start).indent if homework else 0
-        if not self.custom_layout or (start > 0 and self.text[start - 1] != "\n"):
+        if (not self.custom_layout and self.fine_offset is None) or (
+            start > 0 and self.text[start - 1] != "\n"
+        ):
             return start, indent, False
         marker = RIGHT_ALIGN_MARKER.match(self.text, start)
         if marker:
@@ -522,8 +542,8 @@ class _PageRenderer:
             )
         return start, indent, False
 
-    def _line(self, start: int) -> tuple[list[Unit], int]:
-        units: list[Unit] = []
+    def _line(self, start: int) -> tuple[list[_Unit], int]:
+        units: list[_Unit] = []
         homework = isinstance(self.tpl, HomeworkTemplate)
         start, indent, right_aligned = self._line_start(start, homework=homework)
         cursor: float = self.metrics.left + indent
@@ -565,7 +585,8 @@ class _PageRenderer:
                 break
             units.append(
                 glyph.unit(
-                    rigid=self.monospaced or self.layout.is_math_glyph(char) or glyph.corrected
+                    start,
+                    rigid=self.monospaced or self.layout.is_math_glyph(char) or glyph.corrected,
                 )
             )
             cursor = next_cursor
@@ -574,11 +595,11 @@ class _PageRenderer:
         at_end = start == len(self.text) or self.text[start] == "\n"
         if right_aligned and at_end and units:
             ink_right = max(
-                (x + bbox[2] for _, bbox, x, _, _ in units if bbox[2] > bbox[0]),
+                (u.x + u.bbox[2] for u in units if u.bbox[2] > u.bbox[0]),
                 default=self.metrics.right,
             )
             offset = self.metrics.right - ink_right
-            units = [(image, bbox, x + offset, dy, rigid) for image, bbox, x, dy, rigid in units]
+            units = [replace(u, x=u.x + offset) for u in units]
         if at_end and start < len(self.text):
             start += 1
         return units, start
@@ -597,23 +618,26 @@ class _PageRenderer:
         )
 
     def _fit_line(
-        self, units: list[Unit], max_height: int | None = None
-    ) -> tuple[list[Unit], int, int]:
-        min_y = min(bbox[1] + dy for _, bbox, _, dy, _ in units)
-        max_y = max(bbox[3] + dy for _, bbox, _, dy, _ in units)
+        self, units: list[_Unit], max_height: int | None = None
+    ) -> tuple[list[_Unit], int, int]:
+        min_y = min(u.bbox[1] + u.dy for u in units)
+        max_y = max(u.bbox[3] + u.dy for u in units)
         # 2026-10-15：极端纵向抖动时整体缩放行字形，不裁掉墨迹。
         height = self.metrics.area.height if max_height is None else max_height
         if max_height is None and max_y - min_y <= height:
             return units, min_y, max_y
         factor = min(1, height / (max_y - min_y))
-        adjusted: list[Unit] = []
-        for image, bbox, x, dy, rigid in units:
-            scaled = _resize(image, factor)
-            y1 = math.floor((bbox[1] + dy - min_y) * factor)
+        adjusted: list[_Unit] = []
+        for u in units:
+            scaled = _resize(u.image, factor)
+            left = u.bbox[0]
+            y1 = math.floor((u.bbox[1] + u.dy - min_y) * factor)
             adjusted.append(
-                (scaled, (bbox[0], y1, bbox[0] + scaled.width, y1 + scaled.height), x, 0, rigid)
+                replace(
+                    u, image=scaled, bbox=(left, y1, left + scaled.width, y1 + scaled.height), dy=0
+                )
             )
-        return adjusted, 0, max(bbox[3] for _, bbox, _, _, _ in adjusted)
+        return adjusted, 0, max(u.bbox[3] for u in adjusted)
 
     def _blank_line(self) -> None:
         # 2026-10-15：空行正常消耗输入和基础行距，避免循环卡在换行符。
@@ -625,8 +649,8 @@ class _PageRenderer:
         self.previous_bottom = max(self.previous_bottom, self.previous_y + metrics.font_size)
 
     def _fit_standard_row(
-        self, units: list[Unit], min_y: int, max_y: int
-    ) -> tuple[list[Unit], int, int]:
+        self, units: list[_Unit], min_y: int, max_y: int
+    ) -> tuple[list[_Unit], int, int]:
         metrics = self.metrics
         height = metrics.spacing - metrics.gap
         ink_height = max_y - min_y
@@ -645,20 +669,21 @@ class _PageRenderer:
             return units, min_y, max_y
         factor = min(1.0, height / ink_height)
         start = max(upper, min(min_y, lower - math.ceil(ink_height * factor)))
-        fitted: list[Unit] = []
-        for image, bbox, x, dy, rigid in units:
-            y0 = start + math.floor((bbox[1] + dy - min_y) * factor)
-            y1 = start + math.ceil((bbox[3] + dy - min_y) * factor)
+        fitted: list[_Unit] = []
+        for u in units:
+            image, bbox = u.image, u.bbox
+            y0 = start + math.floor((bbox[1] + u.dy - min_y) * factor)
+            y1 = start + math.ceil((bbox[3] + u.dy - min_y) * factor)
             resized = (
                 image
                 if y1 - y0 == image.height
                 else image.resize((image.width, y1 - y0), Image.Resampling.NEAREST)
             )
-            fitted.append((resized, (bbox[0], y0, bbox[2], y1), x, 0, rigid))
+            fitted.append(replace(u, image=resized, bbox=(bbox[0], y0, bbox[2], y1), dy=0))
         return (
             fitted,
-            min(bbox[1] for _, bbox, _, _, _ in fitted),
-            max(bbox[3] for _, bbox, _, _, _ in fitted),
+            min(u.bbox[1] for u in fitted),
+            max(u.bbox[3] for u in fitted),
         )
 
     def _baseline(self, min_y: int) -> int:
@@ -675,15 +700,27 @@ class _PageRenderer:
         origin = metrics.ruled_origin + metrics.spacing - metrics.font_size
         return origin + max(0, math.ceil((required - origin) / metrics.spacing)) * metrics.spacing
 
-    def _paint(self, unit: Unit, baseline: int) -> None:
-        image, bbox, x, dy, rigid = unit
-        position = (x + bbox[0], baseline + dy + bbox[1])
+    def _paint(self, unit: _Unit, baseline: int) -> None:
+        image, bbox = unit.image, unit.bbox
+        position = (unit.x + bbox[0], baseline + unit.dy + bbox[1])
+        if self.fine_offset is not None:
+            remember_draft(
+                self.page.image,
+                DraftGlyph(
+                    self.fine_offset + unit.index,
+                    image,
+                    position,
+                    baseline,
+                    unit.rigid,
+                ),
+            )
+            return
         if image.mode == "LA":
             latin = image.getchannel("A")
             if latin.getbbox() is not None:
                 remember_math_ink(self.page, latin, position, latin=True)
             image = image.getchannel("L")
-        if rigid:
+        if unit.rigid:
             remember_math_ink(self.page, image, position)
         self.draw.bitmap(position, image, fill=self.layout.api.white)
 
@@ -698,7 +735,7 @@ class _PageRenderer:
                 self.section_lines = 0
             units, start = self._line(start)
             # 2026-11-16：空格已计入横向字距，但没有墨迹，不能触发纵向避让。
-            units = [unit for unit in units if unit[1][1] < unit[1][3]]
+            units = [u for u in units if u.bbox[1] < u.bbox[3]]
             if not units:
                 self._blank_line()
                 self.section_lines = 0
@@ -741,7 +778,10 @@ def install_math_page_layout(
     @functools.wraps(original)
     def draw_page(page: Page, text: str, start: int, tpl: Template, rand: Random) -> int:
         custom = isinstance(tpl, TextLayoutTemplate) and (
-            tpl.custom_layout or tpl.split_latin_ink or tpl.scaled_latin
+            tpl.custom_layout
+            or tpl.split_latin_ink
+            or tpl.scaled_latin
+            or tpl.fine_offset is not None
         )
         if (
             not custom

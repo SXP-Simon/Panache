@@ -6,7 +6,9 @@ from __future__ import annotations
 import ast
 import asyncio
 import base64
+import copy
 import gc
+import hashlib
 import importlib
 import io
 import itertools
@@ -48,6 +50,7 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
+from fine_edit import EditPage, FineEdits, encode_png, parse_edits
 from generation_cancellation import (
     CancellationProbe,
     GenerationCancelledError,
@@ -620,35 +623,41 @@ def handwrite_with_page_breaks(
 
     # 非侵入式字符清洗与基于当前字体的字形兜底（解决特殊空格、缺失数学符号等留白问题）
     custom_layout = isinstance(template, TextLayoutTemplate) and template.custom_layout
-    normalized = normalize_text_for_font(text, font_path, preserve_indent=custom_layout)
+    fine = isinstance(template, TextLayoutTemplate) and template.fine_offset is not None
+    normalized = (
+        text if fine else normalize_text_for_font(text, font_path, preserve_indent=custom_layout)
+    )
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
-    aligned = normalized if custom_layout else apply_right_align(normalized, template)
+    aligned = normalized if custom_layout or fine else apply_right_align(normalized, template)
     render_text = handwrite if seed is None else partial(handwrite, seed=seed)
 
     if not _PAGE_BREAK_RE.search(aligned):
         return render_inline_markdown_images(aligned, template, render_text)
 
-    raw_chunks = _PAGE_BREAK_RE.split(aligned)
-    chunks: list[str] = []
-    for index, raw_chunk in enumerate(raw_chunks):
-        chunk = raw_chunk
-        if index > 0 and chunk.startswith("\n"):
-            chunk = chunk[1:]
-        if index < len(raw_chunks) - 1 and chunk.endswith("\n"):
-            chunk = chunk[:-1]
-        if chunk.strip():
-            chunks.append(chunk)
+    breaks = list(_PAGE_BREAK_RE.finditer(aligned))
+    starts = [0, *(item.end() for item in breaks)]
+    ends = [*(item.start() for item in breaks), len(aligned)]
+    chunks: list[tuple[int, str]] = []
+    for raw_start, raw_end in zip(starts, ends, strict=True):
+        start = raw_start + int(bool(raw_start) and aligned[raw_start : raw_start + 1] == "\n")
+        end = raw_end - int(raw_end < len(aligned) and aligned[raw_end - 1 : raw_end] == "\n")
+        if aligned[start:end].strip():
+            chunks.append((start, aligned[start:end]))
     logger.info("manual page break detected: %s chunk(s)", len(chunks))
 
     if not chunks:
         return render_inline_markdown_images("", template, render_text)
 
-    if is_single_page_preview:
-        # 单页预览只需处理第 1 个 chunk
-        return render_inline_markdown_images(chunks[0], template, render_text)
+    def render_chunk(start: int, chunk: str) -> Iterable[Image.Image]:
+        chunk_template = template
+        if isinstance(template, TextLayoutTemplate) and template.fine_offset is not None:
+            chunk_template = copy.copy(template)
+            chunk_template.fine_offset = start
+        return render_inline_markdown_images(chunk, chunk_template, render_text)
 
     return itertools.chain.from_iterable(
-        render_inline_markdown_images(chunk, template, render_text) for chunk in chunks
+        render_chunk(start, chunk)
+        for start, chunk in (chunks[:1] if is_single_page_preview else chunks)
     )
 
 
@@ -898,9 +907,10 @@ def _template_for(
     first_line_indent = data.get("first_line_indent") == "true"
     monospaced = data.get("monospaced") == "true"
     split_latin = data.get("ink_layers") == "true" and data.get("separate_latin_ink") == "true"
+    fine = data.get("fine_edit") == "true" and data.get("ink_layers") == "true"
     plain_template = (
         TextLayoutTemplate
-        if first_line_indent or monospaced or split_latin or latin_scale != 1
+        if first_line_indent or monospaced or split_latin or latin_scale != 1 or fine
         else Template
     )
     template_type = (
@@ -943,6 +953,7 @@ def _template_for(
         template.monospaced = monospaced
         template.split_latin_ink = split_latin
         template.scaled_latin = latin_scale != 1
+        template.fine_offset = 0 if fine else None
     if isinstance(template, RuledTemplate):
         template.ruled_origin = int(data["top_margin"])
     if isinstance(template, HomeworkTemplate):
@@ -1124,6 +1135,60 @@ def _deliver_images(
     return _pdf_response(images, report) if pdf else _zip_response(images, report)
 
 
+@dataclass(frozen=True)
+class _FineDocument:
+    key: str
+    styles: InkStyles
+    adjustments: FineEdits | None
+
+    def deliver(
+        self,
+        data: dict[str, str],
+        images: Iterable[Image.Image],
+        background: Image.Image,
+        report: ReportProgress,
+    ) -> Response:
+        pdf = data.get("pdf_save") == "true"
+        pages = (EditPage.from_image(page, self.styles) for page in images)
+        if data["preview"] == "true" and not pdf:
+            if data.get("full_preview") == "false":
+                pages = itertools.islice(pages, 1)
+            return _fine_preview(pages, background, self.key, report)
+        edits = (
+            {edit.id: edit for edit in self.adjustments.glyphs}
+            if self.adjustments and self.adjustments.key == self.key
+            else {}
+        )
+        flattened = (page.flatten(edits) for page in pages)
+        return (
+            _pdf_response(flattened, report, lossless=True)
+            if pdf
+            else _zip_response(flattened, report)
+        )
+
+
+def _fine_preview(
+    pages: Iterable[EditPage], background: Image.Image, key: str, report: ReportProgress
+) -> Response:
+    papers: list[str] = []
+    model: list[dict[str, object]] = []
+    previous: Image.Image | None = None
+    encoded = ""
+    for page in pages:
+        if page.paper is not previous:
+            encoded = base64.b64encode(_png_bytes(page.paper)).decode("ascii")
+            previous = page.paper
+        papers.append(encoded)
+        model.append(page.preview(encode_png))
+    if not papers:
+        papers.append(base64.b64encode(_png_bytes(background)).decode("ascii"))
+        model.append(EditPage(background, ((0, 0, 0), (0, 0, 0)), ()).preview(encode_png))
+    report("finalizing", "正在返回预览结果", 100)
+    return JSONResponse(
+        {"status": "success", "images": papers, "fine_edit": {"key": key, "pages": model}}
+    )
+
+
 def _ink_styles(data: dict[str, str]) -> InkStyles | None:
     if data.get("ink_layers") != "true":
         return None
@@ -1133,6 +1198,12 @@ def _ink_styles(data: dict[str, str]) -> InkStyles | None:
         return primary, None
     latin_color, latin_alpha = _ink_color(data.get("latin_fill", data["fill"]))
     return primary, (latin_color, InkEffects.from_form(data, prefix="latin_"), latin_alpha)
+
+
+def _fine_document_key(source: str, normalized: str) -> str:
+    # 2026-11-18：公式和表格的私用字符由工作进程分配，不可用其编号作为持久标识。
+    stable = "".join("\ufffc" if is_math_glyph(char) else char for char in normalized)
+    return hashlib.sha256(json.dumps([source, stable], ensure_ascii=True).encode()).hexdigest()
 
 
 def _render_handwriting(
@@ -1180,6 +1251,16 @@ def _render_handwriting(
             digits=params.digit_font == "latin",
             scale=latin_scale,
         ):
+            fine = None
+            if (
+                styles is not None
+                and isinstance(template, TextLayoutTemplate)
+                and template.fine_offset is not None
+            ):
+                text = normalize_text_for_font(text, path, preserve_indent=template.custom_layout)
+                fine = _FineDocument(
+                    _fine_document_key(params.text, text), styles, parse_edits(params.fine_edits)
+                )
             images = checked_items(
                 handwrite_with_page_breaks(
                     text,
@@ -1189,6 +1270,8 @@ def _render_handwriting(
                     seed=20261116 if styles is not None else None,
                 )
             )
+            if fine is not None:
+                return fine.deliver(data, images, background, report)
             return _deliver_images(data, images, background, report, styles)
     except HTTPException as error:
         return JSONResponse(

@@ -123,14 +123,12 @@ def _soften(mask: InkMask, radius: int) -> InkMask:
     return mask
 
 
-def composite(
-    paper: Image.Image,
+def filtered_alpha(
     alpha: Image.Image,
-    color: InkColor,
     effects: InkEffects,
     color_alpha: int = 255,
 ) -> Image.Image:
-    """Apply signed morphology, separable box blur and opacity to ink only."""
+    """2026-11-18：普通字迹与可编辑字形共用滤镜和透明度计算。."""
     mask = np.asarray(alpha, dtype=np.uint8)
     if effects.thickness:
         thin = effects.thickness < 0
@@ -151,9 +149,22 @@ def composite(
         mask = changed
     if effects.softness:
         mask = _fractional_mask(mask, effects.softness, _soften)
-    result = paper.copy()
     adjusted = (
         (np.asarray(mask, dtype=np.uint32) * effects.opacity * color_alpha + 12_750) // 25_500
     ).astype(np.uint8)
-    result.paste(color, (0, 0, result.width, result.height), Image.fromarray(adjusted))
+    return Image.fromarray(adjusted)
+
+
+def composite(
+    paper: Image.Image,
+    alpha: Image.Image,
+    color: InkColor,
+    effects: InkEffects,
+    color_alpha: int = 255,
+) -> Image.Image:
+    """Apply signed morphology, separable box blur and opacity to ink only."""
+    result = paper.copy()
+    result.paste(
+        color, (0, 0, result.width, result.height), filtered_alpha(alpha, effects, color_alpha)
+    )
     return result

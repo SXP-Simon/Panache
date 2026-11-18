@@ -25,12 +25,12 @@ if __package__:
     from .generation_cancellation import check_cancelled
     from .ink_effects import INK_LAYERS_KEY, layers
     from .logging_setup import get_logger
-    from .math_page_layout import RuledTemplate
+    from .math_page_layout import RuledTemplate, TextLayoutTemplate
 else:
     from generation_cancellation import check_cancelled
     from ink_effects import INK_LAYERS_KEY, layers
     from logging_setup import get_logger
-    from math_page_layout import RuledTemplate
+    from math_page_layout import RuledTemplate, TextLayoutTemplate
 
 logger = get_logger(__name__)
 INK_DIFFERENCE_THRESHOLD = 15
@@ -256,11 +256,13 @@ class _InlineRenderer:
         self.pages: list[Image.Image] = []
         self.dirty = False
 
-    def text(self, content: str) -> None:
+    def text(self, content: str, offset: int) -> None:
         """Render a text fragment and advance the insertion cursor."""
         if not content.strip():
             return
         template = copy.copy(self.template)
+        if isinstance(template, TextLayoutTemplate) and template.fine_offset is not None:
+            template.fine_offset += offset
         top = self.top
         if isinstance(template, RuledTemplate):
             # 2026-10-17：插图可以任意高，后续文本仍从原纸张的整行网格继续。
@@ -346,8 +348,8 @@ def render_inline_markdown_images(
     end = 0
     for match in MARKDOWN_IMAGE_RE.finditer(text):
         check_cancelled()
-        renderer.text(text[end : match.start()])
+        renderer.text(text[end : match.start()], end)
         renderer.image(match.group(2).strip(), _parse_image_scale(match.group(1).strip()))
         end = match.end()
-    renderer.text(text[end:])
+    renderer.text(text[end:], end)
     return renderer.result()

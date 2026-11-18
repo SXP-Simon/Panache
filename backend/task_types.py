@@ -81,6 +81,8 @@ class GenerateHandwritingParams(BaseModel):
     latin_font_scale: str = "100"
     pdf_save: str = "false"
     full_preview: str = "true"
+    fine_edit: Literal["true", "false"] = "false"
+    fine_edits: str | None = None
 
 
 class _FormDependency[Model: BaseModel]:
