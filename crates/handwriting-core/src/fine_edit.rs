@@ -16,6 +16,11 @@ pub struct Adjustment {
     pub angle: i8,
     pub opacity: u8,
     pub color: Option<[u8; 3]>,
+    // 2026-11-18：相对全局设置的偏移，以 0.1 px 为单位。
+    #[serde(default)]
+    pub thickness: i8,
+    #[serde(default)]
+    pub softness: i8,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -48,6 +53,8 @@ impl Adjustments {
                     && (50..=200).contains(&v.scale)
                     && (-45..=45).contains(&v.angle)
                     && v.opacity <= 100
+                    && (-20..=20).contains(&v.thickness)
+                    && (-20..=20).contains(&v.softness)
             })
     }
 }
@@ -143,7 +150,11 @@ pub(crate) fn paint(
     edit: Option<&Adjustment>,
     cancel: &Cancellation,
 ) -> Result<()> {
-    let mask = ink_effects::shape(tile.mask, p, cancel)?;
+    let thickness =
+        (p.ink_thickness + edit.map_or(0., |v| f64::from(v.thickness) / 10.)).clamp(-2., 2.);
+    let softness =
+        (p.ink_softness + edit.map_or(0., |v| f64::from(v.softness) / 10.)).clamp(0., 2.);
+    let mask = ink_effects::shape(tile.mask, thickness, softness, cancel)?;
     let (w, h) = (f64::from(mask.width()), f64::from(mask.height()));
     let scale = edit.map_or(1., |v| f64::from(v.scale) / 100.);
     let angle = edit.map_or(0., |v| f64::from(v.angle) * std::f64::consts::PI / 180.);
