@@ -277,6 +277,8 @@
   "fineScale": "大小",
   "fineAngle": "旋转",
   "fineOpacity": "浓淡",
+  "fineThickness": "粗细微调",
+  "fineSoftness": "柔化微调",
   "fineColor": "局部墨色",
   "fineSnap": "吸附横线",
   "fineReset": "恢复选区",

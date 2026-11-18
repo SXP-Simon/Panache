@@ -67,6 +67,7 @@ class _FinePreviewState extends State<FinePreview> {
   List<FineAdjustment> _draft = [];
   bool _moved = false, _painting = false, _pending = false, _failed = false;
   bool _awaitingPixels = false;
+  bool _shapeDraft = false;
   Size _viewport = Size.zero;
   final _retired = <ui.Image>{};
 
@@ -127,6 +128,8 @@ class _FinePreviewState extends State<FinePreview> {
     _painting = true;
     final look = widget.look;
     final edits = widget.edits;
+    final draft = _shapeDraft && _committed != null;
+    final visible = draft ? _visible : edits;
     try {
       final raster = _raster ?? await FineRaster.decode(widget.page);
       if (!mounted) {
@@ -134,8 +137,12 @@ class _FinePreviewState extends State<FinePreview> {
         return;
       }
       _raster = raster;
-      await raster.prepare(look);
+      await raster.prepare(look, visible);
       if (!mounted) return;
+      if (draft) {
+        setState(() => _failed = false);
+        return;
+      }
       final image = await raster.render(edits, look);
       if (!mounted) {
         image.dispose();
@@ -285,13 +292,28 @@ class _FinePreviewState extends State<FinePreview> {
     _draft = [];
   });
 
+  void _clearSelection() {
+    _selection.select([]);
+    widget.onCanvasSelect?.call();
+    _cancelGesture();
+  }
+
   void _finish(List<FineAdjustment> values) {
     if (values.isNotEmpty) widget.onEdit?.call(values);
   }
 
-  void _adjust({int? scale, int? angle, int? opacity, int? color}) {
-    setState(
-      () => _draft = _selection.change(
+  void _adjust({
+    int? scale,
+    int? angle,
+    int? opacity,
+    int? color,
+    int? thickness,
+    int? softness,
+  }) {
+    final changesShape = thickness != null || softness != null;
+    setState(() {
+      _shapeDraft = changesShape;
+      _draft = _selection.change(
         widget.edits,
         (v) => (
           id: v.id,
@@ -301,14 +323,26 @@ class _FinePreviewState extends State<FinePreview> {
           angle: angle ?? v.angle,
           opacity: opacity ?? v.opacity,
           color: color ?? v.color,
+          thickness: thickness ?? v.thickness,
+          softness: softness ?? v.softness,
         ),
-      ),
-    );
+      );
+    });
+    if (changesShape) unawaited(_paintCommitted());
   }
 
   void _commitDraft() {
+    final wasShaping = _shapeDraft;
     _finish(_draft);
-    setState(() => _draft = []);
+    setState(() {
+      _draft = [];
+      _shapeDraft = false;
+    });
+    if (wasShaping) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_paintCommitted());
+      });
+    }
   }
 
   void _nudge(Offset by) => _finish(
@@ -325,9 +359,7 @@ class _FinePreviewState extends State<FinePreview> {
         key == LogicalKeyboardKey.keyY || keyboard.isShiftPressed,
       );
     } else if (key == LogicalKeyboardKey.escape) {
-      _selection.select([]);
-      widget.onCanvasSelect?.call();
-      _cancelGesture();
+      _clearSelection();
     } else if (_selection.selected.isNotEmpty) {
       final shift = switch (key) {
         LogicalKeyboardKey.arrowLeft => const Offset(-1, 0),
@@ -453,149 +485,227 @@ class _FinePreviewState extends State<FinePreview> {
     );
   }
 
-  Widget _inspector(BuildContext context) {
+  Widget _inspector(BuildContext context, double maxHeight) {
     final l = AppLocalizations.of(context)!;
     final selection = _selection.selected;
     final first = selection.firstOrNull;
-    final current = first == null
-        ? null
-        : _visible[first] ?? defaultFineAdjustment(first);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Wrap(
-          spacing: 4,
-          runSpacing: 0,
-          crossAxisAlignment: WrapCrossAlignment.center,
+    final current = _visible[first] ?? defaultFineAdjustment(first ?? 0);
+    final summary = Text(
+      first == null ? l.fineHint : l.fineSelected(selection.length),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: _compact ? TextAlign.center : TextAlign.start,
+      style: Theme.of(context).textTheme.bodySmall,
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              current == null ? l.fineHint : l.fineSelected(selection.length),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            IconButton(
-              key: const ValueKey('fine-undo'),
-              tooltip: l.fineUndo,
-              onPressed: widget.canUndo
-                  ? () => widget.onHistory?.call(false)
-                  : null,
-              icon: const Icon(Icons.undo),
-            ),
-            IconButton(
-              key: const ValueKey('fine-redo'),
-              tooltip: l.fineRedo,
-              onPressed: widget.canRedo
-                  ? () => widget.onHistory?.call(true)
-                  : null,
-              icon: const Icon(Icons.redo),
-            ),
-            IconButton(
-              tooltip: l.previewZoomOut,
-              onPressed: () => _zoomBy(1 / 1.25),
-              icon: const Icon(Icons.zoom_out),
-            ),
-            IconButton(
-              tooltip: l.previewZoomIn,
-              onPressed: () => _zoomBy(1.25),
-              icon: const Icon(Icons.zoom_in),
-            ),
-            if (!_touchNavigation)
-              IconButton(
-                isSelected: _selection.tool == FineTool.pan,
-                tooltip: l.finePan,
-                onPressed: () => setState(() {
-                  _selection.tool = _selection.tool == FineTool.pan
-                      ? FineTool.select
-                      : FineTool.pan;
-                }),
-                icon: const Icon(Icons.pan_tool_outlined),
-                selectedIcon: const Icon(Icons.pan_tool),
+            Flexible(
+              child: SingleChildScrollView(
+                primary: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_compact) summary,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_compact) Flexible(child: summary),
+                        Flexible(
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            children: [
+                              IconButton(
+                                key: const ValueKey('fine-undo'),
+                                tooltip: l.fineUndo,
+                                onPressed: widget.canUndo
+                                    ? () => widget.onHistory?.call(false)
+                                    : null,
+                                icon: const Icon(Icons.undo),
+                              ),
+                              IconButton(
+                                key: const ValueKey('fine-redo'),
+                                tooltip: l.fineRedo,
+                                onPressed: widget.canRedo
+                                    ? () => widget.onHistory?.call(true)
+                                    : null,
+                                icon: const Icon(Icons.redo),
+                              ),
+                              IconButton(
+                                tooltip: l.previewZoomOut,
+                                onPressed: () => _zoomBy(1 / 1.25),
+                                icon: const Icon(Icons.zoom_out),
+                              ),
+                              IconButton(
+                                tooltip: l.previewZoomIn,
+                                onPressed: () => _zoomBy(1.25),
+                                icon: const Icon(Icons.zoom_in),
+                              ),
+                              if (!_touchNavigation)
+                                IconButton(
+                                  isSelected: _selection.tool == FineTool.pan,
+                                  tooltip: l.finePan,
+                                  onPressed: () => setState(() {
+                                    _selection.tool =
+                                        _selection.tool == FineTool.pan
+                                        ? FineTool.select
+                                        : FineTool.pan;
+                                  }),
+                                  icon: const Icon(Icons.pan_tool_outlined),
+                                  selectedIcon: const Icon(Icons.pan_tool),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_compact)
+                      SegmentedButton<FineTool>(
+                        showSelectedIcon: false,
+                        segments: [
+                          ButtonSegment(
+                            value: FineTool.select,
+                            label: Text(l.fineTap),
+                          ),
+                          ButtonSegment(
+                            value: FineTool.box,
+                            label: Text(l.fineBox),
+                          ),
+                          ButtonSegment(
+                            value: FineTool.move,
+                            label: Text(l.fineMove),
+                            enabled: first != null,
+                          ),
+                        ],
+                        selected: {
+                          _selection.tool == FineTool.pan
+                              ? FineTool.select
+                              : _selection.tool,
+                        },
+                        onSelectionChanged: (value) =>
+                            setState(() => _selection.tool = value.first),
+                      ),
+                    Visibility(
+                      visible: first != null,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      maintainSize: true,
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _slider(
+                            'fine-scale',
+                            l.fineScale,
+                            current.scale,
+                            50,
+                            200,
+                            '%',
+                            (v) => _adjust(scale: v),
+                          ),
+                          _slider(
+                            'fine-angle',
+                            l.fineAngle,
+                            current.angle,
+                            -45,
+                            45,
+                            '°',
+                            (v) => _adjust(angle: v),
+                          ),
+                          _slider(
+                            'fine-opacity',
+                            l.fineOpacity,
+                            current.opacity,
+                            0,
+                            100,
+                            '%',
+                            (v) => _adjust(opacity: v),
+                          ),
+                          _slider(
+                            'fine-thickness',
+                            l.fineThickness,
+                            current.thickness,
+                            math
+                                .min(
+                                  current.thickness,
+                                  -20 - (widget.look.thickness * 10).round(),
+                                )
+                                .clamp(-20, 0),
+                            math
+                                .max(
+                                  current.thickness,
+                                  20 - (widget.look.thickness * 10).round(),
+                                )
+                                .clamp(0, 20),
+                            ' px',
+                            (v) => _adjust(thickness: v),
+                            delta: true,
+                          ),
+                          _slider(
+                            'fine-softness',
+                            l.fineSoftness,
+                            current.softness,
+                            math.min(
+                              current.softness,
+                              -(widget.look.softness * 10).round(),
+                            ),
+                            math.max(
+                              current.softness,
+                              20 - (widget.look.softness * 10).round(),
+                            ),
+                            ' px',
+                            (v) => _adjust(softness: v),
+                            delta: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            ),
+            Visibility(
+              visible: first != null,
+              maintainState: true,
+              maintainAnimation: true,
+              maintainSize: true,
+              child: Wrap(
+                spacing: 4,
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  TextButton.icon(
+                    key: const ValueKey('fine-color'),
+                    onPressed: () => _pickColor(current),
+                    icon: ColorSwatchIndicator(
+                      Color(current.color ?? widget.look.color),
+                    ),
+                    label: Text(l.fineColor),
+                  ),
+                  FilterChip(
+                    label: Text(l.fineSnap),
+                    selected: _selection.snap,
+                    onSelected: (value) =>
+                        setState(() => _selection.snap = value),
+                  ),
+                  TextButton.icon(
+                    key: const ValueKey('fine-reset'),
+                    label: Text(l.fineReset),
+                    icon: const Icon(Icons.restart_alt),
+                    onPressed: () =>
+                        _finish(selection.map(defaultFineAdjustment).toList()),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        if (_compact)
-          SegmentedButton<FineTool>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(value: FineTool.select, label: Text(l.fineTap)),
-              ButtonSegment(value: FineTool.box, label: Text(l.fineBox)),
-              ButtonSegment(
-                value: FineTool.move,
-                label: Text(l.fineMove),
-                enabled: current != null,
-              ),
-            ],
-            selected: {
-              _selection.tool == FineTool.pan
-                  ? FineTool.select
-                  : _selection.tool,
-            },
-            onSelectionChanged: (value) =>
-                setState(() => _selection.tool = value.first),
-          ),
-        if (current != null) ...[
-          Wrap(
-            spacing: 10,
-            runSpacing: 4,
-            alignment: WrapAlignment.center,
-            children: [
-              _slider(
-                'fine-scale',
-                l.fineScale,
-                current.scale,
-                50,
-                200,
-                '%',
-                (v) => _adjust(scale: v),
-              ),
-              _slider(
-                'fine-angle',
-                l.fineAngle,
-                current.angle,
-                -45,
-                45,
-                '°',
-                (v) => _adjust(angle: v),
-              ),
-              _slider(
-                'fine-opacity',
-                l.fineOpacity,
-                current.opacity,
-                0,
-                100,
-                '%',
-                (v) => _adjust(opacity: v),
-              ),
-            ],
-          ),
-          Wrap(
-            spacing: 4,
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              TextButton.icon(
-                key: const ValueKey('fine-color'),
-                onPressed: () => _pickColor(current),
-                icon: ColorSwatchIndicator(
-                  Color(current.color ?? widget.look.color),
-                ),
-                label: Text(l.fineColor),
-              ),
-              FilterChip(
-                label: Text(l.fineSnap),
-                selected: _selection.snap,
-                onSelected: (value) => setState(() => _selection.snap = value),
-              ),
-              TextButton.icon(
-                key: const ValueKey('fine-reset'),
-                label: Text(l.fineReset),
-                icon: const Icon(Icons.restart_alt),
-                onPressed: () =>
-                    _finish(selection.map(defaultFineAdjustment).toList()),
-              ),
-            ],
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -606,58 +716,56 @@ class _FinePreviewState extends State<FinePreview> {
     int min,
     int max,
     String unit,
-    ValueChanged<int> change,
-  ) => SizedBox(
-    width: 107,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('$label $value$unit'),
-        Slider(
-          key: ValueKey(key),
-          value: value.toDouble(),
-          min: min.toDouble(),
-          max: max.toDouble(),
-          divisions: max - min,
-          label: '$value$unit',
-          onChanged: (v) => change(v.round()),
-          onChangeEnd: (_) => _commitDraft(),
-        ),
-      ],
-    ),
-  );
+    ValueChanged<int> change, {
+    bool delta = false,
+  }) {
+    final display = delta
+        ? '${value > 0 ? '+' : ''}${(value / 10).toStringAsFixed(1)}$unit'
+        : '$value$unit';
+    return SizedBox(
+      width: 107,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, textAlign: TextAlign.center),
+          Text(display, softWrap: false),
+          Slider(
+            key: ValueKey(key),
+            value: value.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: max - min,
+            label: display,
+            onChanged: (v) => change(v.round()),
+            onChangeEnd: (_) => _commitDraft(),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => !widget.toolbar
-      ? _paper(context)
-      : Focus(
-          focusNode: _focus,
-          onKeyEvent: _key,
-          child: Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: _paper(context),
-                ),
+  Widget build(BuildContext context) {
+    if (!widget.toolbar) return _paper(context);
+    return Focus(
+      focusNode: _focus,
+      onKeyEvent: _key,
+      child: LayoutBuilder(
+        builder: (context, bounds) => Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: _paper(context),
               ),
-              if (widget.editing && _committed != null)
-                SizedBox(
-                  height: math.min(
-                    _compact ? 190 : 151,
-                    MediaQuery.sizeOf(context).height * .32,
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 4,
-                    ),
-                    child: _inspector(context),
-                  ),
-                ),
-            ],
-          ),
-        );
+            ),
+            if (widget.editing && _committed != null)
+              _inspector(context, bounds.maxHeight * .6),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 bool mapEqualsFine(Map<int, FineAdjustment> a, Map<int, FineAdjustment> b) =>

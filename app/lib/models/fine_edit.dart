@@ -74,10 +74,21 @@ typedef FineAdjustment = ({
   int angle,
   int opacity,
   int? color,
+  int thickness,
+  int softness,
 });
 
-FineAdjustment defaultFineAdjustment(int id) =>
-    (id: id, dx: 0, dy: 0, scale: 100, angle: 0, opacity: 100, color: null);
+FineAdjustment defaultFineAdjustment(int id) => (
+  id: id,
+  dx: 0,
+  dy: 0,
+  scale: 100,
+  angle: 0,
+  opacity: 100,
+  color: null,
+  thickness: 0,
+  softness: 0,
+);
 
 bool _validKey(String key) => RegExp(r'^[0-9a-f]{64}$').hasMatch(key);
 
@@ -108,6 +119,8 @@ class FineEdits {
         scale: value['scale'] as int,
         angle: value['angle'] as int,
         opacity: value['opacity'] as int,
+        thickness: value['thickness'] as int? ?? 0,
+        softness: value['softness'] as int? ?? 0,
         color: rgb == null
             ? null
             : 0xff000000 +
@@ -122,7 +135,9 @@ class FineEdits {
           edit.scale > 200 ||
           edit.angle.abs() > 45 ||
           edit.opacity < 0 ||
-          edit.opacity > 100) {
+          edit.opacity > 100 ||
+          edit.thickness.abs() > 20 ||
+          edit.softness.abs() > 20) {
         throw const FormatException('Invalid fine adjustment');
       }
       result[edit.id] = edit;
@@ -141,6 +156,8 @@ class FineEdits {
           'scale': edit.scale,
           'angle': edit.angle,
           'opacity': edit.opacity,
+          if (edit.thickness != 0) 'thickness': edit.thickness,
+          if (edit.softness != 0) 'softness': edit.softness,
           'color': edit.color == null
               ? null
               : [
