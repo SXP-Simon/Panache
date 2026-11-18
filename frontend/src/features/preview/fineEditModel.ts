@@ -31,6 +31,8 @@ export const adjustmentSchema = v.object({
   angle: bounded(-45, 45),
   opacity: bounded(0, 100),
   color: v.nullable(color),
+  thickness: v.optional(bounded(-20, 20), 0),
+  softness: v.optional(bounded(-20, 20), 0),
 });
 export const fineEditsSchema = v.object({
   text: v.string(),
@@ -42,7 +44,16 @@ export type FinePage = v.InferOutput<typeof page>;
 export type Glyph = v.InferOutput<typeof glyph>;
 export type Adjustment = v.InferOutput<typeof adjustmentSchema>;
 export type FineEdits = v.InferOutput<typeof fineEditsSchema>;
-export const defaultAdjustment = { dx: 0, dy: 0, scale: 100, angle: 0, opacity: 100, color: null };
+export const defaultAdjustment = {
+  dx: 0,
+  dy: 0,
+  scale: 100,
+  angle: 0,
+  opacity: 100,
+  color: null,
+  thickness: 0,
+  softness: 0,
+};
 export type Adjustments = ReadonlyMap<number, Adjustment>;
 
 export function isDefault(adjustment: Adjustment) {

@@ -38,6 +38,7 @@ export function union(a: Bounds, b: Bounds): Bounds {
 type Rgb = [number, number, number];
 export type FineInk = InkShape & { color: string; opacity: number };
 type MaskPair = [Uint8Array, Uint8Array];
+type FilteredGlyph = { thickness: number; softness: number; masks: MaskPair };
 function rgb(hex: string): Rgb {
   const n = Number.parseInt(hex.slice(1), 16);
   return [Math.floor(n / 65536), Math.floor(n / 256) % 256, n % 256];
@@ -92,7 +93,7 @@ export class FineRaster {
   private readonly image: ImageData;
   private readonly paper: ImageData;
   private readonly atlas: ImageData;
-  private readonly filtered = new Map<number, MaskPair>();
+  private readonly filtered = new Map<number, FilteredGlyph>();
   private styles: [FineInk, FineInk] | null = null;
   private readonly context: CanvasRenderingContext2D;
 
@@ -118,10 +119,12 @@ export class FineRaster {
     this.atlas = source.getImageData(0, 0, atlasCanvas.width, atlasCanvas.height);
   }
 
-  private masks(glyph: Glyph, styles: [FineInk, FineInk]): MaskPair {
+  private masks(glyph: Glyph, styles: [FineInk, FineInk], edit?: Adjustment): MaskPair {
     const [id, , , width, height, ax, ay] = glyph;
+    const thickness = edit?.thickness ?? 0;
+    const softness = edit?.softness ?? 0;
     const previous = this.filtered.get(id);
-    if (previous) return previous;
+    if (previous?.thickness === thickness && previous.softness === softness) return previous.masks;
     const channel = (index: 0 | 1) => {
       const input = new Uint8Array(width * height);
       let visible = false;
@@ -135,13 +138,16 @@ export class FineRaster {
       }
       const style = styles[index];
       if (!visible) return input;
-      const shape = filterInk(input, width, height, style);
+      const shape = filterInk(input, width, height, {
+        thickness: Math.max(-2, Math.min(2, style.thickness + thickness / 10)),
+        softness: Math.max(0, Math.min(2, style.softness + softness / 10)),
+      });
       return style.opacity === 100
         ? shape
         : shape.map((alpha) => Math.floor((alpha * style.opacity + 50) / 100));
     };
     const masks: MaskPair = [channel(0), channel(1)];
-    this.filtered.set(id, masks);
+    this.filtered.set(id, { thickness, softness, masks });
     return masks;
   }
 
@@ -194,7 +200,7 @@ export class FineRaster {
     for (const glyph of this.page.glyphs) {
       const edit = edits.get(glyph[0]);
       if (overlaps(pose(glyph, edit), clip))
-        drawGlyph(this.image, this.masks(glyph, styles), glyph, colors, clip, edit);
+        drawGlyph(this.image, this.masks(glyph, styles, edit), glyph, colors, clip, edit);
     }
     this.context.putImageData(
       this.image,

@@ -402,6 +402,8 @@ const words = {
   fineScale: ['大小', 'Size'],
   fineAngle: ['旋转', 'Rotation'],
   fineOpacity: ['浓淡', 'Opacity'],
+  fineThickness: ['粗细微调', 'Stroke weight'],
+  fineSoftness: ['柔化微调', 'Edge softness'],
   fineColor: ['局部墨色', 'Local ink'],
   fineSnap: ['吸附横线', 'Snap to lines'],
   fineNudge: ['微调位置', 'Nudge selection'],

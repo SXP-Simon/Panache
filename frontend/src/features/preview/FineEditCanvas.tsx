@@ -163,6 +163,8 @@ export default function FineEditCanvas({
   );
   const first = selection.selected[0];
   const values = first ? (overrides.get(first[0]) ?? defaultAdjustment) : defaultAdjustment;
+  const stroke = styles.map((style) => Math.round(style.thickness * 10));
+  const softness = styles.map((style) => Math.round(style.softness * 10));
 
   function change(patch: Partial<Adjustment>) {
     batch.current = selection.selected.map((glyph) => ({ ...selection.position(glyph), ...patch }));
@@ -296,94 +298,122 @@ export default function FineEditCanvas({
               ))}
             </div>
             {first && active && (
-              <div className="fine-fields">
-                {(
-                  [
-                    ['scale', 'fineScale', 50, 200, '%'],
-                    ['angle', 'fineAngle', -45, 45, '°'],
-                    ['opacity', 'fineOpacity', 0, 100, '%'],
-                  ] as const
-                ).map(([field, label, min, max, unit]) => (
-                  <label key={field}>
-                    <span>
-                      {t(label)}{' '}
-                      <output>
-                        {values[field]}
-                        {unit}
-                      </output>
-                    </span>
-                    <input
-                      type="range"
-                      min={min}
-                      max={max}
-                      value={values[field]}
-                      data-testid={`fine-${field}`}
-                      onChange={(event) => change({ [field]: event.currentTarget.valueAsNumber })}
-                      onPointerUp={finish}
-                      onPointerCancel={finish}
-                      onKeyUp={finish}
-                      onBlur={finish}
-                    />
-                  </label>
-                ))}
-                <label className="fine-color">
-                  {t('fineColor')}
-                  <input
-                    type="color"
-                    value={values.color ?? paperInk.color}
-                    data-testid="fine-color"
-                    onChange={(event) => {
-                      const color = event.currentTarget.value;
-                      commit(
-                        selection.selected.map((glyph) => ({
-                          ...selection.position(glyph),
-                          color,
-                        })),
-                      );
-                    }}
-                  />
-                </label>
-                <label className="check-row">
-                  <input
-                    type="checkbox"
-                    data-testid="fine-snap"
-                    checked={selection.snap}
-                    onChange={(event) => selection.setSnap(event.currentTarget.checked)}
-                  />
-                  {t('fineSnap')}
-                </label>
-                <div className="fine-nudges" aria-label={t('fineNudge')}>
+              <>
+                <div className="fine-fields">
                   {(
                     [
-                      [-1, 0, 'fineLeft', '←'],
-                      [0, -1, 'fineUp', '↑'],
-                      [0, 1, 'fineDown', '↓'],
-                      [1, 0, 'fineRight', '→'],
+                      ['scale', 'fineScale', 50, 200, '%'],
+                      ['angle', 'fineAngle', -45, 45, '°'],
+                      ['opacity', 'fineOpacity', 0, 100, '%'],
+                      [
+                        'thickness',
+                        'fineThickness',
+                        Math.max(-20, -20 - Math.max(...stroke)),
+                        Math.min(20, 20 - Math.min(...stroke)),
+                        ' px',
+                      ],
+                      [
+                        'softness',
+                        'fineSoftness',
+                        -Math.max(...softness),
+                        20 - Math.min(...softness),
+                        ' px',
+                      ],
                     ] as const
-                  ).map(([dx, dy, label, arrow]) => (
-                    <Button
-                      key={label}
-                      size="icon"
-                      variant="ghost"
-                      aria-label={t(label)}
-                      onClick={() => selection.nudge(dx, dy)}
-                    >
-                      {arrow}
-                    </Button>
-                  ))}
+                  ).map(([field, label, min, max, unit]) => {
+                    const value = values[field];
+                    const delta = unit === ' px';
+                    const display = delta
+                      ? `${value > 0 ? '+' : ''}${(value / 10).toFixed(1)}`
+                      : value;
+                    return (
+                      <label key={field}>
+                        <span>
+                          {t(label)}{' '}
+                          <output>
+                            {display}
+                            {unit}
+                          </output>
+                        </span>
+                        <input
+                          type="range"
+                          min={Math.min(value, min)}
+                          max={Math.max(value, max)}
+                          value={value}
+                          aria-valuetext={`${display}${unit}`}
+                          data-testid={`fine-${field}`}
+                          onChange={(event) =>
+                            change({ [field]: event.currentTarget.valueAsNumber })
+                          }
+                          onPointerUp={finish}
+                          onPointerCancel={finish}
+                          onKeyUp={finish}
+                          onBlur={finish}
+                        />
+                      </label>
+                    );
+                  })}
                 </div>
-                <Button
-                  size="small"
-                  variant="ghost"
-                  data-testid="fine-reset"
-                  onClick={() =>
-                    commit(selection.selected.map(([id]) => ({ id, ...defaultAdjustment })))
-                  }
-                >
-                  <RotateCcw size={14} />
-                  {t('fineReset')}
-                </Button>
-              </div>
+                <div className="fine-actions" data-testid="fine-actions">
+                  <label className="fine-color">
+                    {t('fineColor')}
+                    <input
+                      type="color"
+                      value={values.color ?? paperInk.color}
+                      data-testid="fine-color"
+                      onChange={(event) => {
+                        const color = event.currentTarget.value;
+                        commit(
+                          selection.selected.map((glyph) => ({
+                            ...selection.position(glyph),
+                            color,
+                          })),
+                        );
+                      }}
+                    />
+                  </label>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      data-testid="fine-snap"
+                      checked={selection.snap}
+                      onChange={(event) => selection.setSnap(event.currentTarget.checked)}
+                    />
+                    {t('fineSnap')}
+                  </label>
+                  <div className="fine-nudges" aria-label={t('fineNudge')}>
+                    {(
+                      [
+                        [-1, 0, 'fineLeft', '←'],
+                        [0, -1, 'fineUp', '↑'],
+                        [0, 1, 'fineDown', '↓'],
+                        [1, 0, 'fineRight', '→'],
+                      ] as const
+                    ).map(([dx, dy, label, arrow]) => (
+                      <Button
+                        key={label}
+                        size="icon"
+                        variant="ghost"
+                        aria-label={t(label)}
+                        onClick={() => selection.nudge(dx, dy)}
+                      >
+                        {arrow}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    size="small"
+                    variant="ghost"
+                    data-testid="fine-reset"
+                    onClick={() =>
+                      commit(selection.selected.map(([id]) => ({ id, ...defaultAdjustment })))
+                    }
+                  >
+                    <RotateCcw size={14} />
+                    {t('fineReset')}
+                  </Button>
+                </div>
+              </>
             )}
           </div>,
           inspector,

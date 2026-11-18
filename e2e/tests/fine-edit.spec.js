@@ -68,6 +68,12 @@ test('fine editing moves real ink during drag and copies exactly what PDF and ZI
   await page.getByTestId('fine-opacity').press('ArrowLeft');
   await page.getByTestId('fine-color').fill('#904927');
   await expect.poll(pixelData).not.toBe(beforeSize);
+  for (const [field, value] of [['thickness', '7'], ['softness', '4']]) {
+    const before = await pixelData();
+    await page.getByTestId('fine-' + field).fill(value);
+    await expect.poll(pixelData).not.toBe(before);
+    await page.getByTestId('fine-' + field).blur();
+  }
   const beforeFilter = await pixelData();
   await page.getByTestId('canvas-pane-ink').click();
   await page.getByTestId('ink-thickness-number').fill('0.7');
@@ -123,7 +129,7 @@ with fitz.open(sys.argv[4]) as pdf:
 });
 
 test('touch lets the user box-select and then move the whole selection', async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 844 }, baseURL });
+  const context = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 680 }, baseURL });
   try {
     const page = await context.newPage();
     await page.goto('/');
@@ -169,7 +175,15 @@ test('touch lets the user box-select and then move the whole selection', async (
     const shift = await selected.first().evaluate((rect) => Number(rect.getAttribute('x'))) - x;
     expect(Math.abs(shift - 50)).toBeLessThanOrEqual(2);
     await expect(page.getByTestId('fine-undo')).toBeEnabled();
+    const actions = page.getByTestId('fine-actions');
+    const reset = actions.getByTestId('fine-reset');
+    await reset.scrollIntoViewIfNeeded();
+    for (const id of ['fine-color', 'fine-snap', 'fine-reset']) {
+      await expect(actions.getByTestId(id)).toBeInViewport();
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await reset.tap();
+    await expect.poll(() => selected.first().evaluate((rect) => Number(rect.getAttribute('x')))).toBe(x);
   } finally {
     await context.close();
   }

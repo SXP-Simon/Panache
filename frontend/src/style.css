@@ -1386,7 +1386,7 @@ input[type='color'] {
   border-bottom: 1px solid var(--border);
 }
 .fine-inspector-head,
-.fine-fields,
+.fine-actions,
 .fine-history,
 .fine-nudges {
   display: flex;
@@ -1408,15 +1408,22 @@ input[type='color'] {
 .fine-nudges {
   gap: 2px;
 }
-.fine-fields {
+.fine-actions {
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: 4px 12px;
+  margin-top: 6px;
+  touch-action: manipulation;
 }
-.fine-fields > label:has(input[type='range']) {
+.fine-fields {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(106px, 100%), 1fr));
+  gap: 6px 12px;
+}
+.fine-fields > label {
+  display: grid;
+  align-content: end;
   gap: 2px;
-  flex: 1 1 85px;
-  min-width: 74px;
+  min-width: 0;
 }
 .fine-fields input[type='range'] {
   width: 100%;
@@ -1424,6 +1431,7 @@ input[type='color'] {
 .fine-fields output {
   color: var(--muted-foreground);
   margin-inline-start: 3px;
+  white-space: nowrap;
 }
 .fine-color {
   display: flex;
