@@ -2,7 +2,7 @@ const { test, expect, openHome, fillText, useSmallCanvas, openWorkspacePane, exp
 
 test('layered preview zooms without clipping the left edge and opens the image viewer', async ({ page }) => {
   await openHome(page);
-  await useSmallCanvas(page);
+  await useSmallCanvas(page, { width: 600, height: 300 });
   await fillText(page, '手写预览\n放大、缩小与全屏');
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);

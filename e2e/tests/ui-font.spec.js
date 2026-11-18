@@ -1,4 +1,4 @@
-const { test, expect, openHome, fillText, openPaperSettings } = require('./fixtures');
+const { test, expect, openHome, fillText, openPaperSettings, openWorkspacePane } = require('./fixtures');
 
 async function expectUnifiedFont(page) {
   const violations = await page.evaluate(() =>
@@ -45,6 +45,8 @@ for (const width of [1440, 390]) {
         );
         expect(loaded, 'The self-hosted WenKai font must actually load').toBeGreaterThan(0);
         await openPaperSettings(page);
+        await expectUnifiedFont(page);
+        await openWorkspacePane(page, 'ink');
         await page.getByTestId('variation-settings-toggle').click();
         await page.getByTestId('strike-settings-toggle').click();
         await expectUnifiedFont(page);
@@ -66,7 +68,7 @@ for (const width of [1440, 390]) {
         for (const selector of [
           ...(width > 720
             ? ['[data-testid="text-panel"] h2', '[data-testid="brand-title"]', '[data-testid="project-source-link"]']
-            : ['[data-testid="mobile-settings-btn"]']),
+            : ['[data-testid="text-panel"] h2', '[data-testid="mobile-settings-btn"]']),
           '[data-testid="quick-symbol-α"]',
           '[data-testid="text-input"]',
         ]) {

@@ -93,7 +93,7 @@ test('built-in small preset keeps every original handwriting value', async ({ pa
 test('reset removes background and uploaded font and preset cannot override a background', async ({
   page,
 }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   const initialFont = await page.getByTestId('font-select').inputValue();
   await useSmallCanvas(page);
   const font = path.join(__dirname, '..', '..', 'backend', 'font_assets', '云烟体.ttf');

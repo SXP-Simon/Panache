@@ -2,7 +2,7 @@ const { test, expect, openHome, setNumber } = require('./fixtures');
 
 test.describe('预设与设置存取', () => {
   test('内置预设：一键套用小字加下划线（云烟体）', async ({ page }) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     const presetSelect = page.getByTestId('builtin-preset-select');
     await expect(presetSelect).toBeEnabled();
 
@@ -16,7 +16,7 @@ test.describe('预设与设置存取', () => {
   });
 
   test('保存 / 重置 / 载入设置', async ({ page }) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     await setNumber(page, 'font-size-input', 123);
 
     await page.getByTestId('save-settings-btn').click();
@@ -31,7 +31,7 @@ test.describe('预设与设置存取', () => {
   });
 
   test('没有保存过设置时载入给出提示', async ({ page }) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
 
     await page.getByTestId('load-settings-btn').click();
 
@@ -40,7 +40,7 @@ test.describe('预设与设置存取', () => {
 });
 
 test('草稿与参数刷新后保留，损坏预设不会覆盖当前值', async ({ page }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   await page.getByTestId('text-input').fill('自动保存草稿 $x^2$');
   await setNumber(page, 'font-size-input', 99);
   await page.getByTestId('ink-effects-toggle').click();

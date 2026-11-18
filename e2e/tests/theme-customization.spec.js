@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { test, expect, openHome, fillText, setNumber, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, openWorkspacePane, fillText, setNumber, expectPreviewImageLoaded } = require('./fixtures');
 const screenshots = path.resolve(__dirname, '../../preview_outputs/theme-customization');
 
 test('dark workspace surfaces stay neutral under custom accents', async ({ page }) => {
@@ -104,6 +104,7 @@ test('mobile appearance edits persist and stay separate from paper ink', async (
   await expect(page.getByTestId('app-header')).not.toBeVisible();
   const panel = await page.getByTestId('text-panel').boundingBox();
   expect(panel.y).toBeLessThan(150);
+  await openWorkspacePane(page, 'ink');
   const ink = await page.getByTestId('ink-color-input').inputValue();
   await fillText(page, 'Panache · 自定义配色\n界面随心，纸张与笔迹保持原样。');
   await page.getByTestId('mobile-settings-btn').click();
@@ -120,11 +121,13 @@ test('mobile appearance edits persist and stay separate from paper ink', async (
   await page.screenshot({ path: path.join(screenshots, 'web-mobile-settings.png') });
   await page.getByTestId('appearance-modal-close').click();
   await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
+  await openWorkspacePane(page, 'ink');
   await expect(page.getByTestId('ink-color-input')).toHaveValue(ink);
+  await openWorkspacePane(page, 'edit');
   await page.screenshot({ path: path.join(screenshots, 'web-mobile-effect.png') });
   await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
   await page.reload();
-  await expect(page.getByTestId('text-input')).toContainText('Panache');
+  await expect(page.getByTestId('text-input')).toHaveValue(/Panache/);
   expect(await page.locator('html').evaluate((el) => el.style.getPropertyValue('--primary'))).toBe('#8b5cf6');
   expect(await page.locator('html').evaluate((el) => el.style.getPropertyValue('--secondary'))).toBe('#538577');
   await page.getByTestId('mobile-settings-btn').click();

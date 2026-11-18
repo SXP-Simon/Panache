@@ -22,9 +22,7 @@ const expected = '于是，X 的分布律为\n⟦ X | 0  1  2  3 ; ── ; P | 
 for (const repetitions of [1, 2]) {
   test(`distribution arrays convert and render: ${repetitions} cleanup click(s)`, async ({ page }) => {
     await openHome(page, { classic: true });
-    await useSmallCanvas(page, { fontSize: 70, lineSpacing: 120 });
-    await page.getByTestId('width-input').fill('1600');
-    await page.getByTestId('height-input').fill('1600');
+    await useSmallCanvas(page, { width: 1600, height: 1600, fontSize: 70, lineSpacing: 120 });
     await page.getByTestId(repetitions === 2 ? 'paper-style-ruled' : 'paper-style-blank').check();
     const input = page.getByTestId('text-input');
     await input.fill(source);
@@ -45,9 +43,7 @@ for (const repetitions of [1, 2]) {
 
  test('Markdown probability table renders a handwriting grid', async ({ page }) => {
     await openHome(page);
-    await useSmallCanvas(page, { fontSize: 70, lineSpacing: 120 });
-    await page.getByTestId('width-input').fill('1600');
-    await page.getByTestId('height-input').fill('1600');
+    await useSmallCanvas(page, { width: 1600, height: 1600, fontSize: 70, lineSpacing: 120 });
     const input = page.getByTestId('text-input');
     await input.fill('分布律与计算记录\n| X | 0 | 1 | 2 | 3 |\n|---|---|---|---|---|\n| P | $\\frac8{15}$ | $\\frac4{15}$ | $\\frac2{15}$ | $\\frac1{15}$ |\n\n| 项目 | 结果 |\n|---|---|\n| 期望 | $\\frac{11}{15}$ |\n| 说明 | text $x$ unit |');
     await page.getByTestId('prepare-text-btn').click();
@@ -55,5 +51,7 @@ for (const repetitions of [1, 2]) {
     await page.getByTestId('preview-btn').click();
     await expectPreviewImageLoaded(page);
     const png = await previewPng(page);
-    fs.writeFileSync(path.resolve(__dirname, '../../preview_outputs/distribution-arrays/web-markdown-grid-full.png'), Buffer.from(png));
+    const output = path.resolve(__dirname, '../../preview_outputs/distribution-arrays');
+    fs.mkdirSync(output, { recursive: true });
+    fs.writeFileSync(path.join(output, 'web-markdown-grid-full.png'), Buffer.from(png));
  });

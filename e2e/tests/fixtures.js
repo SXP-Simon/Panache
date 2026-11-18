@@ -17,11 +17,20 @@ async function openHome(page, { classic = false } = {}) {
   await page.goto(classic ? '/?studio=classic' : '/');
   await expect(page.getByTestId('preview-btn')).toBeVisible();
   await expect(page.getByTestId('font-select').locator('option')).not.toHaveCount(0);
+  await disableLivePreview(page);
   await page.evaluate(() => document.fonts.ready);
 }
 
+// 用例主动提交预览时，先停用自动生成，避免与断言竞争同一次请求。
+async function disableLivePreview(page) {
+  const live = page.getByTestId('live-preview-toggle').getByRole('checkbox');
+  if (await live.isVisible()) await live.uncheck();
+}
+
 async function openWorkspacePane(page, pane) {
-  const entry = page.getByTestId('workspace-pane-' + pane);
+  const entry = page.getByTestId(`canvas-pane-${pane}`)
+    .or(page.getByTestId(`workspace-pane-${pane}`))
+    .filter({ visible: true });
   if (await entry.isVisible() && await entry.getAttribute('aria-pressed') !== 'true')
     await entry.click();
 }
@@ -42,16 +51,20 @@ async function openPaperSettings(page) {
 }
 
 // 小画布 + 短文本，真实渲染约 2 秒
-async function useSmallCanvas(page, { fontSize = 50, lineSpacing = 60 } = {}) {
+async function useSmallCanvas(
+  page, { width = 400, height = 300, fontSize = 50, lineSpacing = 60 } = {},
+) {
   await openPaperSettings(page);
-  await setNumber(page, 'width-input', 400);
-  await setNumber(page, 'height-input', 300);
-  await setNumber(page, 'font-size-input', fontSize);
-  await setNumber(page, 'line-spacing-input', lineSpacing);
+  await setNumber(page, 'width-input', width);
+  await setNumber(page, 'height-input', height);
   await setNumber(page, 'margin-top-input', 20);
   await setNumber(page, 'margin-bottom-input', 20);
   await setNumber(page, 'margin-left-input', 20);
   await setNumber(page, 'margin-right-input', 20);
+  await openWorkspacePane(page, 'layout');
+  await setNumber(page, 'font-size-input', fontSize);
+  await setNumber(page, 'line-spacing-input', lineSpacing);
+  await openWorkspacePane(page, 'edit');
 }
 
 // 等真实生成的 PNG 预览完成，不以占位画布作为成功条件。
@@ -95,6 +108,7 @@ module.exports = {
   test,
   expect,
   blockThirdParty,
+  disableLivePreview,
   openHome,
   fillText,
   setNumber,

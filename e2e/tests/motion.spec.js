@@ -22,7 +22,7 @@ for (const testId of [
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await openHome(page);
+    await openHome(page, { classic: true });
     const toggle = page.getByTestId(testId);
     const content = page.getByTestId(`${testId}-content`);
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -45,7 +45,7 @@ test('rapid accordion reversals preserve values and finish in the requested stat
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openHome(page);
+  await openHome(page, { classic: true });
   const toggle = page.getByTestId('paper-settings-toggle');
   await toggle.click();
   await page.getByTestId('width-input').fill('471');
@@ -69,7 +69,7 @@ test('rapid accordion reversals preserve values and finish in the requested stat
 test('collapsing settings immediately prevents programmatic and keyboard focus inside', async ({
   page,
 }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   const toggle = page.getByTestId('paper-settings-toggle');
   const content = page.getByTestId('paper-settings-toggle-content');
   const width = page.getByTestId('width-input');
@@ -96,7 +96,7 @@ test('reduced motion opens and closes settings without intermediate animation fr
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openHome(page);
+  await openHome(page, { classic: true });
   const content = page.getByTestId('paper-settings-toggle-content');
   const opening = await toggleHeights(page, 'paper-settings-toggle', 4);
   const fullHeight = await content.evaluate((element) => element.scrollHeight);

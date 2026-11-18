@@ -1,7 +1,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const http = require('node:http');
-const { test, expect, openHome } = require('./fixtures');
+const { test, expect, openHome, disableLivePreview } = require('./fixtures');
 const output = path.resolve(__dirname, '../../preview_outputs/update-feature');
 async function dismissPrompt(page) {
   await expect(page.getByTestId('update-prompt')).toBeVisible();
@@ -76,6 +76,7 @@ test('production deployment waits for approval and saves the draft before activa
   const page = await context.newPage();
   try {
     await page.goto(origin); await page.getByTestId('text-input').waitFor();
+    await disableLivePreview(page);
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
     await page.getByTestId('appearance-btn').click(); await page.getByTestId('update-auto').uncheck();

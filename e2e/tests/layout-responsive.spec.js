@@ -19,7 +19,7 @@ for (const viewport of [
 ]) {
   test(`${viewport.mode}: panels stay usable without horizontal overflow`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await openHome(page);
+    await openHome(page, { classic: true });
     await fillText(page, 'A'.repeat(1000) + '\n' + '中文公式 $x^2$ '.repeat(30));
     const symbolLayout = await page.getByTestId('symbol-strip').evaluate((strip) => {
       const label = strip.querySelector('[data-testid="symbol-strip-label"]');

@@ -6,6 +6,7 @@ const {
   openHome,
   openPaperSettings,
   useSmallCanvas,
+  disableLivePreview,
   expectPreviewImageLoaded,
 } = require('./fixtures');
 
@@ -74,6 +75,7 @@ test('连续输入和插图刷新后完整恢复，生成仍提交原始图片�
   await page.reload();
   await expect(editor).toHaveValue(expected);
   await expect(page.locator('.inline-image-row img')).toHaveCount(1);
+  await disableLivePreview(page);
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);
   expect(transport.forms).toHaveLength(1);
@@ -86,7 +88,7 @@ test('内置字体按名称持久化，刷新与字体列表重排后保持选�
   let fonts = ['first.ttf', 'chosen.ttf'];
   await page.route('**/api/fonts_info', (route) => route.fulfill({ json: fonts }));
   const transport = await generationTransport(page);
-  await openHome(page);
+  await openHome(page, { classic: true });
   await page.getByTestId('font-select').selectOption('chosen.ttf');
   await saved(page);
   fonts = ['new-first.ttf', 'first.ttf', 'chosen.ttf'];
@@ -109,7 +111,7 @@ test('上传字体和纸张背景刷新后恢复二进制资源而非仅文件�
   const transport = await generationTransport(page);
   const fontBytes = fs.readFileSync(path.join(__dirname, '../../backend/font_assets/云烟体.ttf'));
   const backgroundBytes = fs.readFileSync(fixture('sample-page.png'));
-  await openHome(page);
+  await openHome(page, { classic: true });
   await useSmallCanvas(page);
   await page.getByTestId('text-input').fill('资源恢复后的正文');
   await page.getByTestId('font-file-input').setInputFiles({
@@ -160,7 +162,7 @@ for (const source of ['studio-records', 'camel-case']) {
       }
       localStorage.setItem('state.migration.seeded', '1');
     }, { source, dataUrl });
-    await openHome(page);
+    await openHome(page, { classic: true });
     const editor = page.getByTestId('text-input');
     await expect(editor).toHaveValue(/历史草稿[\s\S]*!\[插图 1\][\s\S]*完整末尾/);
     await expect(page.getByTestId('font-size-input')).toHaveValue('48');
@@ -288,7 +290,7 @@ test('新插图写入失败后刷新恢复上一份完整快照，不留下断�
 });
 
 test('数字输入可先清空再填写，签名内全选只替换签名', async ({ page }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   const fontSize = page.getByTestId('font-size-input');
   await fontSize.fill('');
   await expect(fontSize).toHaveValue('');
@@ -319,7 +321,7 @@ test('数字输入可先清空再填写，签名内全选只替换签名', async
 });
 
 test('旧大字体预设尚未保存完时再次保存，最终加载第二份快照', async ({ page }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   await saved(page);
   await page.evaluate(() => {
     const originalDigest = SubtleCrypto.prototype.digest;
@@ -388,7 +390,7 @@ test('延迟文档导入期间加载同正文不同文件名的预设，旧响�
       await route.fulfill({ json: { text: '较早导入的旧正文，不应覆盖已加载的预设。' } });
     } else await route.fulfill({ json: { text } });
   });
-  await openHome(page);
+  await openHome(page, { classic: true });
   const editor = page.getByTestId('text-input');
   const fileName = page.getByTestId('text-file-name');
   const upload = (name) => page.getByTestId('text-file-input').setInputFiles({

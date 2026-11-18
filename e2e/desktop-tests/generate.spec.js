@@ -6,7 +6,7 @@ const { test, expect } = require('./fixtures');
 const { resetHome, waitForDownload } = require('./launch');
 const {
   fillText,
-  setNumber,
+  disableLivePreview,
   useSmallCanvas,
   expectPreviewImageLoaded,
 } = require('../tests/fixtures');
@@ -15,6 +15,7 @@ test.describe('打包版的手写生成主流程（真实渲染）', () => {
   test('预览：输入文字后返回真实手写图片', async ({ desktop }) => {
     await resetHome(desktop);
     const { page } = desktop;
+    await disableLivePreview(page);
     await useSmallCanvas(page);
     await fillText(page, '你好世界');
 
@@ -26,6 +27,7 @@ test.describe('打包版的手写生成主流程（真实渲染）', () => {
   test('生成图片：下载的 zip 是真实压缩包', async ({ desktop }) => {
     await resetHome(desktop);
     const { page } = desktop;
+    await disableLivePreview(page);
     await useSmallCanvas(page);
     await fillText(page, '测试');
 
@@ -47,6 +49,7 @@ test.describe('打包版的手写生成主流程（真实渲染）', () => {
   test('生成 PDF：直接拿到 PDF，体积落在导出预算内', async ({ desktop }) => {
     await resetHome(desktop);
     const { page } = desktop;
+    await disableLivePreview(page);
     await useSmallCanvas(page, { fontSize: 32, lineSpacing: 45 });
     await fillText(page, '静夜思床前明月光疑是地上霜举头望明月低头思故乡春眠不觉晓');
 
@@ -65,6 +68,7 @@ test.describe('打包版的手写生成主流程（真实渲染）', () => {
   test('上传文本文件转文字后生成（走打包内的解析依赖）', async ({ desktop }) => {
     await resetHome(desktop);
     const { page } = desktop;
+    await disableLivePreview(page);
     await useSmallCanvas(page);
 
     await page

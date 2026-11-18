@@ -6,6 +6,7 @@ const {
   openHome,
   fillText,
   useSmallCanvas,
+  openWorkspacePane,
   expectPreviewImageLoaded,
 } = require('./fixtures');
 
@@ -63,6 +64,7 @@ test('上传字体随真实生成请求发送并出图', async ({ page }) => {
   await openHome(page);
   await useSmallCanvas(page);
   await fillText(page, '上传字体 Font 123');
+  await openWorkspacePane(page, 'layout');
   const font = path.join(__dirname, '..', '..', 'backend', 'font_assets', '云烟体.ttf');
   await page.getByTestId('font-file-input').setInputFiles({
     name: 'custom-upload.ttf',

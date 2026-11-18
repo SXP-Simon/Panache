@@ -5,6 +5,7 @@ const {
   openHome,
   fillText,
   setNumber,
+  openWorkspacePane,
   useSmallCanvas,
   expectPreviewImageLoaded,
 } = require('./fixtures');
@@ -68,6 +69,7 @@ test.describe('手写生成主流程（真实后端渲染）', () => {
   test('字号大于行距时前端直接拦截，不会发出请求', async ({ page }) => {
     await openHome(page);
     await fillText(page, '测试');
+    await openWorkspacePane(page, 'layout');
     await setNumber(page, 'font-size-input', 200);
     await setNumber(page, 'line-spacing-input', 100);
 

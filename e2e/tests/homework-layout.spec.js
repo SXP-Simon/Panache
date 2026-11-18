@@ -69,7 +69,7 @@ async function generate(page, name, style) {
 
 test('同一份真实作业在标准和作业笔记模式下出图，切换不改原文与字体', async ({ page }) => {
   await seed(page);
-  await openHome(page);
+  await openHome(page, { classic: true });
   await page.getByTestId('text-input').fill(assignment);
   await page.getByTestId('prepare-text-btn').click();
   await expect(page.getByTestId('prepare-text-undo')).toBeVisible();
@@ -90,7 +90,7 @@ test('同一份真实作业在标准和作业笔记模式下出图，切换不�
 
 test('作业笔记随草稿和预设保存，旧预设明确回退标准模式', async ({ page }) => {
   await seed(page);
-  await openHome(page);
+  await openHome(page, { classic: true });
   const text = '1. 原文保持不变。\n(1) (A→B)∧(B→C)⇒(A→C)';
   await page.getByTestId('text-input').fill(text);
   await page.getByTestId('layout-style-select').selectOption('homework');
@@ -121,7 +121,7 @@ test('作业笔记随草稿和预设保存，旧预设明确回退标准模式',
 
 test('上传浅色横线背景后仍可启用作业笔记，切换保留识别参数', async ({ page }) => {
   await seed(page);
-  await openHome(page);
+  await openHome(page, { classic: true });
   await openPaperSettings(page);
   const encoded = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 1697;
@@ -156,7 +156,7 @@ for (const theme of ['light', 'dark']) {
     await seed(page, { layoutStyle: 'homework' });
     await page.setViewportSize({ width: 390, height: 844 });
     if (theme === 'light') await page.addInitScript(() => localStorage.setItem('studio.locale', 'en'));
-    await openHome(page);
+    await openHome(page, { classic: true });
     if (theme === 'dark') {
       await page.getByTestId('mobile-settings-btn').click();
       await page.getByTestId('settings-theme-toggle').click();

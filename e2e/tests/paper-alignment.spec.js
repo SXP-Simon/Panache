@@ -47,7 +47,7 @@ async function uploadAndDetect(page, file) {
 test('参数组在窄屏和中等窗口保留间距，展开状态清晰', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1024, height: 930 });
-  await openHome(page);
+  await openHome(page, { classic: true });
   await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[0]));
   await page.getByTestId('detect-background-cancel').click();
   const textGroup = page.getByRole('region', { name: '文字与排版' });
@@ -86,7 +86,7 @@ test('参数组在窄屏和中等窗口保留间距，展开状态清晰', async
 test('框选纸张正文、调整行数并实际生成预览', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 890 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openHome(page);
+  await openHome(page, { classic: true });
   await openWorkspacePane(page, 'paper');
   await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[0]));
   await page.getByTestId('detect-background-cancel').click();
@@ -132,7 +132,7 @@ for (const options of cases) {
       }));
       localStorage.setItem('paper.seeded', '1');
     });
-    await openHome(page);
+    await openHome(page, { classic: true });
     await openPaperSettings(page);
     const source = await paper(page, options);
     const detected = await uploadAndDetect(page, source);
@@ -181,7 +181,7 @@ for (const options of cases) {
 }
 
 test('识别期间手动修改参数，旧结果不覆盖；重新识别可再次应用', async ({ page }) => {
-  await openHome(page); await openPaperSettings(page);
+  await openHome(page, { classic: true }); await openPaperSettings(page);
   const file = await paper(page, cases[0]);
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
@@ -210,7 +210,7 @@ test('识别期间手动修改参数，旧结果不覆盖；重新识别可再�
 });
 
 test('校正图损坏时不替换背景或任何参数', async ({ page }) => {
-  await openHome(page); await openPaperSettings(page);
+  await openHome(page, { classic: true }); await openPaperSettings(page);
   const previous = await page.getByTestId('line-spacing-input').inputValue();
   await page.route('**/api/imagefileprocess', (route) => route.fulfill({ json: {
     marginLeft: 60, marginRight: 60, marginTop: 80, marginBottom: 100, lineSpacing: 70,
@@ -224,7 +224,7 @@ test('校正图损坏时不替换背景或任何参数', async ({ page }) => {
 });
 
 test('换背景时丢弃旧识别，并清除横线网格标记', async ({ page }) => {
-  await openHome(page); await openPaperSettings(page);
+  await openHome(page, { classic: true }); await openPaperSettings(page);
   await page.getByTestId('font-size-input').fill('36');
   await uploadAndDetect(page, await paper(page, cases[0]));
   let release;
@@ -258,7 +258,7 @@ for (const theme of ['light', 'dark']) {
       localStorage.setItem('studio.theme', theme);
       localStorage.setItem('studio.locale', theme === 'light' ? 'en' : 'cn');
     }, theme);
-    await openHome(page); await openPaperSettings(page);
+    await openHome(page, { classic: true }); await openPaperSettings(page);
     await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[2]));
     await page.getByTestId('detect-background-confirm').click();
     await expect(page.getByTestId('message-info')).toContainText(theme === 'light' ? 'Paper aligned' : '纸张已识别对齐');

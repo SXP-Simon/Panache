@@ -1,4 +1,4 @@
-const { test, expect, openHome, fillText, useSmallCanvas } = require('./fixtures');
+const { test, expect, openHome, openWorkspacePane, openPaperSettings, fillText, useSmallCanvas } = require('./fixtures');
 
 // 这些分支真实后端很难触发（要凑满 8 个排队任务 / 制造 5xx），用路由拦截模拟
 test.describe('异常分支（mock 后端响应）', () => {
@@ -98,6 +98,8 @@ for (const [field, value] of [
       requested = true;
       return route.abort();
     });
+    if (field === 'line-spacing-input') await openWorkspacePane(page, 'layout');
+    else await openPaperSettings(page);
     await page.getByTestId(field).fill(String(value));
     await page.getByTestId('preview-btn').click();
     await expect(page.getByTestId('message-info')).toBeVisible();

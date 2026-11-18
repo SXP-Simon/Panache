@@ -4,6 +4,7 @@ const {
   expect,
   openHome,
   openPaperSettings,
+  openWorkspacePane,
   fillText,
   useSmallCanvas,
   expectPreviewImageLoaded,
@@ -23,8 +24,9 @@ const TOLERANCE_PX = 4;
 test.describe('背景图片与边距识别', () => {
   test('上传图片确认识别后，把四个边距与行距回填进参数框', async ({ page }) => {
     await openHome(page);
-    await openPaperSettings(page);
+    await openWorkspacePane(page, 'layout');
     await page.getByTestId('line-spacing-input').fill('60');
+    await openPaperSettings(page);
 
     const responsePromise = page.waitForResponse(
       (response) =>
@@ -56,13 +58,14 @@ test.describe('背景图片与边距识别', () => {
     expect(await inputValue('margin-left-input')).toBe(margins.marginLeft);
     expect(await inputValue('margin-right-input')).toBe(margins.marginRight);
     expect(await inputValue('margin-bottom-input')).toBe(margins.layoutBottomMargin);
-    expect(await inputValue('line-spacing-input')).toBe(margins.lineSpacing);
     expect(await inputValue('margin-top-input')).toBe(margins.layoutTopMargin);
     await expect(page.getByTestId('message-info')).toContainText('纸张已识别对齐');
 
     // 背景图生效后尺寸交给图片决定，宽高输入框禁用（isBackgroundImageSpecified）
     await expect(page.getByTestId('width-input')).toBeDisabled();
     await expect(page.getByTestId('height-input')).toBeDisabled();
+    await openWorkspacePane(page, 'layout');
+    await expect(page.getByTestId('line-spacing-input')).toHaveValue(String(margins.lineSpacing));
   });
 });
 
@@ -87,7 +90,7 @@ test('取消识别保留背景，可移除背景恢复尺寸输入', async ({ pa
 });
 
 test('背景图作为真实生成文件发送，纸张尺寸由图片决定', async ({ page }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   await openPaperSettings(page);
   await useSmallCanvas(page, { fontSize: 32, lineSpacing: 50 });
   await fillText(page, '有背景的手写预览');
@@ -111,7 +114,7 @@ test('背景图作为真实生成文件发送，纸张尺寸由图片决定', as
 for (const language of ['cn', 'en']) {
   test(`识别空白背景失败时保留参数并提供操作提示：${language}`, async ({ page }) => {
     await page.addInitScript((locale) => localStorage.setItem('studio.locale', locale), language);
-    await openHome(page);
+    await openHome(page, { classic: true });
     await openPaperSettings(page);
     const fields = ['margin-left-input', 'margin-right-input', 'margin-top-input', 'margin-bottom-input', 'line-spacing-input'];
     const original = await Promise.all(fields.map((id) => page.getByTestId(id).inputValue()));
@@ -142,7 +145,7 @@ for (const language of ['cn', 'en']) {
 
 for (const lineSpacing of [0, -5]) {
   test(`无效识别结果不会覆盖参数：行距 ${lineSpacing}`, async ({ page }) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     await openPaperSettings(page);
     const spacing = page.getByTestId('line-spacing-input');
     const previous = await spacing.inputValue();

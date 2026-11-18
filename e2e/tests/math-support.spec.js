@@ -18,9 +18,7 @@ test('converted nested fractions and radicals render through the real backend', 
   page,
 }, testInfo) => {
   await openHome(page);
-  await useSmallCanvas(page, { fontSize: 40, lineSpacing: 110 });
-  await page.getByTestId('width-input').fill('800');
-  await page.getByTestId('height-input').fill('600');
+  await useSmallCanvas(page, { width: 800, height: 600, fontSize: 40, lineSpacing: 110 });
   await page.getByTestId('text-input').fill(String.raw`$\frac{\sqrt{a+\frac{b}{c}}}{d}$
 $2\sqrt{x}+\sqrt[5]{y}$
 $\mathbb{R}\subseteq\mathbb{C}$`);
