@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Simon and Panache contributors.
-"""2026-11-18：局部修改的身份、纸面与导出回归。."""
+"""2026-11-18：局部修改的身份、纸面与导出回归."""
 
 import asyncio
 import base64
@@ -45,6 +45,7 @@ def test_repeated_glyphs_are_independent_and_pdf_contains_the_zip_pixels():
     first, second = [page["glyphs"] for page in fine["pages"]]
     assert [item[0] for item in first] == [0, 1, 2]
     assert [item[0] for item in second] == [8, 9]
+    assert fine["pages"][1]["source_ranges"] == [[8, 9], [9, 10]]
     first_id, x, y, w, h, *_ = first[0]
     edit = json.dumps(
         {
@@ -93,6 +94,7 @@ def test_stale_adjustments_cannot_apply_to_new_text_and_formula_is_one_item():
     source = r"左 \frac{1}{2} 右"
     fine = json.loads(render(text=source))["fine_edit"]
     assert len(fine["pages"][0]["glyphs"]) == 3
+    assert "source_ranges" not in fine["pages"][0]
     edits = json.dumps({"key": fine["key"], "glyphs": [{"id": 0, "color": "#ff0000"}]})
     changed = unzip(render(text="新", preview="false", fine_edits=edits))[0]
     unedited = unzip(render(text="新", preview="false"))[0]
@@ -110,3 +112,7 @@ def test_inline_image_preserves_glyphs_on_both_sides_without_id_collisions():
     [page] = preview["fine_edit"]["pages"]
     assert [item[0] for item in page["glyphs"]] == [0, len(source) - 1]
     assert page["glyphs"][1][2] > page["glyphs"][0][2]
+
+
+def test_plain_source_offsets_use_browser_utf16_units():
+    assert app._fine_source_positions("甲𠀀乙", "甲𠀀乙") == [(0, 1), (1, 3), (3, 4)]

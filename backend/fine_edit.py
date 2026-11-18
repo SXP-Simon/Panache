@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Simon and Panache contributors.
-"""2026-11-18：可编辑墨迹单元、页面图集与导出合成。."""
+"""2026-11-18：可编辑墨迹单元、页面图集与导出合成."""
 
 import base64
 import io
@@ -19,6 +19,7 @@ _TILES = "panache_fine_tiles"
 _OPAQUE = 100
 _BYTE = 255
 _HEX = 16
+_FILTER_PAD = 4
 type InkStyle = tuple[InkColor, InkEffects, int]
 type Position = tuple[int, int]
 type ByteWriter = Callable[[Image.Image], bytes]
@@ -26,7 +27,7 @@ type InkPair = tuple[InkStyle, InkStyle | None]
 
 
 class GlyphAdjustment(BaseModel):
-    """2026-11-18：位移使用纸面像素，缩放和浓淡使用百分比。."""
+    """2026-11-18：位移使用纸面像素，缩放和浓淡使用百分比."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
     id: int = Field(ge=0)
@@ -39,7 +40,7 @@ class GlyphAdjustment(BaseModel):
 
 
 class FineEdits(BaseModel):
-    """2026-11-18：仅当可编辑文本的指纹相同时应用保存的调整。."""
+    """2026-11-18：仅当可编辑文本的指纹相同时应用保存的调整."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
     key: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
@@ -50,7 +51,7 @@ _edits_adapter = TypeAdapter(FineEdits)
 
 
 def parse_edits(raw: str | None) -> FineEdits | None:
-    """2026-11-18：在进入渲染前限制调整表大小。."""
+    """2026-11-18：在进入渲染前限制调整表大小."""
     if not raw:
         return None
     max_bytes = 1_000_000
@@ -62,7 +63,7 @@ def parse_edits(raw: str | None) -> FineEdits | None:
 
 @dataclass(frozen=True)
 class DraftGlyph:
-    """2026-11-18：排版后的墨迹位置与正文中的单元标识。."""
+    """2026-11-18：排版后的墨迹位置与正文中的单元标识."""
 
     id: int
     image: Image.Image
@@ -73,7 +74,7 @@ class DraftGlyph:
 
 @dataclass(frozen=True)
 class GlyphTile:
-    """2026-11-18：渲染后的局部主字迹、拉丁字迹。."""
+    """2026-11-18：渲染后的局部主字迹、拉丁字迹."""
 
     id: int
     position: Position
@@ -83,27 +84,27 @@ class GlyphTile:
 
 
 def remember_draft(target: Image.Image, glyph: DraftGlyph) -> None:
-    """2026-11-18：保存未合并的单元，避免用矩形擦掉相邻文字。."""
+    """2026-11-18：保存未合并的单元，避免用矩形擦掉相邻文字."""
     cast("list[DraftGlyph]", target.info.setdefault(_DRAFT, [])).append(glyph)
 
 
 def start_draft(target: Image.Image) -> None:
-    """2026-11-18：标记需要返回墨迹单元的空白草稿。."""
+    """2026-11-18：标记需要返回墨迹单元的空白草稿."""
     target.info[_DRAFT] = []
 
 
 def drafts(target: Image.Image) -> list[DraftGlyph] | None:
-    """2026-11-18：区分普通出图与收集编辑信息的草稿页。."""
+    """2026-11-18：区分普通出图与收集编辑信息的草稿页."""
     return cast("list[DraftGlyph] | None", target.info.get(_DRAFT))
 
 
 def attach_tiles(target: Image.Image, background: Image.Image, tiles: list[GlyphTile]) -> None:
-    """2026-11-18：同页的插图前后片段累计单元，不覆盖原有单元。."""
+    """2026-11-18：同页的插图前后片段累计单元，不覆盖原有单元."""
     target.info[_TILES] = [*page_tiles(background), *tiles]
 
 
 def page_tiles(page: Image.Image) -> tuple[GlyphTile, ...]:
-    """2026-11-18：读取当前页的可编辑单元。."""
+    """2026-11-18：读取当前页的可编辑单元."""
     return tuple(cast("list[GlyphTile]", page.info.get(_TILES, [])))
 
 
@@ -115,40 +116,20 @@ class _Tile:
     mask: Image.Image
 
 
-def _filter(mask: Image.Image, style: InkStyle) -> Image.Image:
-    _, effects, alpha = style
-    pad = math.ceil(abs(effects.thickness)) + math.ceil(effects.softness)
-    if pad:
-        padded = Image.new("L", (mask.width + 2 * pad, mask.height + 2 * pad))
-        padded.paste(mask, (pad, pad))
-        mask = padded
-    return filtered_alpha(mask, effects, alpha)
-
-
-def _prepare_tiles(page: Image.Image, styles: InkPair) -> Iterable[_Tile]:
-    first, second = styles
-    second = second or first
-    pad = max(
-        math.ceil(abs(style[1].thickness)) + math.ceil(style[1].softness)
-        for style in (first, second)
-    )
+def _prepare_tiles(page: Image.Image) -> Iterable[_Tile]:
+    # 2026-11-18：留出全局滤镜的最大扩张范围，拖动全局滑块无需重新排版。
+    pad = _FILTER_PAD
     for glyph in page_tiles(page):
         check_cancelled()
-        primary, latin = _filter(glyph.primary, first), _filter(glyph.latin, second)
         size = (glyph.primary.width + pad * 2, glyph.primary.height + pad * 2)
         channels: list[Image.Image] = []
-        for channel in (primary, latin):
+        for channel in (glyph.primary, glyph.latin):
             padded = Image.new("L", size)
-            inset = pad - (channel.width - glyph.primary.width) // 2
-            padded.paste(channel, (inset, inset))
+            padded.paste(channel, (pad, pad))
             channels.append(padded)
         mask = Image.merge("RGB", (*channels, Image.new("L", size)))
         x, y = glyph.position
         yield _Tile(glyph.id, (x - pad, y - pad), glyph.baseline, mask)
-
-
-def _hex(color: InkColor) -> str:
-    return "#" + "".join(f"{channel:02x}" for channel in color)
 
 
 def _rgb(value: str) -> InkColor:
@@ -157,24 +138,19 @@ def _rgb(value: str) -> InkColor:
 
 @dataclass(frozen=True)
 class EditPage:
-    """2026-11-18：预览与导出使用同一批已滤镜化的蒙版。."""
+    """2026-11-18：预览与导出使用同一批原始蒙版."""
 
     paper: Image.Image
-    colors: tuple[InkColor, InkColor]
+    styles: InkPair
     tiles: tuple[_Tile, ...]
 
     @classmethod
     def from_image(cls, page: Image.Image, styles: InkPair) -> "EditPage":
-        """2026-11-18：纸面与插图保持独立，滤镜只作用于字迹。."""
-        first, second = styles
-        return cls(
-            require_layers(page)[0],
-            (first[0], (second or first)[0]),
-            tuple(_prepare_tiles(page, styles)),
-        )
+        """2026-11-18：纸面与插图保持独立，滤镜只作用于字迹."""
+        return cls(require_layers(page)[0], styles, tuple(_prepare_tiles(page)))
 
-    def preview(self, png: ByteWriter) -> dict[str, object]:
-        """2026-11-18：把小蒙版打包进图集，每页只需解码一次。."""
+    def preview(self, png: ByteWriter, positions: list[Position] | None) -> dict[str, object]:
+        """2026-11-18：把小蒙版打包进图集，每页只需解码一次."""
         tile_area = sum(tile.mask.width * tile.mask.height for tile in self.tiles)
         width = max(1, math.isqrt(tile_area), *(tile.mask.width for tile in self.tiles))
         x, y, row = 0, 0, 0
@@ -190,26 +166,30 @@ class EditPage:
         for tile, pos in slots:
             atlas.paste(tile.mask, pos)
             glyphs.append([tile.id, *tile.position, *tile.mask.size, *pos, tile.baseline])
-        return {
+        result: dict[str, object] = {
             "atlas": base64.b64encode(png(atlas)).decode("ascii"),
-            "colors": list(map(_hex, self.colors)),
             "glyphs": glyphs,
         }
+        if positions is not None:
+            result["source_ranges"] = [positions[tile.id] for tile in self.tiles]
+        return result
 
     def flatten(self, edits: Mapping[int, GlyphAdjustment]) -> Image.Image:
-        """2026-11-18：在固定版面上合并已变换的单元，不参与换行。."""
+        """2026-11-18：在固定版面上合并已变换的单元，不参与换行."""
         pixels = np.array(self.paper.convert("RGB"), dtype=np.uint8)
+        primary, latin = self.styles
+        styles = (primary, latin or primary)
         for tile in self.tiles:
             check_cancelled()
             edit = edits.get(tile.id)
-            _paint(pixels, tile, self.colors, edit)
+            _paint(pixels, tile, styles, edit)
         return Image.fromarray(pixels)
 
 
 def _paint(
     paper: np.ndarray[tuple[int, ...], np.dtype[np.uint8]],
     tile: _Tile,
-    colors: tuple[InkColor, InkColor],
+    styles: tuple[InkStyle, InkStyle],
     edit: GlyphAdjustment | None,
 ) -> None:
     # 2026-11-18：和 Web 的采样及整数 alpha 混合一致，PDF/ZIP 保留相同像素。
@@ -235,20 +215,23 @@ def _paint(
     sx = np.floor((xx * cos + yy * sin) / scale + width / 2 + epsilon).astype(np.int32)
     sy = np.floor((-xx * sin + yy * cos) / scale + height / 2 + epsilon).astype(np.int32)
     inside = (sx >= 0) & (sx < width) & (sy >= 0) & (sy < height)
-    source = np.asarray(tile.mask)[sy[inside], sx[inside]]
     target = paper[top:bottom, left:right]
     rgb = target[inside].astype(np.uint32)
     opacity = edit.opacity if edit else _OPAQUE
     override = _rgb(edit.color) if edit and edit.color else None
-    for channel, default in enumerate(colors):
+    for channel, (default, effects, ink_alpha) in enumerate(styles):
         color = override or default
-        alpha = ((source[:, channel].astype(np.uint32) * opacity + 50) // _OPAQUE)[:, None]
+        mask = tile.mask.getchannel(channel)
+        if mask.getbbox() is None:
+            continue
+        source = np.asarray(filtered_alpha(mask, effects, ink_alpha))[sy[inside], sx[inside]]
+        alpha = ((source.astype(np.uint32) * opacity + 50) // _OPAQUE)[:, None]
         rgb = (np.asarray(color, dtype=np.uint32) * alpha + rgb * (_BYTE - alpha) + 127) // _BYTE
     target[inside] = rgb
 
 
 def encode_png(image: Image.Image) -> bytes:
-    """2026-11-18：图集只保存像素，不携带生成阶段的元数据。."""
+    """2026-11-18：图集只保存像素，不携带生成阶段的元数据."""
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", compress_level=1)
     return buffer.getvalue()

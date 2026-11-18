@@ -58,7 +58,7 @@ from generation_cancellation import (
     check_cancelled,
     checked_items,
 )
-from handdrawn_filter import render_inline_markdown_images
+from handdrawn_filter import MARKDOWN_IMAGE_RE, render_inline_markdown_images
 from handright import Feature, Template, handwrite
 from homework_layout import inset_homework_body
 from ink_effects import (
@@ -106,6 +106,8 @@ type InkStyle = tuple[tuple[int, int, int], InkEffects, int]
 type InkStyles = tuple[InkStyle, InkStyle | None]
 type ReportProgress = Callable[[str, str, int], None]
 type RequestResponseEndpoint = Callable[[Request], Awaitable[Response]]
+
+_BMP_LAST = 0xFFFF
 
 
 def _delete_directory_contents(directory: Path) -> None:
@@ -906,8 +908,10 @@ def _template_for(
         raise HTTPException(status_code=400, detail="Strikethrough probability must be in 0..1")
     first_line_indent = data.get("first_line_indent") == "true"
     monospaced = data.get("monospaced") == "true"
-    split_latin = data.get("ink_layers") == "true" and data.get("separate_latin_ink") == "true"
     fine = data.get("fine_edit") == "true" and data.get("ink_layers") == "true"
+    split_latin = data.get("ink_layers") == "true" and (
+        fine or data.get("separate_latin_ink") == "true"
+    )
     plain_template = (
         TextLayoutTemplate
         if first_line_indent or monospaced or split_latin or latin_scale != 1 or fine
@@ -1140,6 +1144,7 @@ class _FineDocument:
     key: str
     styles: InkStyles
     adjustments: FineEdits | None
+    source_positions: list[tuple[int, int]] | None
 
     def deliver(
         self,
@@ -1153,7 +1158,7 @@ class _FineDocument:
         if data["preview"] == "true" and not pdf:
             if data.get("full_preview") == "false":
                 pages = itertools.islice(pages, 1)
-            return _fine_preview(pages, background, self.key, report)
+            return _fine_preview(pages, background, self, report)
         edits = (
             {edit.id: edit for edit in self.adjustments.glyphs}
             if self.adjustments and self.adjustments.key == self.key
@@ -1168,7 +1173,10 @@ class _FineDocument:
 
 
 def _fine_preview(
-    pages: Iterable[EditPage], background: Image.Image, key: str, report: ReportProgress
+    pages: Iterable[EditPage],
+    background: Image.Image,
+    document: _FineDocument,
+    report: ReportProgress,
 ) -> Response:
     papers: list[str] = []
     model: list[dict[str, object]] = []
@@ -1179,13 +1187,18 @@ def _fine_preview(
             encoded = base64.b64encode(_png_bytes(page.paper)).decode("ascii")
             previous = page.paper
         papers.append(encoded)
-        model.append(page.preview(encode_png))
+        model.append(page.preview(encode_png, document.source_positions))
     if not papers:
         papers.append(base64.b64encode(_png_bytes(background)).decode("ascii"))
-        model.append(EditPage(background, ((0, 0, 0), (0, 0, 0)), ()).preview(encode_png))
+        model.append(
+            {
+                "atlas": base64.b64encode(encode_png(Image.new("RGB", (1, 1)))).decode("ascii"),
+                "glyphs": [],
+            }
+        )
     report("finalizing", "正在返回预览结果", 100)
     return JSONResponse(
-        {"status": "success", "images": papers, "fine_edit": {"key": key, "pages": model}}
+        {"status": "success", "images": papers, "fine_edit": {"key": document.key, "pages": model}}
     )
 
 
@@ -1202,8 +1215,25 @@ def _ink_styles(data: dict[str, str]) -> InkStyles | None:
 
 def _fine_document_key(source: str, normalized: str) -> str:
     # 2026-11-18：公式和表格的私用字符由工作进程分配，不可用其编号作为持久标识。
-    stable = "".join("\ufffc" if is_math_glyph(char) else char for char in normalized)
-    return hashlib.sha256(json.dumps([source, stable], ensure_ascii=True).encode()).hexdigest()
+    condensed = MARKDOWN_IMAGE_RE.sub(lambda match: f"\x00{len(match[0])}\x00", normalized)
+    stable = "".join("\ufffc" if is_math_glyph(char) else char for char in condensed)
+    digest = hashlib.sha256(source.encode())
+    digest.update(b"\xff")
+    digest.update(stable.encode())
+    return digest.hexdigest()
+
+
+def _fine_source_positions(source: str, normalized: str) -> list[tuple[int, int]] | None:
+    # 2026-11-18：未改写的正文可直接用 UTF-16 坐标对应浏览器选区；复合结构只从画布选择。
+    if source != normalized or "\r" in source:
+        return None
+    positions: list[tuple[int, int]] = []
+    index = 0
+    for char in source:
+        stop = index + (2 if ord(char) > _BMP_LAST else 1)
+        positions.append((index, stop))
+        index = stop
+    return positions
 
 
 def _render_handwriting(
@@ -1233,7 +1263,9 @@ def _render_handwriting(
         styles = _ink_styles(data)
         if styles is not None:
             template.set_background(
-                new_layered_paper(background, split_latin=styles[1] is not None)
+                new_layered_paper(
+                    background, split_latin=styles[1] is not None or params.fine_edit == "true"
+                )
             )
         text = (
             _english_spacing(
@@ -1259,7 +1291,10 @@ def _render_handwriting(
             ):
                 text = normalize_text_for_font(text, path, preserve_indent=template.custom_layout)
                 fine = _FineDocument(
-                    _fine_document_key(params.text, text), styles, parse_edits(params.fine_edits)
+                    _fine_document_key(params.text, text),
+                    styles,
+                    parse_edits(params.fine_edits),
+                    _fine_source_positions(params.text, text),
                 )
             images = checked_items(
                 handwrite_with_page_breaks(
