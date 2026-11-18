@@ -36,7 +36,7 @@ class MobileTestApi extends HandwritingApi {
     previewReads++;
     return [
       base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQAAAAA3bvkkAAAACklEQVR42mP4DwABAQEAHLCMmQAAAABJRU5ErkJggg==',
       ),
     ];
   }
@@ -267,8 +267,8 @@ void main() {
       final picture = recorder.endRecording();
       final image = await picture.toImage(800, 1000);
       try {
-        return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer
-            .asUint8List();
+        final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+        return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       } finally {
         image.dispose();
         picture.dispose();
