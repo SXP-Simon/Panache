@@ -1,6 +1,7 @@
 import type { MessageKey } from './i18n';
 export const defaultNumbers = {
   font_size: 160,
+  latin_font_scale: 100,
   line_spacing: 260,
   word_spacing: 1,
   width: 2800,
@@ -24,6 +25,9 @@ export const defaultNumbers = {
   ink_opacity: 100,
   ink_thickness: 0,
   ink_softness: 0,
+  latin_ink_opacity: 100,
+  latin_ink_thickness: 0,
+  latin_ink_softness: 0,
 };
 export type NumericKey = keyof typeof defaultNumbers;
 export interface NumberField {
@@ -32,7 +36,18 @@ export interface NumberField {
   testId: string;
   step: number;
   min: number;
+  max?: number;
+  unit?: string;
 }
+export const latinScaleField = {
+  key: 'latin_font_scale',
+  label: 'latinFontScale',
+  testId: 'latin-font-scale',
+  step: 1,
+  min: 50,
+  max: 150,
+  unit: '%',
+} as const;
 export const mainFields: readonly NumberField[] = [
   { key: 'font_size', label: 'fontSize', testId: 'font-size-input', step: 1, min: 1 },
   { key: 'line_spacing', label: 'lineSpacing', testId: 'line-spacing-input', step: 1, min: 1 },
@@ -135,7 +150,15 @@ export const strikeFields: readonly NumberField[] = [
   },
 ];
 export const inkFields = [
-  { key: 'ink_opacity', label: 'inkOpacity', testId: 'ink-opacity', step: 1, min: 0, max: 100 },
+  {
+    key: 'ink_opacity',
+    label: 'inkOpacity',
+    testId: 'ink-opacity',
+    step: 1,
+    min: 0,
+    max: 100,
+    unit: '%',
+  },
   {
     key: 'ink_thickness',
     label: 'inkThickness',
@@ -143,15 +166,30 @@ export const inkFields = [
     step: 0.1,
     min: -2,
     max: 2,
+    unit: 'px',
   },
-  { key: 'ink_softness', label: 'inkSoftness', testId: 'ink-softness', step: 0.1, min: 0, max: 2 },
+  {
+    key: 'ink_softness',
+    label: 'inkSoftness',
+    testId: 'ink-softness',
+    step: 0.1,
+    min: 0,
+    max: 2,
+    unit: 'px',
+  },
 ] as const;
+export const latinInkFields = inkFields.map((field) => ({
+  ...field,
+  key: `latin_${field.key}` as const,
+  testId: `latin-${field.testId}`,
+}));
+export const sliderFields = [...inkFields, ...latinInkFields, latinScaleField];
 export const allFields = [
   ...mainFields,
   ...paperFields,
   ...variationFields,
   ...strikeFields,
-  ...inkFields,
+  ...sliderFields,
 ];
 
 const integerFields = new Set<NumericKey>([
@@ -166,10 +204,12 @@ const integerFields = new Set<NumericKey>([
   'right_margin',
 ]);
 export function validNumber(key: NumericKey, value: number): boolean {
-  const ink = inkFields.find((item) => item.key === key);
-  if (ink)
+  const slider = sliderFields.find((item) => item.key === key);
+  if (slider)
     return (
-      Number.isInteger(value * (ink.step === 1 ? 1 : 10)) && value >= ink.min && value <= ink.max
+      Number.isInteger(value * (slider.step === 1 ? 1 : 10)) &&
+      value >= slider.min &&
+      value <= slider.max
     );
   const field = allFields.find((item) => item.key === key);
   const maximum = key === 'strikethrough_probability' ? 1 : key === 'font_size' ? 2048 : 10000;
@@ -189,4 +229,18 @@ export function validPaper(numbers: typeof defaultNumbers): boolean {
     numbers.top_margin + numbers.bottom_margin + numbers.line_spacing <= numbers.height &&
     numbers.width * numbers.height <= 16_000_000
   );
+}
+export const latinFonts = {
+  handlee: 'Handlee',
+  patrick_hand: 'Patrick Hand',
+  indie_flower: 'Indie Flower',
+  kalam: 'Kalam',
+  shadows_into_light: 'Shadows Into Light',
+} as const;
+export type LatinFont = keyof typeof latinFonts;
+export type DigitFont = 'primary' | 'latin';
+export type PaperPattern = 'grid' | 'dots';
+
+export function isLatinFont(value: unknown): value is LatinFont {
+  return typeof value === 'string' && Object.hasOwn(latinFonts, value);
 }

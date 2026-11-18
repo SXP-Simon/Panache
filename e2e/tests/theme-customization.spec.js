@@ -1,13 +1,19 @@
 const path = require('node:path');
-const { test, expect, openHome, fillText, useSmallCanvas, expectPreviewImageLoaded } = require('./fixtures');
+const { test, expect, openHome, fillText, setNumber, expectPreviewImageLoaded } = require('./fixtures');
 const screenshots = path.resolve(__dirname, '../../preview_outputs/theme-customization');
 
-test('default blue accents keep light and dark workspaces neutral', async ({ page }) => {
+test('dark workspace surfaces stay neutral under custom accents', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openHome(page);
-  await useSmallCanvas(page, { fontSize: 31, lineSpacing: 47 });
-  await page.getByTestId('paper-settings-toggle').click();
+  await page.getByTestId('live-preview-toggle').getByRole('checkbox').uncheck();
+  await page.getByTestId('canvas-pane-paper').click();
+  await setNumber(page, 'width-input', 720);
+  await setNumber(page, 'height-input', 960);
+  await page.getByTestId('canvas-pane-layout').click();
+  await setNumber(page, 'font-size-input', 40);
+  await setNumber(page, 'line-spacing-input', 68);
+  await page.getByTestId('canvas-pane-edit').click();
   await fillText(page, 'Panache 手写工作台\n\n同一张纸，同一种笔迹。\n试写一段文字，看看它落在纸上的样子。');
   await page.getByTestId('preview-btn').click();
   await expectPreviewImageLoaded(page);
@@ -51,19 +57,28 @@ test('default blue accents keep light and dark workspaces neutral', async ({ pag
         primaryCard: background('[data-tone="primary"] [data-slot="card-icon"]'),
         secondaryCard: background('[data-tone="secondary"] [data-slot="card-icon"]'),
         fileField: background('[data-slot="file-field"]'),
+        selectedTool: background('[data-testid="canvas-pane-edit"]'),
+        surfaces: [...document.querySelectorAll(
+          '.canvas-tools, .panel-heading, .editor-toolbar, .document-input, .symbol-strip, .editor-footer, .preview-canvas, .preview-tools, .export-bar',
+        )].map((node) => {
+          const style = getComputedStyle(node);
+          return [style.backgroundColor, style.backgroundImage, style.borderColor];
+        }),
       };
     };
     const root = document.documentElement;
     const baseline = read();
-    root.style.setProperty('--primary', '#da6734');
+    root.style.setProperty('--primary', '#f6d452');
     const primary = read();
     root.style.removeProperty('--primary');
-    root.style.setProperty('--secondary', '#a77dac');
+    root.style.setProperty('--secondary', '#d4ab53');
     const secondary = read();
     root.style.removeProperty('--secondary');
     return { baseline, primary, secondary };
   });
-  for (const key of ['primary', 'primaryCard']) {
+  expect(wiring.primary.surfaces).toEqual(wiring.baseline.surfaces);
+  expect(wiring.secondary.surfaces).toEqual(wiring.baseline.surfaces);
+  for (const key of ['primary', 'primaryCard', 'selectedTool']) {
     expect(wiring.primary[key]).not.toBe(wiring.baseline[key]);
     expect(wiring.secondary[key]).toBe(wiring.baseline[key]);
   }
@@ -71,6 +86,15 @@ test('default blue accents keep light and dark workspaces neutral', async ({ pag
     expect(wiring.secondary[key]).not.toBe(wiring.baseline[key]);
     expect(wiring.primary[key]).toBe(wiring.baseline[key]);
   }
+  await page.getByTestId('appearance-btn').click();
+  await page.getByTestId('theme-color-hex').fill('#f6d452');
+  await page.getByTestId('theme-color-apply').click();
+  await page.getByTestId('theme-secondary-color-hex').fill('#d4ab53');
+  await page.getByTestId('theme-secondary-color-apply').click();
+  await page.getByTestId('appearance-modal-close').click();
+  await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
+  await page.screenshot({ path: path.join(screenshots, 'web-yellow-dark.png') });
 });
 
 test('mobile appearance edits persist and stay separate from paper ink', async ({ page }) => {
@@ -98,7 +122,7 @@ test('mobile appearance edits persist and stay separate from paper ink', async (
   await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
   await expect(page.getByTestId('ink-color-input')).toHaveValue(ink);
   await page.screenshot({ path: path.join(screenshots, 'web-mobile-effect.png') });
-  await expect(page.getByTestId('draft-save-status')).toContainText('已保存');
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
   await page.reload();
   await expect(page.getByTestId('text-input')).toContainText('Panache');
   expect(await page.locator('html').evaluate((el) => el.style.getPropertyValue('--primary'))).toBe('#8b5cf6');
@@ -159,7 +183,7 @@ for (const damagedColor of [undefined, 'broken-color', '#a3f635']) {
   test(`legacy workspace remains intact with theme color ${damagedColor}`, async ({ page }) => {
     await openHome(page);
     await fillText(page, '主题迁移保留草稿');
-    await expect(page.getByTestId('draft-save-status')).toContainText('已保存');
+    await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
     await page.addInitScript((color) => {
       const record = JSON.parse(localStorage.getItem('studio.workspace'));
       if (color === undefined) delete record.preferences.themeColor;

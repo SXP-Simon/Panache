@@ -96,7 +96,7 @@ test('作业笔记随草稿和预设保存，旧预设明确回退标准模式',
   await page.getByTestId('layout-style-select').selectOption('homework');
   await page.getByTestId('save-settings-btn').click();
   await expect(page.getByTestId('message-info')).toContainText('保存成功');
-  await expect(page.getByTestId('draft-save-status')).toContainText('已保存到本机');
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
   await page.reload();
   await expect(page.getByTestId('layout-style-select')).toHaveValue('homework');
   await page.getByTestId('layout-style-select').selectOption('standard');
@@ -112,7 +112,7 @@ test('作业笔记随草稿和预设保存，旧预设明确回退标准模式',
   });
   await page.getByTestId('load-settings-btn').click();
   await expect(page.getByTestId('layout-style-select')).toHaveValue('standard');
-  await expect(page.getByTestId('draft-save-status')).toContainText('已保存到本机');
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
   await page.reload();
   await expect(page.getByTestId('layout-style-select')).toHaveValue('standard');
   await page.getByTestId('reset-settings-btn').click();
@@ -146,7 +146,7 @@ test('上传浅色横线背景后仍可启用作业笔记，切换保留识别�
   await page.getByTestId('layout-style-select').selectOption('standard');
   for (const [i, id] of ids.entries()) await expect(page.getByTestId(id)).toHaveValue(values[i]);
   await page.getByTestId('layout-style-select').selectOption('homework');
-  await expect(page.getByTestId('draft-save-status')).toContainText('已保存到本机');
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
   await page.reload();
   await expect(page.getByTestId('layout-style-select')).toHaveValue('homework');
 });

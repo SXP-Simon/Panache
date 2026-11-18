@@ -14,7 +14,7 @@ const png = fs.readFileSync(fixture('inline-mark.png'));
 const dataUrl = `data:image/png;base64,${png.toString('base64')}`;
 
 async function saved(page) {
-  await expect(page.getByTestId('draft-save-status')).toContainText('已保存到本机');
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'saved');
 }
 
 // Mock only the transport: persisted Files and the submitted FormData still come from the real stores.
@@ -187,6 +187,14 @@ test('正文和语言更新复用字体版本缓存，切语言不覆盖正在�
     return route.fulfill({ json: { version: 'state-cache-test' } });
   });
   await openHome(page);
+  expect(versions).toBe(0);
+  await page.getByTestId('live-preview-toggle').getByRole('checkbox').uncheck();
+  const appearance = page.getByTestId('appearance-btn');
+  const appVersion = page.getByTestId('app-version');
+  await appearance.click();
+  await expect(appVersion).toHaveText('vstate-cache-test');
+  await page.getByTestId('appearance-modal-close').click();
+  await expect(page.getByTestId('appearance-modal')).toHaveCount(0);
   const editor = page.getByTestId('text-input');
   await editor.fill('正在编辑的中文 English');
   for (const language of ['en', 'zh-CN']) {
@@ -197,7 +205,8 @@ test('正文和语言更新复用字体版本缓存，切语言不覆盖正在�
     await editor.pressSequentially('!', { delay: 0 });
     await editor.fill('正在编辑的中文 English');
   }
-  await page.waitForLoadState('networkidle');
+  await appearance.click();
+  await expect(appVersion).toHaveText('vstate-cache-test');
   expect(fonts).toBe(1);
   expect(versions).toBe(1);
 });
@@ -221,6 +230,7 @@ test('活跃生成任务刷新后继续观测同一任务，不能重新POST生�
 
 test('记录写入失败明确显示保存失败，当前正文仍然可编辑', async ({ page }) => {
   await openHome(page);
+  await page.getByTestId('live-preview-toggle').getByRole('checkbox').uncheck();
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
@@ -230,7 +240,9 @@ test('记录写入失败明确显示保存失败，当前正文仍然可编辑',
   });
   await page.getByTestId('text-input').fill('保存失败也不能吞掉当前编辑');
   await expect(page.getByTestId('message-info')).toContainText('无法保存到本机，请检查存储权限或可用空间');
-  await expect(page.getByTestId('draft-save-status')).not.toContainText('已保存到本机');
+  const saveStatus = page.getByTestId('text-panel').getByTestId('draft-save-status');
+  await expect(saveStatus).toHaveAttribute('data-state', 'error');
+  await expect(saveStatus).toContainText('尚未保存，请检查本地存储');
   await expect(page.getByTestId('text-input')).toHaveValue('保存失败也不能吞掉当前编辑');
 });
 
@@ -244,7 +256,7 @@ test('图片资源写入失败不能把仅内存中的插图误报为已保存',
   await page.getByTestId('text-input').fill('图片保存失败的正文');
   await page.getByTestId('inline-image-input').setInputFiles(fixture('inline-mark.png'));
   await expect(page.getByTestId('message-info')).toContainText('无法保存到本机，请检查存储权限或可用空间');
-  await expect(page.getByTestId('draft-save-status')).not.toContainText('已保存到本机');
+  await expect(page.getByTestId('draft-save-status')).toHaveAttribute('data-state', 'error');
   await expect(page.getByTestId('text-input')).toHaveValue(/图片保存失败的正文/);
 });
 

@@ -1,19 +1,26 @@
 import { create } from 'zustand';
 import { defaultNumbers } from '@/models';
-import type { NumericKey } from '@/models';
+import type { DigitFont, LatinFont, NumericKey, PaperPattern } from '@/models';
 
 export interface SettingsData {
   numbers: typeof defaultNumbers;
   selectedFont: string;
+  selectedLatinFont: LatinFont | '';
+  digitFont: DigitFont;
   fontFile: File | null;
   background: File | null;
   backgroundRuled: boolean;
   backgroundUrl: string;
   layoutStyle: 'standard' | 'homework';
+  firstLineIndent: boolean;
+  monospaced: boolean;
   underlined: boolean;
+  paperPattern: PaperPattern | '';
   englishSpacing: boolean;
   fullPreview: boolean;
   ink: string;
+  separateLatinInk: boolean;
+  latinInk: string;
   selectedPreset: string;
 }
 interface SettingsState extends SettingsData {
@@ -25,15 +32,22 @@ interface SettingsState extends SettingsData {
 export const initialSettings: SettingsData = {
   numbers: { ...defaultNumbers },
   selectedFont: '',
+  selectedLatinFont: '',
+  digitFont: 'primary',
   fontFile: null,
   background: null,
   backgroundRuled: false,
   backgroundUrl: '',
   layoutStyle: 'standard',
+  firstLineIndent: false,
+  monospaced: false,
   underlined: true,
+  paperPattern: '',
   englishSpacing: false,
   fullPreview: false,
   ink: '#26322a',
+  separateLatinInk: false,
+  latinInk: '#26322a',
   selectedPreset: '',
 };
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
@@ -83,7 +97,9 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       selectedFont,
       underlined,
       selectedPreset: value,
-      ...(value === 'smallUnderlined' ? { englishSpacing: false, fontFile: null } : {}),
+      ...(value === 'smallUnderlined'
+        ? { englishSpacing: false, fontFile: null, paperPattern: '' }
+        : {}),
     });
     return true;
   },

@@ -11,10 +11,10 @@ const source = '# 常见作业电路\n\nRC 低通电路\n' + circuit('rc-lowpass
 
 for (const style of ['neat', 'casual']) {
   test(`circuitikz ${style} renders intact circuits through the real application`, async ({page}) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     await page.getByTestId('builtin-preset-select').selectOption('clean');
     await page.getByTestId('font-select').selectOption({label: style === 'neat' ? '霞鹜文楷.ttf' : '云烟体.ttf'});
-    await page.getByTestId('underlined-checkbox').uncheck();
+    await page.getByTestId('paper-style-blank').check();
     await page.getByTestId('variation-settings-toggle').click();
     await page.getByTestId('ink-depth-sigma-input').fill(style === 'neat' ? '0' : '12');
     if (style === 'casual') {

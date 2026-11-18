@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreviewStore } from '@/features/preview/store';
@@ -14,6 +15,7 @@ import { Card, CardHeader } from '../shared/ui/Card';
 import Button from '../shared/ui/Button';
 import Modal from '../shared/ui/Modal';
 import PaperAreaControl from './PaperAreaControl';
+import WorkspaceStatus from './WorkspaceStatus';
 import {
   Eye,
   PenLine,
@@ -28,11 +30,18 @@ import {
   FileDown,
   Copy,
 } from '../shared/icons';
-export default function PreviewPanel() {
-  const { images, inkLayers, currentPage, setPage } = usePreviewStore(
+export default function PreviewPanel({
+  keepVisible = false,
+  headingActions,
+}: {
+  keepVisible?: boolean;
+  headingActions?: ReactNode;
+}) {
+  const { images, inkLayers, latinInkLayers, currentPage, setPage } = usePreviewStore(
     useShallow((state) => ({
       images: state.images,
       inkLayers: state.inkLayers,
+      latinInkLayers: state.latinInkLayers,
       currentPage: state.currentPage,
       setPage: state.setPage,
     })),
@@ -54,13 +63,29 @@ export default function PreviewPanel() {
   const [expanded, setExpanded] = useState(false);
   const image = images[currentPage] ?? backgroundUrl;
   const ink = inkLayers[currentPage];
+  const latinInk = latinInkLayers[currentPage] ?? undefined;
+  const sizeLabel = (
+    <span className="preview-size" title={background?.name}>
+      {background ? background.name : `${width} × ${height}`}
+    </span>
+  );
   return (
     <Card className="preview-panel" id="workspace-panel-preview" data-testid="preview-panel">
       <CardHeader title={t('preview')} icon={<Eye size={18} />}>
-        <span className="preview-size">
-          {background ? background.name : `${width} × ${height}`}
-        </span>
+        {headingActions ? (
+          <div className="preview-heading-actions">
+            {sizeLabel}
+            {headingActions}
+          </div>
+        ) : (
+          sizeLabel
+        )}
       </CardHeader>
+      {headingActions && (
+        <div className="canvas-status">
+          <WorkspaceStatus />
+        </div>
+      )}
       <div className={`preview-canvas ${image ? '' : 'is-empty'}`} data-testid="preview-viewport">
         {!image ? (
           <div className="empty-preview">
@@ -72,12 +97,19 @@ export default function PreviewPanel() {
             </div>
             <h3>{t('emptyPreview')}</h3>
             <p>{t('emptyPreviewHint')}</p>
-            <GenerateButton compact />
+            {!headingActions && <GenerateButton compact />}
           </div>
         ) : (
-          <PreviewSheet key={ink ?? image} image={image} ink={ink} zoom={zoom} />
+          <PreviewSheet
+            key={ink ?? image}
+            image={image}
+            ink={ink}
+            latinInk={latinInk}
+            zoom={zoom}
+            fitPage={keepVisible}
+          />
         )}
-        <PreviewProgress />
+        {!(keepVisible && image) && <PreviewProgress />}
       </div>
       <footer className="preview-tools">
         <PreviewPages page={currentPage} count={images.length} setPage={setPage} />
@@ -108,6 +140,7 @@ export default function PreviewPanel() {
             onChange={(event) => patch({ fullPreview: event.currentTarget.checked })}
             type="checkbox"
             data-testid="full-preview-checkbox"
+            aria-describedby={fullPreview && images.length > 3 ? 'long-preview-hint' : undefined}
           />
           <span>{t('fullPreview')}</span>
         </label>
@@ -132,11 +165,17 @@ export default function PreviewPanel() {
           </Button>
         </div>
       </div>
+      {fullPreview && images.length > 3 && (
+        <p className="preview-scope-hint" id="long-preview-hint" role="status">
+          {t('longPreviewHint')}
+        </p>
+      )}
       <AnimatePresence>
         {expanded && image && (
           <ExpandedPreview
             image={image}
             ink={ink}
+            latinInk={latinInk}
             page={currentPage}
             count={images.length}
             setPage={setPage}
@@ -237,6 +276,7 @@ function PreviewZoom({
 function ExpandedPreview({
   image,
   ink,
+  latinInk,
   page,
   count,
   setPage,
@@ -244,6 +284,7 @@ function ExpandedPreview({
 }: {
   image: string;
   ink: string | undefined;
+  latinInk: string | undefined;
   page: number;
   count: number;
   setPage: (page: number) => void;
@@ -260,7 +301,14 @@ function ExpandedPreview({
       className="preview-modal"
     >
       <div className="preview-canvas" data-testid="expanded-preview-viewport">
-        <PreviewSheet key={ink ?? image} image={image} ink={ink} zoom={zoom} expanded />
+        <PreviewSheet
+          key={ink ?? image}
+          image={image}
+          ink={ink}
+          latinInk={latinInk}
+          zoom={zoom}
+          expanded
+        />
       </div>
       <footer className="preview-tools">
         {count > 1 && (
@@ -277,13 +325,17 @@ function ExpandedPreview({
 function PreviewSheet({
   image,
   ink,
+  latinInk,
   zoom,
   expanded = false,
+  fitPage = false,
 }: {
   image: string;
   ink: string | undefined;
+  latinInk: string | undefined;
   zoom: number;
   expanded?: boolean;
+  fitPage?: boolean;
 }) {
   const { t } = useI18n();
   const [loaded, setLoaded] = useState(false);
@@ -295,10 +347,29 @@ function PreviewSheet({
   const opacity = useSettingsStore((state) => state.numbers.ink_opacity) / 100;
   const thickness = useSettingsStore((state) => state.numbers.ink_thickness);
   const softness = useSettingsStore((state) => state.numbers.ink_softness);
+  const latinColor = useSettingsStore((state) =>
+    state.separateLatinInk ? state.latinInk : state.ink,
+  );
+  const latinOpacity =
+    useSettingsStore((state) =>
+      state.separateLatinInk ? state.numbers.latin_ink_opacity : state.numbers.ink_opacity,
+    ) / 100;
+  const latinShape = useSettingsStore(
+    useShallow((state) => ({
+      thickness: state.separateLatinInk
+        ? state.numbers.latin_ink_thickness
+        : state.numbers.ink_thickness,
+      softness: state.separateLatinInk
+        ? state.numbers.latin_ink_softness
+        : state.numbers.ink_softness,
+    })),
+  );
   const mask = useInkMask(ink, { thickness, softness });
+  const latinMask = useInkMask(latinInk, latinShape);
   const reduced = useReducedMotion();
   const prefix = expanded ? 'expanded-preview' : 'preview';
-  const width = expanded ? `calc(min(100cqw, ${aspect * 100}cqh) * ${zoom / 100})` : `${zoom}%`;
+  const width =
+    expanded || fitPage ? `calc(min(100cqw, ${aspect * 100}cqh) * ${zoom / 100})` : `${zoom}%`;
 
   function openImageMenu(x: number, y: number) {
     const element = menu.current;
@@ -313,17 +384,19 @@ function PreviewSheet({
   async function handleImageAction(action: 'copy' | 'save') {
     const background = paper.current;
     if (!background || !mask) return;
+    const inks = [{ mask, color, opacity }];
+    if (latinMask) inks.push({ mask: latinMask, color: latinColor, opacity: latinOpacity });
     try {
       if (action === 'copy') {
         if (!navigator.clipboard || typeof ClipboardItem !== 'function') {
           throw new Error('Image clipboard unavailable');
         }
         // Start the write within the click; the PNG can finish encoding asynchronously.
-        const png = compositePreview(background, mask, color, opacity);
+        const png = compositePreview(background, inks);
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
         setImageActionStatus(t('previewImageCopied'));
       } else {
-        downloadResult(await compositePreview(background, mask, color, opacity), 'png');
+        downloadResult(await compositePreview(background, inks), 'png');
         menu.current?.hidePopover();
       }
     } catch {
@@ -348,7 +421,7 @@ function PreviewSheet({
         className="preview-image"
         onLoad={(event) => {
           const { naturalWidth, naturalHeight } = event.currentTarget;
-          if (expanded && naturalHeight) setAspect(naturalWidth / naturalHeight);
+          if ((expanded || fitPage) && naturalHeight) setAspect(naturalWidth / naturalHeight);
           setLoaded(true);
         }}
         tabIndex={mask ? 0 : undefined}
@@ -374,6 +447,18 @@ function PreviewSheet({
             data-testid={`${prefix}-ink-layer`}
             style={{ backgroundColor: color, opacity, maskImage: `url("${mask}")` }}
           />
+          {latinMask && (
+            <div
+              className="preview-ink-layer"
+              aria-hidden="true"
+              data-testid={`${prefix}-latin-ink-layer`}
+              style={{
+                backgroundColor: latinColor,
+                opacity: latinOpacity,
+                maskImage: `url("${latinMask}")`,
+              }}
+            />
+          )}
           <div ref={menu} className="preview-image-menu" popover="auto">
             <Button
               variant="ghost"

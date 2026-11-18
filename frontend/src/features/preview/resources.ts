@@ -2,13 +2,18 @@ import { useSettingsStore } from '@/features/settings/store';
 import { usePreviewStore } from './store';
 
 export function clearPreview(): void {
-  for (const url of usePreviewStore.getState().images)
-    if (url.startsWith('blob:')) URL.revokeObjectURL(url);
-  usePreviewStore.getState().setImages([]);
+  replacePreview([]);
 }
-export function replacePreview(images: string[], inkLayers?: string[]): void {
-  clearPreview();
-  usePreviewStore.getState().setImages(images, inkLayers);
+export function replacePreview(
+  images: string[],
+  inkLayers?: string[],
+  keepPage = false,
+  latinInkLayers?: (string | null)[],
+): void {
+  const previous = usePreviewStore.getState();
+  previous.setImages(images, inkLayers, keepPage ? previous.currentPage : 0, latinInkLayers);
+  for (const url of previous.images)
+    if (url.startsWith('blob:') && !images.includes(url)) URL.revokeObjectURL(url);
 }
 export function changeBackground(file: File | null, ruled = false): void {
   const previous = useSettingsStore.getState().backgroundUrl;

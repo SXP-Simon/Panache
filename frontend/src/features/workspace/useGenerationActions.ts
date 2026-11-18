@@ -22,57 +22,70 @@ export function useGenerationActions() {
   const downloads = useRef(new Set<() => void>());
   const mounted = useRef(true);
   const sequence = useRef(0);
-  const complete = useCallback(async (pending: Promise<GenerationResult>, token: number) => {
-    try {
-      const result = await pending;
-      if (!mounted.current || token !== sequence.current) return;
-      if (result.type === 'download') {
-        usePreviewStore
-          .getState()
-          .setDownload({ savedPath: '', pdfBytes: result.mode === 'pdf' ? result.blob.size : 0 });
-        downloads.current.add(downloadResult(result.blob, result.mode));
-        useNotificationStore
-          .getState()
-          .inform(window.handwritingDesktop ? 'downloadDesktop' : 'downloadBrowser');
-      } else {
-        replacePreview(
-          result.type === 'images' ? result.images : [URL.createObjectURL(result.blob)],
-          result.type === 'images' ? result.inkLayers : undefined,
-        );
-        useNotificationStore.getState().inform('previewLoaded');
-      }
-      await removeRecord('studio.generation');
-    } catch (cause) {
-      if (!mounted.current || token !== sequence.current) return;
-      if (cause instanceof GenerationStoppedError) {
-        try {
+  const complete = useCallback(
+    async (pending: Promise<GenerationResult>, token: number, current?: () => boolean) => {
+      try {
+        const result = await pending;
+        if (!mounted.current || token !== sequence.current) return;
+        if (current && !current()) {
+          if (result.type === 'images') {
+            for (const url of result.images) if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+          }
           await removeRecord('studio.generation');
-        } catch {
-          useNotificationStore.getState().fail('storageUnavailable');
+          return;
         }
-        if (cause.code === 'cancelled') useNotificationStore.getState().inform('generationStopped');
-        return;
-      }
-      if (cause instanceof ApiError && cause.code === 'cancelled') return;
-      // Transport/task failures already live in the shared query cache.
-      if (!(cause instanceof ApiError)) reportFailure(cause);
-      if (
-        cause instanceof ApiError &&
-        (cause.code === 'taskFailed' ||
-          cause.code === 'queueFull' ||
-          (cause.status !== undefined &&
-            cause.status >= 400 &&
-            cause.status < 500 &&
-            cause.status !== 408))
-      ) {
-        try {
-          await removeRecord('studio.generation');
-        } catch {
-          useNotificationStore.getState().fail('storageUnavailable');
+        if (result.type === 'download') {
+          usePreviewStore
+            .getState()
+            .setDownload({ savedPath: '', pdfBytes: result.mode === 'pdf' ? result.blob.size : 0 });
+          downloads.current.add(downloadResult(result.blob, result.mode));
+          useNotificationStore
+            .getState()
+            .inform(window.handwritingDesktop ? 'downloadDesktop' : 'downloadBrowser');
+        } else {
+          replacePreview(
+            result.type === 'images' ? result.images : [URL.createObjectURL(result.blob)],
+            result.type === 'images' ? result.inkLayers : undefined,
+            Boolean(current),
+            result.type === 'images' ? result.latinInkLayers : undefined,
+          );
+          if (!current) useNotificationStore.getState().inform('previewLoaded');
+        }
+        await removeRecord('studio.generation');
+      } catch (cause) {
+        if (!mounted.current || token !== sequence.current) return;
+        if (cause instanceof GenerationStoppedError) {
+          try {
+            await removeRecord('studio.generation');
+          } catch {
+            useNotificationStore.getState().fail('storageUnavailable');
+          }
+          if (cause.code === 'cancelled')
+            useNotificationStore.getState().inform('generationStopped');
+          return;
+        }
+        if (cause instanceof ApiError && cause.code === 'cancelled') return;
+        // Transport/task failures already live in the shared query cache.
+        if (!(cause instanceof ApiError)) reportFailure(cause);
+        if (
+          cause instanceof ApiError &&
+          (cause.code === 'taskFailed' ||
+            cause.code === 'queueFull' ||
+            (cause.status !== undefined &&
+              cause.status >= 400 &&
+              cause.status < 500 &&
+              cause.status !== 408))
+        ) {
+          try {
+            await removeRecord('studio.generation');
+          } catch {
+            useNotificationStore.getState().fail('storageUnavailable');
+          }
         }
       }
-    }
-  }, []);
+    },
+    [],
+  );
   useEffect(() => {
     mounted.current = true;
     const saved = takeRestoredGeneration();
@@ -107,13 +120,15 @@ export function useGenerationActions() {
     };
   }, [complete, resume]);
   const generate = useCallback(
-    async (mode: GenerationMode) => {
+    async (mode: GenerationMode, live = false) => {
       const current = readGenerationState(client);
       if (current.busy || current.retrySeconds > 0) return;
-      const snapshot = { ...useSettingsStore.getState(), ...useDocumentStore.getState() };
+      const settings = useSettingsStore.getState();
+      const document = useDocumentStore.getState();
+      const snapshot = { ...settings, ...document };
       const invalid = validateGeneration(snapshot);
       if (invalid) {
-        useNotificationStore.getState().fail(invalid);
+        if (!live) useNotificationStore.getState().fail(invalid);
         return;
       }
       useNotificationStore.getState().clear();
@@ -138,6 +153,10 @@ export function useGenerationActions() {
           },
         }),
         ++sequence.current,
+        live
+          ? () =>
+              settings === useSettingsStore.getState() && document === useDocumentStore.getState()
+          : undefined,
       );
     },
     [client, complete, create],

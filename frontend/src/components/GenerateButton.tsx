@@ -26,6 +26,7 @@ export default function GenerateButton({
   return (
     <Button
       variant="primary"
+      size={compact ? 'small' : 'normal'}
       data-testid={testId}
       disabled={disabled}
       onClick={onGenerate ?? (() => void generate('preview'))}

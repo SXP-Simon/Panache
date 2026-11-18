@@ -21,11 +21,11 @@ const expected = '于是，X 的分布律为\n⟦ X | 0  1  2  3 ; ── ; P | 
 
 for (const repetitions of [1, 2]) {
   test(`distribution arrays convert and render: ${repetitions} cleanup click(s)`, async ({ page }) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     await useSmallCanvas(page, { fontSize: 70, lineSpacing: 120 });
     await page.getByTestId('width-input').fill('1600');
     await page.getByTestId('height-input').fill('1600');
-    await page.getByTestId('underlined-checkbox').setChecked(repetitions === 2);
+    await page.getByTestId(repetitions === 2 ? 'paper-style-ruled' : 'paper-style-blank').check();
     const input = page.getByTestId('text-input');
     await input.fill(source);
     for (let i = 0; i < repetitions; i++) await page.getByTestId('prepare-text-btn').click();

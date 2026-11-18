@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { NumberField as Field } from '../models';
+import { validNumber, type NumberField as Field } from '../models';
 import { useI18n } from '../i18n';
 export default function NumberField({
   field,
@@ -24,6 +24,7 @@ export default function NumberField({
           data-testid={field.testId}
           type="number"
           min={field.min}
+          max={field.max}
           step={field.step}
           disabled={disabled}
           onFocus={() => {
@@ -33,12 +34,13 @@ export default function NumberField({
           onBlur={() => setEditing(false)}
           onChange={(event) => {
             const next = event.currentTarget.valueAsNumber;
-            const finite = Number.isFinite(next);
-            setDraft({ text: event.currentTarget.value, committed: finite ? next : value });
-            if (finite) onChange(next);
+            const valid =
+              Number.isFinite(next) && (field.max === undefined || validNumber(field.key, next));
+            setDraft({ text: event.currentTarget.value, committed: valid ? next : value });
+            if (valid) onChange(next);
           }}
         />
-        {field.step >= 1 && <small>px</small>}
+        {(field.unit || field.step >= 1) && <small>{field.unit ?? 'px'}</small>}
       </div>
     </label>
   );

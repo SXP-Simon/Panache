@@ -6,10 +6,10 @@ const path = require('node:path');
 
 for (const [index, source] of pages.entries()) {
   test(`realistic homework ${index + 1} survives cleanup, conversion and real rendering`, async ({page}) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     await page.getByTestId('builtin-preset-select').selectOption('clean');
     await page.getByTestId('font-select').selectOption({label:'云烟体.ttf'});
-    await page.getByTestId('underlined-checkbox').check();
+    await page.getByTestId('paper-style-ruled').check();
     await useSmallCanvas(page, {fontSize:52, lineSpacing:100});
     await page.getByTestId('width-input').fill('1800');
     await page.getByTestId('height-input').fill('2300');

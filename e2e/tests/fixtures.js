@@ -13,8 +13,8 @@ const test = base.extend({
 });
 
 // 打开首页并等字体列表就绪（生成请求要靠它取 font_option，没加载完就点会报错）
-async function openHome(page) {
-  await page.goto('/');
+async function openHome(page, { classic = false } = {}) {
+  await page.goto(classic ? '/?studio=classic' : '/');
   await expect(page.getByTestId('preview-btn')).toBeVisible();
   await expect(page.getByTestId('font-select').locator('option')).not.toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);

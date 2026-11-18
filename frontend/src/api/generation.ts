@@ -30,6 +30,10 @@ export const generationKeys = {
   task: (id: string) => ['generation', 'task', id] as const,
   result: (id: string, mode: GenerationMode) => ['generation', 'result', id, mode] as const,
 };
+function inkFill(color: string) {
+  const channels = color.match(/[\da-f]{2}/gi)?.map((value) => Number.parseInt(value, 16));
+  return `(${(channels ?? [0, 0, 0]).join(',')},255)`;
+}
 export function generationFormData(snapshot: GenerationSnapshot, mode: GenerationMode): FormData {
   const body = new FormData();
   body.append('text', expandInlineImages(snapshot.text, snapshot.imageStore));
@@ -38,17 +42,26 @@ export function generationFormData(snapshot: GenerationSnapshot, mode: Generatio
     body.append(key, String(value));
   }
   body.append('font_option', snapshot.selectedFont);
+  if (snapshot.selectedLatinFont) body.append('latin_font_option', snapshot.selectedLatinFont);
+  if (snapshot.digitFont === 'latin') body.append('digit_font', 'latin');
   if (snapshot.fontFile?.name === snapshot.selectedFont)
     body.append('font_file', snapshot.fontFile);
   body.append('background_image', snapshot.background ?? '');
-  const channels = snapshot.ink.match(/[\da-f]{2}/gi)?.map((value) => Number.parseInt(value, 16));
-  body.append('fill', `(${(channels ?? [0, 0, 0]).join(',')},255)`);
+  body.append('fill', inkFill(snapshot.ink));
+  if (snapshot.separateLatinInk) {
+    body.append('separate_latin_ink', 'true');
+    body.append('latin_fill', inkFill(snapshot.latinInk ?? snapshot.ink));
+  }
   body.append('preview', String(mode === 'preview'));
   body.append('ink_layers', 'true');
   body.append('pdf_save', String(mode === 'pdf'));
   body.append('full_preview', String(mode === 'preview' && snapshot.fullPreview));
   body.append('isUnderlined', String(snapshot.underlined));
+  if (!snapshot.background && snapshot.paperPattern)
+    body.append('paper_pattern', snapshot.paperPattern);
   body.append('layout_style', snapshot.layoutStyle ?? 'standard');
+  if (snapshot.firstLineIndent) body.append('first_line_indent', 'true');
+  if (snapshot.monospaced) body.append('monospaced', 'true');
   body.append('background_ruled', String(Boolean(snapshot.background && snapshot.backgroundRuled)));
   body.append('enableEnglishSpacing', String(snapshot.englishSpacing));
   return body;
@@ -132,16 +145,30 @@ export async function getGenerationResult(
   if (mode === 'preview') {
     if (type.includes('json')) {
       const value = parsePayload(
-        v.object({ images: v.array(v.string()), ink_layers: v.optional(v.array(v.string())) }),
+        v.object({
+          images: v.array(v.string()),
+          ink_layers: v.optional(v.array(v.string())),
+          latin_ink_layers: v.optional(v.array(v.nullable(v.string()))),
+        }),
         await readJson(response),
       );
-      if (value.ink_layers && value.ink_layers.length !== value.images.length)
+      if (
+        (value.ink_layers && value.ink_layers.length !== value.images.length) ||
+        (value.latin_ink_layers && value.latin_ink_layers.length !== value.images.length)
+      )
         throw new ApiError('invalidResponse');
       return {
         type: 'images',
         images: value.images.map((image) => `data:image/png;base64,${image}`),
         ...(value.ink_layers
           ? { inkLayers: value.ink_layers.map((image) => `data:image/png;base64,${image}`) }
+          : {}),
+        ...(value.latin_ink_layers
+          ? {
+              latinInkLayers: value.latin_ink_layers.map((image) =>
+                image === null ? null : `data:image/png;base64,${image}`,
+              ),
+            }
           : {}),
       };
     }

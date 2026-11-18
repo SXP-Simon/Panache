@@ -35,13 +35,13 @@ test('legacy camelCase settings and myPreset migrate without losing text or font
     );
     localStorage.setItem('audit.seeded', '1');
   });
-  await openHome(page);
+  await openHome(page, { classic: true });
   await expect(page.getByTestId('font-size-input')).toHaveValue('42');
   await expect(page.getByTestId('line-spacing-input')).toHaveValue('64');
   await expect(page.getByTestId('ink-color-input')).toHaveValue('#184d32');
   await expect(page.getByTestId('text-input')).toHaveValue('旧版草稿');
   await expect(page.getByTestId('text-file-name')).toHaveText('legacy.txt');
-  await expect(page.getByTestId('underlined-checkbox')).not.toBeChecked();
+  await expect(page.getByTestId('paper-style-blank')).toBeChecked();
   await expect(page.getByTestId('english-spacing-checkbox')).toBeChecked();
   await expect(page.getByTestId('full-preview-checkbox')).toBeChecked();
   await expect(page.getByTestId('markdown-table-mode')).toHaveValue('aligned');
@@ -65,7 +65,7 @@ test('legacy camelCase settings and myPreset migrate without losing text or font
 });
 
 test('built-in small preset keeps every original handwriting value', async ({ page }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   await page.getByTestId('english-spacing-checkbox').check();
   await page.getByTestId('builtin-preset-select').selectOption('smallUnderlined');
   for (const [id, value] of Object.entries({
@@ -86,7 +86,7 @@ test('built-in small preset keeps every original handwriting value', async ({ pa
     'strikethrough-width-input': 8,
   }))
     await expect(page.getByTestId(id)).toHaveValue(String(value));
-  await expect(page.getByTestId('underlined-checkbox')).toBeChecked();
+  await expect(page.getByTestId('paper-style-ruled')).toBeChecked();
   await expect(page.getByTestId('english-spacing-checkbox')).not.toBeChecked();
 });
 

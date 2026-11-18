@@ -7,14 +7,16 @@ export default function Accordion({
   title,
   testId,
   children,
+  initiallyOpen = false,
 }: {
   title: string;
   testId: string;
   children: ReactNode;
+  initiallyOpen?: boolean;
 }) {
   const id = useId();
-  const [open, setOpen] = useState(false);
-  const [hidden, setHidden] = useState(true);
+  const [open, setOpen] = useState(initiallyOpen);
+  const [hidden, setHidden] = useState(!initiallyOpen);
   const reduced = useReducedMotion();
   return (
     <section className="settings-accordion">

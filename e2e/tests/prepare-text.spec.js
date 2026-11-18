@@ -132,13 +132,13 @@ test('stopping during worker loading never applies an old response after restart
 });
 
 test('automata formula renders after one preparation action', async ({ page }) => {
-  await openHome(page);
+  await openHome(page, { classic: true });
   await page.getByTestId('builtin-preset-select').selectOption('clean');
   await page.getByTestId('font-select').selectOption({ label: '霞鹜文楷.ttf' });
   await useSmallCanvas(page, { fontSize: 60, lineSpacing: 110 });
   await page.getByTestId('width-input').fill('2300');
   await page.getByTestId('height-input').fill('650');
-  await page.getByTestId('underlined-checkbox').check();
+  await page.getByTestId('paper-style-ruled').check();
   await page.getByTestId('text-input').fill(source);
   await page.getByTestId('prepare-text-btn').click();
   await expect(page.getByTestId('text-input')).toHaveValue('正规式作业\n能被 5 整除的十进制整数\n' + expected);

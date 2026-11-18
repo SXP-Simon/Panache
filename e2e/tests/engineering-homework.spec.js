@@ -20,10 +20,10 @@ const homework = String.raw`# 电路与信号作业
 
 for (const style of ['neat', 'casual']) {
   test(`engineering homework ${style} cleans, converts and renders through the real engine`, async ({page}, testInfo) => {
-    await openHome(page);
+    await openHome(page, { classic: true });
     await page.getByTestId('builtin-preset-select').selectOption('clean');
     await page.getByTestId('font-select').selectOption({label: style === 'neat' ? '霞鹜文楷.ttf' : '云烟体.ttf'});
-    await page.getByTestId('underlined-checkbox').uncheck();
+    await page.getByTestId('paper-style-blank').check();
     await page.getByTestId('variation-settings-toggle').click();
     await page.getByTestId('ink-depth-sigma-input').fill(style === 'neat' ? '0' : '12');
     if (style === 'casual') {

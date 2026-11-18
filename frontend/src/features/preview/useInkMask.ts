@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { InkShape } from '@/utils/inkEffects';
 
 export function useInkMask(source: string | undefined, { thickness, softness }: InkShape) {
-  const [mask, setMask] = useState(source);
+  const [filtered, setFiltered] = useState<{ source: string; url: string } | null>(null);
   const send = useRef<((shape: InkShape) => void) | null>(null);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export function useInkMask(source: string | undefined, { thickness, softness }: 
       original = !shape.thickness && !shape.softness;
       if (original) {
         pending = null;
-        setMask(source);
+        setFiltered(null);
         return;
       }
       pending = shape;
@@ -39,7 +39,7 @@ export function useInkMask(source: string | undefined, { thickness, softness }: 
       if (event.data && !original) {
         if (activeUrl) URL.revokeObjectURL(activeUrl);
         activeUrl = URL.createObjectURL(event.data);
-        setMask(activeUrl);
+        setFiltered({ source, url: activeUrl });
       }
       busy = false;
       pump();
@@ -54,5 +54,5 @@ export function useInkMask(source: string | undefined, { thickness, softness }: 
     send.current?.({ thickness, softness });
   }, [source, thickness, softness]);
 
-  return source && (mask ?? source);
+  return source && (filtered?.source === source ? filtered.url : source);
 }
