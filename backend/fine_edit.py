@@ -5,12 +5,12 @@ import base64
 import io
 import math
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Annotated, cast
 
 import numpy as np
 from generation_cancellation import check_cancelled
-from ink_effects import InkColor, InkEffects, filtered_alpha, require_layers
+from ink_effects import MAX_RADIUS, InkColor, InkEffects, filtered_alpha, require_layers
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
 
@@ -37,6 +37,16 @@ class GlyphAdjustment(BaseModel):
     angle: int = Field(default=0, ge=-45, le=45)
     opacity: int = Field(default=100, ge=0, le=100)
     color: Annotated[str, StringConstraints(pattern=r"^#[0-9a-fA-F]{6}$")] | None = None
+    thickness: int = Field(default=0, ge=-20, le=20)
+    softness: int = Field(default=0, ge=-20, le=20)
+
+    def apply_shape(self, effects: InkEffects) -> InkEffects:
+        """2026-11-18：在全局字迹基础上应用以 0.1 px 为单位的选区偏移."""
+        return replace(
+            effects,
+            thickness=max(-MAX_RADIUS, min(MAX_RADIUS, effects.thickness + self.thickness / 10)),
+            softness=max(0, min(MAX_RADIUS, effects.softness + self.softness / 10)),
+        )
 
 
 class FineEdits(BaseModel):
@@ -224,7 +234,8 @@ def _paint(
         mask = tile.mask.getchannel(channel)
         if mask.getbbox() is None:
             continue
-        source = np.asarray(filtered_alpha(mask, effects, ink_alpha))[sy[inside], sx[inside]]
+        shape = edit.apply_shape(effects) if edit and (edit.thickness or edit.softness) else effects
+        source = np.asarray(filtered_alpha(mask, shape, ink_alpha))[sy[inside], sx[inside]]
         alpha = ((source.astype(np.uint32) * opacity + 50) // _OPAQUE)[:, None]
         rgb = (np.asarray(color, dtype=np.uint32) * alpha + rgb * (_BYTE - alpha) + 127) // _BYTE
     target[inside] = rgb

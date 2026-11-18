@@ -59,6 +59,8 @@ def test_repeated_glyphs_are_independent_and_pdf_contains_the_zip_pixels():
                     "angle": 22,
                     "opacity": 70,
                     "color": "#be2020",
+                    "thickness": 7,
+                    "softness": 4,
                 }
             ],
         }
