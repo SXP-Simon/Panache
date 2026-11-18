@@ -79,7 +79,12 @@ void main() {
       final storage = DefaultStorage();
       final custom = Settings()
         ..font = 'selected.ttf'
-        ..underlined = false;
+        ..paperStyle = PaperStyle.dots
+        ..latinFont = 'patrick_hand'
+        ..latinScale = 115
+        ..latinDigits = true
+        ..firstLineIndent = true
+        ..monospaced = true;
       custom.values.addAll({
         'width': '2100',
         'height': '2800',

@@ -1,5 +1,24 @@
 import 'ink_page.dart';
 
+enum PaperStyle { blank, ruled, grid, dots }
+
+const latinFonts = {
+  'handlee': 'Handlee',
+  'patrick_hand': 'Patrick Hand',
+  'indie_flower': 'Indie Flower',
+  'kalam': 'Kalam',
+  'shadows_into_light': 'Shadows Into Light',
+};
+
+const latinScaleParameter = Parameter(
+  'latin_font_scale',
+  '英文字号比例',
+  'English font scale',
+  100,
+  minimum: 50,
+  maximum: 150,
+);
+
 class Parameter {
   const Parameter(
     this.key,
@@ -151,7 +170,24 @@ class Settings {
   String fill = '(0, 0, 0, 255)';
   String layoutStyle = 'standard';
   String? font;
+  String? latinFont;
+  int latinScale = 100;
+  bool latinDigits = false, firstLineIndent = false, monospaced = false;
+  String? _paperPattern;
   bool underlined = true, englishSpacing = false, fullPreview = false;
+
+  PaperStyle get paperStyle => switch (_paperPattern) {
+    'grid' => PaperStyle.grid,
+    'dots' => PaperStyle.dots,
+    _ => underlined ? PaperStyle.ruled : PaperStyle.blank,
+  };
+  set paperStyle(PaperStyle style) {
+    underlined = style == PaperStyle.ruled;
+    _paperPattern = switch (style) {
+      PaperStyle.grid || PaperStyle.dots => style.name,
+      _ => null,
+    };
+  }
 
   InkLook get inkLook {
     final rgb = fill
@@ -178,6 +214,12 @@ class Settings {
     'fill': fill,
     'layoutStyle': layoutStyle,
     'font_option': font,
+    'latin_font_option': latinFont,
+    'latin_font_scale': latinScale,
+    'digit_font': latinDigits ? 'latin' : 'primary',
+    'first_line_indent': firstLineIndent,
+    'monospaced': monospaced,
+    'paper_pattern': _paperPattern,
     'isUnderlined': underlined,
     'enableEnglishSpacing': englishSpacing,
     'full_preview': fullPreview,
@@ -211,6 +253,18 @@ class Settings {
         : 'standard';
     if (json['fill'] is String) fill = json['fill'];
     if (json['font_option'] is String) font = json['font_option'];
+    final latin = json['latin_font_option'];
+    latinFont = latin is String && latinFonts.containsKey(latin) ? latin : null;
+    final scale = '${json['latin_font_scale']}';
+    latinScale = latinScaleParameter.accepts(scale) ? int.parse(scale) : 100;
+    latinDigits = json['digit_font'] == 'latin';
+    firstLineIndent = json['first_line_indent'] == true;
+    monospaced = json['monospaced'] == true;
+    _paperPattern = switch (json['paper_pattern']) {
+      'grid' => 'grid',
+      'dots' => 'dots',
+      _ => null,
+    };
     if (json.containsKey('isUnderlined')) {
       underlined = json['isUnderlined'] == true;
     }
@@ -240,6 +294,12 @@ class Settings {
     'text': text,
     'fill': fill,
     'font_option': ?font,
+    'latin_font_option': ?latinFont,
+    'latin_font_scale': '$latinScale',
+    'digit_font': latinDigits ? 'latin' : 'primary',
+    'first_line_indent': '$firstLineIndent',
+    'monospaced': '$monospaced',
+    'paper_pattern': ?_paperPattern,
     'preview': '$preview',
     'pdf_save': '$pdf',
     'full_preview': '$fullPreview',
@@ -275,6 +335,6 @@ class Settings {
       'perturb_y_sigma': '1',
       'strikethrough_probability': '0',
     });
-    underlined = true;
+    paperStyle = PaperStyle.ruled;
   }
 }

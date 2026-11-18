@@ -44,6 +44,7 @@ class GenerationViewModel extends ChangeNotifier {
     required bool preview,
     required bool pdf,
     Future<void> Function()? onSubmitted,
+    bool Function()? acceptPreview,
   }) async {
     if (!available) return false;
     final generation = ++_generation;
@@ -100,8 +101,9 @@ class GenerationViewModel extends ChangeNotifier {
       }
       if (!current()) return false;
       if (preview) {
+        if (acceptPreview?.call() == false) return false;
         final rendered = await engine.preview(submittedId);
-        if (!current()) return false;
+        if (!current() || acceptPreview?.call() == false) return false;
         inkPages = rendered.map(InkPage.fromPacket).toList(growable: false);
         pages = [
           for (var i = 0; i < rendered.length; i++)
@@ -109,7 +111,9 @@ class GenerationViewModel extends ChangeNotifier {
         ];
         previewRevision = revision;
         previewTaskId = submittedId;
-        page = 0;
+        page = acceptPreview == null || pages.isEmpty
+            ? 0
+            : page.clamp(0, pages.length - 1);
       } else {
         final bytes = await engine.export(submittedId);
         if (!current()) return false;

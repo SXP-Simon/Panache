@@ -27,6 +27,7 @@ import '../widgets/workbench_controls.dart';
 import '../widgets/workbench_editor.dart';
 import '../widgets/workbench_preview.dart';
 import '../widgets/workbench_layout.dart';
+import '../widgets/ink_parameter_controls.dart';
 import '../widgets/workbench_information.dart';
 import '../widgets/workbench_settings.dart';
 import '../widgets/workbench_shell.dart';
@@ -68,9 +69,16 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   final editor = TextEditingController();
   TextEditingValue? lastEditorSelection;
   final editorFocus = FocusNode();
+  final editorPane = GlobalKey();
+  final previewPane = GlobalKey();
   final form = GlobalKey<FormState>();
   final undo = UndoHistoryController();
   int destination = 0, mobileTab = 0;
+  SettingsSection settingsSection = SettingsSection.layout;
+  Timer? liveTimer;
+  int? liveSubmitted;
+  bool livePreview = false;
+  bool composing = false;
   int navigationRevision = 0;
   bool operation = false;
   int settingsRevision = 0;
@@ -168,7 +176,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         selection: TextSelection.collapsed(offset: w.text.length),
       );
     }
+    if (livePreview && editor.text.trim().isEmpty && w.pages.isNotEmpty) {
+      w.pages = [];
+      w.page = 0;
+    }
     setState(() {});
+    scheduleLivePreview();
     updatePrompts?.evaluate();
   }
 
@@ -180,6 +193,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    liveTimer?.cancel();
     final job = preparation;
     if (job != null) unawaited(job.cancel());
     WidgetsBinding.instance.removeObserver(this);
@@ -211,7 +225,10 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     } catch (e) {
       notify('${l.errorTitle}: $e');
     } finally {
-      if (mounted) setState(() => operation = false);
+      if (mounted) {
+        setState(() => operation = false);
+        scheduleLivePreview();
+      }
     }
   }
 
@@ -247,6 +264,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   void rememberEditorSelection() {
     final value = editor.value;
+    final composingNow =
+        value.composing.isValid && !value.composing.isCollapsed;
+    if (composing != composingNow) {
+      composing = composingNow;
+      scheduleLivePreview();
+    }
     if (value.selection.isValid && value.selection.end <= value.text.length) {
       lastEditorSelection = value;
     } else if (lastEditorSelection?.text != value.text) {
@@ -334,25 +357,57 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     w.edit();
   });
 
+  void scheduleLivePreview() {
+    liveTimer?.cancel();
+    if (!livePreview ||
+        destination != 0 ||
+        locked ||
+        !w.generation.available ||
+        editor.text.trim().isEmpty ||
+        w.generation.previewRevision == w.editRevision ||
+        liveSubmitted == w.editRevision ||
+        composing) {
+      return;
+    }
+    liveTimer = Timer(
+      Duration(milliseconds: w.settings.fullPreview ? 750 : 350),
+      () {
+        if (!mounted || locked || destination != 0 || !livePreview) return;
+        if (composing) return;
+        liveSubmitted = w.editRevision;
+        unawaited(w.generate(live: true));
+      },
+    );
+  }
+
+  void setLivePreview(bool enabled) {
+    setState(() {
+      livePreview = enabled;
+      liveSubmitted = null;
+    });
+    scheduleLivePreview();
+  }
+
   Future<void> generate({bool preview = true, bool pdf = false}) async {
     if (!(form.currentState?.validate() ?? w.settings.valid)) {
       notify(l.validation);
       return;
     }
     w.text = editor.text;
+    if (preview) liveSubmitted = w.editRevision;
     final navigation = navigationRevision;
     final succeeded = await w.generate(preview: preview, pdf: pdf);
     if (!mounted || !succeeded) return;
     if (!preview && w.exportBytes != null) {
       await action(() => saveBytes(w.exportBytes!, w.exportExtension));
+      return;
     }
     if (preview && w.pages.isNotEmpty) {
+      if (MediaQuery.sizeOf(context).width >= 900) return;
       if (navigation == navigationRevision &&
           destination == 0 &&
           !w.previewStale) {
         selectPane(2);
-      } else {
-        notify(l.previewReady);
       }
     }
   }
@@ -369,6 +424,16 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     FocusScope.of(context).unfocus();
     setState(() {
       destination = index;
+      navigationRevision++;
+    });
+    scheduleLivePreview();
+  }
+
+  void selectSettingsSection(SettingsSection section) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      settingsSection = section;
+      mobileTab = 1;
       navigationRevision++;
     });
   }
@@ -403,6 +468,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         },
         child: WorkbenchShell(
           updateAvailable: widget.updates?.phase == UpdatePhase.available,
+          version: w.version,
           destination: destination,
           onDestinationSelected: selectDestination,
           connected: w.connected,
@@ -437,10 +503,20 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     stage: w.generation.stage,
     pagesCompleted: w.generation.pagesCompleted,
     mobileTab: mobileTab,
+    settingsSection: settingsSection,
+    onSectionSelected: selectSettingsSection,
+    livePreview: livePreview,
+    onLivePreview: setLivePreview,
+    fullPreview: w.settings.fullPreview,
+    onFullPreview: (value) {
+      w.settings.fullPreview = value;
+      w.edit();
+    },
+    pageCount: w.pages.length,
     formKey: form,
     editorView: editorPanel(),
-    settingsView: settingsPanel(),
-    previewView: previewPanel(),
+    settingsView: settingsPanel(wide),
+    buildPreview: previewPanel,
     onDismissError: () {
       w.error = '';
       w.emit();
@@ -455,6 +531,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   );
 
   Widget editorPanel() => WorkbenchEditor(
+    key: editorPane,
     controller: editor,
     focusNode: editorFocus,
     undo: undo,
@@ -592,13 +669,20 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     }
   }
 
-  Widget settingsPanel() => WorkbenchSettings(
+  Widget settingsPanel(bool wide) => WorkbenchSettings(
     settings: w.settings,
     fonts: w.fonts,
     fontFile: w.fontFile,
     background: w.background,
     settingsRevision: settingsRevision,
-    locked: locked,
+    locked: editingLocked,
+    activeSection: settingsSection,
+    onSectionChanged: wide ? null : selectSettingsSection,
+    inkControls: InkParameterControls(
+      look: w.settings.inkLook,
+      onChanged: editingLocked ? null : w.editInk,
+      colorKey: const ValueKey('settings-ink-color'),
+    ),
     onEdited: w.edit,
     onSelectFont: (value) {
       w.settings.font = value;
@@ -677,14 +761,15 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     },
   );
 
-  Widget previewPanel() => WorkbenchPreview(
+  Widget previewPanel(Widget? toolbar) => WorkbenchPreview(
+    key: previewPane,
+    toolbar: toolbar,
     pages: w.pages,
     inkPages: w.inkPages,
     inkLook: w.settings.inkLook,
-    onInkChanged: w.editInk,
     stale: w.previewStale,
     page: w.page,
-    version: w.version,
+    version: '',
     locked: locked,
     backgroundBytes: w.background?.bytes,
     onAdjustBackground: w.background == null ? null : adjustPaperArea,

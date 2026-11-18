@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ink_page.dart';
 import '../services/image_clipboard.dart';
-import 'ink_color_control.dart';
+import 'ink_parameter_controls.dart';
 import 'preview_image_actions.dart';
 import 'workbench_controls.dart';
 import 'preview_pager.dart';
@@ -29,6 +29,7 @@ class WorkbenchPreview extends StatefulWidget {
     this.onInkChanged,
     this.backgroundBytes,
     this.onAdjustBackground,
+    this.toolbar,
   });
   final List<Uint8List> pages;
   final int page;
@@ -43,6 +44,7 @@ class WorkbenchPreview extends StatefulWidget {
   final ValueChanged<InkLook>? onInkChanged;
   final Uint8List? backgroundBytes;
   final VoidCallback? onAdjustBackground;
+  final Widget? toolbar;
 
   @override
   State<WorkbenchPreview> createState() => _WorkbenchPreviewState();
@@ -84,6 +86,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
     return WorkbenchPanel(
       title: l.previewTitle,
       icon: Icons.description_outlined,
+      toolbar: widget.toolbar,
       child: Column(
         children: [
           if (paperActions || inkActions || hasPages)
@@ -135,7 +138,12 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                 ),
               ),
             ),
-          if (_inkExpanded && inkActions) _inkControls(l),
+          if (_inkExpanded && inkActions)
+            InkParameterControls(
+              look: widget.inkLook,
+              onChanged: widget.locked ? null : widget.onInkChanged,
+              colorKey: const ValueKey('preview-ink-color'),
+            ),
           if (widget.stale)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -238,102 +246,6 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _inkControls(AppLocalizations l) {
-    final look = widget.inkLook;
-    final change = widget.onInkChanged!;
-    Widget slider(
-      String name,
-      String key,
-      num value,
-      int min,
-      int max,
-      ValueChanged<double> set, {
-      bool fractional = false,
-    }) => Row(
-      children: [
-        Expanded(
-          child: Text(
-            fractional
-                ? '$name ${value.toStringAsFixed(1)} px'
-                : '$name $value%',
-          ),
-        ),
-        Expanded(
-          child: Slider(
-            key: ValueKey(key),
-            min: min.toDouble(),
-            max: max.toDouble(),
-            divisions: (max - min) * (fractional ? 10 : 1),
-            value: value.toDouble(),
-            label: value.toStringAsFixed(fractional ? 1 : 0),
-            onChanged: (value) =>
-                set(fractional ? (value * 10).round() / 10 : value),
-          ),
-        ),
-      ],
-    );
-    return Column(
-      children: [
-        slider(
-          l.inkOpacity,
-          'ink-opacity',
-          look.opacity,
-          0,
-          100,
-          (v) => change((
-            opacity: v.round(),
-            thickness: look.thickness,
-            softness: look.softness,
-            color: look.color,
-          )),
-        ),
-        slider(
-          l.inkThickness,
-          'ink-thickness',
-          look.thickness,
-          -2,
-          2,
-          (v) => change((
-            opacity: look.opacity,
-            thickness: v,
-            softness: look.softness,
-            color: look.color,
-          )),
-          fractional: true,
-        ),
-        slider(
-          l.inkSoftness,
-          'ink-softness',
-          look.softness,
-          0,
-          2,
-          (v) => change((
-            opacity: look.opacity,
-            thickness: look.thickness,
-            softness: v,
-            color: look.color,
-          )),
-          fractional: true,
-        ),
-        InkColorControl(
-          key: const ValueKey('preview-ink-color'),
-          color: Color(look.color),
-          onChanged: widget.locked
-              ? null
-              : (color) {
-                  final current = widget.inkLook;
-                  widget.onInkChanged?.call((
-                    opacity: current.opacity,
-                    thickness: current.thickness,
-                    softness: current.softness,
-                    color: color.toARGB32(),
-                  ));
-                },
-        ),
-      ],
     );
   }
 }

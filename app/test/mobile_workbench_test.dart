@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/main.dart';
+import 'package:handwriting_app/models/settings.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/widgets/workbench_settings.dart';
@@ -16,20 +17,30 @@ class MobileTestApi extends HandwritingApi {
   String? cancelled;
   final terminal = Completer<Map<String, dynamic>>();
   Completer<void>? stoppingGate;
+  final submissions = <Map<String, String>>[];
+  int previewReads = 0;
   @override
   Future<String> submit(
     Map<String, String> fields,
     Map<String, Upload> files, {
     String? taskId,
-  }) async => 'mobile-task';
+  }) async {
+    submissions.add(Map.of(fields));
+    return 'mobile-task';
+  }
+
   @override
   Future<Map<String, dynamic>> status(String id) => terminal.future;
   @override
-  Future<List<Uint8List>> preview(String id) async => [
-    base64Decode(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
-    ),
-  ];
+  Future<List<Uint8List>> preview(String id) async {
+    previewReads++;
+    return [
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+      ),
+    ];
+  }
+
   @override
   bool get supportsCancel => true;
   @override
@@ -124,6 +135,71 @@ void main() {
     expect(workspace.text, '保持编辑状态');
     expect(tester.takeException(), isNull);
   });
+
+  for (final width in [375.0, 1440.0]) {
+    testWidgets(
+      'live workbench keeps the latest draft and selected paper at $width px',
+      (tester) async {
+        final workspace = await openWorkbench(tester, size: Size(width, 880));
+        final api = workspace.api as MobileTestApi;
+        final narrow = width < 900;
+        Finder keyed(String key) => find.byKey(ValueKey(key));
+        final editor = keyed('text-editor');
+        final l = labels(tester);
+
+        if (narrow) {
+          await tester.tap(keyed('open-paper'));
+          await tester.pumpAndSettle();
+          await tester.tap(keyed('settings-section'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l.mobilePaper).last);
+        } else {
+          await tester.tap(keyed('workspace-tool-paper'));
+        }
+        await tester.pumpAndSettle();
+        await tester.tap(keyed('paper-style-dots'));
+        await tester.pumpAndSettle();
+        expect(workspace.settings.paperStyle, PaperStyle.dots);
+
+        if (narrow) {
+          await tester.tap(keyed('open-preview'));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(keyed('live-preview'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          keyed(narrow ? 'back-to-editor' : 'workspace-tool-edit'),
+        );
+        await tester.pumpAndSettle();
+        final field = tester.widget<TextField>(editor);
+        await tester.enterText(editor, 'old draft');
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(api.submissions.single['text'], 'old draft');
+        await tester.enterText(editor, '新稿 Draft 123');
+        api.terminal.complete({'task_status': 'completed'});
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
+        expect(api.previewReads, 1);
+        expect(api.submissions.last, containsPair('text', '新稿 Draft 123'));
+        expect(api.submissions.last, containsPair('paper_pattern', 'dots'));
+        expect(workspace.previewStale, isFalse);
+        expect(
+          tester.widget<TextField>(editor).controller,
+          same(field.controller),
+        );
+        if (narrow) {
+          await tester.tap(keyed('open-preview'));
+          await tester.pumpAndSettle();
+          await tester.tap(keyed('open-export'));
+          await tester.pumpAndSettle();
+        }
+        expect(keyed('export-pdf'), findsOneWidget);
+        expect(keyed('export-zip'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('generation completion respects navigation and newer edits', (
     tester,

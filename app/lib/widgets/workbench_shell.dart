@@ -18,6 +18,7 @@ class WorkbenchShell extends StatelessWidget {
     this.reduceMotion = false,
     this.onReduceMotionChanged,
     this.updateAvailable = false,
+    this.version = '',
     required this.destination,
     required this.onDestinationSelected,
     required this.connected,
@@ -35,6 +36,7 @@ class WorkbenchShell extends StatelessWidget {
   final Future<bool> Function(Color)? onThemeColorChanged,
       onSecondaryThemeColorChanged;
   final bool updateAvailable;
+  final String version;
   final int destination;
   final ValueChanged<int> onDestinationSelected;
   final bool connected, managedBackend, locked;
@@ -49,11 +51,6 @@ class WorkbenchShell extends StatelessWidget {
         MediaQuery.sizeOf(context).width < 1100 &&
         MediaQuery.viewInsetsOf(context).bottom > 0;
     final labels = [l.workspace, l.guide, l.about];
-    const icons = [
-      Icons.edit_note_rounded,
-      Icons.menu_book_outlined,
-      Icons.info_outline_rounded,
-    ];
     return Scaffold(
       appBar: MediaQuery.sizeOf(context).width < 900
           ? AppBar(
@@ -87,6 +84,19 @@ class WorkbenchShell extends StatelessWidget {
                     )
                   : null,
               actions: [
+                IconButton(
+                  tooltip: l.guide,
+                  onPressed: () => onDestinationSelected(1),
+                  icon: const Icon(Icons.menu_book_outlined),
+                ),
+                IconButton(
+                  tooltip: l.about,
+                  onPressed: () => onDestinationSelected(2),
+                  icon: Badge(
+                    isLabelVisible: updateAvailable,
+                    child: const Icon(Icons.info_outline),
+                  ),
+                ),
                 if (MediaQuery.sizeOf(context).width < 1100) ...[
                   TextButton.icon(
                     key: const ValueKey('app-preferences'),
@@ -101,35 +111,15 @@ class WorkbenchShell extends StatelessWidget {
                     icon: const Icon(Icons.palette_outlined),
                     label: Text(l.appPreferences),
                   ),
-                  Tooltip(
-                    message: l.connection,
-                    child: TextButton.icon(
-                      onPressed: locked || managedBackend ? null : onConnection,
-                      icon: Icon(
-                        connected
-                            ? Icons.cloud_done_outlined
-                            : Icons.cloud_off_outlined,
-                      ),
-                      label: Text(
-                        managedBackend ? l.localEngine : l.connection,
-                      ),
-                    ),
+                  IconButton(
+                    tooltip: l.language,
+                    onPressed: onToggleLocale,
+                    icon: const Icon(Icons.translate),
                   ),
-                  Tooltip(
-                    message: l.language,
-                    child: TextButton.icon(
-                      onPressed: onToggleLocale,
-                      icon: const Icon(Icons.translate),
-                      label: Text(l.language),
-                    ),
-                  ),
-                  Tooltip(
-                    message: l.theme,
-                    child: TextButton.icon(
-                      onPressed: onToggleTheme,
-                      icon: const Icon(Icons.contrast),
-                      label: Text(l.theme),
-                    ),
+                  IconButton(
+                    tooltip: l.theme,
+                    onPressed: onToggleTheme,
+                    icon: const Icon(Icons.contrast),
                   ),
                 ],
               ],
@@ -144,43 +134,21 @@ class WorkbenchShell extends StatelessWidget {
                 workspaceBuilder(wide, constraints.maxWidth),
                 Column(
                   children: [
-                    if (!wide)
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: TextButton.icon(
-                          key: const ValueKey('back-to-workspace'),
-                          onPressed: () => onDestinationSelected(0),
-                          icon: const Icon(Icons.arrow_back),
-                          label: Text(l.backToEditor),
-                        ),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        key: const ValueKey('back-to-workspace'),
+                        onPressed: () => onDestinationSelected(0),
+                        icon: const Icon(Icons.arrow_back),
+                        label: Text(l.backToEditor),
                       ),
+                    ),
                     Expanded(child: informationBuilder()),
                   ],
                 ),
               ],
             );
-            return Row(
-              children: [
-                if (wide)
-                  NavigationRail(
-                    selectedIndex: destination,
-                    onDestinationSelected: onDestinationSelected,
-                    labelType: NavigationRailLabelType.all,
-                    destinations: [
-                      for (var i = 0; i < labels.length; i++)
-                        NavigationRailDestination(
-                          icon: Badge(
-                            isLabelVisible: i == 2 && updateAvailable,
-                            child: Icon(icons[i]),
-                          ),
-                          label: Text(labels[i]),
-                        ),
-                    ],
-                  ),
-                if (wide) const VerticalDivider(width: 1),
-                Expanded(child: content),
-              ],
-            );
+            return content;
           },
         ),
       ),
@@ -301,6 +269,14 @@ class WorkbenchShell extends StatelessWidget {
                             },
                     ),
                   ),
+                  if (version.isNotEmpty)
+                    ListTile(
+                      title: Text(l.installedEngineVersion),
+                      trailing: Semantics(
+                        identifier: 'app-version',
+                        child: Text('v$version'),
+                      ),
+                    ),
                   const ProjectSourceLink(),
                   const SizedBox(height: 16),
                 ],

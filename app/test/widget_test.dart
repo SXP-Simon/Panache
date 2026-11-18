@@ -57,6 +57,8 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('text-editor')), '测试文字');
     await tester.pump();
     expect(w.text, '测试文字');
+    await tester.tap(find.byKey(const ValueKey('workspace-tool-layout')));
+    await tester.pumpAndSettle();
     final size = find.byKey(const ValueKey('font_size-0'));
     await tester.scrollUntilVisible(
       size,
@@ -75,6 +77,8 @@ void main() {
     expect(field.enabled, isTrue);
     expect(w.settings.values['font_size'], '80');
     await tester.tap(find.byTooltip('切换明暗主题'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('workspace-tool-edit')));
     await tester.pumpAndSettle();
     expect(
       Theme.of(tester.element(find.byKey(const ValueKey('text-editor'))))

@@ -87,6 +87,12 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('open-paper')));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('settings-section')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-paper')).last,
+        );
+        await tester.pumpAndSettle();
         final scrollable = find
             .descendant(
               of: find.byType(WorkbenchSettings),
