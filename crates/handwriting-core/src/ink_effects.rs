@@ -95,12 +95,11 @@ fn blend_radius(
     Ok(lower)
 }
 
-pub fn composite(
-    mut paper: RgbaImage,
+pub(crate) fn shape(
     mut mask: GrayImage,
     p: &Parameters,
     cancel: &Cancellation,
-) -> Result<RgbaImage> {
+) -> Result<GrayImage> {
     if p.ink_thickness != 0. {
         let thin = p.ink_thickness < 0.;
         let kernel = if thin { Kernel::Min } else { Kernel::Max };
@@ -115,6 +114,16 @@ pub fn composite(
     if p.ink_softness != 0. {
         mask = blend_radius(&mask, p.ink_softness, &Kernel::Mean, cancel)?;
     }
+    Ok(mask)
+}
+
+pub fn composite(
+    mut paper: RgbaImage,
+    mask: GrayImage,
+    p: &Parameters,
+    cancel: &Cancellation,
+) -> Result<RgbaImage> {
+    let mask = shape(mask, p, cancel)?;
     for y in 0..paper.height() {
         cancel.check()?;
         for x in 0..paper.width() {

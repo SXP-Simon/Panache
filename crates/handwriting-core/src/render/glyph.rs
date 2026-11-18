@@ -98,6 +98,7 @@ pub(super) struct Glyphs<'a> {
     pen: pen::MathPen,
 }
 type Path = (Vec<(i32, i32)>, i32);
+pub(super) type PositionedGlyph = (Glyph, i32, i32);
 impl<'a> Glyphs<'a> {
     pub fn new(book: &'a FontBook) -> Self {
         Self {
@@ -208,7 +209,7 @@ impl<'a> Glyphs<'a> {
     }
     pub(super) fn compose(
         advance: f32,
-        children: Vec<(Glyph, i32, i32)>,
+        children: Vec<PositionedGlyph>,
         paths: Vec<Path>,
     ) -> Result<Glyph> {
         let mut bounds: Option<(i32, i32, i32, i32)> = None;

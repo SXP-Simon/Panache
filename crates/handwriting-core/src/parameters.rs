@@ -76,6 +76,10 @@ pub struct Parameters {
     pub strikethrough_width: f32,
     pub ink_depth_sigma: f32,
     pub ink_layers: bool,
+    #[serde(default)]
+    pub fine_edit: bool,
+    #[serde(default)]
+    pub fine_edits: Option<crate::fine_edit::Adjustments>,
     pub ink_opacity: u8,
     pub ink_thickness: f64,
     pub ink_softness: f64,
@@ -121,6 +125,8 @@ impl Default for Parameters {
             strikethrough_width: 8.,
             ink_depth_sigma: 30.,
             ink_layers: false,
+            fine_edit: false,
+            fine_edits: None,
             ink_opacity: 100,
             ink_thickness: 0.,
             ink_softness: 0.,
@@ -209,6 +215,14 @@ impl Parameters {
         p.full_preview = boolean(f, "full_preview", true)?;
         p.pdf_save = boolean(f, "pdf_save", false)?;
         p.ink_layers = boolean(f, "ink_layers", false)?;
+        p.fine_edit = boolean(f, "fine_edit", false)?;
+        if p.fine_edit {
+            p.ink_layers = true;
+            p.fine_edits = f
+                .get("fine_edits")
+                .map(|json| crate::fine_edit::Adjustments::parse(json))
+                .transpose()?;
+        }
         if p.ink_opacity > 100
             || !(-2. ..=2.).contains(&p.ink_thickness)
             || !(0. ..=2.).contains(&p.ink_softness)

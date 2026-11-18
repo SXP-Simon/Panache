@@ -541,7 +541,7 @@ fn assert_layered_export_parity(pattern: Option<PaperPattern>) {
     } else {
         assert_eq!(decoded, paper);
     }
-    let mask = decode(&preview[0].ink);
+    let mask = decode(preview[0].ink.as_deref().unwrap());
     assert!(mask.pixels().any(|p| p[3] > 0));
     assert_eq!(mask[(5, 92)][3], 0);
     let expected = pages(&request).remove(0);
