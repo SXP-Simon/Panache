@@ -6,19 +6,37 @@ import 'dart:math' as math;
 /// Decodes supported raster data URLs without letting corrupt drafts throw
 /// during widget construction. Image codec failures are handled by the view.
 const maxRestoredIllustrationBytes = 32 * 1024 * 1024;
+final _imageHeader = RegExp(
+  r'^data:image/(?:png|jpe?g|webp|gif|bmp);base64,',
+  caseSensitive: false,
+);
+final _invalidBase64Character = RegExp(r'[^A-Za-z0-9+/=\s]');
+final _base64Whitespace = RegExp(r'\s');
+
+/// Scans for invalid characters without matching the whole payload with a
+/// repeated regex group, which can overflow the Dart VM's regexp stack.
+String? compactImagePayload(String payload) {
+  if (payload.isEmpty ||
+      payload.length > ((maxRestoredIllustrationBytes + 2) ~/ 3) * 4 ||
+      _invalidBase64Character.hasMatch(payload)) {
+    return null;
+  }
+  return _base64Whitespace.hasMatch(payload)
+      ? payload.replaceAll(_base64Whitespace, '')
+      : payload;
+}
 
 Uint8List? decodeImageData(String source) {
   // Reject oversized drafts before regex matching, whitespace copying or decode.
   if (source.length > ((maxRestoredIllustrationBytes + 2) ~/ 3) * 4 + 128) {
     return null;
   }
-  final match = RegExp(
-    r'^data:image/(?:png|jpe?g|webp|gif|bmp);base64,([A-Za-z0-9+/=\s]+)$',
-    caseSensitive: false,
-  ).firstMatch(source);
-  if (match == null) return null;
+  final header = _imageHeader.firstMatch(source);
+  if (header == null) return null;
+  final payload = compactImagePayload(source.substring(header.end));
+  if (payload == null) return null;
   try {
-    final bytes = base64Decode(match[1]!.replaceAll(RegExp(r'\s'), ''));
+    final bytes = base64Decode(payload);
     return bytes.isEmpty || bytes.length > maxRestoredIllustrationBytes
         ? null
         : bytes;
@@ -58,7 +76,7 @@ Future<String> prepareIllustration(Uint8List bytes) async {
           if (png.lengthInBytes > 16 * 1024 * 1024) {
             throw const FormatException('image-size');
           }
-          return 'data:image/png;base64,${base64Encode(png.buffer.asUint8List())}';
+          return 'data:image/png;base64,${base64Encode(png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes))}';
         } finally {
           frame.image.dispose();
         }
