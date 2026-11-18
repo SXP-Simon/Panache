@@ -16,11 +16,11 @@ if TYPE_CHECKING:
     from handright import Template
 
 if __package__:
-    from .ink_effects import attach_ink
+    from .ink_effects import attach_ink, latin_layer
     from .ink_effects import layers as page_layers
     from .library_boundary import install_member, member
 else:
-    from ink_effects import attach_ink
+    from ink_effects import attach_ink, latin_layer
     from ink_effects import layers as page_layers
     from library_boundary import install_member, member
 
@@ -55,12 +55,15 @@ class MathInk:
 
     mask: Image.Image
     position: tuple[int, int]
+    latin: bool
 
 
-def remember_math_ink(page: Page, mask: Image.Image, position: tuple[int, int]) -> None:
+def remember_math_ink(
+    page: Page, mask: Image.Image, position: tuple[int, int], *, latin: bool = False
+) -> None:
     """2026-10-24：记录已完成缩放、分页和位置扰动的复合结构。."""
     layers = cast("list[MathInk]", page.image.info.setdefault(_KEY, []))
-    layers.append(MathInk(mask, position))
+    layers.append(MathInk(mask, position, latin))
 
 
 def install_math_ink(core: object) -> None:
@@ -70,7 +73,7 @@ def install_math_ink(core: object) -> None:
     if getattr(original, "_math_ink", False):
         return
 
-    def draw(instance: object, page: Page) -> Image.Image:
+    def draw(instance: object, page: Page, latin_canvas: Image.Image | None = None) -> Image.Image:
         layers = cast("list[MathInk]", page.image.info.get(_KEY, []))
         if not layers:
             return original(instance, page)
@@ -79,14 +82,19 @@ def install_math_ink(core: object) -> None:
         prose.image = page.image.copy()
         prose.image.info.pop(_KEY, None)
         for layer in layers:
-            prose.image.paste(0, layer.position, layer.mask)
+            if not layer.latin:
+                prose.image.paste(0, layer.position, layer.mask)
         canvas = original(instance, prose)
         templates = cast("Sequence[Template]", member(instance, "_templates"))
         template = templates[page.num % len(templates)]
         rand = cast("Random", member(instance, "_rand"))
         # 2026-10-24：布局已预留真实边界；再次随机旋转会越界或碰撞相邻行。
         for layer in layers:
-            ImageDraw.Draw(canvas).bitmap(layer.position, layer.mask, fill=_ink(template, rand))
+            target = latin_canvas if layer.latin and latin_canvas is not None else canvas
+            color = _ink(template, rand)
+            if target is latin_canvas and isinstance(color, tuple):
+                color = color[0]
+            ImageDraw.Draw(target).bitmap(layer.position, layer.mask, fill=color)
         return canvas
 
     @functools.wraps(original)
@@ -102,7 +110,10 @@ def install_math_ink(core: object) -> None:
         source.set_background(Image.new("RGB", background.size, "white"))
         source.set_fill((0, 0, 0))
         install_member(renderer_copy, "_templates", value=(source,))
-        return attach_ink(background, draw(renderer_copy, page))
+        latin_canvas = (
+            Image.new("L", background.size, 255) if latin_layer(background) is not None else None
+        )
+        return attach_ink(background, draw(renderer_copy, page, latin_canvas), latin_canvas)
 
     install_member(merge, "_math_ink", value=True)
     install_member(renderer, "_perturb_and_merge", merge)

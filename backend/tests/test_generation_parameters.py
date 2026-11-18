@@ -112,6 +112,11 @@ def test_layered_preview_matches_zip_and_pdf_without_filtering_paper() -> None:
         ink_opacity="48",
         ink_thickness="1.4",
         ink_softness="0.3",
+        first_line_indent="true",
+        monospaced="true",
+        latin_font_option="kalam",
+        latin_font_scale="115",
+        paper_pattern="dots",
         text=r"墨 x² \frac{a}{b}",
         full_preview="false",
         ink_depth_sigma="12",
@@ -147,6 +152,250 @@ def test_layered_preview_matches_zip_and_pdf_without_filtering_paper() -> None:
     with fitz.open(stream=bytes(pdf.body), filetype="pdf") as document:
         rendered = document[0].get_pixmap(alpha=False)
         assert rendered.samples == expected.tobytes()
+
+
+def test_full_preview_reuses_paper_encoding_and_single_preview_matches_first_page() -> None:
+    """2026-11-18：四页预览只编码一次复用纸面，单页预览只编码首张纸与墨迹."""
+    settings = parameters(ink_layers="true", text="甲\n---\n乙\n---\n丙\n---\n丁")
+    with (
+        patch("app.psutil.cpu_percent", return_value=0),
+        patch.object(app, "_png_bytes", wraps=app._png_bytes) as encode,
+    ):
+        full = asyncio.run(app.generate_handwriting_impl(settings))
+        assert encode.call_count == 5
+        encode.reset_mock()
+        first = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"full_preview": "false"}))
+        )
+        assert encode.call_count == 2
+    assert full.status_code == first.status_code == 200
+    pages = json.loads(bytes(full.body))
+    first_page = json.loads(bytes(first.body))
+    assert len(pages["images"]) == len(pages["ink_layers"]) == 4
+    assert first_page["images"] == pages["images"][:1]
+    assert first_page["ink_layers"] == pages["ink_layers"][:1]
+
+
+def test_single_page_preview_setting_does_not_truncate_exports() -> None:
+    """2026-11-18：预览首页时，PDF 和 ZIP 仍导出全部四页."""
+    settings = parameters(
+        ink_layers="true",
+        text="甲\n---\n乙\n---\n丙\n---\n丁",
+        full_preview="false",
+        preview="false",
+    )
+    with patch("app.psutil.cpu_percent", return_value=0):
+        zipped = asyncio.run(app.generate_handwriting_impl(settings))
+        pdf = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"pdf_save": "true"}))
+        )
+    assert zipped.status_code == pdf.status_code == 200
+    with ZipFile(io.BytesIO(bytes(zipped.body))) as archive:
+        assert archive.namelist() == ["0.png", "1.png", "2.png", "3.png"]
+    with fitz.open(stream=bytes(pdf.body), filetype="pdf") as document:
+        assert len(document) == 4
+
+
+@pytest.mark.parametrize(
+    "latin_font", ["handlee", "patrick_hand", "indie_flower", "kalam", "shadows_into_light"]
+)
+def test_independent_latin_font_changes_only_english_line(
+    monkeypatch: pytest.MonkeyPatch, latin_font: str
+) -> None:
+    """2026-11-18：实际渲染验证英文字体独立，且两项并发任务不共享选择."""
+    assets = Path(__file__).resolve().parents[1] / "font_assets"
+    monkeypatch.setattr(app, "font_assets_bundled_dir", str(assets))
+    settings = parameters(
+        ink_layers="true",
+        font_option="云烟体.ttf",
+        text="墨\nCosine Similarity Cosine Similarity\ncos(x,y)=(x·y)/(||x||₂||y||₂)",
+        width="1000",
+        height="320",
+    )
+
+    async def render_both() -> tuple[Response, Response]:
+        default = app.generate_handwriting_impl(settings)
+        changed = app.generate_handwriting_impl(
+            settings.model_copy(update={"latin_font_option": latin_font})
+        )
+        first, second = await asyncio.gather(default, changed)
+        return first, second
+
+    with patch("app.psutil.cpu_percent", return_value=0):
+        primary, separate = asyncio.run(render_both())
+    assert primary.status_code == separate.status_code == 200
+    left = json.loads(bytes(primary.body))["ink_layers"][0]
+    right = json.loads(bytes(separate.body))["ink_layers"][0]
+    with (
+        Image.open(io.BytesIO(base64.b64decode(left))) as before,
+        Image.open(io.BytesIO(base64.b64decode(right))) as after,
+    ):
+        assert before.crop((0, 0, 1000, 75)).tobytes() == after.crop((0, 0, 1000, 75)).tobytes()
+        assert before.crop((0, 75, 1000, 130)).tobytes() != after.crop((0, 75, 1000, 130)).tobytes()
+        assert (
+            before.crop((0, 130, 1000, 320)).tobytes() != after.crop((0, 130, 1000, 320)).tobytes()
+        )
+
+
+def _ink_mask(encoded: str) -> Image.Image:
+    with Image.open(io.BytesIO(base64.b64decode(encoded))) as image:
+        return image.getchannel("A")
+
+
+def test_digit_font_switch_changes_digits_without_changing_letters() -> None:
+    """2026-11-18：切换数字字体不会让英文字母或中文跟着换字形."""
+    settings = parameters(
+        ink_layers="true", latin_font_option="kalam", text="墨\n123456\nKalam", width="400"
+    )
+    with patch("app.psutil.cpu_percent", return_value=0):
+        primary = asyncio.run(app.generate_handwriting_impl(settings))
+        latin = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"digit_font": "latin"}))
+        )
+    assert primary.status_code == latin.status_code == 200
+    before = _ink_mask(json.loads(bytes(primary.body))["ink_layers"][0])
+    after = _ink_mask(json.loads(bytes(latin.body))["ink_layers"][0])
+    assert before.crop((0, 0, 400, 75)).tobytes() == after.crop((0, 0, 400, 75)).tobytes()
+    assert before.crop((0, 75, 400, 130)).tobytes() != after.crop((0, 75, 400, 130)).tobytes()
+    assert before.crop((0, 130, 400, 240)).tobytes() == after.crop((0, 130, 400, 240)).tobytes()
+
+
+@pytest.mark.parametrize("digit_font", ["primary", "latin"])
+@pytest.mark.parametrize("latin_font", [None, "kalam"])
+def test_latin_size_scales_letters_and_only_digits_assigned_to_latin(
+    digit_font: str, latin_font: str | None
+) -> None:
+    """2026-11-18：比例对中文无影响，可缩放主字体的英文及公式内字形."""
+    settings = parameters(
+        ink_layers="true",
+        separate_latin_ink="true",
+        digit_font=digit_font,
+        text="墨\n1234\nWWW\n(1)/(x)",
+        width="400",
+        height="360",
+        line_spacing="70",
+    ).model_copy(update={"latin_font_option": latin_font})
+
+    def render(scale: str) -> tuple[Image.Image, Image.Image]:
+        result = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"latin_font_scale": scale}))
+        )
+        assert result.status_code == 200
+        payload = json.loads(bytes(result.body))
+        return _ink_mask(payload["ink_layers"][0]), _ink_mask(payload["latin_ink_layers"][0])
+
+    with patch("app.psutil.cpu_percent", return_value=0):
+        primary, latin = render("100")
+        resized_primary, resized_latin = render("135")
+    assert (
+        primary.crop((0, 0, 400, 90)).tobytes() == resized_primary.crop((0, 0, 400, 90)).tobytes()
+    )
+    digit_row = (0, 90, 400, 160)
+    if digit_font == "latin":
+        assert latin.crop(digit_row).tobytes() != resized_latin.crop(digit_row).tobytes()
+    else:
+        assert primary.crop(digit_row).tobytes() == resized_primary.crop(digit_row).tobytes()
+    english_row = (0, 160, 400, 230)
+    original = latin.crop(english_row).getbbox()
+    enlarged = resized_latin.crop(english_row).getbbox()
+    assert original is not None
+    assert enlarged is not None
+    assert enlarged[2] - enlarged[0] > original[2] - original[0]
+    assert abs(enlarged[3] - original[3]) <= 2
+    formula = (0, 230, 400, 360)
+    assert latin.crop(formula).tobytes() != resized_latin.crop(formula).tobytes()
+
+
+@pytest.mark.parametrize("scale", ["49", "151", "nan", "100.5"])
+def test_latin_size_rejects_values_outside_slider_contract(scale: str) -> None:
+    """2026-11-18：生成前拒绝越界及非整数比例."""
+    with patch("app.psutil.cpu_percent", return_value=0):
+        result = asyncio.run(app.generate_handwriting_impl(parameters(latin_font_scale=scale)))
+    assert result.status_code == 400
+
+
+@pytest.mark.parametrize("pattern", ["grid", "dots"])
+def test_paper_pattern_respects_margins_and_matches_exports(pattern: str) -> None:
+    """2026-11-18：方格和点阵遵循纸张尺寸，预览、ZIP、PDF 复用生成的纸面."""
+    settings = parameters(ink_layers="true", paper_pattern=pattern, text="墨 ABC")
+    with patch("app.psutil.cpu_percent", return_value=0):
+        preview = asyncio.run(app.generate_handwriting_impl(settings))
+        zipped = asyncio.run(
+            app.generate_handwriting_impl(settings.model_copy(update={"preview": "false"}))
+        )
+        pdf = asyncio.run(
+            app.generate_handwriting_impl(
+                settings.model_copy(update={"preview": "false", "pdf_save": "true"})
+            )
+        )
+    assert preview.status_code == zipped.status_code == pdf.status_code == 200
+    payload = json.loads(bytes(preview.body))
+    blank = (255, 255, 255)
+    with Image.open(io.BytesIO(base64.b64decode(payload["images"][0]))) as paper:
+        assert paper.size == (240, 240)
+        assert paper.getpixel((70, 70)) != blank
+        assert paper.getpixel((70, 120)) != blank
+        assert (paper.getpixel((45, 70)) != blank) == (pattern == "grid")
+        assert (paper.getpixel((70, 95)) != blank) == (pattern == "grid")
+        for xy in ((10, 70), (231, 70), (70, 10), (70, 230), (45, 95)):
+            assert paper.getpixel(xy) == blank
+        mask = _ink_mask(payload["ink_layers"][0])
+        expected = composite(paper, mask, (12, 34, 56), InkEffects(100, 0, 0))
+    with (
+        ZipFile(io.BytesIO(bytes(zipped.body))) as archive,
+        Image.open(io.BytesIO(archive.read("0.png"))) as png,
+    ):
+        assert png.convert("RGB").tobytes() == expected.tobytes()
+    with fitz.open(stream=bytes(pdf.body), filetype="pdf") as document:
+        assert document[0].get_pixmap(alpha=False).samples == expected.tobytes()
+
+
+def test_split_ink_layers_keep_paper_and_match_pdf_and_zip() -> None:
+    """2026-11-18：普通字与公式中的两种字迹独立合成，三种输出共用滤镜参数."""
+    settings = parameters(
+        text="墨\n123456\nWWWW\n(1)/(x)",
+        width="400",
+        height="320",
+        ink_layers="true",
+        separate_latin_ink="true",
+        latin_font_option="kalam",
+        digit_font="latin",
+        ink_opacity="70",
+        ink_thickness="0.5",
+        latin_fill="(150, 30, 12, 255)",
+        latin_ink_opacity="50",
+        latin_ink_thickness="1.2",
+        latin_ink_softness="0.7",
+    )
+    with patch("app.psutil.cpu_percent", return_value=0):
+        preview = asyncio.run(app.generate_handwriting_impl(settings))
+        exports = settings.model_copy(update={"preview": "false"})
+        zipped = asyncio.run(app.generate_handwriting_impl(exports))
+        pdf = asyncio.run(
+            app.generate_handwriting_impl(exports.model_copy(update={"pdf_save": "true"}))
+        )
+    assert preview.status_code == zipped.status_code == pdf.status_code == 200
+    result = json.loads(bytes(preview.body))
+    main = _ink_mask(result["ink_layers"][0])
+    latin = _ink_mask(result["latin_ink_layers"][0])
+    assert main.crop((0, 0, 400, 90)).getbbox()
+    assert latin.crop((0, 0, 400, 90)).getbbox() is None
+    assert main.crop((0, 90, 400, 180)).getbbox() is None
+    assert latin.crop((0, 90, 400, 180)).getbbox()
+    assert main.crop((0, 180, 400, 320)).getbbox()
+    assert latin.crop((0, 180, 400, 320)).getbbox()
+
+    with Image.open(io.BytesIO(base64.b64decode(result["images"][0]))) as paper:
+        primary = composite(paper, main, (12, 34, 56), InkEffects(70, 0.5, 0))
+        expected = composite(primary, latin, (150, 30, 12), InkEffects(50, 1.2, 0.7))
+        assert expected.getpixel((3, 3)) == paper.getpixel((3, 3))
+    with (
+        ZipFile(io.BytesIO(bytes(zipped.body))) as archive,
+        Image.open(io.BytesIO(archive.read("0.png"))) as png,
+    ):
+        assert png.tobytes() == expected.tobytes()
+    with fitz.open(stream=bytes(pdf.body), filetype="pdf") as document:
+        assert document[0].get_pixmap(alpha=False).samples == expected.tobytes()
 
 
 @pytest.mark.parametrize(

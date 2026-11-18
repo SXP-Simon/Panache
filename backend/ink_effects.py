@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from PIL import Image, ImageChops
 
 INK_LAYERS_KEY = "panache_ink_layers"
+_LATIN_INK_KEY = "panache_latin_ink"
 FULL_OPACITY = 100
 MAX_RADIUS = 2
 type InkColor = tuple[int, int, int]
@@ -26,12 +27,12 @@ class InkEffects:
     softness: float
 
     @classmethod
-    def from_form(cls, data: dict[str, str]) -> "InkEffects":
+    def from_form(cls, data: dict[str, str], *, prefix: str = "") -> "InkEffects":
         """Parse bounded integer settings before allocating pixel buffers."""
         values = cls(
-            int(data.get("ink_opacity", "100")),
-            float(data.get("ink_thickness", "0")),
-            float(data.get("ink_softness", "0")),
+            int(data.get(f"{prefix}ink_opacity", "100")),
+            float(data.get(f"{prefix}ink_thickness", "0")),
+            float(data.get(f"{prefix}ink_softness", "0")),
         )
         if not (
             0 <= values.opacity <= FULL_OPACITY
@@ -59,21 +60,36 @@ def require_layers(image: Image.Image) -> tuple[Image.Image, Image.Image]:
     return result
 
 
-def new_layered_paper(image: Image.Image) -> Image.Image:
+def latin_layer(image: Image.Image) -> Image.Image | None:
+    """2026-11-18：返回可选的独立英文字迹蒙版."""
+    return cast("Image.Image | None", image.info.get(_LATIN_INK_KEY))
+
+
+def new_layered_paper(image: Image.Image, *, split_latin: bool = False) -> Image.Image:
     """Mark a request-local page for layered rendering."""
     paper = image.convert("RGB")
     result = paper.copy()
     result.info[INK_LAYERS_KEY] = (paper, Image.new("L", paper.size))
+    if split_latin:
+        result.info[_LATIN_INK_KEY] = Image.new("L", paper.size)
     return result
 
 
-def attach_ink(background: Image.Image, rendered: Image.Image) -> Image.Image:
+def attach_ink(
+    background: Image.Image, rendered: Image.Image, rendered_latin: Image.Image | None = None
+) -> Image.Image:
     """Merge a text fragment into its existing transparent ink layer."""
     paper, alpha = require_layers(background)
     fragment = ImageChops.invert(rendered.convert("L"))
     combined = ImageChops.lighter(alpha, fragment)
-    result = composite(paper, combined, (0, 0, 0), InkEffects(100, 0, 0))
+    latin = latin_layer(background)
+    if latin is not None and rendered_latin is not None:
+        latin = ImageChops.lighter(latin, ImageChops.invert(rendered_latin))
+    all_ink = ImageChops.lighter(combined, latin) if latin is not None else combined
+    result = composite(paper, all_ink, (0, 0, 0), InkEffects(100, 0, 0))
     result.info[INK_LAYERS_KEY] = (paper, combined)
+    if latin is not None:
+        result.info[_LATIN_INK_KEY] = latin
     return result
 
 

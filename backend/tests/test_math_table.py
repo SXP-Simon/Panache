@@ -98,9 +98,16 @@ def test_english_spacing_preserves_table_columns_and_nested_math():
 
 @pytest.mark.parametrize("ruled", [False, True])
 @pytest.mark.parametrize("size", [(200, 240), (700, 400)])
-def test_table_fits_page_without_splitting_cells_or_clipping(size, ruled):
+@pytest.mark.parametrize("monospaced", [False, True])
+def test_table_fits_page_without_splitting_cells_or_clipping(size, ruled, monospaced):
     font = ImageFont.truetype(str(FONT), 56)
-    tpl = template(size=size, font=font, line_spacing=70, ruled_origin=10 if ruled else None)
+    tpl = template(
+        size=size,
+        font=font,
+        line_spacing=70,
+        ruled_origin=10 if ruled else None,
+        monospaced=monospaced,
+    )
     converted = symbols.normalize_text_for_font(X)
     text = "\n".join([converted] * 4)
     pages, consumed = draft(real_core, text, tpl)

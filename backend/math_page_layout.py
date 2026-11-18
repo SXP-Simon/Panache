@@ -5,6 +5,8 @@ import copy
 import functools
 import math
 import os
+import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,7 +15,7 @@ from typing import Protocol, cast
 
 from handright import Template
 from handright._util import Page
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 from PIL.ImageFont import FreeTypeFont, ImageFont
 
 if __package__:
@@ -36,9 +38,29 @@ type BBox = tuple[int, int, int, int]
 type Raster = tuple[Image.Image, BBox, int]
 type Unit = tuple[Image.Image, BBox, int, int, bool]
 type DrawPage = Callable[[Page, str, int, Template, Random], int]
+type SplitGlyph = Callable[
+    [tuple[ImageDraw.ImageDraw, ImageDraw.ImageDraw], str, tuple[int, int], Font], int
+]
 
 
-class RuledTemplate(Template):
+RIGHT_ALIGN_MARKER = re.compile(r"[ \t]*>>>[ \t]?")
+
+
+class TextLayoutTemplate(Template):
+    """2026-11-18：两项可叠加的正文排版设置，保存于当前生成任务的模板."""
+
+    first_line_indent = False
+    monospaced = False
+    split_latin_ink = False
+    scaled_latin = False
+
+    @property
+    def custom_layout(self) -> bool:
+        """2026-11-18：仅在显式开启时接管普通正文的行布局."""
+        return self.first_line_indent or self.monospaced
+
+
+class RuledTemplate(TextLayoutTemplate):
     """2026-10-17：保留纸张横线原点，插图临时调整上边距时也不改变行网格。."""
 
     __slots__ = ("ruled_origin",)
@@ -208,6 +230,13 @@ def _resize(image: Image.Image, ratio: float) -> Image.Image:
     )
 
 
+def _ink_mask(image: Image.Image) -> Image.Image:
+    # 2026-11-18：LA 保留两个子蒙版，使缩放、换行和涂改使用同一套坐标。
+    if image.mode == "LA":
+        return ImageChops.lighter(image.getchannel("L"), image.getchannel("A"))
+    return image
+
+
 @dataclass(frozen=True)
 class _PairCanvas:
     image: Image.Image
@@ -217,7 +246,7 @@ class _PairCanvas:
     advance: int
 
     @classmethod
-    def create(cls, bounds: list[BBox], advance: int, area: _Area) -> "_PairCanvas":
+    def create(cls, bounds: list[BBox], advance: int, area: _Area, mode: str) -> "_PairCanvas":
         left, top = min(bound[0] for bound in bounds), min(bound[1] for bound in bounds)
         right, bottom = max(bound[2] for bound in bounds), max(bound[3] for bound in bounds)
         # 2026-10-15：先缩放坐标再分配蒙版，极端删除线参数不能产生超大中间画布。
@@ -230,7 +259,7 @@ class _PairCanvas:
             max(1, min(area.width, int((right - left) * ratio))),
             max(1, min(area.height, int((bottom - top) * ratio))),
         )
-        return cls(Image.new("1", size, 0), left, top, ratio, advance)
+        return cls(Image.new(mode, size), left, top, ratio, advance)
 
     def paste(self, glyph: Image.Image, x: int, y: int) -> None:
         if self.ratio < 1:
@@ -239,19 +268,23 @@ class _PairCanvas:
             max(0, min(self.image.width - glyph.width, round((x - self.left) * self.ratio))),
             max(0, min(self.image.height - glyph.height, round((y - self.top) * self.ratio))),
         )
-        self.image.paste(glyph, position, glyph)
+        self.image.paste(glyph, position, _ink_mask(glyph))
 
     def draw_strokes(self, strokes: list[Stroke]) -> None:
-        draw = ImageDraw.Draw(self.image)
+        split = self.image.mode == "LA"
+        main = self.image.getchannel("L") if split else self.image
+        draw = ImageDraw.Draw(main)
         for points, fill, thickness in strokes:
             draw.line(
                 tuple(
                     round((value - (self.left if index % 2 == 0 else self.top)) * self.ratio)
                     for index, value in enumerate(points)
                 ),
-                fill=fill,
+                fill=255 if split and fill else fill,
                 width=max(1, round(thickness * self.ratio)),
             )
+        if split:
+            self.image.paste(Image.merge("LA", (main, self.image.getchannel("A"))))
 
     def raster(self) -> Raster:
         left, top = math.floor(self.left * self.ratio), math.floor(self.top * self.ratio)
@@ -264,22 +297,30 @@ class _MathLayout:
     api: _CoreAdapter
     is_math_glyph: Callable[[str], bool]
     measure_bbox: Callable[[str, Font, str | None], BBox]
+    split_glyph: SplitGlyph | None
 
-    def raster(self, char: str, font: Font) -> Raster:
+    def raster(self, char: str, font: Font, *, split: bool = False) -> Raster:
         # 2026-10-15：测量只用于预留画布，前进量始终取实际绘制的返回值。
         left, top, right, bottom = self.measure_bbox(char, font, _font_path(font))
         left, top = math.floor(left), math.floor(top)
         right, bottom = math.ceil(right), math.ceil(bottom)
         image = Image.new("1", (max(1, right - left + 4), max(1, bottom - top + 4)), 0)
         origin = (2 - left, 2 - top)
-        advance = self.api.draw_char(ImageDraw.Draw(image), char, origin, font)
-        ink = image.getbbox()
+        if split and self.split_glyph is not None:
+            latin = Image.new("1", image.size)
+            advance = self.split_glyph(
+                (ImageDraw.Draw(image), ImageDraw.Draw(latin)), char, origin, font
+            )
+            image = Image.merge("LA", (image.convert("L"), latin.convert("L")))
+        else:
+            advance = self.api.draw_char(ImageDraw.Draw(image), char, origin, font)
+        ink = _ink_mask(image).getbbox()
         if ink is None:
             return image.crop((0, 0, 1, 1)), (0, 0, 0, 0), max(1, advance)
         bbox = (ink[0] - origin[0], ink[1] - origin[1], ink[2] - origin[0], ink[3] - origin[1])
         return image.crop(ink), bbox, max(1, advance)
 
-    def fit(self, char: str, font: Font, area: _Area) -> Raster:
+    def fit(self, char: str, font: Font, area: _Area, *, split: bool = False) -> Raster:
         # 2026-10-15：先以字体原生尺寸重绘；极窄纸张再整体等比缩小，分式不拆开。
         bbox = self.measure_bbox(char, font, _font_path(font))
         while (
@@ -295,7 +336,7 @@ class _MathLayout:
                 size=max(_MIN_FONT_SIZE, min(_font_size(font) - 1, int(_font_size(font) * ratio)))
             )
             bbox = self.measure_bbox(char, font, _font_path(font))
-        image, bbox, advance = self.raster(char, font)
+        image, bbox, advance = self.raster(char, font, split=split)
         width = max(advance, bbox[2]) - min(0, bbox[0])
         height = bbox[3] - bbox[1]
         ratio = min(1, area.width / max(1, width), area.height / max(1, height))
@@ -317,7 +358,9 @@ class _Correction:
     def compose(self, correct: Raster, wrong: str, font: Font) -> Raster:
         # 2026-10-15：先划掉错字，再在其右侧写正确字，不能把两者叠成一个字。
         image, bbox, advance = correct
-        wrong_image, wrong_bbox, wrong_advance = self.layout.fit(wrong, font, self.area)
+        wrong_image, wrong_bbox, wrong_advance = self.layout.fit(
+            wrong, font, self.area, split=image.mode == "LA"
+        )
         capture = _StrokeCapture()
         self.layout.api.strike(capture, 0, 0, self.tpl, self.rand)
         bounds = [wrong_bbox, *(_stroke_bounds(stroke) for stroke in capture.strokes)]
@@ -327,7 +370,7 @@ class _Correction:
             wrong_right + max(2, round(_font_size(font) * 0.08)),
         )
         bounds.append((bbox[0] + offset, bbox[1], bbox[2] + offset, bbox[3]))
-        canvas = _PairCanvas.create(bounds, advance + offset, self.area)
+        canvas = _PairCanvas.create(bounds, advance + offset, self.area, image.mode)
         canvas.paste(wrong_image, wrong_bbox[0], wrong_bbox[1])
         canvas.draw_strokes(capture.strokes)
         canvas.paste(image, bbox[0] + offset, bbox[1])
@@ -362,19 +405,26 @@ class _PageRenderer:
     previous_y: int | None = field(init=False, default=None)
     previous_bottom: int = field(init=False)
     section_lines: int = field(init=False, default=0)
+    custom_layout: bool = field(init=False)
+    monospaced: bool = field(init=False)
+    split: bool = field(init=False)
 
     def __post_init__(self) -> None:
         self.metrics = _Metrics.create(self.page, self.tpl, self.layout.api)
+        self.custom_layout = isinstance(self.tpl, TextLayoutTemplate) and self.tpl.custom_layout
+        self.monospaced = isinstance(self.tpl, TextLayoutTemplate) and self.tpl.monospaced
+        self.split = isinstance(self.tpl, TextLayoutTemplate) and self.tpl.split_latin_ink
         self.draw = self.page.draw()
         self.correction = _Correction(self.layout, self.tpl, self.rand, self.metrics.area)
         self.previous_bottom = self.metrics.top - self.metrics.gap
         self.candidates = tuple(
-            char for char in self.text if char not in self.tpl.get_end_chars() + " \n\t\r"
+            char for char in self.text if char not in self.tpl.get_end_chars() + " \n\t\r\u3000"
         )
 
     def _prepare(self, char: str, cursor: float) -> _Glyph:
         font = self.layout.api.get_font(self.tpl, self.rand)
-        raster = self.layout.fit(char, font, self.metrics.area)
+        drawn = " " if self.custom_layout and char in ("\t", "\u3000") else char
+        raster = self.layout.fit(drawn, font, self.metrics.area, split=self.split)
         jitter_x = (
             self.layout.api.gauss(self.rand, 0, self.tpl.get_word_spacing_sigma())
             if self.metrics.grid
@@ -404,9 +454,11 @@ class _PageRenderer:
             return glyph.x + footprint + max(0, next_bbox[2]) > self.metrics.right
         return False
 
-    def _correct(self, glyph: _Glyph, cursor: float, *, has_units: bool) -> bool:
+    def _correct(self, glyph: _Glyph, char: str, cursor: float, *, has_units: bool) -> bool:
         glyph.corrected = bool(
-            self.candidates and self.rand.random() < self.tpl.get_strikethrough_probability()
+            self.candidates
+            and (not self.custom_layout or not char.isspace())
+            and self.rand.random() < self.tpl.get_strikethrough_probability()
         )
         if not glyph.corrected:
             return False
@@ -434,10 +486,46 @@ class _PageRenderer:
         # 2026-10-15：负字距是普通文字的显式参数，不能被数学行的防碰撞规则覆盖。
         return glyph.x + max(1, step, bbox[2] if compound else 1)
 
+    def _place_on_grid(self, glyph: _Glyph, char: str, cursor: float) -> float:
+        # 2026-11-18：普通字形居中于固定列，宽公式和表格以半格为单位预留整体宽度。
+        image, bbox, advance = glyph.raster
+        half = self.metrics.cell_width / 2
+        if self.layout.is_math_glyph(char):
+            slot = max(1, math.ceil(max(advance, image.width) / half)) * half
+        elif char == "\t":
+            slot = (4 - round((cursor - self.metrics.left) / half) % 4) * half
+        else:
+            slot = self.metrics.cell_width if unicodedata.east_asian_width(char) in "WF" else half
+        available = min(slot, max(1, self.metrics.right - cursor))
+        if bbox[2] > bbox[0]:
+            width = min(image.width, max(1, math.floor(available)))
+            if width != image.width:
+                image = image.resize((width, image.height), Image.Resampling.NEAREST)
+            glyph.raster = (image, (0, bbox[1], width, bbox[3]), advance)
+            glyph.x = round(cursor + (available - width) / 2)
+        return cursor + slot
+
+    def _line_start(self, start: int, *, homework: bool) -> tuple[int, int, bool]:
+        indent = self._paragraph(start).indent if homework else 0
+        if not self.custom_layout or (start > 0 and self.text[start - 1] != "\n"):
+            return start, indent, False
+        marker = RIGHT_ALIGN_MARKER.match(self.text, start)
+        if marker:
+            return marker.end(), 0, True
+        if (
+            isinstance(self.tpl, TextLayoutTemplate)
+            and self.tpl.first_line_indent
+            and not self.text[start].isspace()
+        ):
+            indent = min(
+                2 * self.metrics.cell_width, self.metrics.area.width - self.metrics.font_size
+            )
+        return start, indent, False
+
     def _line(self, start: int) -> tuple[list[Unit], int]:
         units: list[Unit] = []
         homework = isinstance(self.tpl, HomeworkTemplate)
-        indent = self._paragraph(start).indent if homework else 0
+        start, indent, right_aligned = self._line_start(start, homework=homework)
         cursor: float = self.metrics.left + indent
         depth = 0
         boundary: tuple[int, int, object] | None = None
@@ -453,20 +541,45 @@ class _PageRenderer:
             ):
                 boundary = len(units), start, char_state
             glyph = self._prepare(char, cursor)
-            if self._would_wrap(glyph, start, has_units=bool(units)) or self._correct(
-                glyph, cursor, has_units=bool(units)
-            ):
+            if self.monospaced:
+                # 2026-11-18：涂改会插入错字并占列，固定列模式保留原字符位置。
+                next_cursor = self._place_on_grid(glyph, char, cursor)
+                wrap = bool(units) and next_cursor > self.metrics.right
+            else:
+                wrap = self._would_wrap(glyph, start, has_units=bool(units)) or self._correct(
+                    glyph, char, cursor, has_units=bool(units)
+                )
+                next_cursor = (
+                    cursor + self.metrics.cell_width
+                    if self.custom_layout and char == "\u3000"
+                    else self._advance(glyph, char)
+                    if not wrap
+                    else cursor
+                )
+            if wrap:
                 self.rand.setstate(char_state)
                 if boundary is not None:
                     count, start, state = boundary
                     units = units[:count]
                     self.rand.setstate(state)
                 break
-            units.append(glyph.unit(rigid=self.layout.is_math_glyph(char) or glyph.corrected))
-            cursor = self._advance(glyph, char)
+            units.append(
+                glyph.unit(
+                    rigid=self.monospaced or self.layout.is_math_glyph(char) or glyph.corrected
+                )
+            )
+            cursor = next_cursor
             depth = bracket_depth(char, depth)
             start += 1
-        if start < len(self.text) and self.text[start] == "\n":
+        at_end = start == len(self.text) or self.text[start] == "\n"
+        if right_aligned and at_end and units:
+            ink_right = max(
+                (x + bbox[2] for _, bbox, x, _, _ in units if bbox[2] > bbox[0]),
+                default=self.metrics.right,
+            )
+            offset = self.metrics.right - ink_right
+            units = [(image, bbox, x + offset, dy, rigid) for image, bbox, x, dy, rigid in units]
+        if at_end and start < len(self.text):
             start += 1
         return units, start
 
@@ -562,6 +675,18 @@ class _PageRenderer:
         origin = metrics.ruled_origin + metrics.spacing - metrics.font_size
         return origin + max(0, math.ceil((required - origin) / metrics.spacing)) * metrics.spacing
 
+    def _paint(self, unit: Unit, baseline: int) -> None:
+        image, bbox, x, dy, rigid = unit
+        position = (x + bbox[0], baseline + dy + bbox[1])
+        if image.mode == "LA":
+            latin = image.getchannel("A")
+            if latin.getbbox() is not None:
+                remember_math_ink(self.page, latin, position, latin=True)
+            image = image.getchannel("L")
+        if rigid:
+            remember_math_ink(self.page, image, position)
+        self.draw.bitmap(position, image, fill=self.layout.api.white)
+
     def render(self, start: int) -> int:
         while start < len(self.text):
             check_cancelled()
@@ -593,12 +718,8 @@ class _PageRenderer:
                 else:
                     self.rand.setstate(line_state)
                     return line_start
-            for image, bbox, x, dy, rigid in units:
-                if rigid:
-                    remember_math_ink(self.page, image, (x + bbox[0], baseline + dy + bbox[1]))
-                self.draw.bitmap(
-                    (x + bbox[0], baseline + dy + bbox[1]), image, fill=self.layout.api.white
-                )
+            for unit in units:
+                self._paint(unit, baseline)
             self.previous_y, self.previous_bottom = baseline, baseline + max_y
             self.section_lines += 1
         return start
@@ -608,18 +729,24 @@ def install_math_page_layout(
     core: object,
     is_math_glyph: Callable[[str], bool],
     measure_bbox: Callable[[str, Font, str | None], BBox],
+    split_glyph: SplitGlyph | None = None,
 ) -> None:
     """2026-10-15：安装按真实墨迹范围换行、调行距与分页的布局适配器."""
     api = _bindings(core)
     original = api.draw_page
     if getattr(original, "_math_page_layout", False):
         return
-    layout = _MathLayout(api, is_math_glyph, measure_bbox)
+    layout = _MathLayout(api, is_math_glyph, measure_bbox, split_glyph)
 
     @functools.wraps(original)
     def draw_page(page: Page, text: str, start: int, tpl: Template, rand: Random) -> int:
-        if not isinstance(tpl, HomeworkTemplate) and not any(
-            is_math_glyph(char) for char in text[start:]
+        custom = isinstance(tpl, TextLayoutTemplate) and (
+            tpl.custom_layout or tpl.split_latin_ink or tpl.scaled_latin
+        )
+        if (
+            not custom
+            and not isinstance(tpl, HomeworkTemplate)
+            and not any(is_math_glyph(char) for char in text[start:])
         ):
             # 2026-10-24：上游用随机重试选错字；全是排除字符时会永远到不了取消检查点。
             if tpl.get_strikethrough_probability() and not any(

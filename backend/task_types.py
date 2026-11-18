@@ -8,6 +8,7 @@ from fastapi import Form
 from pydantic import BaseModel, ConfigDict, Field
 
 type TaskStatus = Literal["pending", "processing", "cancelling", "cancelled", "completed", "failed"]
+type PaperPattern = Literal["grid", "dots"]
 
 
 class GenerationTask(TypedDict, total=False):
@@ -58,13 +59,26 @@ class GenerateHandwritingParams(BaseModel):
     ink_opacity: str = "100"
     ink_thickness: str = "0"
     ink_softness: str = "0"
+    separate_latin_ink: Literal["true", "false"] = "false"
+    latin_fill: str | None = None
+    latin_ink_opacity: str = "100"
+    latin_ink_thickness: str = "0"
+    latin_ink_softness: str = "0"
     width: str | None = None
     height: str | None = None
     is_underlined: str = Field("false", alias="isUnderlined")
+    paper_pattern: PaperPattern | None = None
     background_ruled: str = "false"
     layout_style: Literal["standard", "homework"] = "standard"
+    first_line_indent: Literal["true", "false"] = "false"
+    monospaced: Literal["true", "false"] = "false"
     enable_english_spacing: str = Field("false", alias="enableEnglishSpacing")
     font_option: str | None = None
+    latin_font_option: (
+        Literal["handlee", "patrick_hand", "indie_flower", "kalam", "shadows_into_light"] | None
+    ) = None
+    digit_font: Literal["primary", "latin"] = "primary"
+    latin_font_scale: str = "100"
     pdf_save: str = "false"
     full_preview: str = "true"
 

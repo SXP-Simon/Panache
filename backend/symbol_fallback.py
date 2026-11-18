@@ -15,7 +15,9 @@ import math
 import os
 import re
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from random import Random
@@ -984,11 +986,53 @@ def _resolve_glyph(
 def _resolve_primary_glyph(
     char: str, font: Font, font_path: str | None = None
 ) -> tuple[Font, BBox, int, bool]:
+    latin_path, _, scale = _LATIN_FONT.get()
+    base_size = font_size_of(font)
+    is_latin = _uses_latin_style(char)
+    size = max(1, round(base_size * scale)) if is_latin else base_size
+    if is_latin and latin_path is not None and ord(char) in _get_font_cmap(latin_path):
+        latin_font, bbox, advance, used_fallback = _get_char_glyph_and_bbox_cached(
+            char, latin_path, size
+        )
+        if not used_fallback and _font_has_visible_glyph(latin_font, char):
+            return latin_font, bbox, advance, True
     path = font_path or font_path_of(font)
-    size = font_size_of(font)
     if path is not None:
-        return _get_char_glyph_and_bbox_cached(char, path, size)
-    return _resolve_glyph(char, font, _memory_font_cmap(font), size)
+        chosen, bbox, advance, fallback = _get_char_glyph_and_bbox_cached(char, path, size)
+    else:
+        chosen, bbox, advance, fallback = _resolve_glyph(
+            char, _resize_font(font, size), _memory_font_cmap(font), size
+        )
+    return chosen, bbox, advance, fallback or size != base_size
+
+
+_LATIN_FONT: ContextVar[tuple[str | None, bool, float]] = ContextVar(
+    "latin_font", default=(None, False, 1)
+)
+
+
+def _uses_latin_style(char: str) -> bool:
+    return char.isascii() and (char.isalpha() or (_LATIN_FONT.get()[1] and char.isdigit()))
+
+
+@contextmanager
+def use_latin_font(path: str | None, *, digits: bool = False, scale: float = 1) -> Generator[None]:
+    """2026-11-18：同一渲染任务共享英文字体，避免并发任务串用字形."""
+    token = _LATIN_FONT.set((path, digits, scale))
+    try:
+        yield
+    finally:
+        _LATIN_FONT.reset(token)
+
+
+def _latin_baseline_offset(char: str, base: Font, chosen: Font) -> int:
+    # 2026-11-18：调整比例时让同一英文字体保留原字号的基线。
+    if _LATIN_FONT.get()[2] == 1 or not _uses_latin_style(char):
+        return 0
+    reference = _resize_font(chosen, font_size_of(base))
+    if isinstance(chosen, ImageFont.FreeTypeFont) and isinstance(reference, ImageFont.FreeTypeFont):
+        return reference.getmetrics()[0] - chosen.getmetrics()[0]
+    return 0
 
 
 def _get_char_glyph_and_bbox(
@@ -996,7 +1040,8 @@ def _get_char_glyph_and_bbox(
 ) -> tuple[Font, BBox, int]:
     """获取单个字符的最佳可用字体、真实渲染包围盒 bbox 及前进量 advance."""
     fb_font, bb, adv, _ = _resolve_primary_glyph(char, font, font_path)
-    return (fb_font, bb, adv)
+    offset = _latin_baseline_offset(char, font, fb_font)
+    return fb_font, (bb[0], bb[1] + offset, bb[2], bb[3] + offset), adv
 
 
 @dataclass(frozen=True)
@@ -1008,9 +1053,19 @@ class _MathBox:
     children: tuple[BoxChild, ...] = ()
     paths: tuple[BoxPath, ...] = ()
     glyph: str | None = None
+    glyph_y: int = 0
     font: Font | None = None
     semantic: str | None = None
     bitmap: Image.Image | None = None
+
+
+def _primary_glyph_box(char: str, font: Font, path: str | None) -> _MathBox:
+    chosen, bbox, advance, _ = _resolve_primary_glyph(char, font, path)
+    offset = _latin_baseline_offset(char, font, chosen)
+    x0, y0, x1, y1 = bbox
+    return _MathBox(
+        advance, (x0, y0 + offset, x1, y1 + offset), glyph=char, glyph_y=offset, font=chosen
+    )
 
 
 @dataclass
@@ -1435,9 +1490,8 @@ def _layout_math_char(char: str, font: Font, font_path: str | None, memo: _Layou
             drawn.advance, drawn.bbox, paths=drawn.paths, semantic=char
         )
     else:
-        chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
-        result = _handwritten_circled_number(char, font, font_path) or _MathBox(
-            advance, bbox, glyph=char, font=chosen
+        result = _handwritten_circled_number(char, font, font_path) or _primary_glyph_box(
+            char, font, font_path
         )
     return result
 
@@ -1560,9 +1614,9 @@ def _layout_math_text(
         x = 0
         children: list[BoxChild] = []
         for char in text:
-            chosen, bbox, advance = _get_char_glyph_and_bbox(char, font, font_path)
-            children.append((_MathBox(advance, bbox, glyph=char, font=chosen), x, 0))
-            x += advance
+            box = _primary_glyph_box(char, font, font_path)
+            children.append((box, x, 0))
+            x += box.advance
         return _compose_box(x, children)
     active.add(key)
     x, index = 0, 0
@@ -1591,16 +1645,24 @@ def _layout_math_text(
     return result
 
 
-def _paint_math_box(draw: ImageDraw.ImageDraw, box: _MathBox, xy: tuple[int, int]) -> None:
+def _paint_math_box(
+    draw: ImageDraw.ImageDraw,
+    box: _MathBox,
+    xy: tuple[int, int],
+    latin: ImageDraw.ImageDraw | None = None,
+) -> None:
 
     x, y = xy
     if box.bitmap is not None:
         draw.bitmap((x + box.bbox[0], y + box.bbox[1]), box.bitmap, fill=MONOCHROME_WHITE)
     if box.glyph is not None:
-        cast("MathDrawer", draw).text((x, y), box.glyph, fill=MONOCHROME_WHITE, font=box.font)
+        target = latin if latin is not None and _uses_latin_style(box.glyph) else draw
+        cast("MathDrawer", target).text(
+            (x, y + box.glyph_y), box.glyph, fill=MONOCHROME_WHITE, font=box.font
+        )
     for child, dx, dy in box.children:
         check_cancelled()
-        _paint_math_box(draw, child, (x + dx, y + dy))
+        _paint_math_box(draw, child, (x + dx, y + dy), latin)
     for points, thickness in box.paths:
         check_cancelled()
         draw.line(
@@ -1617,6 +1679,22 @@ def _draw_text_or_fraction(
     box = _layout_math_text(text, font, font_path)
     _paint_math_box(draw, box, xy)
     return box.advance, box.bbox[3] - box.bbox[1]
+
+
+def _split_glyph(
+    draw_char: Callable[[ImageDraw.ImageDraw, str, tuple[int, int], Font], int],
+    targets: tuple[ImageDraw.ImageDraw, ImageDraw.ImageDraw],
+    char: str,
+    xy: tuple[int, int],
+    font: Font,
+) -> int:
+    # 2026-11-18：复合公式只排版一次，各叶子字形按文字类别绘制，结构线保留在主层。
+    primary, latin = targets
+    if is_math_glyph(char):
+        box = _layout_math_text(char, font)
+        _paint_math_box(primary, box, xy, latin)
+        return box.advance
+    return draw_char(latin if _uses_latin_style(char) else primary, char, xy, font)
 
 
 def _measure_text_or_fraction(text: str, font: Font, font_path: str | None) -> tuple[int, int]:
@@ -1646,7 +1724,13 @@ def _fallback_draw_char(
 
         fb_font, _bb, adv, is_fallback = _resolve_primary_glyph(char, font)
         if is_fallback:
-            cast("MathDrawer", draw).text(xy, char, fill=MONOCHROME_WHITE, font=fb_font)
+            x, y = xy
+            cast("MathDrawer", draw).text(
+                (x, y + _latin_baseline_offset(char, font, fb_font)),
+                char,
+                fill=MONOCHROME_WHITE,
+                font=fb_font,
+            )
             return adv
 
         return original(draw, char, xy, font)
@@ -1702,12 +1786,15 @@ def init_glyph_fallback_engine() -> None:
             member(core, "_draw_char"),
         )
 
-        install_member(core, "_draw_char", _fallback_draw_char(orig_draw_char))
+        draw_char = _fallback_draw_char(orig_draw_char)
+        install_member(core, "_draw_char", draw_char)
 
         # 挂载带缓存的 _get_font，彻底解决 FreeType 每字重复重载导致的内存溢出 (Out Of Memory)
         install_member(core, "_get_font", _cached_get_font)
         # 2026-10-15：只对含复合数学字形的文本按实际墨迹调整换行与行距。
-        install_math_page_layout(core, is_math_glyph, _get_rendered_text_bbox)
+        install_math_page_layout(
+            core, is_math_glyph, _get_rendered_text_bbox, functools.partial(_split_glyph, draw_char)
+        )
         install_math_ink(core)
         install_cancellation_checks(core)
         logger.info(
@@ -1723,25 +1810,32 @@ def init_glyph_fallback_engine() -> None:
 init_glyph_fallback_engine()
 
 
-def clean_invisible_and_special_characters(text: str) -> str:
+def clean_invisible_and_special_characters(text: str, *, preserve_indent: bool = False) -> str:
     """清理文本中的不可见字符、Word 公式特殊空格以及通用数学符号规范化."""
     if not text:
         return ""
 
     chars: list[str] = []
+    leading = True
     for ch in text:
         check_cancelled()
-        if ch in _INVISIBLE_AND_SPECIAL_SPACES:
+        if preserve_indent and leading and ch == "\u3000":
+            chars.append(ch)
+        elif ch in _INVISIBLE_AND_SPECIAL_SPACES:
             chars.append(_INVISIBLE_AND_SPECIAL_SPACES[ch])
         elif ch in _UNIVERSAL_CANONICAL_MAP:
             chars.append(_UNIVERSAL_CANONICAL_MAP[ch])
         else:
             chars.append(ch)
+        if preserve_indent:
+            leading = ch in "\r\n" or (leading and ch.isspace())
 
     return "".join(chars)
 
 
-def normalize_text_for_font(text: str, font_path: str | None = None) -> str:
+def normalize_text_for_font(
+    text: str, font_path: str | None = None, *, preserve_indent: bool = False
+) -> str:
     """Normalize mathematical text while preserving protected literal content."""
     if not text:
         return ""
@@ -1750,7 +1844,7 @@ def normalize_text_for_font(text: str, font_path: str | None = None) -> str:
     if not _state.initialized:
         init_glyph_fallback_engine()
 
-    cleaned = clean_invisible_and_special_characters(text)
+    cleaned = clean_invisible_and_special_characters(text, preserve_indent=preserve_indent)
     # 2026-10-20：先解码表格 JSON 单元格，避免数学转换破坏引号中的反斜杠转义。
     return map_circuit_document(
         cleaned,

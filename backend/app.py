@@ -58,10 +58,17 @@ from generation_cancellation import (
 from handdrawn_filter import render_inline_markdown_images
 from handright import Feature, Template, handwrite
 from homework_layout import inset_homework_body
-from ink_effects import InkEffects, alpha_png, composite, new_layered_paper, require_layers
+from ink_effects import (
+    InkEffects,
+    alpha_png,
+    composite,
+    latin_layer,
+    new_layered_paper,
+    require_layers,
+)
 from library_boundary import member
 from logging_setup import get_logger
-from math_page_layout import HomeworkTemplate, RuledTemplate
+from math_page_layout import RIGHT_ALIGN_MARKER, HomeworkTemplate, RuledTemplate, TextLayoutTemplate
 from PIL import Image, ImageDraw, ImageFont
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -78,6 +85,7 @@ from symbol_fallback import (
     math_text_bbox,
     measure_drawn_advance,
     normalize_text_for_font,
+    use_latin_font,
 )
 from task_store import cleanup_expired as cleanup_expired_generation_tasks
 from task_store import create_task as create_generation_task
@@ -91,6 +99,8 @@ from task_types import GenerateHandwritingParams, GenerationTask, form_dependenc
 from werkzeug.utils import secure_filename
 
 type Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
+type InkStyle = tuple[tuple[int, int, int], InkEffects, int]
+type InkStyles = tuple[InkStyle, InkStyle | None]
 type ReportProgress = Callable[[str, str, int], None]
 type RequestResponseEndpoint = Callable[[Request], Awaitable[Response]]
 
@@ -396,6 +406,7 @@ class NotebookOptions:
     left_margin: int
     right_margin: int
     underlined: bool
+    pattern: str | None = None
 
 
 def create_notebook_image(width: int, height: int, layout: NotebookOptions) -> Image.Image:
@@ -404,20 +415,38 @@ def create_notebook_image(width: int, height: int, layout: NotebookOptions) -> I
         error = "Image dimensions and line spacing must be positive"
         raise ValueError(error)
     image = Image.new("RGB", (width, height), "white")
-    if layout.underlined:
+    if layout.underlined or layout.pattern is not None:
         draw = ImageDraw.Draw(image)
         # 2026-10-18：横线随纸张宽度缩放，避免 Word 缩图时滤掉单像素细线。
         line_width = max(1, (width + 599) // 600)
-        for y in range(
-            layout.top_margin + layout.line_spacing,
-            height - layout.bottom_margin,
-            layout.line_spacing,
-        ):
-            draw.line(
-                (layout.left_margin, y, width - layout.right_margin, y),
-                fill="black",
-                width=line_width,
-            )
+        left, right = layout.left_margin, width - layout.right_margin
+        first_rule = layout.top_margin + layout.line_spacing
+        rows = range(first_rule, height - layout.bottom_margin, layout.line_spacing)
+        columns = range(left, right + 1, layout.line_spacing)
+        # 2026-11-18：点和方格使用同一行距及边距，保留既有横线的落笔位置。
+        if layout.pattern == "dots" and rows and columns:
+            radius = min(line_width // 2, (layout.line_spacing - 1) // 2)
+            stripe = Image.new("RGB", (right - left + 1, 2 * radius + 1), "white")
+            stipple = ImageDraw.Draw(stripe)
+            for x in range(0, stripe.width, layout.line_spacing):
+                if radius:
+                    stipple.ellipse((x - radius, 0, x + radius, 2 * radius), fill="#a3a8ae")
+                else:
+                    stipple.point((x, 0), fill="#a3a8ae")
+            for y in rows:
+                image.paste(stripe, (left, y - radius))
+        else:
+            color = "#bec3c9" if layout.pattern == "grid" else "black"
+            for y in rows:
+                draw.line((left, y, right, y), fill=color, width=line_width)
+            if layout.pattern == "grid" and rows and columns:
+                for x in itertools.chain(columns, (right,) if columns[-1] != right else ()):
+                    draw.line((x, layout.top_margin, x, rows[-1]), fill=color, width=line_width)
+                draw.line(
+                    (left, layout.top_margin, right, layout.top_margin),
+                    fill=color,
+                    width=line_width,
+                )
     return image
 
 
@@ -496,10 +525,6 @@ def read_pdf(file_path: str) -> str:
 # A line containing only three or more dashes forces a new page.
 _PAGE_BREAK_RE = re.compile(r"(?m)^[ \t]*-{3,}[ \t]*$")
 
-# A line prefixed with ">>>" is right-aligned. One optional following space is
-# part of the marker and is removed before rendering.
-_RIGHT_ALIGN_RE = re.compile(r"^[ \t]*>>>[ \t]?")
-
 
 def _alignment_advance(char: str, template: Template, *, math_layout: bool, grid: bool) -> float:
     font = template.get_font()
@@ -535,7 +560,7 @@ def apply_right_align(text: str, template: Template) -> str:
     aligned_count = 0
 
     for line in text.split("\n"):
-        marker = _RIGHT_ALIGN_RE.match(line)
+        marker = RIGHT_ALIGN_MARKER.match(line)
         if not marker:
             output.append(line)
             continue
@@ -592,9 +617,10 @@ def handwrite_with_page_breaks(
         font_path = font_path_of(font_obj)
 
     # 非侵入式字符清洗与基于当前字体的字形兜底（解决特殊空格、缺失数学符号等留白问题）
-    normalized = normalize_text_for_font(text, font_path)
+    custom_layout = isinstance(template, TextLayoutTemplate) and template.custom_layout
+    normalized = normalize_text_for_font(text, font_path, preserve_indent=custom_layout)
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
-    aligned = apply_right_align(normalized, template)
+    aligned = normalized if custom_layout else apply_right_align(normalized, template)
     render_text = handwrite if seed is None else partial(handwrite, seed=seed)
 
     if not _PAGE_BREAK_RE.search(aligned):
@@ -808,6 +834,7 @@ def _background_for(data: dict[str, str], background: bytes | None) -> Image.Ima
             left_margin=int(data["left_margin"]),
             right_margin=int(data["right_margin"]),
             underlined=data.get("isUnderlined") == "true",
+            pattern=data.get("paper_pattern"),
         )
         return create_notebook_image(int(data["width"]), int(data["height"]), layout)
     if background is None:
@@ -830,15 +857,59 @@ def _font_for(data: dict[str, str], uploaded: bytes | None) -> tuple[Font, str |
     return get_cached_image_font(path, int(data["font_size"])), path
 
 
-def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> Template:
+def _latin_font_for(option: str | None) -> str | None:
+    # 2026-11-18：独立的英文字体来自随包目录，保留用户主字体与缺字回退。
+    if option is None:
+        return None
+    filenames = {
+        "handlee": "Handlee-Regular.ttf",
+        "patrick_hand": "PatrickHand-Regular.ttf",
+        "indie_flower": "IndieFlower-Regular.ttf",
+        "kalam": "Kalam-Regular.ttf",
+        "shadows_into_light": "ShadowsIntoLight.ttf",
+    }
+    name = filenames.get(option)
+    if name is None:
+        raise HTTPException(status_code=400, detail="Unknown Latin font")
+    path = Path(font_assets_bundled_dir) / "latin" / name
+    if not path.is_file():
+        raise HTTPException(status_code=400, detail="Latin font unavailable")
+    return str(path)
+
+
+def _latin_scale(value: str) -> float:
+    minimum, maximum = 50, 150
+    percent = int(value)
+    if not minimum <= percent <= maximum:
+        raise HTTPException(
+            status_code=400, detail=f"Latin font scale must be in {minimum}..{maximum}"
+        )
+    return percent / 100
+
+
+def _template_for(
+    data: dict[str, str], background: Image.Image, font: Font, *, latin_scale: float = 1
+) -> Template:
     probability = _nonnegative_float(data, "strikethrough_probability")
     if probability > 1:
         raise HTTPException(status_code=400, detail="Strikethrough probability must be in 0..1")
+    first_line_indent = data.get("first_line_indent") == "true"
+    monospaced = data.get("monospaced") == "true"
+    split_latin = data.get("ink_layers") == "true" and data.get("separate_latin_ink") == "true"
+    plain_template = (
+        TextLayoutTemplate
+        if first_line_indent or monospaced or split_latin or latin_scale != 1
+        else Template
+    )
     template_type = (
         RuledTemplate
-        if (data.get("isUnderlined") == "true" and "width" in data and "height" in data)
+        if (
+            (data.get("isUnderlined") == "true" or data.get("paper_pattern") is not None)
+            and "width" in data
+            and "height" in data
+        )
         or (data.get("background_ruled") == "true" and "width" not in data)
-        else Template
+        else plain_template
     )
     if data.get("layout_style") == "homework":
         template_type = HomeworkTemplate
@@ -865,6 +936,11 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
         strikethrough_width=_nonnegative_float(data, "strikethrough_width"),
         ink_depth_sigma=_nonnegative_float(data, "ink_depth_sigma"),
     )
+    if isinstance(template, TextLayoutTemplate):
+        template.first_line_indent = first_line_indent
+        template.monospaced = monospaced
+        template.split_latin_ink = split_latin
+        template.scaled_latin = latin_scale != 1
     if isinstance(template, RuledTemplate):
         template.ruled_origin = int(data["top_margin"])
     if isinstance(template, HomeworkTemplate):
@@ -872,9 +948,9 @@ def _template_for(data: dict[str, str], background: Image.Image, font: Font) -> 
     return template
 
 
-def _english_spacing(text: str) -> str:
+def _english_spacing(text: str, *, preserve_indent: bool = False) -> str:
     # 2026-10-20：先绑定表格，英文加宽不能改变列分隔空格。
-    text = normalize_text_for_font(text)
+    text = normalize_text_for_font(text, preserve_indent=preserve_indent)
     english = re.compile(r"""^[a-zA-Z0-9.,!?;:\'\"()\-_]+$""")
     lines: list[str] = []
     for line in text.split("\n"):
@@ -917,30 +993,58 @@ def _preview_response(
 
 
 def _layered_preview_response(
-    images: Iterable[Image.Image], background: Image.Image, *, single: bool, report: ReportProgress
+    images: Iterable[Image.Image],
+    background: Image.Image,
+    *,
+    single: bool,
+    split_latin: bool = False,
+    report: ReportProgress,
 ) -> Response:
     pages = itertools.islice(images, 1) if single else images
     papers: list[str] = []
     inks: list[str] = []
+    latin_inks: list[str | None] = []
+    last_paper: Image.Image | None = None
+    encoded_paper = ""
     for page in pages:
         paper, alpha = require_layers(page)
-        papers.append(base64.b64encode(_png_bytes(paper)).decode("ascii"))
+        # 2026-11-18：同一批预览的纸面对象可共享，只编码不可变纸面一次。
+        if paper is not last_paper:
+            encoded_paper = base64.b64encode(_png_bytes(paper)).decode("ascii")
+            last_paper = paper
+        papers.append(encoded_paper)
         inks.append(base64.b64encode(_png_bytes(alpha_png(alpha))).decode("ascii"))
+        if split_latin:
+            latin = latin_layer(page)
+            latin_inks.append(
+                base64.b64encode(_png_bytes(alpha_png(latin))).decode("ascii")
+                if latin is not None and latin.getbbox() is not None
+                else None
+            )
     if not papers:
         papers.append(base64.b64encode(_png_bytes(background)).decode("ascii"))
         inks.append(
             base64.b64encode(_png_bytes(Image.new("RGBA", background.size))).decode("ascii")
         )
+        if split_latin:
+            latin_inks.append(None)
     report("finalizing", "正在返回预览结果", 100)
-    return JSONResponse({"status": "success", "images": papers, "ink_layers": inks})
+    result: dict[str, object] = {"status": "success", "images": papers, "ink_layers": inks}
+    if split_latin:
+        result["latin_ink_layers"] = latin_inks
+    return JSONResponse(result)
 
 
 def _filtered_pages(
-    images: Iterable[Image.Image], effects: InkEffects, color: tuple[int, int, int], alpha: int
+    images: Iterable[Image.Image], primary: InkStyle, latin: InkStyle | None
 ) -> Iterable[Image.Image]:
     for page in images:
         check_cancelled()
-        yield composite(*require_layers(page), color, effects, alpha)
+        composed = composite(*require_layers(page), *primary)
+        latin_alpha = latin_layer(page)
+        if latin is not None and latin_alpha is not None and latin_alpha.getbbox() is not None:
+            composed = composite(composed, latin_alpha, *latin)
+        yield composed
 
 
 def _zip_response(images: Iterable[Image.Image], report: ReportProgress) -> Response:
@@ -1001,19 +1105,32 @@ def _deliver_images(
     images: Iterable[Image.Image],
     background: Image.Image,
     report: ReportProgress,
-    effects: InkEffects | None,
+    styles: InkStyles | None,
 ) -> Response:
     pdf = data.get("pdf_save") == "true"
     if data["preview"] == "true" and not pdf:
-        preview = _layered_preview_response if effects is not None else _preview_response
-        return preview(
-            images, background, single=data.get("full_preview") == "false", report=report
-        )
-    if effects is not None:
-        images = _filtered_pages(images, effects, *_ink_color(data["fill"]))
+        single = data.get("full_preview") == "false"
+        if styles is not None:
+            return _layered_preview_response(
+                images, background, single=single, split_latin=styles[1] is not None, report=report
+            )
+        return _preview_response(images, background, single=single, report=report)
+    if styles is not None:
+        images = _filtered_pages(images, *styles)
         if pdf:
             return _pdf_response(images, report, lossless=True)
     return _pdf_response(images, report) if pdf else _zip_response(images, report)
+
+
+def _ink_styles(data: dict[str, str]) -> InkStyles | None:
+    if data.get("ink_layers") != "true":
+        return None
+    color, alpha = _ink_color(data["fill"])
+    primary = (color, InkEffects.from_form(data), alpha)
+    if data.get("separate_latin_ink") != "true":
+        return primary, None
+    latin_color, latin_alpha = _ink_color(data.get("latin_fill", data["fill"]))
+    return primary, (latin_color, InkEffects.from_form(data, prefix="latin_"), latin_alpha)
 
 
 def _render_handwriting(
@@ -1030,6 +1147,7 @@ def _render_handwriting(
     try:
         report("validating", "正在校验参数", 5)
         data = model_to_dict(params)
+        latin_scale = _latin_scale(params.latin_font_scale)
         report("system_check", "正在检查服务器负载", 10)
         rejection = _generation_rejection(data)
         if rejection is not None:
@@ -1038,29 +1156,38 @@ def _render_handwriting(
         background = _background_for(data, background_image)
         report("prepare_font", "正在加载字体", 30)
         font, path = _font_for(data, font_file)
-        template = _template_for(data, background, font)
-        layered = data.get("ink_layers") == "true"
-        effects = InkEffects.from_form(data) if layered else None
-        if layered:
-            template.set_background(new_layered_paper(background))
+        template = _template_for(data, background, font, latin_scale=latin_scale)
+        styles = _ink_styles(data)
+        if styles is not None:
+            template.set_background(
+                new_layered_paper(background, split_latin=styles[1] is not None)
+            )
         text = (
-            _english_spacing(data["text"])
+            _english_spacing(
+                data["text"],
+                preserve_indent=isinstance(template, TextLayoutTemplate) and template.custom_layout,
+            )
             if data.get("enableEnglishSpacing") == "true"
             else data["text"]
         )
         preview, pdf = data["preview"] == "true", data.get("pdf_save") == "true"
         single = preview and data.get("full_preview") == "false" and not pdf
         report("rendering", "正在生成手写图像", 45)
-        images = checked_items(
-            handwrite_with_page_breaks(
-                text,
-                template,
-                font_path=path,
-                is_single_page_preview=single,
-                seed=20261116 if layered else None,
+        with use_latin_font(
+            _latin_font_for(params.latin_font_option),
+            digits=params.digit_font == "latin",
+            scale=latin_scale,
+        ):
+            images = checked_items(
+                handwrite_with_page_breaks(
+                    text,
+                    template,
+                    font_path=path,
+                    is_single_page_preview=single,
+                    seed=20261116 if styles is not None else None,
+                )
             )
-        )
-        return _deliver_images(data, images, background, report, effects)
+            return _deliver_images(data, images, background, report, styles)
     except HTTPException as error:
         return JSONResponse(
             {"status": "fail", "message": str(error.detail)}, status_code=error.status_code

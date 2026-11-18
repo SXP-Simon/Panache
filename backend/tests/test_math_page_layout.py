@@ -11,7 +11,7 @@ import pytest
 import symbol_fallback as symbols
 from app import apply_right_align
 from handright import Feature, Template
-from math_page_layout import RuledTemplate, install_math_page_layout
+from math_page_layout import RuledTemplate, TextLayoutTemplate, install_math_page_layout
 from PIL import Image, ImageFont
 
 
@@ -66,6 +66,8 @@ def synthetic_core(original=None):
 
 def template(size=(230, 260), features=frozenset(), **kwargs):
     ruled_origin = kwargs.pop("ruled_origin", None)
+    first_line_indent = kwargs.pop("first_line_indent", False)
+    monospaced = kwargs.pop("monospaced", False)
     params = {
         "background": Image.new("RGB", size, "white"),
         "font": Font(),
@@ -86,7 +88,15 @@ def template(size=(230, 260), features=frozenset(), **kwargs):
         "strikethrough_probability": 0,
     }
     params.update(kwargs)
-    tpl = (RuledTemplate if ruled_origin is not None else Template)(**params)
+    template_type = Template
+    if ruled_origin is not None:
+        template_type = RuledTemplate
+    elif first_line_indent or monospaced:
+        template_type = TextLayoutTemplate
+    tpl = template_type(**params)
+    if isinstance(tpl, TextLayoutTemplate):
+        tpl.first_line_indent = first_line_indent
+        tpl.monospaced = monospaced
     if isinstance(tpl, RuledTemplate):
         tpl.ruled_origin = ruled_origin
     return tpl
@@ -131,6 +141,28 @@ def assert_inside(pages, tpl):
         assert top >= tpl.get_top_margin()
         assert right <= page.width - tpl.get_right_margin()
         assert bottom <= page.height - tpl.get_bottom_margin()
+
+
+def test_two_cell_indent_only_applies_to_authored_paragraph_starts():
+    tpl = template(size=(170, 260), first_line_indent=True)
+    source = "AAAAAAAAAAAA\nB\n\u3000\u3000C\n>>> D"
+    [page], _ = draft(
+        synthetic_core(), symbols.normalize_text_for_font(source, preserve_indent=True), tpl
+    )
+    rows = [
+        page.crop((0, run[0], page.width, run[-1] + 1)).getbbox()
+        for run in occupied_runs(page, "y")
+    ]
+    assert [bounds[0] for bounds in rows] == [58, 10, 58, 58, 148]
+    assert rows[-1][2] == 160
+
+
+def test_mixed_width_grid_aligns_across_rows_without_spacing_jitter():
+    tpl = template(monospaced=True, word_spacing_sigma=5, strikethrough_probability=1)
+    [page], _ = draft(synthetic_core(), "中 i W 1\n中 W i 2", tpl)
+    for run in occupied_runs(page, "y"):
+        row = page.crop((0, run[0], page.width, run[-1] + 1))
+        assert [columns[0] for columns in occupied_runs(row, "x")] == [16, 46, 70, 94]
 
 
 def test_plain_text_delegates_without_consuming_randomness():
