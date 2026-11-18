@@ -19,6 +19,7 @@ import 'dialogs/text_preview_dialog.dart';
 import '../services/api.dart';
 import '../services/illustration_import.dart';
 import '../services/workspace.dart';
+import '../models/fine_edit.dart';
 import '../services/desktop_exit.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
@@ -202,6 +203,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     updatePrompts?.dispose();
     if (widget.workspace == null) w.dispose();
     editor.dispose();
+    fineSource.dispose();
     editorFocus.dispose();
     undo.dispose();
     super.dispose();
@@ -264,6 +266,10 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   void rememberEditorSelection() {
     final value = editor.value;
+    final selection = value.selection;
+    fineSource.value = selection.isValid && !selection.isCollapsed
+        ? (start: selection.start, end: selection.end)
+        : null;
     final composingNow =
         value.composing.isValid && !value.composing.isCollapsed;
     if (composing != composingNow) {
@@ -275,6 +281,15 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     } else if (lastEditorSelection?.text != value.text) {
       lastEditorSelection = null;
     }
+  }
+
+  final fineSource = ValueNotifier<FineRange?>(null);
+
+  Future<bool> enterFineEdit() async {
+    w.text = editor.text;
+    final result = await w.enterFineEdit();
+    if (mounted && result) liveSubmitted = w.editRevision;
+    return result;
   }
 
   void insert(String value, {TextSelection? at}) {
@@ -394,6 +409,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       return;
     }
     w.text = editor.text;
+    if (!preview && w.finePreviewNeedsRefresh) {
+      liveSubmitted = w.editRevision;
+      final refreshed = await w.generate();
+      if (!mounted || !refreshed || w.previewStale) return;
+    }
     if (preview) liveSubmitted = w.editRevision;
     final navigation = navigationRevision;
     final succeeded = await w.generate(preview: preview, pdf: pdf);
@@ -767,6 +787,16 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     pages: w.pages,
     inkPages: w.inkPages,
     inkLook: w.settings.inkLook,
+    onFineEdit: w.api.supportsFineEdit && editor.text.trim().isNotEmpty
+        ? enterFineEdit
+        : null,
+    fineAdjustments: w.fineAdjustments,
+    onFineChanged: w.applyFineEdits,
+    onFineHistory: (redo) => w.stepFineHistory(redo: redo),
+    canFineUndo: w.canFineUndo,
+    canFineRedo: w.canFineRedo,
+    fineSource: fineSource,
+    onFineCanvasSelect: () => fineSource.value = null,
     stale: w.previewStale,
     page: w.page,
     version: '',

@@ -136,7 +136,12 @@ class HandwritingApi {
   }
 
   bool get supportsCancel => _supportsCancel;
+  bool supportsFineEdit = false;
   void configureCapabilities(dynamic info) {
+    supportsFineEdit =
+        info is Map &&
+        info['capabilities'] is Map &&
+        info['capabilities']['fine_edit'] == true;
     _supportsCancel =
         info is Map &&
         info['capabilities'] is Map &&

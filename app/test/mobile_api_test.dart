@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:handwriting_app/models/ink_page.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/mobile_api.dart';
+import 'package:handwriting_app/services/workspace.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   const library = String.fromEnvironment('MOBILE_ENGINE_LIBRARY');
@@ -90,7 +93,29 @@ void main() {
       api.close();
       final restarted = await open();
       expect(await Directory('${root.path}/tasks').exists(), false);
-      restarted.close();
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      final w = Workspace(api: restarted);
+      addTearDown(w.dispose);
+      await w.initialize();
+      expect(w.api.supportsFineEdit, isTrue);
+      w.text = '手写 Wave';
+      w.settings.values.addAll({
+        'width': '420',
+        'height': '320',
+        'font_size': '32',
+        'line_spacing': '45',
+        'left_margin': '20',
+        'right_margin': '20',
+        'top_margin': '20',
+        'bottom_margin': '20',
+      });
+      expect(await w.enterFineEdit(), isTrue, reason: w.error);
+      final page = InkPage.fromPacket(
+        (await restarted.preview(w.previewTaskId!)).single,
+      )!;
+      expect(page.fine!.glyphs.length, 6);
+      expect(page.ink, isNull);
     },
     skip: library.isEmpty ? '通过 MOBILE_ENGINE_LIBRARY 指定 host cdylib' : false,
     timeout: const Timeout(Duration(minutes: 2)),

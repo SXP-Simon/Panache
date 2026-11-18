@@ -70,9 +70,11 @@ class EngineInfo {
     required this.version,
     required this.canCancel,
     required this.canChooseTaskId,
+    this.canFineEdit = false,
   });
   final String version;
   final bool canCancel, canChooseTaskId;
+  final bool canFineEdit;
   factory EngineInfo.fromJson(Map<String, dynamic> value) {
     final capabilities = value['capabilities'];
     return EngineInfo(
@@ -81,6 +83,7 @@ class EngineInfo {
           capabilities is Map && capabilities['task_cancellation'] == true,
       canChooseTaskId:
           capabilities is Map && capabilities['task_submission_id'] == true,
+      canFineEdit: capabilities is Map && capabilities['fine_edit'] == true,
     );
   }
 }
@@ -122,6 +125,7 @@ class ApiEngineGateway implements EngineGateway, EngineCatalog {
     'capabilities': {
       'task_cancellation': info.canCancel,
       'task_submission_id': info.canChooseTaskId,
+      'fine_edit': info.canFineEdit,
     },
   });
 

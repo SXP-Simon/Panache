@@ -50,9 +50,9 @@ class _LiveInkPreviewState extends State<LiveInkPreview> {
     final look = widget.look;
     try {
       final mask = look.thickness == 0 && look.softness == 0
-          ? await decodeInkImage(widget.page.ink)
+          ? await decodeInkImage(widget.page.ink!)
           : await shapeInk(
-              _source ??= await decodeInkMask(widget.page.ink),
+              _source ??= await decodeInkMask(widget.page.ink!),
               look,
             );
       if (!mounted) {
