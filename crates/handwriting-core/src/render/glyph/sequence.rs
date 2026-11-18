@@ -5,8 +5,17 @@ impl Glyphs<'_> {
         self.sequence_at(nodes, size, 0)
     }
     pub(super) fn sequence_at(&mut self, nodes: &[Node], size: f32, depth: usize) -> Result<Glyph> {
+        let (advance, children) = self.sequence_parts(nodes, size, depth)?;
+        Self::compose(advance, children, vec![])
+    }
+    pub(in crate::render) fn sequence_parts(
+        &mut self,
+        nodes: &[Node],
+        size: f32,
+        depth: usize,
+    ) -> Result<(f32, Vec<PositionedGlyph>)> {
         let mut x: f32 = 0.;
-        let mut children: Vec<(Glyph, i32, i32)> = Vec::new();
+        let mut children: Vec<PositionedGlyph> = Vec::new();
         let mut child_bytes = 0usize;
         for node in nodes {
             let (glyph, at) = if let (Node::Scripts { upper, lower }, Some((base, base_x, _))) =
@@ -34,7 +43,7 @@ impl Glyphs<'_> {
                 return Err(Error::new("invalid_layout", "数学结构过宽"));
             }
         }
-        Self::compose(x, children, vec![])
+        Ok((x, children))
     }
     pub(super) fn scripts(
         &mut self,

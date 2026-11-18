@@ -251,7 +251,7 @@ impl Server {
     ) -> Result<()> {
         token.check()?;
         let mut p = Parameters::from_form(&fields)?;
-        if !fields.contains_key("seed") {
+        if !fields.contains_key("seed") && !p.fine_edit {
             p.seed = u64::from_le_bytes(uuid::Uuid::new_v4().as_bytes()[..8].try_into().unwrap());
         }
         let primary = if let Some(file) = files.get("font_file") {
@@ -426,7 +426,7 @@ async fn fonts(State(s): State<Server>) -> Json<Vec<String>> {
 }
 async fn version(State(s): State<Server>) -> Json<serde_json::Value> {
     Json(
-        serde_json::json!({"version":s.0.config.version,"capabilities":{"task_cancellation":true,"task_submission_id":true}}),
+        serde_json::json!({"version":s.0.config.version,"capabilities":{"task_cancellation":true,"task_submission_id":true,"fine_edit":true}}),
     )
 }
 struct Upload {

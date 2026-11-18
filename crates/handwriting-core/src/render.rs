@@ -1,5 +1,5 @@
 use crate::{
-    Error, LayoutStyle, Limits, Parameters, Result, imaging, ink_effects,
+    Error, LayoutStyle, Limits, Parameters, Result, fine_edit, imaging, ink_effects,
     text::{self, Node},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -33,6 +33,7 @@ pub struct RenderRequest {
     pub fonts: FontBook,
     pub limits: Limits,
 }
+mod fine;
 mod glyph;
 mod homework;
 mod ink;
@@ -47,15 +48,24 @@ struct LineUnit {
     x: i32,
     dy: i32,
     break_after: bool,
+    id: u32,
+    source: Option<[u32; 2]>,
+    fine_parts: Option<fine::Parts>,
+}
+pub(crate) enum PageInk {
+    Flat(GrayImage),
+    Fine(Vec<fine_edit::Tile>),
 }
 struct Pages<'a, F>
 where
-    F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>,
+    F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>,
 {
     background: RgbaImage,
     canvas: RgbaImage,
     ink_layer: Option<RgbaImage>,
     mask: GrayImage,
+    tiles: Vec<fine_edit::Tile>,
+    tile_area: usize,
     p: &'a Parameters,
     rng: ChaCha8Rng,
     cancel: &'a Cancellation,
@@ -70,8 +80,11 @@ where
     emit: F,
     stopped: bool,
 }
-impl<F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>> Pages<'_, F> {
+impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
     fn flush_ink(&mut self) -> Result<()> {
+        if self.p.fine_edit {
+            return Ok(());
+        }
         perturb(
             &mut self.mask,
             self.ink_layer.as_mut().unwrap_or(&mut self.canvas),
@@ -91,11 +104,16 @@ impl<F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>> Pages<'_, F> {
         }
         self.flush_ink()?;
         let canvas = std::mem::replace(&mut self.canvas, self.background.clone());
-        let alpha = self.ink_layer.as_mut().map(|ink| {
-            let alpha = ink_effects::coverage(ink);
-            ink.as_mut().fill(0);
-            alpha
-        });
+        let alpha = if self.p.fine_edit {
+            self.tile_area = 0;
+            Some(PageInk::Fine(std::mem::take(&mut self.tiles)))
+        } else {
+            self.ink_layer.as_mut().map(|ink| {
+                let alpha = ink_effects::coverage(ink);
+                ink.as_mut().fill(0);
+                PageInk::Flat(alpha)
+            })
+        };
         (self.emit)(self.count, canvas, alpha)?;
         self.count += 1;
         self.stopped = self.p.preview && !self.p.full_preview && !self.p.pdf_save;
@@ -224,7 +242,15 @@ impl<F: FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>> Pages<'_, F> {
                 u.x + u.glyph.left,
                 anchor.round() as i32 + u.dy + u.glyph.top,
             );
-            if u.rigid {
+            if self.p.fine_edit {
+                for tile in fine::capture(u, origin, anchor.round() as i32, self.p, self.cancel)? {
+                    self.tile_area += tile.mask.len();
+                    if self.tile_area > fine_edit::PAGE_TILE_BUDGET {
+                        return Err(Error::new("invalid_layout", "当前页的字形超过内存预算"));
+                    }
+                    self.tiles.push(tile);
+                }
+            } else if u.rigid {
                 paint_math_unit(
                     self.ink_layer.as_mut().unwrap_or(&mut self.canvas),
                     &u.glyph.mask,
@@ -289,9 +315,25 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     cancel: &Cancellation,
     mut emit: F,
 ) -> Result<usize> {
+    let key = r
+        .params
+        .fine_edit
+        .then(|| fine_edit::document_key(&r.text, &r.params));
+    let edits = key
+        .as_deref()
+        .map(|key| fine_edit::overrides(key, &r.params))
+        .unwrap_or_default();
     render_pages(r, cancel, |i, paper, ink| {
         let image = match ink {
-            Some(ink) => ink_effects::composite(paper, ink, &r.params, cancel)?,
+            Some(PageInk::Flat(ink)) => ink_effects::composite(paper, ink, &r.params, cancel)?,
+            Some(PageInk::Fine(tiles)) => {
+                let mut paper = paper;
+                for tile in tiles {
+                    let adjustment = edits.get(&tile.id).copied();
+                    fine_edit::paint(&mut paper, tile, &r.params, adjustment, cancel)?;
+                }
+                paper
+            }
             None => paper,
         };
         emit(i, image)
@@ -339,11 +381,14 @@ fn fit_standard_ruled_row(
 pub(crate) fn render_pages(
     r: &RenderRequest,
     cancel: &Cancellation,
-    emit: impl FnMut(usize, RgbaImage, Option<GrayImage>) -> Result<()>,
+    emit: impl FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>,
 ) -> Result<usize> {
     cancel.check()?;
     crate::validate_document(&r.text, &r.limits)?;
     let p = &r.params;
+    if p.fine_edit && p.fine_edits.as_ref().is_some_and(|edits| !edits.valid()) {
+        return Err(Error::new("invalid_parameter", "fine_edits"));
+    }
     let mut background = match (p.width, p.height) {
         (Some(w), Some(h)) => {
             p.validate(w, h, &r.limits)?;
@@ -371,7 +416,7 @@ pub(crate) fn render_pages(
     } else {
         p.clone()
     };
-    if p.ink_layers {
+    if p.ink_layers || p.fine_edit {
         // The generated mask stores concentration, independent of the selected tint.
         layout.fill = [0, 0, 0, 255];
         for pixel in background.pixels_mut() {
@@ -385,11 +430,16 @@ pub(crate) fn render_pages(
     }
     let p = &layout;
     p.validate(w, h, &r.limits)?;
-    let nodes = text::parse(&text::normalize_for_layout(
+    let normalized = text::normalize_for_layout(
         &r.text,
         p.english_spacing,
         p.first_line_indent || p.monospaced,
-    ));
+    );
+    let nodes = text::parse(&normalized);
+    let source = p
+        .fine_edit
+        .then(|| fine::source_ranges(&r.text, &normalized, &nodes))
+        .flatten();
     let units = if homework_mode {
         homework::units(&nodes)
     } else {
@@ -398,9 +448,15 @@ pub(crate) fn render_pages(
     let mut glyphs = Glyphs::with_parameters(&r.fonts, p)?;
     let mut pages = Pages {
         canvas: background.clone(),
-        ink_layer: p.ink_layers.then(|| RgbaImage::new(w, h)),
+        ink_layer: (p.ink_layers && !p.fine_edit).then(|| RgbaImage::new(w, h)),
         background,
-        mask: GrayImage::new(w, h),
+        mask: if p.fine_edit {
+            GrayImage::new(0, 0)
+        } else {
+            GrayImage::new(w, h)
+        },
+        tiles: Vec::new(),
+        tile_area: 0,
         p,
         rng: ChaCha8Rng::seed_from_u64(p.seed),
         cancel,
@@ -417,6 +473,7 @@ pub(crate) fn render_pages(
     };
     let right = w as f32 - p.effective_right_margin();
     let mut i = 0;
+    let mut node_index = 0;
     let mut paragraph_start = true;
     let mut section_line_start = 0;
     let mut continuation = p.left_margin;
@@ -555,7 +612,23 @@ pub(crate) fn render_pages(
             node => {
                 let size =
                     (p.font_size + normal(&mut pages.rng, p.font_size_sigma)).clamp(1., 2048.);
-                let mut g = glyphs.unit(units[i], size)?;
+                let mut fine_parts = None;
+                let mut g = if p.fine_edit
+                    && units[i].len() > 1
+                    && units[i].iter().all(|node| matches!(node, Node::Char(_)))
+                {
+                    let (advance, children) = glyphs.sequence_parts(units[i], size, 0)?;
+                    let composed = Glyphs::compose(advance, children.clone(), vec![])?;
+                    fine_parts = Some(fine::Parts::new(
+                        &composed,
+                        children,
+                        node_index,
+                        source.as_deref(),
+                    ));
+                    composed
+                } else {
+                    glyphs.unit(units[i], size)?
+                };
                 let mut compound = units[i].len() > 1
                     || !matches!(node, Node::Char(_))
                     || matches!(node,Node::Char(c) if glyph::is_circled(*c));
@@ -604,6 +677,7 @@ pub(crate) fn render_pages(
                             vec![(path, width)],
                         )?;
                         compound = true;
+                        fine_parts = None;
                     }
                 }
                 if homework_mode
@@ -670,9 +744,18 @@ pub(crate) fn render_pages(
                     x: x.round() as i32,
                     dy,
                     break_after: homework_mode && homework::break_after(units[i]),
+                    id: node_index as u32,
+                    source: source.as_ref().map(|positions| {
+                        [
+                            positions[node_index],
+                            positions[node_index + units[i].len()],
+                        ]
+                    }),
+                    fine_parts,
                 });
             }
         }
+        node_index += units[i].len();
         i += 1;
     }
     if !pages.stopped {
@@ -699,6 +782,9 @@ mod ruled_tests {
             x: 10,
             dy: 0,
             break_after: false,
+            id: 0,
+            source: None,
+            fine_parts: None,
         }]
     }
 
@@ -733,6 +819,8 @@ mod ruled_tests {
                 canvas: bg,
                 ink_layer: None,
                 mask: GrayImage::new(180, 193),
+                tiles: Vec::new(),
+                tile_area: 0,
                 p: &p,
                 rng: ChaCha8Rng::seed_from_u64(42),
                 cancel: &cancel,

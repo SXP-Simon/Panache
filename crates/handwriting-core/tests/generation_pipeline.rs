@@ -160,3 +160,94 @@ fn failed_page_sink_stops_before_publishing_progress() {
     assert_eq!(error.code, "storage_failed");
     assert_eq!(events, [Event::Rendering]);
 }
+
+#[test]
+fn fine_edit_moves_one_homework_character_and_exports_the_same_pages() {
+    use fine_edit::{Adjustment, Adjustments};
+
+    let cancel = Cancellation::default();
+    let mut request = request("Wave 中文");
+    request.params.fine_edit = true;
+    request.params.full_preview = true;
+    request.params.layout_style = LayoutStyle::Homework;
+    request.params.underlined = true;
+
+    let layers = |request: &RenderRequest| {
+        let mut layers = Vec::new();
+        generation::generate(
+            request,
+            &cancel,
+            Output::InkLayers(&mut |_, page| {
+                layers.push(page);
+                Ok(())
+            }),
+            |_| Ok(()),
+        )
+        .unwrap();
+        layers
+    };
+    let page_images = |request: &RenderRequest| {
+        let mut images = Vec::new();
+        render(request, &cancel, |_, page| {
+            images.push(page);
+            Ok(())
+        })
+        .unwrap();
+        images
+    };
+    assert_eq!(
+        layers(&request)[0].fine.as_ref().unwrap().source_ranges[..4],
+        [Some([0, 1]), Some([1, 2]), Some([2, 3]), Some([3, 4])]
+    );
+    request.text = "Wave 中文\n---\nWave 中文".into();
+    let before = page_images(&request);
+    let preview = layers(&request);
+    assert_eq!(preview.len(), 2);
+    let fine = preview[0].fine.as_ref().unwrap();
+    assert_eq!(fine.glyphs.len(), 6);
+    assert!(preview[1].fine.as_ref().unwrap().glyphs[0][0] > fine.glyphs[5][0]);
+    let [id, x, y, width, height, ..] = fine.glyphs[0];
+    request.params.fine_edits = Some(Adjustments {
+        key: fine.key.clone(),
+        glyphs: vec![Adjustment {
+            id: id as u32,
+            dx: 90,
+            dy: 49,
+            scale: 115,
+            angle: 12,
+            opacity: 83,
+            color: Some([167, 12, 36]),
+        }],
+    });
+    let after = page_images(&request);
+    assert_eq!(before[1], after[1]);
+    assert_ne!(before[0], after[0]);
+    assert_eq!(layers(&request)[0].paper, preview[0].paper);
+    assert!(
+        after[0]
+            .enumerate_pixels()
+            .any(|(px, py, p)| { px as i32 > x + width && py as i32 > y + height && p[0] > p[1] })
+    );
+    let mut zip = Cursor::new(vec![]);
+    generation::generate(&request, &cancel, Output::Zip(&mut zip), |_| Ok(())).unwrap();
+    let mut archive = zip::ZipArchive::new(zip).unwrap();
+    for (index, image) in after.iter().enumerate() {
+        let mut bytes = vec![];
+        archive
+            .by_name(&format!("{index}.png"))
+            .unwrap()
+            .read_to_end(&mut bytes)
+            .unwrap();
+        assert_eq!(image::load_from_memory(&bytes).unwrap().to_rgba8(), *image);
+    }
+    let mut pdf = vec![];
+    generation::generate(&request, &cancel, Output::Pdf(&mut pdf), |_| Ok(())).unwrap();
+    let mut expected = export::PdfExport::lossless();
+    for image in &after {
+        expected.add(image).unwrap();
+    }
+    assert!(pdf == expected.finish(), "精细编辑 PDF 应嵌入无损页面");
+
+    request.params.fine_edits.as_mut().unwrap().key = "0".repeat(64);
+    assert_eq!(before, page_images(&request));
+}

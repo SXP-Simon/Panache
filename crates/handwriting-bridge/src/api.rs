@@ -140,7 +140,9 @@ pub fn execute(mut request: Request) -> Result<Value> {
             "\n",
             include_str!("../../handwriting-core/licenses/handright-LICENSE.txt")
         ))),
-        "version" => Ok(json!({"version": handwriting_core::app_version()})),
+        "version" => Ok(
+            json!({"version": handwriting_core::app_version(), "capabilities": {"fine_edit": true}}),
+        ),
         "import" | "identify" => {
             let _operation = OPERATIONS
                 .try_lock()
@@ -277,7 +279,7 @@ fn generate(request: Request, task: &Arc<Mutex<Task>>) -> Result<()> {
     drop(state);
     cancel.check()?;
     let mut params = Parameters::from_form(&request.fields)?;
-    if !request.fields.contains_key("seed") {
+    if !request.fields.contains_key("seed") && !params.fine_edit {
         params.seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(io_error)?
