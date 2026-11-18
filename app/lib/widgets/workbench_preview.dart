@@ -40,6 +40,7 @@ class WorkbenchPreview extends StatefulWidget {
     this.canFineRedo = false,
     this.fineSource,
     this.onFineCanvasSelect,
+    this.fineInspector,
   });
   final List<Uint8List> pages;
   final int page;
@@ -62,6 +63,7 @@ class WorkbenchPreview extends StatefulWidget {
   final bool canFineUndo, canFineRedo;
   final ValueListenable<FineRange?>? fineSource;
   final VoidCallback? onFineCanvasSelect;
+  final FineInspectorSlot? fineInspector;
 
   @override
   State<WorkbenchPreview> createState() => _WorkbenchPreviewState();
@@ -71,6 +73,10 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
   final _heroOwner = Object();
   bool _inkExpanded = false;
   bool _fineEditing = false;
+
+  void _closeFineEdit() {
+    if (mounted && _fineEditing) setState(() => _fineEditing = false);
+  }
 
   void _expand() {
     final source = widget.pages;
@@ -117,6 +123,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
       canRedo: widget.canFineRedo,
       source: source,
       onCanvasSelect: widget.onFineCanvasSelect,
+      inspector: widget.fineInspector,
     );
     final source = widget.fineSource;
     return source == null
@@ -166,7 +173,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                             ? null
                             : (selected) async {
                                 if (!selected) {
-                                  setState(() => _fineEditing = false);
+                                  _closeFineEdit();
                                   return;
                                 }
                                 if (await widget.onFineEdit!() && mounted) {
@@ -208,6 +215,16 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                         onPressed: _expand,
                         icon: const Icon(Icons.open_in_full),
                         label: Text(l.expandPreview),
+                      ),
+                    if (widget.fineInspector case final slot? when _fineEditing)
+                      ValueListenableBuilder(
+                        valueListenable: slot,
+                        builder: (context, inspector, _) => IconButton(
+                          key: const ValueKey('fine-fit-page'),
+                          tooltip: l.resetPreviewZoom,
+                          onPressed: inspector?.fitPage,
+                          icon: const Icon(Icons.fit_screen_outlined),
+                        ),
                       ),
                   ],
                 ),
@@ -314,6 +331,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                       inkPages: widget.inkPages,
                       inkLook: widget.inkLook,
                       fineEdits: _fineEdits(),
+                      enlargeInitially: widget.fineInspector != null,
                       onPageChanged: widget.onPageChanged,
                     ),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import 'fine_preview.dart';
 import 'workbench_motion.dart';
 import 'workbench_settings.dart';
 
@@ -30,6 +31,7 @@ class WorkbenchLayout extends StatelessWidget {
     required this.editorView,
     required this.settingsView,
     required this.buildPreview,
+    required this.fineInspector,
     required this.onDismissError,
     required this.onTabChanged,
     required this.onPreview,
@@ -51,6 +53,7 @@ class WorkbenchLayout extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final Widget editorView, settingsView;
   final Widget Function(Widget? toolbar) buildPreview;
+  final FineInspectorSlot fineInspector;
   final VoidCallback onDismissError, onPreview, onPdf, onZip;
   final VoidCallback? onCancel;
   final ValueChanged<int> onTabChanged;
@@ -253,42 +256,14 @@ class WorkbenchLayout extends StatelessWidget {
   }
 
   Widget wideWorkspace(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final editing = mobileTab != 1;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: 105,
-          child: ListView(
-            padding: const EdgeInsets.all(6),
-            children: [
-              tool(
-                context,
-                l.mobileEditor,
-                Icons.edit_outlined,
-                'edit',
-                editing,
-                () => onTabChanged(0),
-              ),
-              for (final section in SettingsSection.values)
-                tool(
-                  context,
-                  section.label(l),
-                  section.icon,
-                  section.name,
-                  !editing && section == settingsSection,
-                  () => onSectionSelected(section),
-                ),
-            ],
-          ),
-        ),
-        const VerticalDivider(width: 1),
-        SizedBox(
-          width: (width * .29).clamp(260.0, 430.0),
-          child: RetainedPaneSwitcher(
-            index: editing ? 0 : 1,
-            children: [editorView, settingsView],
+        ValueListenableBuilder(
+          valueListenable: fineInspector,
+          builder: (context, inspector, _) => _wideTools(
+            context,
+            inspector?.hasSelection == true ? inspector : null,
           ),
         ),
         const VerticalDivider(width: 1),
@@ -308,6 +283,69 @@ class WorkbenchLayout extends StatelessWidget {
                   children: exportButtons(context),
                 ),
               ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _wideTools(BuildContext context, FineInspector? inspector) {
+    final l = AppLocalizations.of(context)!;
+    final editing = mobileTab != 1;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 105,
+          child: ListView(
+            padding: const EdgeInsets.all(6),
+            children: [
+              tool(
+                context,
+                l.mobileEditor,
+                Icons.edit_outlined,
+                'edit',
+                editing && inspector == null,
+                () {
+                  inspector?.close();
+                  onTabChanged(0);
+                },
+              ),
+              for (final section in SettingsSection.values)
+                tool(
+                  context,
+                  section.label(l),
+                  section.icon,
+                  section.name,
+                  !editing && inspector == null && section == settingsSection,
+                  () {
+                    inspector?.close();
+                    onSectionSelected(section);
+                  },
+                ),
+            ],
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        SizedBox(
+          width: (width * .29).clamp(260.0, 430.0),
+          child: RetainedPaneSwitcher(
+            index: inspector != null
+                ? 2
+                : editing
+                ? 0
+                : 1,
+            children: [
+              editorView,
+              settingsView,
+              if (inspector == null)
+                const SizedBox.shrink()
+              else
+                Builder(
+                  key: const ValueKey('fine-inspector-sidebar'),
+                  builder: inspector.build,
+                ),
             ],
           ),
         ),

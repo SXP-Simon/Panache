@@ -10,6 +10,7 @@ import '../utils/ink_effects.dart';
 import 'live_ink_preview.dart';
 import 'fine_preview.dart';
 import 'preview_image_actions.dart';
+import 'preview_zoom.dart';
 import 'workbench_motion.dart';
 
 /// A controlled image viewer. Page intent is reported without waiting for motion;
@@ -27,6 +28,7 @@ class PreviewPager extends StatefulWidget {
     this.inkPages = const [],
     this.inkLook = defaultInkLook,
     this.fineEdits = const [],
+    this.enlargeInitially = false,
   }) : assert(pages.length > 0);
 
   final List<Uint8List> pages;
@@ -39,6 +41,7 @@ class PreviewPager extends StatefulWidget {
   final List<InkPage?> inkPages;
   final InkLook inkLook;
   final List<Map<int, FineAdjustment>> fineEdits;
+  final bool enlargeInitially;
 
   @override
   State<PreviewPager> createState() => _PreviewPagerState();
@@ -164,6 +167,8 @@ class _PreviewPagerState extends State<PreviewPager> {
                   onOpen: widget.onOpen,
                   copyImage: widget.copyImage,
                   readerMode: widget.readerMode,
+                  enlargeInitially:
+                      widget.enlargeInitially && !widget.readerMode,
                   onZoomChanged: (zoomed) {
                     if (index == _visible && _zoomed != zoomed) {
                       setState(() => _zoomed = zoomed);
@@ -226,6 +231,7 @@ class _ZoomablePage extends StatefulWidget {
     required this.ink,
     required this.look,
     required this.fineEdits,
+    required this.enlargeInitially,
   });
   final Uint8List bytes;
   final Object heroTag;
@@ -238,6 +244,7 @@ class _ZoomablePage extends StatefulWidget {
   final InkPage? ink;
   final InkLook look;
   final Map<int, FineAdjustment> fineEdits;
+  final bool enlargeInitially;
 
   @override
   State<_ZoomablePage> createState() => _ZoomablePageState();
@@ -254,6 +261,8 @@ class _ZoomablePageState extends State<_ZoomablePage>
   bool _zoomed = false;
   bool _mouse = false;
   bool _dragging = false;
+  bool _manualZoom = false;
+  Size? _defaultZoomViewport;
   Offset _doubleTapPoint = Offset.zero;
   Size _viewport = Size.zero;
   double get _scale => _transform.value.getMaxScaleOnAxis();
@@ -307,7 +316,16 @@ class _ZoomablePageState extends State<_ZoomablePage>
   @override
   void didUpdateWidget(_ZoomablePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.reset != widget.reset || oldWidget.active && !widget.active) {
+    final layoutChanged = oldWidget.enlargeInitially != widget.enlargeInitially;
+    if (layoutChanged || oldWidget.active != widget.active) {
+      _defaultZoomViewport = null;
+      _manualZoom = false;
+    } else if (oldWidget.reset != widget.reset && widget.active) {
+      _manualZoom = true;
+    }
+    if (layoutChanged ||
+        oldWidget.reset != widget.reset ||
+        oldWidget.active && !widget.active) {
       // Parent already clears its zoom flag; do not notify during its build.
       _animation.stop();
       _transform.removeListener(_changed);
@@ -315,6 +333,38 @@ class _ZoomablePageState extends State<_ZoomablePage>
       _zoomed = false;
       _transform.addListener(_changed);
     }
+  }
+
+  void _scheduleInitialZoom() {
+    if (_manualZoom ||
+        _viewport == _defaultZoomViewport ||
+        !widget.active ||
+        !widget.enlargeInitially ||
+        _viewport.isEmpty) {
+      return;
+    }
+    final size = previewPngSize(widget.bytes);
+    if (size == null) return;
+    _defaultZoomViewport = _viewport;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _manualZoom ||
+          !widget.active ||
+          !widget.enlargeInitially ||
+          _viewport.isEmpty) {
+        return;
+      }
+      final glyphs = widget.ink?.fine?.glyphs;
+      var top = size.height;
+      for (final glyph in glyphs ?? const <FineGlyph>[]) {
+        if (glyph.y < top) top = glyph.y.toDouble();
+      }
+      _transform.value = initialPreviewZoom(
+        _viewport,
+        size,
+        contentTop: top == size.height ? 0 : top,
+      );
+    });
   }
 
   @override
@@ -336,6 +386,7 @@ class _ZoomablePageState extends State<_ZoomablePage>
         child: LayoutBuilder(
           builder: (context, constraints) {
             _viewport = constraints.biggest;
+            _scheduleInitialZoom();
             return MouseRegion(
               cursor: widget.readerMode
                   ? (_dragging
@@ -390,7 +441,10 @@ class _ZoomablePageState extends State<_ZoomablePage>
                         ? const ValueKey('reader-canvas')
                         : null,
                     transformationController: _transform,
-                    onInteractionStart: (_) => _animation.stop(),
+                    onInteractionStart: (_) {
+                      _manualZoom = true;
+                      _animation.stop();
+                    },
                     panEnabled: _zoomed && !_dragging,
                     boundaryMargin: widget.readerMode
                         ? const EdgeInsets.all(double.infinity)
