@@ -66,6 +66,7 @@ class Workbench extends StatefulWidget {
 class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   late final Workspace w;
   final editor = TextEditingController();
+  TextEditingValue? lastEditorSelection;
   final editorFocus = FocusNode();
   final form = GlobalKey<FormState>();
   final undo = UndoHistoryController();
@@ -102,6 +103,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     destination = widget.initialDestination;
     w = widget.workspace ?? Workspace();
     editor.text = w.text;
+    editor.addListener(rememberEditorSelection);
     w.addListener(refresh);
     widget.updates?.addListener(refreshUpdates);
     if (widget.updates case final updates?) {
@@ -243,8 +245,17 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     );
   }
 
-  void insert(String value) {
-    final selection = editor.selection;
+  void rememberEditorSelection() {
+    final value = editor.value;
+    if (value.selection.isValid && value.selection.end <= value.text.length) {
+      lastEditorSelection = value;
+    } else if (lastEditorSelection?.text != value.text) {
+      lastEditorSelection = null;
+    }
+  }
+
+  void insert(String value, {TextSelection? at}) {
+    final selection = at ?? editor.selection;
     final start = selection.isValid ? selection.start : editor.text.length;
     final end = selection.isValid ? selection.end : start;
     editor.value = TextEditingValue(
@@ -271,8 +282,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   Future<void> insertImage() => action(() async {
     // Capture before the native picker/dialog changes focus. No text edit is
     // committed until decoding and confirmation both succeed.
-    final selection = editor.selection;
     final originalText = editor.text;
+    final previous = lastEditorSelection;
+    final selection = previous != null && previous.text == originalText
+        ? previous.selection
+        : TextSelection.collapsed(offset: originalText.length);
     String source;
     try {
       final file = await pickIllustration();
@@ -291,8 +305,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         .firstOrNull;
     final id = existing?.key ?? nextIllustrationId(w.images, editor.text);
     w.images[id] = source;
-    editor.selection = selection;
-    insert('\n![插图 $id|$value%]\n');
+    final before = originalText.substring(0, selection.start);
+    final after = originalText.substring(selection.end);
+    final leading = before.isEmpty || before.endsWith('\n') ? '' : '\n';
+    final trailing = after.startsWith('\n') ? '' : '\n';
+    insert('$leading![插图 $id|$value%]$trailing', at: selection);
   });
 
   Future<void> editImage(IllustrationMarker marker) => action(() async {
@@ -483,6 +500,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
           l.insertImage,
           Icons.add_photo_alternate_outlined,
           locked ? null : insertImage,
+          identifier: 'insert-image',
           description: l.insertImageHelp,
         ),
         EditorAction(
