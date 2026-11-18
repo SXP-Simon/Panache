@@ -97,13 +97,14 @@ fn blend_radius(
 
 pub(crate) fn shape(
     mut mask: GrayImage,
-    p: &Parameters,
+    thickness: f64,
+    softness: f64,
     cancel: &Cancellation,
 ) -> Result<GrayImage> {
-    if p.ink_thickness != 0. {
-        let thin = p.ink_thickness < 0.;
+    if thickness != 0. {
+        let thin = thickness < 0.;
         let kernel = if thin { Kernel::Min } else { Kernel::Max };
-        let mut changed = blend_radius(&mask, p.ink_thickness.abs(), &kernel, cancel)?;
+        let mut changed = blend_radius(&mask, thickness.abs(), &kernel, cancel)?;
         if thin {
             for (after, before) in changed.pixels_mut().zip(mask.pixels()) {
                 after[0] = ((u16::from(after[0]) * 7 + u16::from(before[0]) * 3 + 5) / 10) as u8;
@@ -111,8 +112,8 @@ pub(crate) fn shape(
         }
         mask = changed;
     }
-    if p.ink_softness != 0. {
-        mask = blend_radius(&mask, p.ink_softness, &Kernel::Mean, cancel)?;
+    if softness != 0. {
+        mask = blend_radius(&mask, softness, &Kernel::Mean, cancel)?;
     }
     Ok(mask)
 }
@@ -123,7 +124,7 @@ pub fn composite(
     p: &Parameters,
     cancel: &Cancellation,
 ) -> Result<RgbaImage> {
-    let mask = shape(mask, p, cancel)?;
+    let mask = shape(mask, p.ink_thickness, p.ink_softness, cancel)?;
     for y in 0..paper.height() {
         cancel.check()?;
         for x in 0..paper.width() {

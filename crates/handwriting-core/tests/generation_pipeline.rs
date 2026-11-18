@@ -217,6 +217,8 @@ fn fine_edit_moves_one_homework_character_and_exports_the_same_pages() {
             angle: 12,
             opacity: 83,
             color: Some([167, 12, 36]),
+            thickness: 7,
+            softness: 4,
         }],
     });
     let after = page_images(&request);
