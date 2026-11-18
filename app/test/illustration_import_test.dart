@@ -1,11 +1,14 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
+import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/screens/dialogs/illustration_dialog.dart';
 import 'package:handwriting_app/services/illustration_import.dart';
+import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/image_data.dart';
 
 class _Picker extends FilePicker {
@@ -34,6 +37,7 @@ class _Picker extends FilePicker {
 }
 
 void main() {
+  setUp(() => FilePicker.platform = _Picker(null));
   test(
     'picker cancellation requests streaming without reading the file',
     () async {
@@ -104,6 +108,79 @@ void main() {
     final huge = 'A' * ((((maxRestoredIllustrationBytes + 2) ~/ 3) * 4) + 129);
     expect(decodeImageData(huge), isNull);
   });
+  testWidgets(
+    'phone inserts at the last caret after the tool sheet takes focus',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 780);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final previousPicker = FilePicker.platform;
+      final png = (await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        ui.Canvas(recorder).drawColor(Colors.black, ui.BlendMode.src);
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(16, 16);
+        final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+        image.dispose();
+        picture.dispose();
+        return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      }))!;
+      FilePicker.platform = _Picker(
+        FilePickerResult([
+          PlatformFile(
+            name: 'paper.png',
+            size: png.length,
+            readStream: Stream.value(png),
+          ),
+        ]),
+      );
+      addTearDown(() => FilePicker.platform = previousPicker);
+      final workspace = Workspace()..text = '第一段\n第二段';
+      addTearDown(workspace.dispose);
+      await tester.pumpWidget(
+        HandwritingApp(locale: const Locale('zh'), workspace: workspace),
+      );
+      final editor = find.byKey(const ValueKey('text-editor'));
+      await tester.tap(editor);
+      await tester.pumpAndSettle();
+      final controller = tester.widget<TextField>(editor).controller!;
+      controller.selection = const TextSelection.collapsed(offset: 3);
+      await tester.tap(find.byKey(const ValueKey('editor-tools')));
+      await tester.pumpAndSettle();
+      controller.selection = const TextSelection.collapsed(offset: -1);
+      final insert = find.byKey(const ValueKey('insert-image'));
+      await tester.ensureVisible(insert);
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(insert);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      final apply = find.byKey(const ValueKey('illustration-apply'));
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(apply, findsOneWidget);
+      for (
+        var attempt = 0;
+        attempt < 5 && tester.widget<FilledButton>(apply).onPressed == null;
+        attempt++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(tester.widget<FilledButton>(apply).onPressed, isNotNull);
+      await tester.runAsync(() async {
+        await tester.tap(apply);
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      expect(workspace.text, '第一段\n![插图 1|50%]\n第二段');
+      expect(workspace.images.keys, ['1']);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('corrupt but base64-valid illustration cannot be applied', (
     tester,
   ) async {

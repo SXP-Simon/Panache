@@ -195,6 +195,9 @@ class EditorToolbar extends StatelessWidget {
           const SizedBox(height: 12),
           for (final action in actions)
             ListTile(
+              key: action.identifier == null
+                  ? null
+                  : ValueKey(action.identifier!),
               leading: Icon(action.icon),
               title: Text(action.label),
               subtitle: action.description == null
