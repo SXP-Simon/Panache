@@ -80,7 +80,9 @@ void main() {
           expect(
             tester.getRect(fontLabel).bottom,
             lessThan(
-              tester.getRect(find.byType(DropdownButtonFormField<String>)).top,
+              tester
+                  .getRect(find.byKey(const ValueKey('font-test.ttf-null')))
+                  .top,
             ),
           );
           final layout = find.text(l.sizeSpacing);

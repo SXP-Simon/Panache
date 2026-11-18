@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:handwriting_app/models/settings.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 
@@ -36,7 +37,12 @@ void main() {
       expect(w.error, isEmpty);
       expect(w.pages.single.take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
       w.settings.fullPreview = true;
-      w.text = '第一页\n---\n第二页';
+      w.settings
+        ..paperStyle = PaperStyle.grid
+        ..latinFont = 'kalam'
+        ..latinDigits = true
+        ..latinScale = 115;
+      w.text = '第一页 Draft 123\n---\n第二页 Cosine Similarity';
       await w.generate();
       expect(w.error, isEmpty);
       expect(w.pages.length, 2);

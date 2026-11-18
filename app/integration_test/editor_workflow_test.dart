@@ -49,6 +49,10 @@ void main() {
     await capture('panache-editor');
     await tester.tap(find.byKey(const ValueKey('open-paper')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-section')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-section-paper')).last);
+    await tester.pumpAndSettle();
     expect(find.byKey(const PageStorageKey('settings-paper')), findsOneWidget);
     await capture('panache-paper');
     await tester.tap(find.byKey(const ValueKey('back-to-editor')));

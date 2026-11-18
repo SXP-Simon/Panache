@@ -7,11 +7,13 @@ class WorkbenchPanel extends StatelessWidget {
     required this.icon,
     required this.child,
     this.actions = const [],
+    this.toolbar,
   });
   final String title;
   final IconData icon;
   final Widget child;
   final List<Widget> actions;
+  final Widget? toolbar;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -20,31 +22,46 @@ class WorkbenchPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(7),
-                  child: Icon(
-                    icon,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.onSurface,
+          LayoutBuilder(
+            builder: (context, bounds) {
+              final inline =
+                  toolbar != null &&
+                  bounds.maxWidth >=
+                      MediaQuery.textScalerOf(context).scale(570);
+              final heading = Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(7),
+                      child: Icon(
+                        icon,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              ...actions,
-            ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  ...actions,
+                  if (inline)
+                    SizedBox(width: bounds.maxWidth * .76, child: toolbar),
+                ],
+              );
+              if (toolbar == null || inline) return heading;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [heading, const SizedBox(height: 4), toolbar!],
+              );
+            },
           ),
           const Divider(height: 20),
           Expanded(child: child),

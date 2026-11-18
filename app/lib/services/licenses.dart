@@ -10,7 +10,13 @@ void registerBundledLicenses() {
       '霞鹜漫黑 / LXGW Marker Gothic': 'lxgw-marker-gothic-OFL.txt',
       '悠哉手写体 / Yozai': 'yozai-OFL.txt',
       '志莽行书 / Zhi Mang Xing': 'zhimangxing-OFL.txt',
-      'KaTeX mathematical fonts / Panache Math Script': 'katex-math-fonts-OFL.txt',
+      'KaTeX mathematical fonts / Panache Math Script':
+          'katex-math-fonts-OFL.txt',
+      'Handlee': 'Handlee-OFL.txt',
+      'Patrick Hand': 'PatrickHand-OFL.txt',
+      'Indie Flower': 'IndieFlower-OFL.txt',
+      'Kalam': 'Kalam-OFL.txt',
+      'Shadows Into Light': 'ShadowsIntoLight-OFL.txt',
     };
     for (final entry in licenses.entries) {
       var text = await rootBundle.loadString(

@@ -71,6 +71,7 @@ class Workspace extends ChangeNotifier {
   WorkspaceStorage? storage;
   Future<void> _writes = Future<void>.value();
   int _connection = 0, _editRevision = 0;
+  int get editRevision => _editRevision;
   String? get previewTaskId => generation.previewTaskId;
   bool get previewStale =>
       pages.isNotEmpty && generation.previewRevision != _editRevision;
@@ -317,7 +318,11 @@ class Workspace extends ChangeNotifier {
     }
   }
 
-  Future<bool> generate({bool preview = true, bool pdf = false}) async {
+  Future<bool> generate({
+    bool preview = true,
+    bool pdf = false,
+    bool live = false,
+  }) async {
     if (disposed ||
         busy ||
         (retryAt != null && DateTime.now().isBefore(retryAt!))) {
@@ -326,8 +331,10 @@ class Workspace extends ChangeNotifier {
     if (text.trim().isEmpty ||
         !settings.valid ||
         (fontFile == null && settings.font == null)) {
-      error = 'validation';
-      emit();
+      if (!live) {
+        error = 'validation';
+        emit();
+      }
       return false;
     }
     final revision = _editRevision;
@@ -339,6 +346,7 @@ class Workspace extends ChangeNotifier {
     if (background != null) {
       fields.remove('width');
       fields.remove('height');
+      fields.remove('paper_pattern');
       fields['background_ruled'] = '$backgroundRuled';
     }
     final request = GenerationRequest(fields, {
@@ -352,6 +360,7 @@ class Workspace extends ChangeNotifier {
       preview: preview,
       pdf: pdf,
       onSubmitted: persist,
+      acceptPreview: live ? () => revision == _editRevision : null,
     );
   }
 
