@@ -4,19 +4,37 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import '../models/fine_edit.dart';
+import '../models/fine_transform.dart';
 import '../models/ink_page.dart';
 import 'ink_effects.dart';
 
 class FinePose {
   FinePose(FineGlyph glyph, FineAdjustment? edit)
     : scale = (edit?.scale ?? 100) / 100,
-      center = ui.Offset(
+      origin = ui.Offset(
         glyph.x + glyph.width / 2 + (edit?.dx ?? 0),
         glyph.y + glyph.height / 2 + (edit?.dy ?? 0),
       ),
       angle = (edit?.angle ?? 0) * math.pi / 180 {
     cos = math.cos(angle);
     sin = math.sin(angle);
+    final warp = edit?.warp;
+    if (warp != null) {
+      final corners = fineCorners(glyph.width, glyph.height, scale, cos, sin);
+      if (fineWarpFits(warp, corners)) {
+        final m = [...coefficients(warp), 1.0];
+        final points = corners.map((point) => origin + mapFinePoint(m, point));
+        center = origin + mapFinePoint(m, ui.Offset.zero);
+        bounds = points
+            .map((point) => ui.Rect.fromPoints(point, point))
+            .reduce((a, b) => a.expandToInclude(b));
+        projection = m;
+        inverse = inverseFineWarp(warp);
+        return;
+      }
+    }
+    center = origin;
+    projection = inverse = null;
     bounds = ui.Rect.fromCenter(
       center: center,
       width: scale * (cos.abs() * glyph.width + sin.abs() * glyph.height),
@@ -24,9 +42,20 @@ class FinePose {
     );
   }
   final double scale, angle;
-  final ui.Offset center;
+  final ui.Offset origin;
+  late final ui.Offset center;
+  late final List<double>? projection, inverse;
   late final double cos, sin;
   late final ui.Rect bounds;
+
+  bool hit(FineGlyph glyph, ui.Offset point) {
+    if (!bounds.contains(point)) return false;
+    final warp = inverse;
+    if (warp == null) return true;
+    final at = mapFinePoint(warp, point - origin);
+    return (at.dx * cos + at.dy * sin).abs() <= glyph.width * scale / 2 &&
+        (-at.dx * sin + at.dy * cos).abs() <= glyph.height * scale / 2;
+  }
 }
 
 Future<ui.Image> _image(Uint8List bytes, int width, int height) {
@@ -162,7 +191,29 @@ class FineRaster {
       brush.colorFilter = ui.ColorFilter.mode(color, ui.BlendMode.srcIn);
       final w = glyph.width.toDouble(), h = glyph.height.toDouble();
       canvas.save();
-      canvas.translate(pose.center.dx, pose.center.dy);
+      canvas.translate(pose.origin.dx, pose.origin.dy);
+      if (pose.projection case final m?) {
+        canvas.transform(
+          Float64List.fromList([
+            m[0],
+            m[3],
+            0,
+            m[6],
+            m[1],
+            m[4],
+            0,
+            m[7],
+            0,
+            0,
+            1,
+            0,
+            m[2],
+            m[5],
+            0,
+            m[8],
+          ]),
+        );
+      }
       canvas.rotate(pose.angle);
       canvas.scale(pose.scale);
       canvas.drawImageRect(
@@ -198,9 +249,13 @@ class FineRaster {
         y < math.min(height, rect.bottom.ceil());
         y++
       ) {
-        final dy = y + .5 - pose.center.dy;
         for (var x = left; x < right; x++) {
-          final dx = x + .5 - pose.center.dx;
+          var position = ui.Offset(x + .5, y + .5) - pose.origin;
+          if (pose.inverse case final inverse?) {
+            position = mapFinePoint(inverse, position);
+            if (!position.isFinite) continue;
+          }
+          final dx = position.dx, dy = position.dy;
           final sx =
               ((dx * pose.cos + dy * pose.sin) / pose.scale +
                       glyph.width / 2 +

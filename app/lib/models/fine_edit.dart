@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'fine_transform.dart';
+
 typedef FineRange = ({int start, int end});
 
 class FineGlyph {
@@ -76,6 +78,7 @@ typedef FineAdjustment = ({
   int? color,
   int thickness,
   int softness,
+  FineWarp? warp,
 });
 
 FineAdjustment defaultFineAdjustment(int id) => (
@@ -88,6 +91,7 @@ FineAdjustment defaultFineAdjustment(int id) => (
   color: null,
   thickness: 0,
   softness: 0,
+  warp: null,
 );
 
 bool _validKey(String key) => RegExp(r'^[0-9a-f]{64}$').hasMatch(key);
@@ -112,6 +116,15 @@ class FineEdits {
           (rgb.length != 3 || rgb.any((c) => c is! int || c < 0 || c > 255))) {
         throw const FormatException('Invalid fine edit color');
       }
+      final rawWarp = value['warp'];
+      if (rawWarp != null &&
+          (rawWarp is! List ||
+              rawWarp.length != 8 ||
+              rawWarp.any(
+                (v) => v is! num || !v.isFinite || v.abs() > 65535,
+              ))) {
+        throw const FormatException('Invalid fine edit transform');
+      }
       final edit = (
         id: value['id'] as int,
         dx: value['dx'] as int,
@@ -121,6 +134,11 @@ class FineEdits {
         opacity: value['opacity'] as int,
         thickness: value['thickness'] as int? ?? 0,
         softness: value['softness'] as int? ?? 0,
+        warp: rawWarp == null
+            ? null
+            : readWarp(
+                (rawWarp as List).map((v) => (v as num).toDouble()).toList(),
+              ),
         color: rgb == null
             ? null
             : 0xff000000 +
@@ -158,6 +176,7 @@ class FineEdits {
           'opacity': edit.opacity,
           if (edit.thickness != 0) 'thickness': edit.thickness,
           if (edit.softness != 0) 'softness': edit.softness,
+          if (edit.warp case final warp?) 'warp': coefficients(warp),
           'color': edit.color == null
               ? null
               : [
