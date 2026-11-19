@@ -1,3 +1,16 @@
+# [1.14.0](https://github.com/SXP-Simon/Panache/compare/v1.13.0...v1.14.0) (2026-11-19)
+
+
+### Bug Fixes
+
+* 更新 Flutter 安装包构建来源 ([8aeb211](https://github.com/SXP-Simon/Panache/commit/8aeb2115b64681fdb38364b328a690c22598c1c4))
+
+
+### Features
+
+* **fe/src/components:** 支持自由圈选纸张书写区 ([9be9bf7](https://github.com/SXP-Simon/Panache/commit/9be9bf7671a209f316066bcddfa9895575d8d5cd))
+* **fe/src/features/preview:** 支持字迹圈选与四角透视 ([f43ddf3](https://github.com/SXP-Simon/Panache/commit/f43ddf35e982f2cbc31681860f85d677e53fbfcd))
+
 # [1.13.0](https://github.com/SXP-Simon/Panache/compare/v1.12.0...v1.13.0) (2026-11-18)
 
 
