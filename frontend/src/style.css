@@ -1346,7 +1346,10 @@ input[type='color'] {
   }
 }
 .fine-touch-tools {
-  display: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-end: 8px;
 }
 @media (pointer: coarse) {
   .fine-touch-tools {
@@ -1360,7 +1363,7 @@ input[type='color'] {
     touch-action: manipulation;
   }
 }
-.fine-selection rect {
+.fine-selection :is(rect, polygon) {
   fill: color-mix(in srgb, var(--primary) 15%, transparent);
   stroke: var(--primary);
   stroke-width: 1;
@@ -1371,9 +1374,42 @@ input[type='color'] {
   fill: none;
   pointer-events: none;
 }
-.fine-selection rect.fine-marquee {
+.fine-selection polygon {
+  fill-rule: evenodd;
+}
+.fine-selection .fine-marquee {
   stroke-dasharray: 4 3;
   pointer-events: none;
+}
+.fine-selection[data-touch-tool='perspective'] {
+  overflow: visible;
+  cursor: default;
+}
+.fine-selection[data-touch-tool='perspective'] rect {
+  display: none;
+}
+.fine-selection polygon.fine-perspective-outline {
+  fill: none;
+  stroke-width: 2;
+  pointer-events: none;
+}
+.fine-perspective-handle circle {
+  cursor: grab;
+  fill: var(--primary);
+  stroke: var(--background);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+}
+.fine-perspective-handle:focus-visible {
+  outline: none;
+}
+.fine-perspective-handle:focus-visible circle {
+  stroke: var(--foreground);
+  stroke-width: 3px;
+}
+.fine-perspective-hint {
+  margin: 0 0 8px;
+  color: var(--muted-foreground);
 }
 .fine-inspector-slot:empty {
   display: none;

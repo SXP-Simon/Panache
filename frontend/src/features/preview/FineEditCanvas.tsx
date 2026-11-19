@@ -73,10 +73,13 @@ export default function FineEditCanvas({
   const undo = useFineEditStore((state) => state.undo.length > 0);
   const redo = useFineEditStore((state) => state.redo.length > 0);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const overlay = useRef<SVGSVGElement>(null);
+  const [overlayWidth, setOverlayWidth] = useState(0);
   const paint = useRef<FineRaster>(null);
   const latest = useRef<{ edits: Adjustments; styles: [FineInk, FineInk] }>(null);
   const [atlas, setAtlas] = useState<HTMLImageElement>();
   const [failed, setFailed] = useState(false);
+  const [transformDraft, setTransformDraft] = useState<{ field: string; value: number }>();
   const [styleDraft, setStyleDraft] = useState<Adjustment[]>([]);
   const batch = useRef<Adjustment[]>([]);
   const edits = useMemoAdjustments(saved?.key === modelKey ? saved.glyphs : undefined);
@@ -154,6 +157,17 @@ export default function FineEditCanvas({
   }, [atlas, overrides, page, size.width, styles]);
 
   const active = editing && Boolean(atlas) && !failed && text !== null && size.width > 0;
+  const showPerspective = active && Boolean(selection.quad);
+  useLayoutEffect(() => {
+    const surface = overlay.current;
+    if (!showPerspective || !surface) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setOverlayWidth(entry.contentRect.width);
+    });
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, [showPerspective]);
+  const handleRadius = overlayWidth ? (6 * size.width) / overlayWidth : 6;
   const marks = active
     ? selection.selected.map((glyph) => ({ id: glyph[0], ...pose(glyph, overrides.get(glyph[0])) }))
     : [];
@@ -175,6 +189,7 @@ export default function FineEditCanvas({
     commit(batch.current);
     batch.current = [];
     setStyleDraft([]);
+    setTransformDraft(undefined);
   }
 
   return (
@@ -187,6 +202,7 @@ export default function FineEditCanvas({
       />
       {active && (
         <svg
+          ref={overlay}
           className="fine-selection"
           data-touch-tool={selection.touchTool}
           role="group"
@@ -216,13 +232,51 @@ export default function FineEditCanvas({
               height={mark.bottom - mark.top}
             />
           ))}
-          {group && (
+          {selection.quad && (
+            <>
+              <polygon
+                className="fine-perspective-outline"
+                data-testid="fine-perspective-outline"
+                points={selection.quad.map(({ x, y }) => `${x},${y}`).join(' ')}
+              />
+              {selection.quad.map(({ x, y }, index) => (
+                <g
+                  key={index}
+                  className="fine-perspective-handle"
+                  role="group"
+                  tabIndex={0}
+                  aria-label={t(
+                    (
+                      [
+                        'fineCornerTopLeft',
+                        'fineCornerTopRight',
+                        'fineCornerBottomRight',
+                        'fineCornerBottomLeft',
+                      ] as const
+                    )[index] ?? 'finePerspectiveCorners',
+                  )}
+                  data-testid={`fine-perspective-corner-${index}`}
+                  data-corner={index}
+                >
+                  <circle cx={x} cy={y} r={handleRadius} />
+                </g>
+              ))}
+            </>
+          )}
+          {group && !selection.quad && (
             <rect
               className="fine-selection-outline"
               x={group.left}
               y={group.top}
               width={group.right - group.left}
               height={group.bottom - group.top}
+            />
+          )}
+          {selection.lasso.length > 1 && (
+            <polygon
+              data-testid="fine-lasso"
+              className="fine-marquee"
+              points={selection.lasso.map(({ x, y }) => `${x},${y}`).join(' ')}
             />
           )}
           {selection.box && (
@@ -278,7 +332,9 @@ export default function FineEditCanvas({
                 [
                   ['pan', 'fineTap'],
                   ['box', 'fineBox'],
+                  ['lasso', 'fineLasso'],
                   ['move', 'fineMove'],
+                  ['perspective', 'finePerspectiveCorners'],
                 ] as const
               ).map(([tool, label]) => (
                 <Button
@@ -286,7 +342,7 @@ export default function FineEditCanvas({
                   size="small"
                   variant={selection.touchTool === tool ? 'tonal' : 'ghost'}
                   aria-pressed={selection.touchTool === tool}
-                  disabled={tool === 'move' && !first}
+                  disabled={(tool === 'move' || tool === 'perspective') && !first}
                   data-testid={`fine-touch-${tool}`}
                   onPointerUp={(event) => {
                     if (event.pointerType === 'touch') selection.setTouchTool(tool);
@@ -297,6 +353,7 @@ export default function FineEditCanvas({
                 </Button>
               ))}
             </div>
+            {selection.quad && <p className="fine-perspective-hint">{t('finePerspectiveHint')}</p>}
             {first && active && (
               <>
                 <div className="fine-fields">
@@ -320,39 +377,85 @@ export default function FineEditCanvas({
                         ' px',
                       ],
                     ] as const
-                  ).map(([field, label, min, max, unit]) => {
-                    const value = values[field];
-                    const delta = unit === ' px';
-                    const display = delta
-                      ? `${value > 0 ? '+' : ''}${(value / 10).toFixed(1)}`
-                      : value;
-                    return (
-                      <label key={field}>
-                        <span>
-                          {t(label)}{' '}
-                          <output>
-                            {display}
-                            {unit}
-                          </output>
-                        </span>
-                        <input
-                          type="range"
-                          min={Math.min(value, min)}
-                          max={Math.max(value, max)}
-                          value={value}
-                          aria-valuetext={`${display}${unit}`}
-                          data-testid={`fine-${field}`}
-                          onChange={(event) =>
-                            change({ [field]: event.currentTarget.valueAsNumber })
-                          }
-                          onPointerUp={finish}
-                          onPointerCancel={finish}
-                          onKeyUp={finish}
-                          onBlur={finish}
-                        />
-                      </label>
-                    );
-                  })}
+                  )
+                    .filter(([field]) => field !== 'angle' || selection.selected.length === 1)
+                    .map(([field, label, min, max, unit]) => {
+                      const value = values[field];
+                      const delta = unit === ' px';
+                      const display = delta
+                        ? `${value > 0 ? '+' : ''}${(value / 10).toFixed(1)}`
+                        : value;
+                      return (
+                        <label key={field}>
+                          <span>
+                            {t(label)}{' '}
+                            <output>
+                              {display}
+                              {unit}
+                            </output>
+                          </span>
+                          <input
+                            type="range"
+                            min={Math.min(value, min)}
+                            max={Math.max(value, max)}
+                            value={value}
+                            aria-valuetext={`${display}${unit}`}
+                            data-testid={`fine-${field}`}
+                            onChange={(event) =>
+                              change({ [field]: event.currentTarget.valueAsNumber })
+                            }
+                            onPointerUp={finish}
+                            onPointerCancel={finish}
+                            onKeyUp={finish}
+                            onBlur={finish}
+                          />
+                        </label>
+                      );
+                    })}
+                </div>
+                <div className="fine-fields">
+                  {(
+                    [
+                      ...(selection.selected.length > 1
+                        ? ([['angle', 'fineGroupAngle', 45, '°']] as const)
+                        : []),
+                      ['horizontal', 'finePerspectiveX', 35, '%'],
+                      ['vertical', 'finePerspectiveY', 35, '%'],
+                    ] as const
+                  ).map(([field, label, max, unit]) => (
+                    <label key={field}>
+                      <span>
+                        {t(label)}{' '}
+                        <output>
+                          {transformDraft?.field === field ? transformDraft.value : 0}
+                          {unit}
+                        </output>
+                      </span>
+                      <input
+                        type="range"
+                        min={-max}
+                        max={max}
+                        value={transformDraft?.field === field ? transformDraft.value : 0}
+                        data-testid={`fine-transform-${field}`}
+                        onChange={(event) => {
+                          const value = event.currentTarget.valueAsNumber;
+                          const values = selection.transform(
+                            field === 'angle' ? value : 0,
+                            field === 'horizontal' ? value : 0,
+                            field === 'vertical' ? value : 0,
+                          );
+                          if (!values) return;
+                          batch.current = values;
+                          setStyleDraft(values);
+                          setTransformDraft({ field, value });
+                        }}
+                        onPointerUp={finish}
+                        onPointerCancel={finish}
+                        onKeyUp={finish}
+                        onBlur={finish}
+                      />
+                    </label>
+                  ))}
                 </div>
                 <div className="fine-actions" data-testid="fine-actions">
                   <label className="fine-color">

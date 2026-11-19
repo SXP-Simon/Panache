@@ -59,7 +59,14 @@ export function generationFormData(snapshot: GenerationSnapshot, mode: Generatio
     body.append('fine_edit', 'true');
     if (snapshot.fineEdits?.text === snapshot.text && mode !== 'preview') {
       const { key, glyphs } = snapshot.fineEdits;
-      body.append('fine_edits', JSON.stringify({ key, glyphs }));
+      const data = JSON.stringify({ key, glyphs });
+      if (data.length > 1_000_000)
+        body.append(
+          'fine_edits_file',
+          new Blob([data], { type: 'application/json' }),
+          'fine-edits.json',
+        );
+      else body.append('fine_edits', data);
     }
   }
   body.append('pdf_save', String(mode === 'pdf'));

@@ -5,6 +5,7 @@ import type { NumericKey } from '@/models';
 const integer = v.pipe(v.number(), v.integer());
 const bounded = (min: number, max: number) =>
   v.pipe(v.number(), v.integer(), v.minValue(min), v.maxValue(max));
+const coefficient = v.pipe(v.number(), v.finite(), v.minValue(-65535), v.maxValue(65535));
 const color = v.pipe(v.string(), v.regex(/^#[0-9a-f]{6}$/i));
 const key = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/));
 const glyph = v.tuple([
@@ -33,6 +34,18 @@ export const adjustmentSchema = v.object({
   color: v.nullable(color),
   thickness: v.optional(bounded(-20, 20), 0),
   softness: v.optional(bounded(-20, 20), 0),
+  warp: v.optional(
+    v.tuple([
+      coefficient,
+      coefficient,
+      coefficient,
+      coefficient,
+      coefficient,
+      coefficient,
+      coefficient,
+      coefficient,
+    ]),
+  ),
 });
 export const fineEditsSchema = v.object({
   text: v.string(),
@@ -57,8 +70,11 @@ export const defaultAdjustment = {
 export type Adjustments = ReadonlyMap<number, Adjustment>;
 
 export function isDefault(adjustment: Adjustment) {
-  return Object.entries(defaultAdjustment).every(
-    ([key, value]) => adjustment[key as keyof typeof defaultAdjustment] === value,
+  return (
+    !adjustment.warp &&
+    Object.entries(defaultAdjustment).every(
+      ([key, value]) => adjustment[key as keyof typeof defaultAdjustment] === value,
+    )
   );
 }
 

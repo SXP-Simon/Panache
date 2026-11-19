@@ -53,6 +53,22 @@ test('fine editing moves real ink during drag and copies exactly what PDF and ZI
   await page.getByTestId('fine-redo').click();
   await expect.poll(pixelData).not.toBe(original);
 
+  const [secondX, secondY] = center(second);
+  const [thirdX] = center(third);
+  await page.getByTestId('fine-touch-lasso').click();
+  const lasso = await Promise.all([
+    [secondX - 10, secondY - 14],
+    [thirdX + 4, secondY - 14],
+    [secondX + 7, secondY + 11],
+    [secondX - 10, secondY + 11],
+  ].map(([x, y]) => hit(x, y)));
+  await page.mouse.move(lasso[0].x, lasso[0].y);
+  await page.mouse.down();
+  for (const { x, y } of lasso.slice(1)) await page.mouse.move(x, y, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.getByTestId('fine-selected-glyph')).toHaveCount(1);
+  await expect(page.getByTestId('fine-selected-glyph')).toHaveAttribute('data-glyph', String(second[0]));
+  await page.getByTestId('fine-touch-box').click();
   const left = await hit(second[1] - 4, second[2] - 5);
   const right = await hit(third[1] + third[3] + 5, Math.max(second[2] + second[4], third[2] + third[4]) + 5);
   await page.mouse.move(left.x, left.y);
@@ -64,7 +80,14 @@ test('fine editing moves real ink during drag and copies exactly what PDF and ZI
   const beforeSize = await pixelData();
   await scale.focus();
   await scale.press('ArrowRight');
-  await page.getByTestId('fine-angle').press('ArrowRight');
+  const beforeRotation = await page.getByTestId('fine-selected-glyph').last().getAttribute('y');
+  await page.getByTestId('fine-transform-angle').fill('25');
+  await expect(page.getByTestId('fine-selected-glyph').last()).not.toHaveAttribute('y', beforeRotation);
+  await page.getByTestId('fine-transform-angle').blur();
+  const rotated = await pixelData();
+  await page.getByTestId('fine-transform-horizontal').fill('25');
+  await expect.poll(pixelData).not.toBe(rotated);
+  await page.getByTestId('fine-transform-horizontal').blur();
   await page.getByTestId('fine-opacity').press('ArrowLeft');
   await page.getByTestId('fine-color').fill('#904927');
   await expect.poll(pixelData).not.toBe(beforeSize);
@@ -74,6 +97,42 @@ test('fine editing moves real ink during drag and copies exactly what PDF and ZI
     await expect.poll(pixelData).not.toBe(before);
     await page.getByTestId('fine-' + field).blur();
   }
+  const beforeWarp = await pixelData();
+  const corners = page.getByTestId('fine-perspective-outline');
+  await expect(corners).toHaveCount(0);
+  await page.getByTestId('fine-touch-perspective').click();
+  const startingFrame = await corners.getAttribute('points');
+  const pointList = (frame) => frame.split(' ').map((pair) => pair.split(',').map(Number));
+  const pull = async (index, dx, dy) => {
+    const before = pointList(await corners.getAttribute('points'));
+    const [x, y] = before[index];
+    const start = await hit(x, y);
+    const end = await hit(x + dx, y + dy);
+    const prior = await pixelData();
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 8 });
+    await expect.poll(pixelData).not.toBe(prior);
+    await page.mouse.up();
+    const after = pointList(await corners.getAttribute('points'));
+    expect(after[index][0]).toBeCloseTo(x + dx, 1);
+    expect(after[index][1]).toBeCloseTo(y + dy, 1);
+    for (const i of [0, 1, 2, 3].filter((i) => i !== index)) expect(after[i]).toEqual(before[i]);
+  };
+  await pull(1, 21, 9);
+  await pull(3, -11, 12);
+  const finalFrame = await corners.getAttribute('points');
+  const warped = await pixelData();
+  await page.getByTestId('fine-undo').click();
+  await page.getByTestId('fine-undo').click();
+  await expect(corners).toHaveAttribute('points', startingFrame);
+  await expect.poll(pixelData).toBe(beforeWarp);
+  await page.getByTestId('fine-redo').click();
+  await page.getByTestId('fine-redo').click();
+  await expect(corners).toHaveAttribute('points', finalFrame);
+  await expect.poll(pixelData).toBe(warped);
+  await page.getByTestId('fine-touch-pan').click();
+  await expect(corners).toHaveCount(0);
   const beforeFilter = await pixelData();
   await page.getByTestId('canvas-pane-ink').click();
   await page.getByTestId('ink-thickness-number').fill('0.7');
@@ -175,6 +234,20 @@ test('touch lets the user box-select and then move the whole selection', async (
     const shift = await selected.first().evaluate((rect) => Number(rect.getAttribute('x'))) - x;
     expect(Math.abs(shift - 50)).toBeLessThanOrEqual(2);
     await expect(page.getByTestId('fine-undo')).toBeEnabled();
+    const mode = page.getByTestId('fine-touch-perspective');
+    await mode.tap();
+    await expect(overlay).toHaveAttribute('data-touch-tool', 'perspective');
+    const frame = page.getByTestId('fine-perspective-outline');
+    const read = async () => (await frame.getAttribute('points')).split(' ').map((pair) => pair.split(',').map(Number));
+    const before = await read();
+    const [cornerX, cornerY] = before[1];
+    await drag(before[1], [cornerX + 25, cornerY + 10]);
+    const after = await read();
+    expect(Math.abs(after[1][0] - cornerX - 25)).toBeLessThanOrEqual(2);
+    expect(Math.abs(after[1][1] - cornerY - 10)).toBeLessThanOrEqual(2);
+    expect(after[0]).toEqual(before[0]);
+    await page.getByTestId('fine-touch-pan').tap();
+    await expect(frame).toHaveCount(0);
     const actions = page.getByTestId('fine-actions');
     const reset = actions.getByTestId('fine-reset');
     await reset.scrollIntoViewIfNeeded();

@@ -227,6 +227,34 @@ test('FormData expands illustrations, binds the selected upload, and lets backgr
   assert.equal(body.get('layout_style'), 'standard');
 });
 
+test('large perspective exports send fine edits as a JSON file', async () => {
+  const { generationFormData } = await modules();
+  const warp = [1.00123456789, 0.0123456789, 0.1, 0.0123456789, 1, 0.1, 0.0000123456789, 0.0000123456789];
+  const fineEdits = {
+    text: 'demo',
+    key: '0'.repeat(64),
+    glyphs: Array.from({ length: 10_000 }, (_, id) => ({ id, warp })),
+  };
+  const snapshot = {
+    text: fineEdits.text, imageStore: {}, numbers: {}, ink: '#26322a',
+    selectedFont: 'test.ttf', fineEdit: true, fineEdits,
+  };
+  const pdf = generationFormData(snapshot, 'pdf');
+  const zip = generationFormData(snapshot, 'zip');
+  for (const body of [pdf, zip]) {
+    assert.equal(body.has('fine_edits'), false);
+    const upload = body.get('fine_edits_file');
+    assert.equal(upload.type, 'application/json');
+    assert.equal((await upload.text()), JSON.stringify({ key: fineEdits.key, glyphs: fineEdits.glyphs }));
+  }
+  assert.equal(generationFormData(snapshot, 'preview').has('fine_edits_file'), false);
+  const small = generationFormData({
+    ...snapshot, fineEdits: { ...fineEdits, glyphs: [fineEdits.glyphs[0]] },
+  }, 'zip');
+  assert.equal(small.has('fine_edits_file'), false);
+  assert.equal(typeof small.get('fine_edits'), 'string');
+});
+
 test('homework layout is explicit request metadata and never rewrites the source text or background', async () => {
   const api = await modules();
   const source = '1. 推理：从前提出发。\n(1) (A→B)∧(B→C)⇒(A→C)';

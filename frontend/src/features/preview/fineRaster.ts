@@ -1,5 +1,6 @@
 import type { Adjustment, Adjustments, FinePage, Glyph } from './fineEditModel';
 import { filterInk } from '@/utils/inkEffects';
+import { affineCorners, inverseWarp, mapPoint, warpFits } from './fineTransform';
 import type { InkShape } from '@/utils/inkEffects';
 
 export interface Bounds {
@@ -19,7 +20,65 @@ export function pose(glyph: Glyph, edit?: Adjustment) {
   const cy = y + height / 2 + (edit?.dy ?? 0);
   const rx = (scale * (Math.abs(cos) * width + Math.abs(sin) * height)) / 2;
   const ry = (scale * (Math.abs(sin) * width + Math.abs(cos) * height)) / 2;
-  return { cx, cy, cos, sin, scale, left: cx - rx, top: cy - ry, right: cx + rx, bottom: cy + ry };
+  const warp = edit?.warp;
+  if (warp) {
+    const corners = affineCorners(width, height, scale, cos, sin);
+    if (warpFits(warp, corners)) {
+      const matrix = [...warp, 1] as const;
+      const points = corners.map(({ x, y }) => mapPoint(matrix, x, y));
+      const center = mapPoint(matrix, 0, 0);
+      return {
+        cx,
+        cy,
+        centerX: cx + center.x,
+        centerY: cy + center.y,
+        cos,
+        sin,
+        scale,
+        inverse: inverseWarp(warp),
+        left: cx + Math.min(...points.map((point) => point.x)),
+        right: cx + Math.max(...points.map((point) => point.x)),
+        top: cy + Math.min(...points.map((point) => point.y)),
+        bottom: cy + Math.max(...points.map((point) => point.y)),
+      };
+    }
+  }
+  return {
+    cx,
+    cy,
+    centerX: cx,
+    centerY: cy,
+    cos,
+    sin,
+    scale,
+    inverse: undefined,
+    left: cx - rx,
+    top: cy - ry,
+    right: cx + rx,
+    bottom: cy + ry,
+  };
+}
+
+export function hitGlyph(
+  glyph: Glyph,
+  edit: Adjustment | undefined,
+  point: { x: number; y: number },
+  slop: number,
+) {
+  const { cx, cy, cos, sin, scale, left, top, right, bottom, inverse } = pose(glyph, edit);
+  if (
+    point.x < left - slop ||
+    point.x > right + slop ||
+    point.y < top - slop ||
+    point.y > bottom + slop
+  )
+    return false;
+  if (!inverse) return true;
+  const { x, y } = mapPoint(inverse, point.x - cx, point.y - cy);
+  return (
+    Math.abs(x * cos + y * sin) <= (glyph[3] * scale) / 2 + slop &&
+    Math.abs(-x * sin + y * cos) <= (glyph[4] * scale) / 2 + slop
+  );
 }
 
 export function overlaps(a: Bounds, b: Bounds) {
@@ -53,7 +112,7 @@ function drawGlyph(
   edit?: Adjustment,
 ) {
   const [, , , width, height] = glyph;
-  const { cx, cy, cos, sin, scale, left, top, right, bottom } = pose(glyph, edit);
+  const { cx, cy, cos, sin, scale, inverse, left, top, right, bottom } = pose(glyph, edit);
   const override = edit?.color ? rgb(edit.color) : null;
   const opacity = edit?.opacity ?? 100;
   const pixels = target.data;
@@ -65,12 +124,13 @@ function drawGlyph(
     y < Math.min(dirty.bottom, Math.ceil(bottom));
     y += 1
   ) {
-    const dy = y + 0.5 - cy;
     for (let x = startX; x < endX; x += 1) {
-      const dx = x + 0.5 - cx;
+      let dx = x + 0.5 - cx,
+        dy = y + 0.5 - cy;
+      if (inverse) ({ x: dx, y: dy } = mapPoint(inverse, dx, dy));
       const sx = Math.floor((dx * cos + dy * sin) / scale + width / 2 + epsilon);
       const sy = Math.floor((-dx * sin + dy * cos) / scale + height / 2 + epsilon);
-      if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
+      if (!(sx >= 0 && sy >= 0 && sx < width && sy < height)) continue;
       const source = sy * width + sx;
       const offset = (y * target.width + x) * 4;
       for (const channel of [0, 1] as const) {

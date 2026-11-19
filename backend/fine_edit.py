@@ -20,10 +20,26 @@ _OPAQUE = 100
 _BYTE = 255
 _HEX = 16
 _FILTER_PAD = 4
+_WARP_LIMIT = 65_535
+_MIN_WARP_DIVISOR = 0.15
+_MIN_WARP_DETERMINANT = 1e-12
+_MAX_WARP_AREA_RATIO = 32
+MAX_FINE_EDITS_BYTES = 4_000_000
 type InkStyle = tuple[InkColor, InkEffects, int]
 type Position = tuple[int, int]
 type ByteWriter = Callable[[Image.Image], bytes]
 type InkPair = tuple[InkStyle, InkStyle | None]
+type Coefficient = Annotated[float, Field(ge=-65535, le=65535)]
+type Warp = tuple[
+    Coefficient,
+    Coefficient,
+    Coefficient,
+    Coefficient,
+    Coefficient,
+    Coefficient,
+    Coefficient,
+    Coefficient,
+]
 
 
 class GlyphAdjustment(BaseModel):
@@ -39,6 +55,7 @@ class GlyphAdjustment(BaseModel):
     color: Annotated[str, StringConstraints(pattern=r"^#[0-9a-fA-F]{6}$")] | None = None
     thickness: int = Field(default=0, ge=-20, le=20)
     softness: int = Field(default=0, ge=-20, le=20)
+    warp: Warp | None = None
 
     def apply_shape(self, effects: InkEffects) -> InkEffects:
         """2026-11-18：在全局字迹基础上应用以 0.1 px 为单位的选区偏移."""
@@ -64,8 +81,7 @@ def parse_edits(raw: str | None) -> FineEdits | None:
     """2026-11-18：在进入渲染前限制调整表大小."""
     if not raw:
         return None
-    max_bytes = 1_000_000
-    if len(raw) > max_bytes:
+    if len(raw) > MAX_FINE_EDITS_BYTES:
         msg = "Too many fine edits"
         raise ValueError(msg)
     return _edits_adapter.validate_json(raw)
@@ -196,6 +212,50 @@ class EditPage:
         return Image.fromarray(pixels)
 
 
+def _projected_geometry(
+    warp: Warp,
+    size: Position,
+    scale: float,
+    cos: float,
+    sin: float,
+) -> tuple[list[tuple[float, float]], tuple[float, ...]] | None:
+    # 2026-11-19：用字迹中心为原点，先检查四个角没有越过透视消失线。
+    a, b, c, d, e, f, g, h = warp
+    inverse = (
+        e - f * h,
+        c * h - b,
+        b * f - c * e,
+        f * g - d,
+        a - c * g,
+        c * d - a * f,
+        d * h - e * g,
+        b * g - a * h,
+        a * e - b * d,
+    )
+    if abs(a * inverse[0] + b * inverse[3] + c * inverse[6]) < _MIN_WARP_DETERMINANT:
+        return None
+    width, height = size
+    points: list[tuple[float, float]] = []
+    for u in (-width / 2, width / 2):
+        for v in (-height / 2, height / 2):
+            x, y = scale * (cos * u - sin * v), scale * (sin * u + cos * v)
+            z = g * x + h * y + 1
+            if z < _MIN_WARP_DIVISOR:
+                return None
+            point = ((a * x + b * y + c) / z, (d * x + e * y + f) / z)
+            if max(abs(point[0]), abs(point[1])) > _WARP_LIMIT:
+                return None
+            points.append(point)
+    px, py = zip(*points, strict=True)
+    original_width = scale * (abs(cos) * width + abs(sin) * height)
+    original_height = scale * (abs(sin) * width + abs(cos) * height)
+    if (max(px) - min(px)) * (max(py) - min(py)) > (
+        _MAX_WARP_AREA_RATIO * original_width * original_height
+    ):
+        return None
+    return points, inverse
+
+
 def _paint(
     paper: np.ndarray[tuple[int, ...], np.dtype[np.uint8]],
     tile: _Tile,
@@ -212,19 +272,36 @@ def _paint(
     cx, cy = x + width / 2 + dx, y + height / 2 + dy
     reach_x = scale * (abs(cos) * width + abs(sin) * height) / 2
     reach_y = scale * (abs(sin) * width + abs(cos) * height) / 2
-    left, top = max(0, math.floor(cx - reach_x)), max(0, math.floor(cy - reach_y))
-    right = min(paper.shape[1], math.ceil(cx + reach_x))
-    bottom = min(paper.shape[0], math.ceil(cy + reach_y))
+    projected = (
+        _projected_geometry(edit.warp, (width, height), scale, cos, sin)
+        if edit and edit.warp
+        else None
+    )
+    x_range = (-reach_x, reach_x)
+    y_range = (-reach_y, reach_y)
+    if projected:
+        px, py = zip(*projected[0], strict=True)
+        x_range, y_range = (min(px), max(px)), (min(py), max(py))
+    left = max(0, math.floor(cx + x_range[0]))
+    top = max(0, math.floor(cy + y_range[0]))
+    right = min(paper.shape[1], math.ceil(cx + x_range[1]))
+    bottom = min(paper.shape[0], math.ceil(cy + y_range[1]))
     if left >= right or top >= bottom:
         return
     yy, xx = np.ogrid[top:bottom, left:right]
     xx = xx + 0.5 - cx
     yy = yy + 0.5 - cy
+    if projected:
+        a, b, c, d, e, f, g, h, i = projected[1]
+        z = g * xx + h * yy + i
+        divisor = np.where(z != 0, z, np.nan)
+        xx, yy = (a * xx + b * yy + c) / divisor, (d * xx + e * yy + f) / divisor
     # 2026-11-18：同一采样点恰好落在整数边界时，消除两端三角函数的尾数误差。
     epsilon = 1e-9
-    sx = np.floor((xx * cos + yy * sin) / scale + width / 2 + epsilon).astype(np.int32)
-    sy = np.floor((-xx * sin + yy * cos) / scale + height / 2 + epsilon).astype(np.int32)
-    inside = (sx >= 0) & (sx < width) & (sy >= 0) & (sy < height)
+    sample_x = np.floor((xx * cos + yy * sin) / scale + width / 2 + epsilon)
+    sample_y = np.floor((-xx * sin + yy * cos) / scale + height / 2 + epsilon)
+    inside = (sample_x >= 0) & (sample_x < width) & (sample_y >= 0) & (sample_y < height)
+    sx, sy = sample_x[inside].astype(np.int32), sample_y[inside].astype(np.int32)
     target = paper[top:bottom, left:right]
     rgb = target[inside].astype(np.uint32)
     opacity = edit.opacity if edit else _OPAQUE
@@ -235,7 +312,7 @@ def _paint(
         if mask.getbbox() is None:
             continue
         shape = edit.apply_shape(effects) if edit and (edit.thickness or edit.softness) else effects
-        source = np.asarray(filtered_alpha(mask, shape, ink_alpha))[sy[inside], sx[inside]]
+        source = np.asarray(filtered_alpha(mask, shape, ink_alpha))[sy, sx]
         alpha = ((source.astype(np.uint32) * opacity + 50) // _OPAQUE)[:, None]
         rgb = (np.asarray(color, dtype=np.uint32) * alpha + rgb * (_BYTE - alpha) + 127) // _BYTE
     target[inside] = rgb

@@ -50,7 +50,7 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
-from fine_edit import EditPage, FineEdits, encode_png, parse_edits
+from fine_edit import MAX_FINE_EDITS_BYTES, EditPage, FineEdits, encode_png, parse_edits
 from generation_cancellation import (
     CancellationProbe,
     GenerationCancelledError,
@@ -1551,6 +1551,23 @@ async def generate_handwriting(
             status_code=503,
         )
     # ────────────────────────────────────────────────────────────────────
+
+    # 2026-11-19：长文透视的 JSON 超过表单文本字段限制时使用文件字段。
+    fine_edits_file = (
+        (await request.form()).get("fine_edits_file") if params.fine_edit == "true" else None
+    )
+    if isinstance(fine_edits_file, StarletteUploadFile):
+        data = await fine_edits_file.read(MAX_FINE_EDITS_BYTES + 1)
+        if len(data) > MAX_FINE_EDITS_BYTES:
+            return JSONResponse(
+                {"status": "error", "message": "Too many fine edits"}, status_code=413
+            )
+        try:
+            params = params.model_copy(update={"fine_edits": data.decode("utf-8")})
+        except UnicodeDecodeError:
+            return JSONResponse(
+                {"status": "error", "message": "Invalid fine edits"}, status_code=400
+            )
 
     background_image_bytes = None
     # 注意：starlette.datastructures.UploadFile 可能是 fastapi.UploadFile 的运行时类型

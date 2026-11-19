@@ -10,7 +10,10 @@ from zipfile import ZipFile
 
 import app
 import fitz
+import requests
+from fine_edit import MAX_FINE_EDITS_BYTES, parse_edits
 from PIL import Image
+from test_generation_cancellation import request
 from test_generation_parameters import parameters
 
 
@@ -114,6 +117,50 @@ def test_inline_image_preserves_glyphs_on_both_sides_without_id_collisions():
     [page] = preview["fine_edit"]["pages"]
     assert [item[0] for item in page["glyphs"]] == [0, len(source) - 1]
     assert page["glyphs"][1][2] > page["glyphs"][0][2]
+
+
+def test_multipart_export_accepts_large_perspective_edits():
+    # 2026-11-19：跨页字迹调整大小超过默认的 1 MiB 文本字段限制。
+    warp = [
+        1.00123456789,
+        0.0123456789,
+        0.1,
+        0.0123456789,
+        1,
+        0.1,
+        0.0000123456789,
+        0.0000123456789,
+    ]
+    count = 10_000
+    edits = json.dumps({"key": "0" * 64, "glyphs": [{"id": i, "warp": warp} for i in range(count)]})
+    assert 1024 * 1024 < len(edits) <= MAX_FINE_EDITS_BYTES
+    fields = parameters(fine_edit="true", preview="false").model_dump(exclude_none=True)
+
+    async def submit(data: bytes):
+        path = "/api/generate_handwriting"
+        form = requests.Request(
+            "POST",
+            f"http://localhost{path}",
+            data=fields,
+            files={"fine_edits_file": ("fine-edits.json", data, "application/json")},
+        ).prepare()
+        headers = [(key.lower().encode(), value.encode()) for key, value in form.headers.items()]
+        return await request("POST", path, body=form.body, headers=headers)
+
+    with (
+        patch("app.cleanup_expired_generation_tasks"),
+        patch("app.get_generation_active_task_count", return_value=0),
+        patch("app.create_generation_task", return_value=True),
+        patch("app.run_generation_task") as run,
+    ):
+        status, response = asyncio.run(submit(edits.encode()))
+        too_large, _ = asyncio.run(submit(b"x" * (MAX_FINE_EDITS_BYTES + 1)))
+    assert status == 200, response
+    assert too_large == 413
+    run.assert_called_once()
+    parsed = parse_edits(run.call_args.args[1]["params"].fine_edits)
+    assert parsed is not None
+    assert len(parsed.glyphs) == count
 
 
 def test_plain_source_offsets_use_browser_utf16_units():
