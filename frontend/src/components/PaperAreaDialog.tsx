@@ -4,6 +4,7 @@ import { useI18n } from '@/i18n';
 import { useSettingsStore } from '@/features/settings/store';
 import { useNotificationStore } from '@/features/notifications/store';
 import { clearPreview } from '@/features/preview/resources';
+import { appendPoint, enclosedRectangle } from '@/utils/lasso';
 import { paperAreaLayout } from '@/features/workspace/paperArea';
 import type { PaperArea, PaperSize } from '@/features/workspace/paperArea';
 import Button from '../shared/ui/Button';
@@ -18,6 +19,10 @@ export default function PaperAreaDialog({ source, close }: { source: string; clo
   const { t } = useI18n();
   const [size, setSize] = useState<PaperSize | null>(null);
   const [area, setArea] = useState<PaperArea | null>(null);
+  const [free, setFree] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const [path, setPath] = useState<Point[]>([]);
+  const [enclosed, setEnclosed] = useState<PaperArea | null>(null);
   const [rowInput, setRowInput] = useState<string | null>(null);
   const [spacing, setSpacing] = useState(1);
   const [loadError, setLoadError] = useState(false);
@@ -26,11 +31,23 @@ export default function PaperAreaDialog({ source, close }: { source: string; clo
     anchor: Point;
     start: Point;
     original: PaperArea | null;
+    path: Point[];
   } | null>(null);
+  const writingArea = free ? enclosed : area;
   const rows =
     rowInput ??
-    (area ? String(Math.max(2, Math.round((area.last - area.first) / spacing) + 1)) : '');
-  const layout = area && size ? paperAreaLayout(area, size, Number(rows)) : null;
+    (writingArea
+      ? String(
+          Math.max(
+            2,
+            Math.round((writingArea.last - writingArea.first) / spacing) + (free ? 0 : 1),
+          ),
+        )
+      : '');
+  const layout =
+    writingArea && size && !(free && drawing)
+      ? paperAreaLayout(writingArea, size, Number(rows), free)
+      : null;
 
   function initialize(image: HTMLImageElement) {
     const paper = { width: image.naturalWidth, height: image.naturalHeight };
@@ -74,14 +91,24 @@ export default function PaperAreaDialog({ source, close }: { source: string; clo
           y: corner.startsWith('n') ? area.last : area.first,
         }
       : start;
-    drag.current = { id: event.pointerId, anchor, start, original: area };
+    drag.current = { id: event.pointerId, anchor, start, original: area, path: [start] };
+    if (free) {
+      setDrawing(true);
+      setPath([start]);
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function moveDrag(event: PointerEvent<HTMLDivElement>) {
     const current = drag.current;
-    if (!current || current.id !== event.pointerId) return;
+    if (!size || !current || current.id !== event.pointerId) return;
     const next = point(event);
+    if (free) {
+      const screenWidth = event.currentTarget.getBoundingClientRect().width;
+      appendPoint(current.path, next, (size.width / screenWidth) * 4);
+      setPath([...current.path, next]);
+      return;
+    }
     if (Math.abs(next.x - current.start.x) + Math.abs(next.y - current.start.y) < 3) return;
     setArea({
       left: Math.min(next.x, current.anchor.x),
@@ -118,19 +145,58 @@ export default function PaperAreaDialog({ source, close }: { source: string; clo
       testId="paper-area-dialog"
       className="paper-area-modal"
     >
-      <p className="help-text">{t('paperAreaHelp')}</p>
+      <div className="paper-area-tools">
+        <Button
+          size="small"
+          aria-pressed={!free}
+          variant={!free ? 'tonal' : 'ghost'}
+          onClick={() => setFree(false)}
+        >
+          {t('fineBox')}
+        </Button>
+        <Button
+          size="small"
+          aria-pressed={free}
+          variant={free ? 'tonal' : 'ghost'}
+          onClick={() => setFree(true)}
+          data-testid="paper-area-lasso-tool"
+        >
+          {t('fineLasso')}
+        </Button>
+      </div>
+      <p className="help-text">{t(free ? 'paperAreaLassoHelp' : 'paperAreaHelp')}</p>
       <div className="paper-area-scroller">
         <div
           className="paper-area-image"
           data-testid="paper-area-image"
           onPointerDown={startDrag}
           onPointerMove={moveDrag}
-          onPointerUp={() => {
+          onPointerUp={(event) => {
+            if (drag.current?.id !== event.pointerId) return;
+            const current = drag.current;
             drag.current = null;
+            if (!free) return;
+            setDrawing(false);
+            const completed = [...current.path, point(event)];
+            setPath(completed);
+            const result = enclosedRectangle(completed);
+            setEnclosed(
+              result && {
+                left: result.left,
+                first: result.top,
+                right: result.right,
+                last: result.bottom,
+              },
+            );
           }}
           onPointerCancel={() => {
             if (drag.current) setArea(drag.current.original);
             drag.current = null;
+            if (free) {
+              setDrawing(false);
+              setPath([]);
+              setEnclosed(null);
+            }
           }}
         >
           <img
@@ -140,18 +206,35 @@ export default function PaperAreaDialog({ source, close }: { source: string; clo
             onLoad={(event) => initialize(event.currentTarget)}
             onError={() => setLoadError(true)}
           />
-          {area && size && (
+          {free && size && path.length > 1 && (
+            <svg className="paper-area-lasso" viewBox={`0 0 ${size.width} ${size.height}`}>
+              <polygon points={path.map(({ x, y }) => `${x},${y}`).join(' ')} />
+            </svg>
+          )}
+          {writingArea && size && (!free || !drawing) && (
             <div
               className="paper-area-selection"
               data-testid="paper-area-selection"
               style={{
-                left: `${(100 * area.left) / size.width}%`,
-                top: `${(100 * area.first) / size.height}%`,
-                width: `${(100 * (area.right - area.left)) / size.width}%`,
-                height: `${(100 * (area.last - area.first)) / size.height}%`,
+                left: `${(100 * writingArea.left) / size.width}%`,
+                top: `${(100 * writingArea.first) / size.height}%`,
+                width: `${(100 * (writingArea.right - writingArea.left)) / size.width}%`,
+                height: `${(100 * (writingArea.last - writingArea.first)) / size.height}%`,
               }}
             >
               {layout &&
+                free &&
+                Array.from({ length: Number(rows) }, (_, index) => (
+                  <span
+                    className="paper-area-guide"
+                    key={index}
+                    style={{
+                      top: `${(100 * (layout.top_margin - writingArea.first + layout.line_spacing * (index + 1))) / (writingArea.last - writingArea.first)}%`,
+                    }}
+                  />
+                ))}
+              {layout &&
+                !free &&
                 Array.from({ length: Number(rows) - 2 }, (_, index) => (
                   <span
                     className="paper-area-guide"
@@ -159,9 +242,14 @@ export default function PaperAreaDialog({ source, close }: { source: string; clo
                     style={{ top: `${(100 * (index + 1)) / (Number(rows) - 1)}%` }}
                   />
                 ))}
-              {corners.map((corner) => (
-                <span className={`paper-area-handle ${corner}`} key={corner} data-corner={corner} />
-              ))}
+              {!free &&
+                corners.map((corner) => (
+                  <span
+                    className={`paper-area-handle ${corner}`}
+                    key={corner}
+                    data-corner={corner}
+                  />
+                ))}
             </div>
           )}
         </div>

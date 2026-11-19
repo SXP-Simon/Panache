@@ -120,6 +120,30 @@ test('框选纸张正文、调整行数并实际生成预览', async ({ page }) 
   await expect(page.getByTestId('preview-image')).toBeVisible();
 });
 
+test('纸张圈选不会把凹形外的页眉区域算入书写范围', async ({ page }) => {
+  await openHome(page, { classic: true });
+  await openWorkspacePane(page, 'paper');
+  await page.getByTestId('background-image-input').setInputFiles(await paper(page, cases[0]));
+  await page.getByTestId('detect-background-cancel').click();
+  await openWorkspacePane(page, 'preview');
+  await page.getByTestId('preview-adjust-paper-area').click();
+  await page.getByTestId('paper-area-lasso-tool').click();
+  const surface = page.getByTestId('paper-area-image');
+  const box = await surface.boundingBox();
+  const points = [[.1, .18], [.35, .18], [.35, .42], [.89, .42], [.89, .83], [.1, .83]];
+  const goto = ([x, y]) => page.mouse.move(box.x + x * box.width, box.y + y * box.height, { steps: 6 });
+  await goto(points[0]);
+  await page.mouse.down();
+  for (const point of points.slice(1)) await goto(point);
+  await goto(points[0]);
+  await page.mouse.up();
+  await page.getByTestId('paper-area-rows').fill('5');
+  await page.getByTestId('paper-area-apply').click();
+  await openPaperSettings(page);
+  expect(Number(await page.getByTestId('margin-top-input').inputValue())).toBeGreaterThan(410);
+  expect(Number(await page.getByTestId('margin-left-input').inputValue())).toBeLessThan(100);
+});
+
 for (const options of cases) {
   test(`真实横线纸识别、对齐、重识别与出图：${options.name}`, async ({ page }) => {
     await page.addInitScript(() => {

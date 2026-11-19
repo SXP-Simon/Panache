@@ -292,6 +292,10 @@ const words = {
   inkSettings: ['墨色与笔画', 'Ink and strokes'],
   paperAreaAction: ['不满意排版？', 'Adjust writing area'],
   paperAreaTitle: ['框选书写区域', 'Select the writing area'],
+  paperAreaLassoHelp: [
+    '沿纸面拖动圈出区域。书写横线会排在圈内最大的矩形中。',
+    'Trace an area on the paper. Writing lines fit inside the largest rectangle in the lasso.',
+  ],
   paperAreaHelp: [
     '在纸图上拖出选框，或拖动四角微调。上、下边对准第一条和最后一条可写横线，再检查行数。',
     'Drag to draw a box, or move its corners. Align the top and bottom with the first and last writing lines, then check the row count.',
@@ -408,6 +412,7 @@ const words = {
   fineSnap: ['吸附横线', 'Snap to lines'],
   fineNudge: ['微调位置', 'Nudge selection'],
   fineTap: ['点选', 'Tap'],
+  fineLasso: ['自由圈选', 'Lasso'],
   fineBox: ['框选', 'Box select'],
   fineMove: ['移动', 'Move'],
   fineLeft: ['向左微调', 'Nudge left'],
