@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import '../utils/lasso.dart';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -81,7 +83,16 @@ typedef _Gesture = ({
   bool move,
   bool add,
   bool tap,
+  List<Offset>? lasso,
 });
+
+class _CornerDrag {
+  _CornerDrag(this.pointer, this.index, this.start, this.frame);
+  final int pointer, index;
+  final Offset start;
+  final FinePerspectiveFrame frame;
+  FinePerspectiveChange? latest;
+}
 
 class _FinePreviewState extends State<FinePreview> {
   final _selection = FineSelection();
@@ -91,7 +102,14 @@ class _FinePreviewState extends State<FinePreview> {
   FineRaster? _raster;
   ui.Image? _committed;
   _Gesture? _gesture;
+  _CornerDrag? _cornerDrag;
+  List<Offset>? get _corners => _selection.tool != FineTool.perspective
+      ? null
+      : _cornerDrag?.latest?.points ??
+            _selection.perspectiveFrame(model, widget.edits)?.points;
   Rect? _box;
+  List<Offset> _lasso = [];
+  ({String field, int value})? _transformDraft;
   List<FineAdjustment> _draft = [];
   bool _moved = false, _painting = false, _pending = false, _failed = false;
   bool _awaitingPixels = false;
@@ -270,6 +288,7 @@ class _FinePreviewState extends State<FinePreview> {
     if (!widget.editing ||
         _selection.tool == FineTool.pan ||
         _gesture != null ||
+        _cornerDrag != null ||
         event.buttons != kPrimaryButton) {
       return;
     }
@@ -277,6 +296,26 @@ class _FinePreviewState extends State<FinePreview> {
         event.kind == PointerDeviceKind.touch ||
         event.kind == PointerDeviceKind.stylus;
     final at = event.localPosition / fit;
+    if (_selection.tool == FineTool.perspective) {
+      final frame = _selection.perspectiveFrame(model, widget.edits);
+      if (frame == null) return;
+      final radius =
+          (touch ? 22 : 15) / (fit * _zoom.value.getMaxScaleOnAxis());
+      var nearest = radius;
+      int? index;
+      for (final (i, point) in frame.points.indexed) {
+        final distance = (at - point).distance;
+        if (distance <= nearest) {
+          nearest = distance;
+          index = i;
+        }
+      }
+      if (index != null) {
+        _cornerDrag = _CornerDrag(event.pointer, index, at, frame);
+        _focus.requestFocus();
+      }
+      return;
+    }
     final hit = _selection.hit(model, widget.edits, at);
     final add = !touch && HardwareKeyboard.instance.isShiftPressed;
     final group = _selection.bounds(model, widget.edits);
@@ -284,9 +323,11 @@ class _FinePreviewState extends State<FinePreview> {
         group != null &&
         group.contains(at) &&
         (hit == null || _selection.selected.contains(hit.id));
-    final move = touch
-        ? _selection.tool == FineTool.move
-        : !add && (selected || hit != null);
+    final move = switch (_selection.tool) {
+      FineTool.move => true,
+      FineTool.select => !touch && !add && (selected || hit != null),
+      _ => false,
+    };
     _gesture = (
       pointer: event.pointer,
       start: at,
@@ -295,12 +336,32 @@ class _FinePreviewState extends State<FinePreview> {
       move: move,
       add: add,
       tap: touch && _selection.tool == FineTool.select,
+      lasso: _selection.tool == FineTool.lasso ? [at] : null,
     );
     _moved = false;
     _focus.requestFocus();
   }
 
   void _move(PointerMoveEvent event, double fit) {
+    final corner = _cornerDrag;
+    if (corner != null && corner.pointer == event.pointer) {
+      final delta = event.localPosition / fit - corner.start;
+      final result = _selection.corner(
+        model,
+        widget.edits,
+        corner.frame,
+        corner.index,
+        delta,
+        _size,
+      );
+      if (result != null) {
+        setState(() {
+          corner.latest = result;
+          _draft = result.changes;
+        });
+      }
+      return;
+    }
     final gesture = _gesture;
     if (gesture == null ||
         gesture.pointer != event.pointer ||
@@ -327,6 +388,13 @@ class _FinePreviewState extends State<FinePreview> {
           _size,
           snapToLine: !HardwareKeyboard.instance.isAltPressed,
         );
+      } else if (gesture.lasso case final path?) {
+        appendLassoPoint(
+          path,
+          point,
+          (3 / fit) / _zoom.value.getMaxScaleOnAxis(),
+        );
+        _lasso = [...path, point];
       } else {
         _box = Rect.fromPoints(gesture.start, point);
       }
@@ -334,6 +402,26 @@ class _FinePreviewState extends State<FinePreview> {
   }
 
   void _up(PointerUpEvent event, double fit) {
+    final corner = _cornerDrag;
+    if (corner != null && corner.pointer == event.pointer) {
+      final delta = event.localPosition / fit - corner.start;
+      final result =
+          _selection.corner(
+            model,
+            widget.edits,
+            corner.frame,
+            corner.index,
+            delta,
+            _size,
+          ) ??
+          corner.latest;
+      if (result != null && result.changes.isNotEmpty) {
+        _selection.rememberCorner(corner.frame, result);
+        _finish(result.changes);
+      }
+      _cancelGesture();
+      return;
+    }
     final gesture = _gesture;
     if (gesture == null || gesture.pointer != event.pointer) return;
     final point = event.localPosition / fit;
@@ -355,6 +443,12 @@ class _FinePreviewState extends State<FinePreview> {
             snapToLine: !HardwareKeyboard.instance.isAltPressed,
           ),
         );
+      } else if (gesture.lasso case final path?) {
+        _selection.lasso(model, widget.edits, [
+          ...path,
+          point,
+        ], append: gesture.add);
+        widget.onCanvasSelect?.call();
       } else {
         _selection.box(
           model,
@@ -370,11 +464,17 @@ class _FinePreviewState extends State<FinePreview> {
 
   void _cancelGesture() => setState(() {
     _gesture = null;
+    _cornerDrag = null;
     _box = null;
+    _lasso = [];
     _draft = [];
+    _transformDraft = null;
   });
 
   void _clearSelection() {
+    if (_selection.tool == FineTool.perspective) {
+      _selection.tool = FineTool.select;
+    }
     _selection.select([]);
     widget.onCanvasSelect?.call();
     _cancelGesture();
@@ -412,11 +512,30 @@ class _FinePreviewState extends State<FinePreview> {
           color: color ?? v.color,
           thickness: thickness ?? v.thickness,
           softness: softness ?? v.softness,
+          warp: v.warp,
         ),
       );
     });
     if (changesShape) unawaited(_paintCommitted());
   }
+
+  void _transform(String field, int value) {
+    final next = _selection.transform(
+      model,
+      widget.edits,
+      angle: field == 'angle' ? value : 0,
+      horizontal: field == 'horizontal' ? value : 0,
+      vertical: field == 'vertical' ? value : 0,
+    );
+    if (next == null) return;
+    setState(() {
+      _transformDraft = (field: field, value: value);
+      _draft = next;
+    });
+  }
+
+  int _transformValue(String field) =>
+      _transformDraft?.field == field ? _transformDraft!.value : 0;
 
   void _commitDraft() {
     final wasShaping = _shapeDraft;
@@ -424,6 +543,7 @@ class _FinePreviewState extends State<FinePreview> {
     setState(() {
       _draft = [];
       _shapeDraft = false;
+      _transformDraft = null;
     });
     if (wasShaping) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -442,12 +562,19 @@ class _FinePreviewState extends State<FinePreview> {
     final keyboard = HardwareKeyboard.instance;
     if ((keyboard.isControlPressed || keyboard.isMetaPressed) &&
         [LogicalKeyboardKey.keyZ, LogicalKeyboardKey.keyY].contains(key)) {
+      if (_cornerDrag != null) _cancelGesture();
       widget.onHistory?.call(
         key == LogicalKeyboardKey.keyY || keyboard.isShiftPressed,
       );
     } else if (key == LogicalKeyboardKey.escape) {
-      _clearSelection();
-    } else if (_selection.selected.isNotEmpty) {
+      if (_selection.tool == FineTool.perspective) {
+        if (_cornerDrag == null) _selection.tool = FineTool.select;
+        _cancelGesture();
+      } else {
+        _clearSelection();
+      }
+    } else if (_selection.selected.isNotEmpty &&
+        _selection.tool != FineTool.perspective) {
       final shift = switch (key) {
         LogicalKeyboardKey.arrowLeft => const Offset(-1, 0),
         LogicalKeyboardKey.arrowRight => const Offset(1, 0),
@@ -568,7 +695,10 @@ class _FinePreviewState extends State<FinePreview> {
                   widget.look,
                   _visible,
                   draft: _draft.isNotEmpty || _awaitingPixels,
-                  outlines: widget.editing
+                  corners: widget.editing ? _corners : null,
+                  handleScale: _zoom.value.getMaxScaleOnAxis(),
+                  outlines:
+                      widget.editing && _selection.tool != FineTool.perspective
                       ? {
                           for (final glyph in model.glyphs.where(
                             (glyph) => _selection.selected.contains(glyph.id),
@@ -577,6 +707,7 @@ class _FinePreviewState extends State<FinePreview> {
                         }
                       : {},
                   box: _box,
+                  lasso: _lasso,
                   color: color,
                 ),
               ),
@@ -598,6 +729,62 @@ class _FinePreviewState extends State<FinePreview> {
               )
             : Center(child: surface);
       },
+    );
+  }
+
+  Widget _selectionTools(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    if (_compact) {
+      return Wrap(
+        spacing: 4,
+        alignment: WrapAlignment.center,
+        children: [
+          for (final (tool, label) in [
+            (FineTool.select, l.fineTap),
+            (FineTool.box, l.fineBox),
+            (FineTool.lasso, l.fineLasso),
+            (FineTool.move, l.fineMove),
+            (FineTool.perspective, l.finePerspectiveCorners),
+          ])
+            ChoiceChip(
+              label: Text(label),
+              showCheckmark: false,
+              visualDensity: VisualDensity.compact,
+              selected: _selection.tool == tool,
+              onSelected:
+                  (tool == FineTool.move || tool == FineTool.perspective) &&
+                      _selection.selected.isEmpty
+                  ? null
+                  : (_) => setState(() => _selection.tool = tool),
+            ),
+        ],
+      );
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<FineTool>(
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(value: FineTool.select, label: Text(l.fineTap)),
+          ButtonSegment(value: FineTool.box, label: Text(l.fineBox)),
+          ButtonSegment(value: FineTool.lasso, label: Text(l.fineLasso)),
+          ButtonSegment(
+            value: FineTool.move,
+            label: Text(l.fineMove),
+            enabled: _selection.selected.isNotEmpty,
+          ),
+          ButtonSegment(
+            value: FineTool.perspective,
+            label: Text(l.finePerspectiveCorners),
+            enabled: _selection.selected.isNotEmpty,
+          ),
+        ],
+        selected: {
+          _selection.tool == FineTool.pan ? FineTool.select : _selection.tool,
+        },
+        onSelectionChanged: (value) =>
+            setState(() => _selection.tool = value.first),
+      ),
     );
   }
 
@@ -683,32 +870,9 @@ class _FinePreviewState extends State<FinePreview> {
                         ),
                       ],
                     ),
-                    if (_compact)
-                      SegmentedButton<FineTool>(
-                        showSelectedIcon: false,
-                        segments: [
-                          ButtonSegment(
-                            value: FineTool.select,
-                            label: Text(l.fineTap),
-                          ),
-                          ButtonSegment(
-                            value: FineTool.box,
-                            label: Text(l.fineBox),
-                          ),
-                          ButtonSegment(
-                            value: FineTool.move,
-                            label: Text(l.fineMove),
-                            enabled: first != null,
-                          ),
-                        ],
-                        selected: {
-                          _selection.tool == FineTool.pan
-                              ? FineTool.select
-                              : _selection.tool,
-                        },
-                        onSelectionChanged: (value) =>
-                            setState(() => _selection.tool = value.first),
-                      ),
+                    if (widget.inspector == null) _selectionTools(context),
+                    if (_selection.tool == FineTool.perspective)
+                      Text(l.finePerspectiveHint, textAlign: TextAlign.center),
                     Visibility(
                       visible: first != null,
                       maintainState: true,
@@ -728,14 +892,43 @@ class _FinePreviewState extends State<FinePreview> {
                             '%',
                             (v) => _adjust(scale: v),
                           ),
+                          if (selection.length == 1)
+                            _slider(
+                              'fine-angle',
+                              l.fineAngle,
+                              current.angle,
+                              -45,
+                              45,
+                              '°',
+                              (v) => _adjust(angle: v),
+                            ),
+                          if (selection.length > 1)
+                            _slider(
+                              'fine-transform-angle',
+                              l.fineGroupAngle,
+                              _transformValue('angle'),
+                              -45,
+                              45,
+                              '°',
+                              (value) => _transform('angle', value),
+                            ),
                           _slider(
-                            'fine-angle',
-                            l.fineAngle,
-                            current.angle,
-                            -45,
-                            45,
-                            '°',
-                            (v) => _adjust(angle: v),
+                            'fine-transform-horizontal',
+                            l.finePerspectiveX,
+                            _transformValue('horizontal'),
+                            -35,
+                            35,
+                            '%',
+                            (value) => _transform('horizontal', value),
+                          ),
+                          _slider(
+                            'fine-transform-vertical',
+                            l.finePerspectiveY,
+                            _transformValue('vertical'),
+                            -35,
+                            35,
+                            '%',
+                            (value) => _transform('vertical', value),
                           ),
                           _slider(
                             'fine-opacity',
@@ -874,6 +1067,10 @@ class _FinePreviewState extends State<FinePreview> {
       child: LayoutBuilder(
         builder: (context, bounds) => Column(
           children: [
+            if (widget.inspector != null &&
+                widget.editing &&
+                _committed != null)
+              _selectionTools(context),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -904,7 +1101,10 @@ class _FinePainter extends CustomPainter {
     this.edits, {
     required this.draft,
     required this.outlines,
+    required this.corners,
+    required this.handleScale,
     required this.box,
+    required this.lasso,
     required this.color,
   });
   final FineRaster raster;
@@ -913,7 +1113,10 @@ class _FinePainter extends CustomPainter {
   final Map<int, FineAdjustment> edits;
   final bool draft;
   final Set<Rect> outlines;
+  final List<Offset>? corners;
+  final double handleScale;
   final Rect? box;
+  final List<Offset> lasso;
   final Color color;
 
   @override
@@ -938,6 +1141,26 @@ class _FinePainter extends CustomPainter {
     for (final rect in [...outlines, ?box]) {
       canvas.drawRect(rect, fill);
       canvas.drawRect(rect, line);
+    }
+    if (lasso.length > 1) {
+      final path = Path()
+        ..fillType = PathFillType.evenOdd
+        ..addPolygon(lasso, true);
+      canvas.drawPath(path, fill);
+      canvas.drawPath(path, line);
+    }
+    if (corners case final points?) {
+      final scale = fit * handleScale;
+      canvas.drawPath(
+        Path()..addPolygon(points, true),
+        line..strokeWidth = 2 / scale,
+      );
+      final handle = Paint()..color = color;
+      final edge = Paint()..color = Colors.white;
+      for (final point in points) {
+        canvas.drawCircle(point, 7 / scale, edge);
+        canvas.drawCircle(point, 5 / scale, handle);
+      }
     }
     canvas.restore();
   }

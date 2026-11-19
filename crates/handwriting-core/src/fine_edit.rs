@@ -21,6 +21,8 @@ pub struct Adjustment {
     pub thickness: i8,
     #[serde(default)]
     pub softness: i8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warp: Option<[f64; 8]>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -33,7 +35,8 @@ pub struct Adjustments {
 impl Adjustments {
     pub(crate) fn parse(raw: &str) -> Result<Self> {
         let invalid = || Error::new("invalid_parameter", "fine_edits");
-        if raw.len() > 1_000_000 {
+        // 2026-11-19：保留万字调整上限，为每个字的透视系数留出空间。
+        if raw.len() > 4_000_000 {
             return Err(invalid());
         }
         let value: Self = serde_json::from_str(raw).map_err(|_| invalid())?;
@@ -55,6 +58,8 @@ impl Adjustments {
                     && v.opacity <= 100
                     && (-20..=20).contains(&v.thickness)
                     && (-20..=20).contains(&v.softness)
+                    && v.warp
+                        .is_none_or(|m| m.into_iter().all(|value| value.abs() <= 65_535.))
             })
     }
 }
@@ -143,6 +148,64 @@ pub(crate) fn overrides<'a>(key: &str, p: &'a Parameters) -> HashMap<u32, &'a Ad
         .collect()
 }
 
+// 2026-11-19：验证透视面后再逆向采样，避免字迹穿过消失线。
+fn projected_geometry(
+    [a, b, c, d, e, f, g, h]: [f64; 8],
+    width: f64,
+    height: f64,
+    scale: f64,
+    cos: f64,
+    sin: f64,
+) -> Option<([f64; 4], [f64; 9])> {
+    let inverse = [
+        e - f * h,
+        c * h - b,
+        b * f - c * e,
+        f * g - d,
+        a - c * g,
+        c * d - a * f,
+        d * h - e * g,
+        b * g - a * h,
+        a * e - b * d,
+    ];
+    if (a * inverse[0] + b * inverse[3] + c * inverse[6]).abs() < 1e-12 {
+        return None;
+    }
+    let mut bounds = [
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+    ];
+    for u in [-width / 2., width / 2.] {
+        for v in [-height / 2., height / 2.] {
+            let x = scale * (cos * u - sin * v);
+            let y = scale * (sin * u + cos * v);
+            let z = g * x + h * y + 1.;
+            if z < 0.15 {
+                return None;
+            }
+            let px = (a * x + b * y + c) / z;
+            let py = (d * x + e * y + f) / z;
+            if px.abs().max(py.abs()) > 65_535. {
+                return None;
+            }
+            bounds = [
+                bounds[0].min(px),
+                bounds[1].min(py),
+                bounds[2].max(px),
+                bounds[3].max(py),
+            ];
+        }
+    }
+    let original_width = scale * (cos.abs() * width + sin.abs() * height);
+    let original_height = scale * (sin.abs() * width + cos.abs() * height);
+    if (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) > 32. * original_width * original_height {
+        return None;
+    }
+    Some((bounds, inverse))
+}
+
 pub(crate) fn paint(
     paper: &mut RgbaImage,
     tile: Tile,
@@ -163,22 +226,32 @@ pub(crate) fn paint(
     let cy = f64::from(tile.y + edit.map_or(0, |v| v.dy)) + h / 2.;
     let rx = scale * (cos.abs() * w + sin.abs() * h) / 2.;
     let ry = scale * (sin.abs() * w + cos.abs() * h) / 2.;
+    let projected = edit
+        .and_then(|v| v.warp)
+        .and_then(|warp| projected_geometry(warp, w, h, scale, cos, sin));
+    let [left, top, right, bottom] = projected.map_or([-rx, -ry, rx, ry], |p| p.0);
     let color = edit
         .and_then(|v| v.color)
         .unwrap_or([p.fill[0], p.fill[1], p.fill[2]]);
     let opacity = u32::from(edit.map_or(100, |v| v.opacity));
-    for y in
-        ((cy - ry).floor().max(0.) as u32)..((cy + ry).ceil().max(0.) as u32).min(paper.height())
+    for y in ((cy + top).floor().max(0.) as u32)
+        ..((cy + bottom).ceil().max(0.) as u32).min(paper.height())
     {
         cancel.check()?;
         let dy = f64::from(y) + 0.5 - cy;
-        for x in
-            ((cx - rx).floor().max(0.) as u32)..((cx + rx).ceil().max(0.) as u32).min(paper.width())
+        for x in ((cx + left).floor().max(0.) as u32)
+            ..((cx + right).ceil().max(0.) as u32).min(paper.width())
         {
             let dx = f64::from(x) + 0.5 - cx;
+            let (dx, dy) = if let Some((_, [a, b, c, d, e, f, g, h, i])) = projected {
+                let z = g * dx + h * dy + i;
+                ((a * dx + b * dy + c) / z, (d * dx + e * dy + f) / z)
+            } else {
+                (dx, dy)
+            };
             let sx = ((dx * cos + dy * sin) / scale + w / 2. + 1e-9).floor();
             let sy = ((-dx * sin + dy * cos) / scale + h / 2. + 1e-9).floor();
-            if sx < 0. || sy < 0. || sx >= w || sy >= h {
+            if !(sx >= 0. && sy >= 0. && sx < w && sy < h) {
                 continue;
             }
             let alpha = (u32::from(mask[(sx as u32, sy as u32)][0])
@@ -194,4 +267,45 @@ pub(crate) fn paint(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Adjustment, Adjustments};
+
+    #[test]
+    fn parses_perspective_edits_for_ten_thousand_glyphs() {
+        let data = Adjustments {
+            key: "0".repeat(64),
+            glyphs: (0..10_000)
+                .map(|id| Adjustment {
+                    id,
+                    dx: 0,
+                    dy: 0,
+                    scale: 100,
+                    angle: 0,
+                    opacity: 100,
+                    color: None,
+                    thickness: 0,
+                    softness: 0,
+                    warp: Some([
+                        1.001_234_567_89,
+                        0.012_345_6,
+                        0.1,
+                        0.012_345_6,
+                        1.,
+                        0.1,
+                        0.000_012_345_6,
+                        0.000_012_345_6,
+                    ]),
+                })
+                .collect(),
+        };
+        let raw = serde_json::to_string(&data).unwrap();
+        assert!(raw.len() > 1_000_000);
+        assert_eq!(
+            Adjustments::parse(&raw).unwrap().glyphs.len(),
+            data.glyphs.len()
+        );
+    }
 }

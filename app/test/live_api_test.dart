@@ -8,6 +8,7 @@ import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/fine_raster.dart';
 import 'package:handwriting_app/utils/ink_effects.dart' show decodeInkImage;
+import 'package:handwriting_app/view_models/fine_selection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -101,9 +102,31 @@ void main() {
           opacity: 72,
           color: 0xff1240d0,
           thickness: 7,
+          warp: null,
           softness: -3,
         ),
       ]);
+      final selected = FineSelection()
+        ..select(model.glyphs.take(2).map((glyph) => glyph.id));
+      final rotated = selected.transform(
+        model,
+        w.fineAdjustments(model),
+        angle: 20,
+      );
+      expect(rotated, isNotNull);
+      w.applyFineEdits(model, rotated!);
+      final edits = w.fineAdjustments(model);
+      final frame = selected.perspectiveFrame(model, edits)!;
+      final tilted = selected.corner(
+        model,
+        edits,
+        frame,
+        1,
+        const ui.Offset(13, -6),
+        const ui.Size(300, 230),
+      );
+      expect(tilted, isNotNull);
+      w.applyFineEdits(model, tilted!.changes);
       expect(w.canFineUndo, isTrue);
       expect(w.previewStale, isFalse);
       final png = await compositeFinePage(

@@ -7,8 +7,11 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/models/fine_edit.dart';
+import 'package:handwriting_app/models/fine_transform.dart';
 import 'package:handwriting_app/models/ink_page.dart';
 import 'package:handwriting_app/utils/ink_effects.dart' show decodeInkImage;
+import 'package:handwriting_app/utils/fine_raster.dart';
+import 'package:handwriting_app/view_models/fine_selection.dart';
 import 'package:handwriting_app/widgets/fine_preview.dart';
 
 Future<Uint8List> _png(Color background, List<Rect> ink, Color color) async {
@@ -47,10 +50,65 @@ Future<InkPage> _page() async => InkPage(
 );
 
 void main() {
+  test('four corner map sends each point to its exact destination', () {
+    const source = [
+      Offset(12, 20),
+      Offset(90, 25),
+      Offset(110, 100),
+      Offset(20, 90),
+    ];
+    const target = [
+      Offset(16, 55),
+      Offset(130, 10),
+      Offset(106, 111),
+      Offset(10, 98),
+    ];
+    final mapping = fineQuadTransform(source, target)!;
+    for (var i = 0; i < source.length; i++) {
+      final at =
+          mapFinePoint(mapping.matrix, source[i] - mapping.origin) +
+          mapping.origin;
+      expect((at - target[i]).distance, lessThan(1e-9));
+    }
+    expect(
+      fineQuadTransform(source, [target[0], target[2], target[1], target[3]]),
+      isNull,
+    );
+  });
+  test('group rotates centers together, then perspective and JSON preserve the group', () {
+    final glyphs = [
+      const FineGlyph(1, 0, 0, 10, 10, 0, 0, 10, null),
+      const FineGlyph(2, 40, 0, 10, 10, 0, 0, 10, null),
+      const FineGlyph(3, 0, 40, 10, 10, 0, 0, 50, null),
+      const FineGlyph(4, 40, 40, 10, 10, 0, 0, 50, null),
+    ];
+    final page = FinePage('0' * 64, Uint8List(0), glyphs);
+    final selection = FineSelection()..select([1, 2, 3, 4]);
+    final rotated = {
+      for (final edit in selection.transform(page, {}, angle: 30)!)
+        edit.id: edit,
+    };
+    final first = FinePose(glyphs[0], rotated[1]).center;
+    final second = FinePose(glyphs[1], rotated[2]).center;
+    expect(second.dy - first.dy, closeTo(20, 1e-8));
+    expect((second - first).distance, closeTo(40, 1e-8));
+    final tilted = {
+      for (final edit in selection.transform(page, {}, horizontal: 24)!)
+        edit.id: edit,
+    };
+    double height(int first, int last) =>
+        FinePose(glyphs[last - 1], tilted[last]).center.dy -
+        FinePose(glyphs[first - 1], tilted[first]).center.dy;
+    expect(height(1, 3), greaterThan(height(2, 4)));
+    expect(
+      FineEdits.fromJson(FineEdits(page.key, tilted).toJson()).glyphs,
+      tilted,
+    );
+  });
   for (final touch in [false, true]) {
     testWidgets(
       touch
-          ? 'narrow touch box selection and movement'
+          ? 'narrow touch lasso selection and movement'
           : 'mouse selection, live drag and copy',
       (tester) async {
         tester.view.devicePixelRatio = 1;
@@ -148,11 +206,13 @@ void main() {
           await tester.pump();
           expect(find.text('1 selected'), findsOneWidget);
         } else {
-          await tester.tap(find.text('Box select'));
+          await tester.tap(find.text('Lasso'));
           await tester.pump();
         }
         final box = await tester.startGesture(point(16, 34), kind: device);
+        if (touch) await box.moveTo(point(61, 34));
         await box.moveTo(point(61, 53));
+        if (touch) await box.moveTo(point(16, 53));
         await tester.pump();
         await box.up();
         await tester.pump();
@@ -205,7 +265,27 @@ void main() {
           (16, 20),
         ]);
 
-        if (touch) return;
+        if (touch) {
+          final mode = find.text('Corner perspective');
+          await tester.ensureVisible(mode);
+          await tester.pump();
+          await tester.tap(mode);
+          await tester.pump();
+          final selected = FineSelection()..select(edits.keys);
+          final frame = selected.perspectiveFrame(page.fine!, edits)!;
+          final right = frame.points[1];
+          final corner = await tester.startGesture(
+            point(right.dx, right.dy),
+            kind: device,
+          );
+          await corner.moveTo(point(right.dx + 8, right.dy + 4));
+          await tester.pump();
+          expect(edits.values.every((edit) => edit.warp == null), isTrue);
+          await corner.up();
+          await tester.pump();
+          expect(edits.values.every((edit) => edit.warp != null), isTrue);
+          return;
+        }
         final slider = find.byKey(const ValueKey('fine-thickness'));
         await tester.ensureVisible(slider);
         await tester.pump();
