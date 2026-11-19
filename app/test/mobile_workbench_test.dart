@@ -316,6 +316,48 @@ void main() {
     expect(workspace.settings.values, containsPair('left_margin', '120'));
     expect(workspace.settings.values, containsPair('top_margin', '220'));
     expect(workspace.settings.values, containsPair('bottom_margin', '200'));
+
+    await tester.runAsync(() async {
+      await tester.tap(adjust);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自由圈选'));
+    await tester.pumpAndSettle();
+    final photo = tester.getRect(surface);
+    Offset vertex(double x, double y) =>
+        photo.topLeft + Offset(x * photo.width, y * photo.height);
+    final path = await tester.startGesture(vertex(.1, .18));
+    for (final (x, y) in [
+      (.35, .18),
+      (.35, .42),
+      (.89, .42),
+      (.89, .83),
+      (.1, .83),
+      (.1, .18),
+    ]) {
+      await path.moveTo(vertex(x, y));
+      await tester.pump();
+    }
+    await path.up();
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('paper-area-rows')), '5');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(apply);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(apply).enabled, isTrue);
+    expect(apply.hitTestable(), findsOneWidget);
+    await tester.tap(apply);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(apply, findsNothing);
+    expect(
+      int.parse(workspace.settings.values['top_margin']!),
+      greaterThanOrEqualTo(419),
+    );
+    expect(int.parse(workspace.settings.values['left_margin']!), lessThan(100));
   });
 
   testWidgets('system back preserves editor scrolling and undo history', (

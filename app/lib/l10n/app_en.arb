@@ -273,6 +273,8 @@
   "fineMove": "Move",
   "finePan": "Pan canvas",
   "fineScale": "Size",
+  "fineLasso": "Lasso",
+  "paperAreaLassoHelp": "Trace an area on the paper. Writing lines fit inside the largest rectangle in the lasso.",
   "fineAngle": "Rotation",
   "fineOpacity": "Opacity",
   "fineThickness": "Stroke weight",
