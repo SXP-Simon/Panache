@@ -275,6 +275,8 @@
   "fineMove": "移动",
   "finePan": "平移画布",
   "fineScale": "大小",
+  "fineLasso": "自由圈选",
+  "paperAreaLassoHelp": "沿纸面拖动圈出区域。书写横线会排在圈内最大的矩形中。",
   "fineAngle": "旋转",
   "fineOpacity": "浓淡",
   "fineThickness": "粗细微调",

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/paper_area.dart';
+import '../../utils/lasso.dart';
 
 class PaperAreaDialog extends StatefulWidget {
   const PaperAreaDialog({
@@ -31,6 +32,12 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
   Rect? previous;
   int? activePointer;
   bool editedRows = false;
+  bool free = false;
+  Rect? enclosed;
+  List<Offset> path = [];
+  List<Offset> shownPath = [];
+
+  Rect? get writingArea => free ? enclosed : area;
 
   double value(String key, double fallback) {
     final parsed = double.tryParse(widget.values[key] ?? '');
@@ -63,8 +70,20 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
     rows = TextEditingController(text: suggestedRows);
   }
 
-  String get suggestedRows =>
-      '${math.max(2, (area.height / spacing).round() + 1)}';
+  String get suggestedRows {
+    final area = writingArea;
+    return area == null
+        ? ''
+        : '${math.max(2, (area.height / spacing).round() + (free ? 0 : 1))}';
+  }
+
+  Offset point(Offset screenPoint, double scale) {
+    final next = screenPoint / scale;
+    return Offset(
+      next.dx.clamp(0, widget.size.width),
+      next.dy.clamp(0, widget.size.height - 1),
+    );
+  }
 
   @override
   void dispose() {
@@ -73,7 +92,15 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
   }
 
   void start(Offset screenPoint, double scale) {
-    final point = screenPoint / scale;
+    final point = this.point(screenPoint, scale);
+    if (free) {
+      setState(() {
+        path = [point];
+        shownPath = path;
+        enclosed = null;
+      });
+      return;
+    }
     previous = area;
     anchor = point;
     final corners = [
@@ -89,9 +116,14 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
   }
 
   void move(Offset screenPoint, double scale) {
+    final next = point(screenPoint, scale);
+    if (free) {
+      appendLassoPoint(path, next, 4 / scale);
+      setState(() => shownPath = [...path, next]);
+      return;
+    }
     final start = anchor;
     if (start == null) return;
-    final next = screenPoint / scale;
     setState(() {
       area = Rect.fromPoints(
         start,
@@ -108,7 +140,10 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final count = int.tryParse(rows.text) ?? 0;
-    final layout = paperAreaLayout(area, widget.size, count);
+    final paper = writingArea;
+    final layout = paper == null
+        ? null
+        : paperAreaLayout(paper, widget.size, count, enclosed: free);
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
@@ -123,7 +158,23 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
-              Text(l.paperAreaHelp),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SegmentedButton<bool>(
+                  segments: [
+                    ButtonSegment(value: false, label: Text(l.fineBox)),
+                    ButtonSegment(value: true, label: Text(l.fineLasso)),
+                  ],
+                  selected: {free},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) => setState(() {
+                    free = selection.first;
+                    if (!editedRows) rows.text = suggestedRows;
+                  }),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(free ? l.paperAreaLassoHelp : l.paperAreaHelp),
               const SizedBox(height: 12),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -135,12 +186,14 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
                     constraints.maxWidth / widget.size.width,
                     maxHeight / widget.size.height,
                   );
-                  final scaledArea = Rect.fromLTRB(
-                    area.left * scale,
-                    area.top * scale,
-                    area.right * scale,
-                    area.bottom * scale,
-                  );
+                  final scaledArea = paper == null
+                      ? null
+                      : Rect.fromLTRB(
+                          paper.left * scale,
+                          paper.top * scale,
+                          paper.right * scale,
+                          paper.bottom * scale,
+                        );
                   return Center(
                     child: SizedBox(
                       width: widget.size.width * scale,
@@ -174,11 +227,27 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
                             onPointerUp: (event) {
                               if (activePointer == event.pointer) {
                                 activePointer = null;
+                                if (free) {
+                                  setState(() {
+                                    shownPath = [
+                                      ...path,
+                                      point(event.localPosition, scale),
+                                    ];
+                                    enclosed = enclosedRectangle(shownPath);
+                                    if (!editedRows) rows.text = suggestedRows;
+                                  });
+                                }
                               }
                             },
                             onPointerCancel: (event) {
                               if (activePointer != event.pointer) return;
-                              if (previous != null) {
+                              if (free) {
+                                setState(() {
+                                  path = [];
+                                  shownPath = [];
+                                  enclosed = null;
+                                });
+                              } else if (previous != null) {
                                 setState(() => area = previous!);
                               }
                               if (!editedRows) rows.text = suggestedRows;
@@ -192,6 +261,23 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
                                   painter: _PaperAreaPainter(
                                     scaledArea,
                                     layout == null ? 0 : count,
+                                    path: free
+                                        ? [
+                                            for (final point in shownPath)
+                                              point * scale,
+                                          ]
+                                        : [],
+                                    firstLine: free && layout != null
+                                        ? (int.parse(layout['top_margin']!) +
+                                                  int.parse(
+                                                    layout['line_spacing']!,
+                                                  )) *
+                                              scale
+                                        : null,
+                                    step: free && layout != null
+                                        ? int.parse(layout['line_spacing']!) *
+                                              scale
+                                        : null,
                                   ),
                                 ),
                               ],
@@ -253,9 +339,17 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
 }
 
 class _PaperAreaPainter extends CustomPainter {
-  const _PaperAreaPainter(this.area, this.rows);
-  final Rect area;
+  const _PaperAreaPainter(
+    this.area,
+    this.rows, {
+    required this.path,
+    required this.firstLine,
+    required this.step,
+  });
+  final Rect? area;
   final int rows;
+  final List<Offset> path;
+  final double? firstLine, step;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -263,8 +357,31 @@ class _PaperAreaPainter extends CustomPainter {
       ..color = const Color(0xff294e1a)
       ..strokeWidth = 1.5;
     final marker = Paint()..color = const Color(0xffa8ed53);
+    final fill = Paint()..color = const Color(0x28a8ed53);
+    if (path.length > 1) {
+      final outline = Path()
+        ..fillType = PathFillType.evenOdd
+        ..addPolygon(path, true);
+      canvas.drawPath(outline, fill);
+      canvas.drawPath(outline, border..style = PaintingStyle.stroke);
+    }
+    final area = this.area;
+    if (area == null) return;
     canvas.drawRect(area, Paint()..color = const Color(0x28a8ed53));
     canvas.drawRect(area, border..style = PaintingStyle.stroke);
+    if (path.isNotEmpty) {
+      if (firstLine != null && step != null) {
+        for (var i = 0; i < rows; i++) {
+          final y = firstLine! + i * step!;
+          canvas.drawLine(
+            Offset(area.left, y),
+            Offset(area.right, y),
+            border..strokeWidth = .65,
+          );
+        }
+      }
+      return;
+    }
     for (var line = 1; line < rows - 1; line++) {
       final y = area.top + area.height * line / (rows - 1);
       canvas.drawLine(
@@ -286,5 +403,9 @@ class _PaperAreaPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PaperAreaPainter oldDelegate) =>
-      area != oldDelegate.area || rows != oldDelegate.rows;
+      area != oldDelegate.area ||
+      rows != oldDelegate.rows ||
+      path != oldDelegate.path ||
+      firstLine != oldDelegate.firstLine ||
+      step != oldDelegate.step;
 }
