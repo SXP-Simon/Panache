@@ -4,6 +4,25 @@ import '../l10n/app_localizations.dart';
 
 enum GuideTarget { editor, layout, preview }
 
+class GuideUnreadBadge extends StatelessWidget {
+  const GuideUnreadBadge({
+    super.key,
+    required this.unread,
+    required this.child,
+  });
+
+  final bool unread;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Badge(
+    smallSize: 8,
+    backgroundColor: Theme.of(context).colorScheme.primary,
+    isLabelVisible: unread,
+    child: child,
+  );
+}
+
 class WorkbenchGuide extends StatelessWidget {
   const WorkbenchGuide({super.key, required this.onOpen});
 

@@ -11,6 +11,9 @@ class AppearancePreferences extends ChangeNotifier {
   static const colorKey = 'panache.themeColor';
   static const secondaryColorKey = 'panache.secondaryThemeColor';
   static const motionKey = 'panache.reduceMotion';
+  static const guideReadKey = 'panache.quickStartRead';
+  bool? _guideRead;
+  bool get guideUnread => _guideRead == false;
   bool reduceMotion = false;
   int _motionRevision = 0;
   Color color = defaultThemeColor;
@@ -30,25 +33,32 @@ class AppearancePreferences extends ChangeNotifier {
     final secondaryRevision = _secondaryRevision;
     try {
       final preferences = await _open();
+      if (_disposed) return;
+      if (preferences.getBool(guideReadKey) == true) _guideRead = true;
       final value = preferences.getInt(colorKey);
       final secondaryValue = preferences.getInt(secondaryColorKey);
-      if (!_disposed && motionRevision == _motionRevision) {
+      if (motionRevision == _motionRevision) {
         reduceMotion = preferences.getBool(motionKey) ?? false;
-        _emit();
       }
-      if (!_disposed && revision == _revision && value != null) {
+      if (revision == _revision && value != null) {
         color = Color(value | 0xFF000000);
-        _emit();
       }
-      if (!_disposed &&
-          secondaryRevision == _secondaryRevision &&
-          secondaryValue != null) {
+      if (secondaryRevision == _secondaryRevision && secondaryValue != null) {
         secondaryColor = Color(secondaryValue | 0xFF000000);
-        _emit();
       }
     } catch (_) {
       /* Unavailable storage keeps the usable default theme. */
+    } finally {
+      _guideRead ??= false;
+      _emit();
     }
+  }
+
+  Future<void> markGuideRead() async {
+    if (_guideRead == true) return;
+    _guideRead = true;
+    _emit();
+    await _save((storage) => storage.setBool(guideReadKey, true));
   }
 
   Future<bool> setSecondaryColor(Color value) {

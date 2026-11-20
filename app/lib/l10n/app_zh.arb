@@ -93,6 +93,7 @@
   "cleanMode": "纯文本",
   "imageScale": "图片缩放比例（10%–700%，不超出纸张范围）",
   "guideBeginner": "新手教程",
+  "guideUnread": "新手教程未读",
   "guideIntro": "点击任一步，即可前往工作台对应的面板。",
   "guideWriteTitle": "写下内容",
   "guideWriteHint": "输入或粘贴正文，也可以点「导入文档」，读取 TXT、DOCX、PDF 或 RTF。",

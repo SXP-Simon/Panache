@@ -51,6 +51,8 @@ class Workbench extends StatefulWidget {
     this.reduceMotion = false,
     this.onReduceMotionChanged,
     this.initialDestination = 0,
+    this.guideUnread = false,
+    this.onGuideOpened,
     required this.toggleLocale,
     required this.toggleTheme,
   });
@@ -62,6 +64,8 @@ class Workbench extends StatefulWidget {
   final Future<bool> Function(Color)? onThemeColorChanged,
       onSecondaryThemeColorChanged;
   final int initialDestination;
+  final bool guideUnread;
+  final VoidCallback? onGuideOpened;
   final VoidCallback toggleLocale, toggleTheme;
   @override
   State<Workbench> createState() => _WorkbenchState();
@@ -149,6 +153,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       firstFrameReady = true;
+      if (mounted && destination == 1) widget.onGuideOpened?.call();
       updatePrompts?.evaluate();
     });
     if (widget.workspace == null) unawaited(w.initialize());
@@ -457,6 +462,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       destination = index;
       navigationRevision++;
     });
+    if (index == 1) widget.onGuideOpened?.call();
     scheduleLivePreview();
   }
 
@@ -519,6 +525,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         },
         child: WorkbenchShell(
           fineFullscreen: fineFullscreen,
+          guideUnread: widget.guideUnread,
           updateAvailable: widget.updates?.phase == UpdatePhase.available,
           version: w.version,
           destination: destination,
@@ -593,6 +600,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     images: w.images,
     onEditImage: editImage,
     onOpenGuide: () => selectDestination(1),
+    guideUnread: widget.guideUnread,
     onUndo: () {
       final prepared = preparedText;
       if (prepared != null && editor.text == prepared.formatted) {

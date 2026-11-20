@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
 import 'workbench_controls.dart';
+import 'workbench_guide.dart';
 
 class WorkbenchEditor extends StatelessWidget {
   const WorkbenchEditor({
@@ -19,6 +20,7 @@ class WorkbenchEditor extends StatelessWidget {
     required this.onChanged,
     this.onEditImage,
     this.onOpenGuide,
+    this.guideUnread = false,
     this.onUndo,
     this.onRedo,
     this.preparing = false,
@@ -36,6 +38,7 @@ class WorkbenchEditor extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final ValueChanged<IllustrationMarker>? onEditImage;
   final VoidCallback? onUndo, onRedo, onOpenGuide;
+  final bool guideUnread;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -45,11 +48,17 @@ class WorkbenchEditor extends StatelessWidget {
       icon: Icons.edit_outlined,
       actions: [
         if (controller.text.isEmpty && onOpenGuide != null)
-          TextButton.icon(
-            key: const ValueKey('open-beginner-guide'),
-            onPressed: onOpenGuide,
-            icon: const Icon(Icons.menu_book_outlined, size: 18),
-            label: Text(l.guideBeginner),
+          Semantics(
+            hint: guideUnread ? l.guideUnread : null,
+            child: TextButton.icon(
+              key: const ValueKey('open-beginner-guide'),
+              onPressed: onOpenGuide,
+              icon: GuideUnreadBadge(
+                unread: guideUnread,
+                child: const Icon(Icons.menu_book_outlined, size: 18),
+              ),
+              label: Text(l.guideBeginner),
+            ),
           ),
       ],
       child: LayoutBuilder(
