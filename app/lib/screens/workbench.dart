@@ -31,6 +31,7 @@ import '../widgets/workbench_preview.dart';
 import '../widgets/workbench_layout.dart';
 import '../widgets/ink_parameter_controls.dart';
 import '../widgets/workbench_information.dart';
+import '../widgets/workbench_guide.dart';
 import '../widgets/workbench_settings.dart';
 import '../widgets/workbench_shell.dart';
 import '../theme/handwriting_theme.dart';
@@ -459,6 +460,23 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     scheduleLivePreview();
   }
 
+  void openGuideTarget(GuideTarget target) {
+    if (target != GuideTarget.preview) fineInspector.value?.close();
+    setState(() {
+      destination = 0;
+      mobileTab = switch (target) {
+        GuideTarget.editor => 0,
+        GuideTarget.layout => 1,
+        GuideTarget.preview => 2,
+      };
+      if (target == GuideTarget.layout) {
+        settingsSection = SettingsSection.layout;
+      }
+      navigationRevision++;
+    });
+    scheduleLivePreview();
+  }
+
   void selectSettingsSection(SettingsSection section) {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -574,6 +592,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     locked: editingLocked,
     images: w.images,
     onEditImage: editImage,
+    onOpenGuide: () => selectDestination(1),
     onUndo: () {
       final prepared = preparedText;
       if (prepared != null && editor.text == prepared.formatted) {
@@ -960,12 +979,13 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     );
   }
 
-  Widget information() => WorkbenchInformation(
-    guide: destination == 1,
-    updates: widget.updates,
-    onReload: reloadUpdatedWeb,
-    onRestart: updateDesktop,
-  );
+  Widget information() => destination == 1
+      ? WorkbenchGuide(onOpen: openGuideTarget)
+      : WorkbenchInformation(
+          updates: widget.updates,
+          onReload: reloadUpdatedWeb,
+          onRestart: updateDesktop,
+        );
 }
 
 class _PreviewIntent extends Intent {

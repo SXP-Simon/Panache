@@ -18,6 +18,7 @@ class WorkbenchEditor extends StatelessWidget {
     required this.images,
     required this.onChanged,
     this.onEditImage,
+    this.onOpenGuide,
     this.onUndo,
     this.onRedo,
     this.preparing = false,
@@ -34,7 +35,7 @@ class WorkbenchEditor extends StatelessWidget {
   final Map<String, String> images;
   final ValueChanged<String> onChanged;
   final ValueChanged<IllustrationMarker>? onEditImage;
-  final VoidCallback? onUndo, onRedo;
+  final VoidCallback? onUndo, onRedo, onOpenGuide;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -42,6 +43,15 @@ class WorkbenchEditor extends StatelessWidget {
     return WorkbenchPanel(
       title: l.editor,
       icon: Icons.edit_outlined,
+      actions: [
+        if (controller.text.isEmpty && onOpenGuide != null)
+          TextButton.icon(
+            key: const ValueKey('open-beginner-guide'),
+            onPressed: onOpenGuide,
+            icon: const Icon(Icons.menu_book_outlined, size: 18),
+            label: Text(l.guideBeginner),
+          ),
+      ],
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
           child: SizedBox(
