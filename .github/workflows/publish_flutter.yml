@@ -1,0 +1,291 @@
+name: Publish Flutter Release
+
+on:
+  workflow_run:
+    workflows: ["Flutter Mobile"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Stable tag to publish from checked main, for example v1.16.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: panache-flutter-release
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  resolve:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      || (github.event_name == 'workflow_run'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_branch == 'main'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      build_number: ${{ steps.plan.outputs.build_number }}
+      flutter_sha: ${{ steps.plan.outputs.flutter_sha }}
+      android: ${{ steps.plan.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify and plan the exact main commit
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          MANUAL_TAG: ${{ inputs.tag }}
+          ANDROID_SIGNING_READY: ${{ secrets.HANDWRITING_ANDROID_KEYSTORE_BASE64 != '' && secrets.HANDWRITING_ANDROID_STORE_PASSWORD != '' && secrets.HANDWRITING_ANDROID_KEY_ALIAS != '' && secrets.HANDWRITING_ANDROID_KEY_PASSWORD != '' }}
+        run: node scripts/release-plan.cjs
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.tag != ''
+        with:
+          name: flutter-release-plan
+          path: release-plan/
+          if-no-files-found: error
+
+  desktop:
+    needs: resolve
+    if: needs.resolve.outputs.tag != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: macos-15
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      HANDWRITING_BUILD_VERSION: ${{ needs.resolve.outputs.version }}
+      HANDWRITING_BUILD_NUMBER: ${{ needs.resolve.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.flutter_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: flutter-release-plan
+          path: release-plan
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+      - uses: Swatinem/rust-cache@v2
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - name: Build pinned Flutter desktop source with the release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLUTTER_BIN="$(python -c 'import shutil; print(shutil.which("flutter") or "flutter")')"
+          python scripts/build-flutter-desktop.py --flutter "$FLUTTER_BIN" --version "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+      - name: Validate the packaged backend and displayed release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          BINARY="$(find target/desktop-package -type f \( -name handwriting-server -o -name handwriting-server.exe \) -print -quit)"
+          BINARY="$(python -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$BINARY")"
+          cd app
+          flutter test test/desktop_backend_test.dart --dart-define="DESKTOP_BACKEND_EXECUTABLE=$BINARY" --dart-define="EXPECTED_APP_VERSION=$HANDWRITING_BUILD_VERSION"
+      - name: Stage Flutter-prefixed archive and provenance
+        shell: bash
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          PACKAGE="$(find target/desktop-package -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print -quit)"
+          node scripts/flutter-release.cjs stage release-plan/Flutter-source.json release-assets "$TARGET_PLATFORM" "$PACKAGE"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter-package-${{ matrix.platform }}
+          path: release-assets/
+          if-no-files-found: error
+
+  android:
+    needs: resolve
+    if: needs.resolve.outputs.tag != '' && needs.resolve.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HANDWRITING_BUILD_VERSION: ${{ needs.resolve.outputs.version }}
+      HANDWRITING_BUILD_NUMBER: ${{ needs.resolve.outputs.build_number }}
+      HANDWRITING_ANDROID_STORE_PASSWORD: ${{ secrets.HANDWRITING_ANDROID_STORE_PASSWORD }}
+      HANDWRITING_ANDROID_KEY_ALIAS: ${{ secrets.HANDWRITING_ANDROID_KEY_ALIAS }}
+      HANDWRITING_ANDROID_KEY_PASSWORD: ${{ secrets.HANDWRITING_ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Free space for Android and Rust release builds
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.flutter_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: flutter-release-plan
+          path: release-plan
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          cache: true
+      - name: Install the supplied release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HANDWRITING_ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/handwriting-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          echo "HANDWRITING_ANDROID_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+      - name: Configure ABI splits
+        shell: bash
+        run: |
+          set -euo pipefail
+          INIT_DIR="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$INIT_DIR"
+          cp scripts/android-release-compat.gradle "$INIT_DIR/handwriting-release.gradle"
+      - name: Build only a formally signed release APK
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          OUTPUT_DIR="build/app/outputs/flutter-apk"
+          rm -f "$OUTPUT_DIR"/app-arm64-v8a-release.apk "$OUTPUT_DIR"/app-x86_64-release.apk
+          for ABI in arm64-v8a x86_64; do
+            case "$ABI" in
+              arm64-v8a) TARGET_PLATFORM="android-arm64" ;;
+              x86_64) TARGET_PLATFORM="android-x64" ;;
+              *) echo "::error::Unsupported ABI: $ABI"; exit 1 ;;
+            esac
+            APK="$OUTPUT_DIR/app-${ABI}-release.apk"
+            flutter build apk --release --split-per-abi --target-platform "$TARGET_PLATFORM" --build-name "$HANDWRITING_BUILD_VERSION" --build-number "$HANDWRITING_BUILD_NUMBER"
+            if [ ! -f "$APK" ]; then
+              echo "::error::Missing split APK: $APK"
+              exit 1
+            fi
+            "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" > "$RUNNER_TEMP/apk-badging-${ABI}.txt"
+            node ../scripts/flutter-release.cjs verify-apk ../release-plan/Flutter-source.json "android-${ABI}" "$RUNNER_TEMP/apk-badging-${ABI}.txt"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apk-signature-${ABI}.txt"
+            if grep -q 'CN=Android Debug' "$RUNNER_TEMP/apk-signature-${ABI}.txt"; then
+              echo "::error::Debug-signed APK cannot be uploaded as a release"
+              exit 1
+            fi
+            python - "$APK" "$ABI" <<'PY'
+          import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as apk:
+              native = {n.split('/')[1] for n in apk.namelist() if n.startswith('lib/') and n.endswith('.so')}
+              if native != {sys.argv[2]}:
+                  raise SystemExit(f"Unexpected APK ABIs: {native}")
+              for library in ('libflutter.so', 'libapp.so', 'libhandwriting_bridge.so'):
+                  if f'lib/{sys.argv[2]}/{library}' not in apk.namelist():
+                      raise SystemExit(f"Missing runtime library: {library}")
+          PY
+          done
+      - name: Stage signed APKs by architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ABI in arm64-v8a x86_64; do
+            node scripts/flutter-release.cjs stage release-plan/Flutter-source.json release-assets "android-${ABI}" "app/build/app/outputs/flutter-apk/app-${ABI}-release.apk"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter-package-android-split
+          path: release-assets/
+          if-no-files-found: error
+      - name: Remove signing key
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/handwriting-release.jks"
+
+  publish:
+    needs: [resolve, desktop, android]
+    if: >-
+      always() && needs.resolve.outputs.tag != '' && needs.resolve.result == 'success'
+      && needs.desktop.result == 'success'
+      && (needs.android.result == 'success' || (needs.resolve.outputs.android == 'false' && needs.android.result == 'skipped'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.flutter_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/download-artifact@v4
+        with:
+          name: flutter-release-plan
+          path: release-plan
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: flutter-package-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify and publish all packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          SOURCE_SHA: ${{ needs.resolve.outputs.flutter_sha }}
+          ANDROID: ${{ needs.resolve.outputs.android }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/flutter-release.cjs verify release-plan/Flutter-source.json release-assets "$ANDROID"
+          bash scripts/publish-flutter-release.sh
