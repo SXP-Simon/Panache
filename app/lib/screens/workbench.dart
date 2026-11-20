@@ -80,6 +80,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   Timer? liveTimer;
   int? liveSubmitted;
   bool livePreview = false;
+  bool fineFullscreen = false;
   bool composing = false;
   int navigationRevision = 0;
   bool operation = false;
@@ -435,6 +436,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     }
   }
 
+  void setFineFullscreen(bool value) {
+    if (fineFullscreen == value) return;
+    if (value) FocusScope.of(context).unfocus();
+    setState(() => fineFullscreen = value);
+  }
+
   void selectPane(int index) {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -472,24 +479,28 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       actions: {
         _PreviewIntent: CallbackAction<_PreviewIntent>(
           onInvoke: (_) {
-            if (!locked) unawaited(generate());
+            if (!locked && !fineFullscreen) unawaited(generate());
             return null;
           },
         ),
       },
       child: PopScope(
         canPop:
+            !fineFullscreen &&
             destination == 0 &&
             (MediaQuery.sizeOf(context).width >= 900 || mobileTab == 0),
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          if (destination != 0) {
+          if (fineFullscreen) {
+            setFineFullscreen(false);
+          } else if (destination != 0) {
             selectDestination(0);
           } else {
             selectPane(0);
           }
         },
         child: WorkbenchShell(
+          fineFullscreen: fineFullscreen,
           updateAvailable: widget.updates?.phase == UpdatePhase.available,
           version: w.version,
           destination: destination,
@@ -515,6 +526,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Widget workspace(bool wide, double width) => WorkbenchLayout(
     wide: wide,
+    fineFullscreen: fineFullscreen,
     keyboardVisible: keyboardVisible,
     width: width,
     error: w.error,
@@ -803,6 +815,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         fineSource: fineSource,
         fineInspector: wide ? fineInspector : null,
         onFineCanvasSelect: () => fineSource.value = null,
+        fineFullscreen: fineFullscreen,
+        onFineFullscreen: wide ? null : setFineFullscreen,
         stale: w.previewStale,
         page: w.page,
         version: '',

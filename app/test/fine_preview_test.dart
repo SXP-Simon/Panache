@@ -6,9 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
+import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/models/fine_edit.dart';
 import 'package:handwriting_app/models/fine_transform.dart';
 import 'package:handwriting_app/models/ink_page.dart';
+import 'package:handwriting_app/services/api.dart';
+import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/ink_effects.dart' show decodeInkImage;
 import 'package:handwriting_app/utils/fine_raster.dart';
 import 'package:handwriting_app/view_models/fine_selection.dart';
@@ -50,6 +53,158 @@ Future<InkPage> _page() async => InkPage(
 );
 
 void main() {
+  testWidgets(
+    'phone fullscreen keeps the same canvas, selection and history',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 840);
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 20);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+
+      final page = (await tester.runAsync(_page))!;
+      final workspace =
+          Workspace(
+              api: HandwritingApi('local://test-engine')
+                ..supportsFineEdit = true,
+            )
+            ..text = '字迹'
+            ..initialized = true
+            ..fineEnabled = true;
+      workspace.generation
+        ..pages = [page.paper]
+        ..inkPages = [page]
+        ..previewRevision = workspace.editRevision;
+      addTearDown(workspace.dispose);
+
+      Finder keyed(String value) => find.byKey(ValueKey(value));
+      await tester.pumpWidget(
+        HandwritingApp(locale: const Locale('en'), workspace: workspace),
+      );
+      await tester.tap(keyed('open-preview'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(keyed('expand-preview'), findsOneWidget);
+      expect(keyed('fullscreen-fine-edit'), findsNothing);
+
+      await tester.tap(keyed('fine-edit-toggle'));
+      final canvas = keyed('fine-canvas');
+      for (var i = 0; i < 100 && canvas.evaluate().isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(canvas, findsOneWidget);
+      Offset point(Offset paperPoint) {
+        final box = tester.renderObject<RenderBox>(canvas);
+        return box.localToGlobal(paperPoint * (box.size.width / 100));
+      }
+
+      final fineState = tester.state(find.byType(FinePreview));
+      final normalCanvasHeight = tester
+          .getSize(find.byType(InteractiveViewer))
+          .height;
+      await tester.tapAt(point(const Offset(30, 42)));
+      await tester.pump();
+      expect(find.text('1 selected'), findsOneWidget);
+
+      await tester.tap(keyed('fullscreen-fine-edit'));
+      await tester.pump();
+      tester.view.physicalSize = const Size(320, 720);
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(FinePreview)), same(fineState));
+      expect(
+        tester.getSize(find.byType(InteractiveViewer)).height,
+        greaterThan(normalCanvasHeight),
+      );
+      expect(keyed('open-preview'), findsNothing);
+      expect(keyed('app-preferences'), findsNothing);
+      expect(
+        tester.getTopLeft(keyed('exit-fullscreen-fine-edit')).dy,
+        greaterThanOrEqualTo(24),
+      );
+      expect(
+        tester.getBottomRight(keyed('fullscreen-fine-tool-move')).dy,
+        lessThanOrEqualTo(700),
+      );
+      expect(keyed('fine-thickness'), findsNothing);
+
+      await tester.tap(keyed('fine-selection-settings'));
+      await tester.pump();
+      expect(find.text('1 selected'), findsOneWidget);
+      expect(keyed('fine-thickness'), findsOneWidget);
+      await tester.tap(keyed('fine-selection-settings'));
+      await tester.pump();
+
+      await tester.tap(keyed('fullscreen-fine-tool-box'));
+      await tester.pump();
+      final box = await tester.startGesture(point(const Offset(16, 29)));
+      await box.moveTo(point(const Offset(62, 53)));
+      await box.up();
+      await tester.pump();
+      await tester.tap(keyed('fullscreen-fine-tool-perspective'));
+      await tester.pump();
+      final selection = FineSelection()..select([1, 2]);
+      final corner = selection
+          .perspectiveFrame(page.fine!, const {})!
+          .points
+          .first;
+      final drag = await tester.startGesture(point(corner));
+      await drag.moveTo(point(corner + const Offset(-5, -7)));
+      await tester.pump();
+      expect(workspace.fineAdjustments(page.fine!), isEmpty);
+      await drag.up();
+      await tester.pump();
+      final edits = workspace.fineAdjustments(page.fine!);
+      expect(edits.keys, unorderedEquals([1, 2]));
+      expect(workspace.canFineUndo, isTrue);
+
+      final viewer = find.byType(InteractiveViewer);
+      final camera = tester
+          .widget<InteractiveViewer>(viewer)
+          .transformationController!;
+      await tester.tap(find.byTooltip('Zoom in'));
+      await tester.pump();
+      expect(camera.value.getMaxScaleOnAxis(), closeTo(1.25, .001));
+
+      tester.view.physicalSize = const Size(760, 340);
+      await tester.pumpAndSettle();
+      expect(keyed('exit-fullscreen-fine-edit'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getBottomRight(keyed('fullscreen-fine-tool-move')).dy,
+        lessThanOrEqualTo(320),
+      );
+      tester.view.physicalSize = const Size(390, 840);
+      await tester.pumpAndSettle();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(keyed('exit-fullscreen-fine-edit'), findsNothing);
+      expect(keyed('fullscreen-fine-edit'), findsOneWidget);
+      expect(keyed('open-preview'), findsOneWidget);
+      expect(tester.state(find.byType(FinePreview)), same(fineState));
+      expect(workspace.fineAdjustments(page.fine!), edits);
+      expect(camera.value.getMaxScaleOnAxis(), closeTo(1.25, .001));
+
+      await tester.tap(keyed('fullscreen-fine-edit'));
+      await tester.pumpAndSettle();
+      await tester.tap(keyed('fine-undo'));
+      await tester.pump();
+      expect(workspace.fineAdjustments(page.fine!), isEmpty);
+      await tester.tap(keyed('exit-fullscreen-fine-edit'));
+      await tester.pumpAndSettle();
+      expect(keyed('open-preview'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
   test('four corner map sends each point to its exact destination', () {
     const source = [
       Offset(12, 20),

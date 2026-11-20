@@ -41,6 +41,8 @@ class WorkbenchPreview extends StatefulWidget {
     this.fineSource,
     this.onFineCanvasSelect,
     this.fineInspector,
+    this.fineFullscreen = false,
+    this.onFineFullscreen,
   });
   final List<Uint8List> pages;
   final int page;
@@ -64,6 +66,8 @@ class WorkbenchPreview extends StatefulWidget {
   final ValueListenable<FineRange?>? fineSource;
   final VoidCallback? onFineCanvasSelect;
   final FineInspectorSlot? fineInspector;
+  final bool fineFullscreen;
+  final ValueChanged<bool>? onFineFullscreen;
 
   @override
   State<WorkbenchPreview> createState() => _WorkbenchPreviewState();
@@ -117,6 +121,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
       copyImage: widget.copyImage,
       editing: !widget.stale && !widget.locked,
       toolbar: true,
+      fullscreen: widget.fineFullscreen,
       onEdit: (values) => widget.onFineChanged?.call(fine, values),
       onHistory: widget.onFineHistory,
       canUndo: widget.canFineUndo,
@@ -144,13 +149,39 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
     final inkActions = widget.onInkChanged != null;
     final current = widget.inkPages.elementAtOrNull(widget.page);
     final fine = current?.fine;
+    final fullscreen = widget.fineFullscreen;
+    final canExpandEditor =
+        _fineEditing &&
+        fine != null &&
+        widget.onFineFullscreen != null &&
+        !widget.stale;
     return WorkbenchPanel(
       title: l.previewTitle,
       icon: Icons.description_outlined,
       toolbar: widget.toolbar,
+      frameless: fullscreen,
       child: Column(
         children: [
-          if (paperActions ||
+          if (fullscreen)
+            Row(
+              children: [
+                IconButton(
+                  key: const ValueKey('exit-fullscreen-fine-edit'),
+                  tooltip: l.fineExitFullscreen,
+                  onPressed: () => widget.onFineFullscreen?.call(false),
+                  icon: const BackButtonIcon(),
+                ),
+                Expanded(
+                  child: Text(l.fineEdit, style: theme.textTheme.titleMedium),
+                ),
+                if (widget.pages.length > 1)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 16),
+                    child: Text('${widget.page + 1} / ${widget.pages.length}'),
+                  ),
+              ],
+            )
+          else if (paperActions ||
               inkActions ||
               hasPages ||
               widget.onFineEdit != null)
@@ -209,7 +240,16 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                           label: Text(l.inkEffects),
                         ),
                       ),
-                    if (hasPages)
+                    if (canExpandEditor)
+                      OutlinedButton.icon(
+                        key: const ValueKey('fullscreen-fine-edit'),
+                        onPressed: widget.locked
+                            ? null
+                            : () => widget.onFineFullscreen?.call(true),
+                        icon: const Icon(Icons.open_in_full),
+                        label: Text(l.fineFullscreen),
+                      )
+                    else if (hasPages)
                       OutlinedButton.icon(
                         key: const ValueKey('expand-preview'),
                         onPressed: _expand,
@@ -230,7 +270,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                 ),
               ),
             ),
-          if (_inkExpanded && inkActions)
+          if (!fullscreen && _inkExpanded && inkActions)
             InkParameterControls(
               look: widget.inkLook,
               onChanged: widget.locked ? null : widget.onInkChanged,
@@ -245,12 +285,15 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
               ),
             ),
           Expanded(
+            key: const ValueKey('workbench-preview-surface'),
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 color: colors.surfaceContainerLow,
-                border: Border.all(color: colors.outlineVariant),
-                borderRadius: BorderRadius.circular(12),
+                border: fullscreen
+                    ? null
+                    : Border.all(color: colors.outlineVariant),
+                borderRadius: fullscreen ? null : BorderRadius.circular(12),
               ),
               clipBehavior: Clip.antiAlias,
               child: widget.pages.isEmpty
@@ -295,7 +338,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                   ? Column(
                       children: [
                         Expanded(child: _editor(current, fine)),
-                        if (widget.pages.length > 1)
+                        if (!fullscreen && widget.pages.length > 1)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -336,7 +379,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                     ),
             ),
           ),
-          if (hasPages || widget.onCancel != null)
+          if (!fullscreen && (hasPages || widget.onCancel != null))
             Wrap(
               alignment: WrapAlignment.center,
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -361,7 +404,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                   ),
               ],
             ),
-          if (widget.version.isNotEmpty)
+          if (!fullscreen && widget.version.isNotEmpty)
             Semantics(
               identifier: 'app-version',
               child: Text(
