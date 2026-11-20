@@ -18,6 +18,7 @@ class WorkbenchShell extends StatelessWidget {
     this.reduceMotion = false,
     this.onReduceMotionChanged,
     this.updateAvailable = false,
+    this.fineFullscreen = false,
     this.version = '',
     required this.destination,
     required this.onDestinationSelected,
@@ -35,7 +36,7 @@ class WorkbenchShell extends StatelessWidget {
   final Future<bool> Function(bool)? onReduceMotionChanged;
   final Future<bool> Function(Color)? onThemeColorChanged,
       onSecondaryThemeColorChanged;
-  final bool updateAvailable;
+  final bool updateAvailable, fineFullscreen;
   final String version;
   final int destination;
   final ValueChanged<int> onDestinationSelected;
@@ -52,7 +53,9 @@ class WorkbenchShell extends StatelessWidget {
         MediaQuery.viewInsetsOf(context).bottom > 0;
     final labels = [l.workspace, l.guide, l.about];
     return Scaffold(
-      appBar: MediaQuery.sizeOf(context).width < 900
+      appBar: fineFullscreen
+          ? null
+          : MediaQuery.sizeOf(context).width < 900
           ? AppBar(
               title: Text(labels[destination]),
               automaticallyImplyLeading: false,
@@ -127,7 +130,7 @@ class WorkbenchShell extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 900;
+            final wide = !fineFullscreen && constraints.maxWidth >= 900;
             final content = RetainedPaneSwitcher(
               index: destination == 0 ? 0 : 1,
               children: [
@@ -153,7 +156,8 @@ class WorkbenchShell extends StatelessWidget {
         ),
       ),
       floatingActionButton:
-          MediaQuery.sizeOf(context).width < 900 &&
+          !fineFullscreen &&
+              MediaQuery.sizeOf(context).width < 900 &&
               MediaQuery.viewInsetsOf(context).bottom > 0
           ? FloatingActionButton.small(
               tooltip: l.dismissKeyboard,

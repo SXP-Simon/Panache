@@ -9,6 +9,7 @@ class WorkbenchLayout extends StatelessWidget {
   const WorkbenchLayout({
     super.key,
     required this.wide,
+    this.fineFullscreen = false,
     required this.keyboardVisible,
     required this.width,
     required this.error,
@@ -39,7 +40,7 @@ class WorkbenchLayout extends StatelessWidget {
     required this.onZip,
     this.onCancel,
   });
-  final bool wide, busy, generating, keyboardVisible;
+  final bool wide, busy, generating, keyboardVisible, fineFullscreen;
   final double width;
   final String error, phase, stage;
   final int? queueWaitSeconds;
@@ -140,7 +141,7 @@ class WorkbenchLayout extends StatelessWidget {
         : const SizedBox(width: double.infinity);
     final content = Column(
       children: [
-        if (error.isNotEmpty)
+        if (!fineFullscreen && error.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Material(
@@ -163,22 +164,25 @@ class WorkbenchLayout extends StatelessWidget {
               ),
             ),
           ),
-        if (MediaQuery.disableAnimationsOf(context))
-          taskStatus
-        else
-          AnimatedSize(
-            duration: WorkbenchMotion.pane,
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: taskStatus,
-          ),
+        if (!fineFullscreen)
+          MediaQuery.disableAnimationsOf(context)
+              ? taskStatus
+              : AnimatedSize(
+                  duration: WorkbenchMotion.pane,
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: taskStatus,
+                ),
         Expanded(
+          key: const ValueKey('workbench-panes'),
           child: Form(
             key: formKey,
             child: wide
                 ? wideWorkspace(context)
                 : Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding: fineFullscreen
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.all(6),
                     child: RetainedPaneSwitcher(
                       index: mobileTab,
                       children: [editorView, settingsView, buildPreview(null)],
@@ -186,7 +190,7 @@ class WorkbenchLayout extends StatelessWidget {
                   ),
           ),
         ),
-        if (!wide && !keyboardVisible) ...[
+        if (!wide && !keyboardVisible && !fineFullscreen) ...[
           if (mobileTab != 1)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -238,8 +242,11 @@ class WorkbenchLayout extends StatelessWidget {
         // Keep the editor's element ancestry stable while the keyboard changes
         // available height, otherwise EditableText is disposed mid-composition.
         return SingleChildScrollView(
+          physics: fineFullscreen ? const NeverScrollableScrollPhysics() : null,
           child: SizedBox(
-            height: bounds.maxHeight < 450 ? 540 : bounds.maxHeight,
+            height: !fineFullscreen && bounds.maxHeight < 450
+                ? 540
+                : bounds.maxHeight,
             child: content,
           ),
         );

@@ -51,6 +51,7 @@ class FinePreview extends StatefulWidget {
     required this.copyImage,
     this.editing = false,
     this.toolbar = false,
+    this.fullscreen = false,
     this.canUndo = false,
     this.canRedo = false,
     this.onEdit,
@@ -64,7 +65,7 @@ class FinePreview extends StatefulWidget {
   final InkLook look;
   final Map<int, FineAdjustment> edits;
   final ImageClipboardWriter copyImage;
-  final bool editing, toolbar, canUndo, canRedo;
+  final bool editing, toolbar, fullscreen, canUndo, canRedo;
   final ValueChanged<List<FineAdjustment>>? onEdit;
   final ValueChanged<bool>? onHistory;
   final FineRange? source;
@@ -118,6 +119,9 @@ class _FinePreviewState extends State<FinePreview> {
   bool _manualZoom = false;
   Size? _defaultZoomViewport;
   Size _viewport = Size.zero;
+  double _pageFit = 0;
+  bool _wasFullscreen = false;
+  bool _showSelectionSettings = false;
   final _retired = <ui.Image>{};
 
   bool get _touchNavigation =>
@@ -621,12 +625,50 @@ class _FinePreviewState extends State<FinePreview> {
     _manualZoom = true;
     final scale = (_zoom.value.getMaxScaleOnAxis() * factor).clamp(1.0, 4.0);
     final center = _viewport.center(Offset.zero);
-    final translation = center - _zoom.toScene(center) * scale;
+    _setCamera(scale, center - _zoom.toScene(center) * scale);
+  }
+
+  void _setCamera(double scale, Offset translation) {
     _zoom.value = scale == 1
         ? Matrix4.identity()
         : (Matrix4.identity()
             ..translateByDouble(translation.dx, translation.dy, 0, 1)
             ..scaleByDouble(scale, scale, 1, 1));
+  }
+
+  void _updateViewport(Size viewport, double fit) {
+    final oldViewport = _viewport;
+    final oldFit = _pageFit;
+    final wasFullscreen = _wasFullscreen;
+    _viewport = viewport;
+    _pageFit = fit;
+    _wasFullscreen = widget.fullscreen;
+    if (!(widget.fullscreen || wasFullscreen) ||
+        oldViewport == viewport ||
+        oldFit <= 0) {
+      return;
+    }
+    final previous = _zoom.value;
+    final scale = previous.getMaxScaleOnAxis();
+    if (scale <= 1) return;
+    final oldCenter = oldViewport.center(Offset.zero);
+    final paperOffset = (_zoom.toScene(oldCenter) - oldCenter) / oldFit;
+    final center = viewport.center(Offset.zero);
+    final translation = center - (center + paperOffset * fit) * scale;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _viewport != viewport ||
+          !identical(_zoom.value, previous)) {
+        return;
+      }
+      _setCamera(
+        scale,
+        Offset(
+          translation.dx.clamp(viewport.width * (1 - scale), 0),
+          translation.dy.clamp(viewport.height * (1 - scale), 0),
+        ),
+      );
+    });
   }
 
   Widget _paper(BuildContext context) {
@@ -640,12 +682,12 @@ class _FinePreviewState extends State<FinePreview> {
     final color = Theme.of(context).colorScheme.primary;
     return LayoutBuilder(
       builder: (context, bounds) {
-        _viewport = bounds.biggest;
         final fit = math.min(
           bounds.maxWidth / _size.width,
           bounds.maxHeight / _size.height,
         );
         if (fit <= 0 || !fit.isFinite) return const SizedBox.shrink();
+        _updateViewport(bounds.biggest, fit);
         if (widget.toolbar) {
           final wide = widget.inspector != null;
           if (_zoomLayout != wide) {
@@ -788,13 +830,152 @@ class _FinePreviewState extends State<FinePreview> {
     );
   }
 
+  List<Widget> _historyActions(AppLocalizations l) => [
+    for (final (key, label, allowed, redo, icon) in [
+      ('fine-undo', l.fineUndo, widget.canUndo, false, Icons.undo),
+      ('fine-redo', l.fineRedo, widget.canRedo, true, Icons.redo),
+    ])
+      IconButton(
+        key: ValueKey(key),
+        tooltip: label,
+        onPressed: allowed ? () => widget.onHistory?.call(redo) : null,
+        icon: Icon(icon),
+      ),
+  ];
+
+  IconButton _zoomButton(AppLocalizations l, {required bool zoomIn}) =>
+      IconButton(
+        tooltip: zoomIn ? l.previewZoomIn : l.previewZoomOut,
+        onPressed: () => _zoomBy(zoomIn ? 1.25 : 1 / 1.25),
+        icon: Icon(zoomIn ? Icons.zoom_in : Icons.zoom_out),
+      );
+
+  Widget _fullscreenControls(BuildContext context, BoxConstraints bounds) {
+    final l = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+    final hasSelection = _selection.selected.isNotEmpty;
+    final showSettings = hasSelection && _showSelectionSettings;
+    final compactHeight = bounds.maxHeight < 440 && bounds.maxWidth >= 640;
+    final camera = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ..._historyActions(l),
+        _zoomButton(l, zoomIn: false),
+        IconButton(
+          tooltip: l.resetPreviewZoom,
+          onPressed: _fitPage,
+          icon: const Icon(Icons.fit_screen_outlined),
+        ),
+        _zoomButton(l, zoomIn: true),
+        IconButton(
+          key: const ValueKey('fine-selection-settings'),
+          tooltip: l.fineSelectionSettings,
+          isSelected: showSettings,
+          onPressed: hasSelection
+              ? () => setState(() => _showSelectionSettings = !showSettings)
+              : null,
+          icon: const Icon(Icons.tune),
+          selectedIcon: Icon(Icons.tune, color: colors.primary),
+        ),
+      ],
+    );
+    final tools = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 540),
+      child: Row(
+        children: [
+          for (final (tool, icon, label) in [
+            (FineTool.pan, Icons.pan_tool_outlined, l.finePanShort),
+            (FineTool.select, Icons.ads_click, l.fineTap),
+            (FineTool.box, Icons.crop_free, l.fineBoxShort),
+            (FineTool.lasso, Icons.gesture, l.fineLasso),
+            (FineTool.move, Icons.open_with, l.fineMove),
+            (FineTool.perspective, Icons.transform, l.finePerspectiveShort),
+          ])
+            Expanded(
+              child: Semantics(
+                selected: tool == _selection.tool,
+                child: TextButton(
+                  key: ValueKey('fullscreen-fine-tool-${tool.name}'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 3,
+                      vertical: 4,
+                    ),
+                    foregroundColor: tool == _selection.tool
+                        ? colors.onPrimaryContainer
+                        : colors.onSurfaceVariant,
+                    backgroundColor: tool == _selection.tool
+                        ? colors.primaryContainer
+                        : null,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed:
+                      !hasSelection &&
+                          (tool == FineTool.move ||
+                              tool == FineTool.perspective)
+                      ? null
+                      : () => setState(() => _selection.tool = tool),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 18),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    return Material(
+      color: colors.surface,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Divider(height: 1),
+          if (showSettings)
+            _inspector(
+              context,
+              math.min(250, bounds.maxHeight * .37),
+              settingsOnly: true,
+            ),
+          if (compactHeight)
+            Row(
+              children: [
+                Expanded(child: tools),
+                camera,
+              ],
+            )
+          else ...[
+            Center(child: camera),
+            const Divider(height: 1),
+            Center(child: tools),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _inspector(
     BuildContext context,
     double maxHeight, {
     bool sidebar = false,
+    bool settingsOnly = false,
   }) {
     final l = AppLocalizations.of(context)!;
     final selection = _selection.selected;
+    final scrollActions = settingsOnly || maxHeight < 160;
     final first = selection.firstOrNull;
     final current = _visible[first] ?? defaultFineAdjustment(first ?? 0);
     final summary = Text(
@@ -803,6 +984,31 @@ class _FinePreviewState extends State<FinePreview> {
       overflow: TextOverflow.ellipsis,
       textAlign: _compact || sidebar ? TextAlign.center : TextAlign.start,
       style: Theme.of(context).textTheme.bodySmall,
+    );
+    final parameterActions = Wrap(
+      spacing: 4,
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        TextButton.icon(
+          key: const ValueKey('fine-color'),
+          onPressed: () => _pickColor(current),
+          icon: ColorSwatchIndicator(Color(current.color ?? widget.look.color)),
+          label: Text(l.fineColor),
+        ),
+        FilterChip(
+          label: Text(l.fineSnap),
+          selected: _selection.snap,
+          onSelected: (value) => setState(() => _selection.snap = value),
+        ),
+        TextButton.icon(
+          key: const ValueKey('fine-reset'),
+          label: Text(l.fineReset),
+          icon: const Icon(Icons.restart_alt),
+          onPressed: () =>
+              _finish(selection.map(defaultFineAdjustment).toList()),
+        ),
+      ],
     );
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
@@ -817,61 +1023,41 @@ class _FinePreviewState extends State<FinePreview> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_compact || sidebar) summary,
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (!_compact && !sidebar) Flexible(child: summary),
-                        Flexible(
-                          child: Wrap(
-                            alignment: WrapAlignment.center,
-                            children: [
-                              IconButton(
-                                key: const ValueKey('fine-undo'),
-                                tooltip: l.fineUndo,
-                                onPressed: widget.canUndo
-                                    ? () => widget.onHistory?.call(false)
-                                    : null,
-                                icon: const Icon(Icons.undo),
-                              ),
-                              IconButton(
-                                key: const ValueKey('fine-redo'),
-                                tooltip: l.fineRedo,
-                                onPressed: widget.canRedo
-                                    ? () => widget.onHistory?.call(true)
-                                    : null,
-                                icon: const Icon(Icons.redo),
-                              ),
-                              IconButton(
-                                tooltip: l.previewZoomOut,
-                                onPressed: () => _zoomBy(1 / 1.25),
-                                icon: const Icon(Icons.zoom_out),
-                              ),
-                              IconButton(
-                                tooltip: l.previewZoomIn,
-                                onPressed: () => _zoomBy(1.25),
-                                icon: const Icon(Icons.zoom_in),
-                              ),
-                              if (!_touchNavigation)
-                                IconButton(
-                                  isSelected: _selection.tool == FineTool.pan,
-                                  tooltip: l.finePan,
-                                  onPressed: () => setState(() {
-                                    _selection.tool =
-                                        _selection.tool == FineTool.pan
-                                        ? FineTool.select
-                                        : FineTool.pan;
-                                  }),
-                                  icon: const Icon(Icons.pan_tool_outlined),
-                                  selectedIcon: const Icon(Icons.pan_tool),
-                                ),
-                            ],
+                    if (_compact || sidebar || settingsOnly) summary,
+                    if (!settingsOnly)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (!_compact && !sidebar) Flexible(child: summary),
+                          Flexible(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              children: [
+                                ..._historyActions(l),
+                                _zoomButton(l, zoomIn: false),
+                                _zoomButton(l, zoomIn: true),
+                                if (!_touchNavigation)
+                                  IconButton(
+                                    isSelected: _selection.tool == FineTool.pan,
+                                    tooltip: l.finePan,
+                                    onPressed: () => setState(() {
+                                      _selection.tool =
+                                          _selection.tool == FineTool.pan
+                                          ? FineTool.select
+                                          : FineTool.pan;
+                                    }),
+                                    icon: const Icon(Icons.pan_tool_outlined),
+                                    selectedIcon: const Icon(Icons.pan_tool),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    if (widget.inspector == null) _selectionTools(context),
-                    if (_selection.tool == FineTool.perspective)
+                        ],
+                      ),
+                    if (!settingsOnly && widget.inspector == null)
+                      _selectionTools(context),
+                    if (!settingsOnly &&
+                        _selection.tool == FineTool.perspective)
                       Text(l.finePerspectiveHint, textAlign: TextAlign.center),
                     Visibility(
                       visible: first != null,
@@ -978,44 +1164,19 @@ class _FinePreviewState extends State<FinePreview> {
                         ],
                       ),
                     ),
+                    if (scrollActions && first != null) parameterActions,
                   ],
                 ),
               ),
             ),
-            Visibility(
-              visible: first != null,
-              maintainState: true,
-              maintainAnimation: true,
-              maintainSize: true,
-              child: Wrap(
-                spacing: 4,
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  TextButton.icon(
-                    key: const ValueKey('fine-color'),
-                    onPressed: () => _pickColor(current),
-                    icon: ColorSwatchIndicator(
-                      Color(current.color ?? widget.look.color),
-                    ),
-                    label: Text(l.fineColor),
-                  ),
-                  FilterChip(
-                    label: Text(l.fineSnap),
-                    selected: _selection.snap,
-                    onSelected: (value) =>
-                        setState(() => _selection.snap = value),
-                  ),
-                  TextButton.icon(
-                    key: const ValueKey('fine-reset'),
-                    label: Text(l.fineReset),
-                    icon: const Icon(Icons.restart_alt),
-                    onPressed: () =>
-                        _finish(selection.map(defaultFineAdjustment).toList()),
-                  ),
-                ],
+            if (!scrollActions)
+              Visibility(
+                visible: first != null,
+                maintainState: true,
+                maintainAnimation: true,
+                maintainSize: true,
+                child: parameterActions,
               ),
-            ),
           ],
         ),
       ),
@@ -1072,15 +1233,17 @@ class _FinePreviewState extends State<FinePreview> {
                 _committed != null)
               _selectionTools(context),
             Expanded(
+              key: const ValueKey('fine-viewport'),
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(widget.fullscreen ? 4 : 10),
                 child: _paper(context),
               ),
             ),
-            if (widget.inspector == null &&
-                widget.editing &&
-                _committed != null)
-              _inspector(context, bounds.maxHeight * .6),
+            if (widget.editing && _committed != null)
+              if (widget.fullscreen)
+                _fullscreenControls(context, bounds)
+              else if (widget.inspector == null)
+                _inspector(context, bounds.maxHeight * .6),
           ],
         ),
       ),
