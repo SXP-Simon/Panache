@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'project_source_link.dart';
+import 'workbench_guide.dart';
 import 'workbench_motion.dart';
 import 'theme_color_editor.dart';
 import '../theme/handwriting_theme.dart';
@@ -18,6 +19,7 @@ class WorkbenchShell extends StatelessWidget {
     this.reduceMotion = false,
     this.onReduceMotionChanged,
     this.updateAvailable = false,
+    this.guideUnread = false,
     this.fineFullscreen = false,
     this.version = '',
     required this.destination,
@@ -36,7 +38,7 @@ class WorkbenchShell extends StatelessWidget {
   final Future<bool> Function(bool)? onReduceMotionChanged;
   final Future<bool> Function(Color)? onThemeColorChanged,
       onSecondaryThemeColorChanged;
-  final bool updateAvailable, fineFullscreen;
+  final bool updateAvailable, fineFullscreen, guideUnread;
   final String version;
   final int destination;
   final ValueChanged<int> onDestinationSelected;
@@ -60,14 +62,20 @@ class WorkbenchShell extends StatelessWidget {
               title: Text(labels[destination]),
               automaticallyImplyLeading: false,
               actions: [
-                TextButton.icon(
-                  key: const ValueKey('app-preferences'),
-                  onPressed: () => preferencesSheet(context),
-                  icon: Badge(
-                    isLabelVisible: updateAvailable,
-                    child: const Icon(Icons.settings_outlined),
+                Semantics(
+                  hint: guideUnread ? l.guideUnread : null,
+                  child: TextButton.icon(
+                    key: const ValueKey('app-preferences'),
+                    onPressed: () => preferencesSheet(context),
+                    icon: Badge(
+                      isLabelVisible: updateAvailable || guideUnread,
+                      backgroundColor: updateAvailable
+                          ? null
+                          : Theme.of(context).colorScheme.primary,
+                      child: const Icon(Icons.settings_outlined),
+                    ),
+                    label: Text(l.appPreferences),
                   ),
-                  label: Text(l.appPreferences),
                 ),
               ],
             )
@@ -88,9 +96,15 @@ class WorkbenchShell extends StatelessWidget {
                   : null,
               actions: [
                 IconButton(
-                  tooltip: l.guide,
+                  key: const ValueKey('open-guide'),
+                  tooltip: guideUnread
+                      ? '${l.guide} · ${l.guideUnread}'
+                      : l.guide,
                   onPressed: () => onDestinationSelected(1),
-                  icon: const Icon(Icons.menu_book_outlined),
+                  icon: GuideUnreadBadge(
+                    unread: guideUnread,
+                    child: const Icon(Icons.menu_book_outlined),
+                  ),
                 ),
                 IconButton(
                   tooltip: l.about,
@@ -204,6 +218,18 @@ class WorkbenchShell extends StatelessWidget {
                     ),
                   ),
                   ListTile(
+                    leading: GuideUnreadBadge(
+                      unread: guideUnread,
+                      child: const Icon(Icons.menu_book_outlined),
+                    ),
+                    title: Text(l.guide),
+                    subtitle: guideUnread ? Text(l.guideUnread) : null,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      onDestinationSelected(1);
+                    },
+                  ),
+                  ListTile(
                     leading: Icon(
                       connected
                           ? Icons.cloud_done_outlined
@@ -241,18 +267,14 @@ class WorkbenchShell extends StatelessWidget {
                         onSecondaryThemeColorChanged ?? (_) async => true,
                     onChanged: onThemeColorChanged ?? (_) async => true,
                   ),
-                  for (final item in [
-                    (1, l.guide, Icons.menu_book_outlined),
-                    (2, l.about, Icons.info_outline),
-                  ])
-                    ListTile(
-                      leading: Icon(item.$3),
-                      title: Text(item.$2),
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        onDestinationSelected(item.$1);
-                      },
-                    ),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: Text(l.about),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      onDestinationSelected(2);
+                    },
+                  ),
                   StatefulBuilder(
                     builder: (context, update) => SwitchListTile(
                       key: const ValueKey('reduce-motion'),

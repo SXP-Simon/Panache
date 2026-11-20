@@ -36,6 +36,23 @@ void main() {
     expect(appearance.saveFailed, isTrue);
     appearance.dispose();
   });
+  test('opening the guide during restore keeps it read on restart', () async {
+    final delayed = Completer<SharedPreferences>();
+    final appearance = AppearancePreferences(open: () => delayed.future);
+    final restoring = appearance.restore();
+    final saving = appearance.markGuideRead();
+    delayed.complete(await SharedPreferences.getInstance());
+    await restoring;
+    await saving;
+    expect(appearance.guideUnread, isFalse);
+    appearance.dispose();
+
+    final restarted = AppearancePreferences();
+    await restarted.restore();
+    expect(restarted.guideUnread, isFalse);
+    restarted.dispose();
+  });
+
   test('dispose while restore or save is pending is safe', () async {
     final delayed = Completer<SharedPreferences>();
     final appearance = AppearancePreferences(open: () => delayed.future);

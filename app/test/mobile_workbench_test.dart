@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/models/settings.dart';
@@ -135,6 +136,53 @@ void main() {
     expect(workspace.text, '保持编辑状态');
     expect(tester.takeException(), isNull);
   });
+
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('guide reminder disappears and stays read at $width px', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      addTearDown(() => SharedPreferences.setMockInitialValues({}));
+      final workspace = await openWorkbench(tester, size: Size(width, 820));
+      await tester.pumpAndSettle();
+      final l = labels(tester);
+      final narrow = width < 900;
+      final entry = find.byKey(
+        ValueKey(narrow ? 'app-preferences' : 'open-guide'),
+      );
+      Finder visibleBadge(Finder parent) => find.descendant(
+        of: parent,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Badge && widget.isLabelVisible,
+        ),
+      );
+      expect(visibleBadge(entry), findsOneWidget);
+      expect(
+        visibleBadge(find.byKey(const ValueKey('open-beginner-guide'))),
+        findsOneWidget,
+      );
+
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      if (narrow) {
+        final guide = find.widgetWithText(ListTile, l.guide);
+        expect(find.text(l.guideUnread), findsOneWidget);
+        expect(visibleBadge(guide), findsOneWidget);
+        await tester.tap(guide);
+        await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const ValueKey('beginner-guide')), findsOneWidget);
+      expect(visibleBadge(entry), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(HandwritingApp(workspace: workspace));
+      await tester.pumpAndSettle();
+      expect(entry, findsOneWidget);
+      expect(visibleBadge(entry), findsNothing);
+      expect(find.byKey(const ValueKey('beginner-guide')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('quick start opens each panel and preserves the draft', (
     tester,

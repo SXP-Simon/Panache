@@ -68,6 +68,8 @@ class _HandwritingAppState extends State<HandwritingApp> {
     workspace: widget.workspace,
     updates: updates,
     initialDestination: destination,
+    guideUnread: appearance.guideUnread,
+    onGuideOpened: appearance.markGuideRead,
     toggleLocale: () => setState(
       () => locale = Locale(locale?.languageCode == 'zh' ? 'en' : 'zh'),
     ),

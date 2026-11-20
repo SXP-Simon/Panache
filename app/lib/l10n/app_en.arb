@@ -93,6 +93,7 @@
   "cleanMode": "Plain text",
   "imageScale": "Illustration scale (10%–700%, limited by the page)",
   "guideBeginner": "Quick start",
+  "guideUnread": "Unread quick-start guide",
   "guideIntro": "Select a step to open its panel in the workbench.",
   "guideWriteTitle": "Add your text",
   "guideWriteHint": "Type or paste your text, or use Import document to open TXT, DOCX, PDF or RTF.",
