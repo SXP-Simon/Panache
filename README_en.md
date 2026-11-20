@@ -1,10 +1,40 @@
-# Handwriting generator
+# Panache
 
-A cross-platform handwriting tool built with Flutter and Rust. It supports text and document import, fonts and backgrounds, layout variation, image previews, and PNG / PDF / ZIP export.
+[简体中文](README.md)
+
+Panache is an open-source handwriting generator built with **Flutter and Rust**. Lay out class notes and lab reports with prose, formulas, tables, and circuit diagrams, then export handwritten pages.
+
+[Download](https://github.com/SXP-Simon/Panache/releases/latest) · [Client guide](app/README.md) · [Self-hosting](deploy/rust/README.md)
+
+
+<table>
+  <thead>
+    <tr>
+      <th width="45%">Ruled notebook samples</th>
+      <th width="55%">Custom backgrounds and generated handwriting</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center" valign="top"><a href="docs/assets/images/panache-showcase.webp"><img src="docs/assets/images/panache-showcase.webp" width="380" alt="Panache cursive notebook samples with circuits, matrices, probability tables, chemistry, and calculus"></a></td>
+      <td align="center" valign="top"><a href="docs/assets/images/panache-custom-background.webp"><img src="docs/assets/images/panache-custom-background.webp" width="460" alt="Nanchang University ruled paper and Wuhan University of Technology dotted paper, with uploaded backgrounds on the left and generated handwriting on the right"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 - Android / iOS use a bundled Rust engine through Dart FFI.
 - Windows / macOS / Linux automatically start a bundled Rust sidecar.
 - Flutter Web connects to a Rust HTTP service that can also host the UI.
+
+## Handwriting and layout
+
+- **Text and documents**　Type, paste, or import TXT, DOCX, PDF, or RTF. Insert an illustration at the cursor. Use a line containing `---` to start a new page or prefix a line with `>>>` to align it to the right.
+- **Math and circuits**　Render stacked fractions, radicals, matrices, scripts, and common mathematical symbols. Fallback fonts supply missing glyphs. Supported CircuiTikZ circuits render on the page.
+- **Markdown tables**　Use **Editing tools → Prepare text** to clean pasted text and choose handwriting grid, aligned text, or list layouts. Ruled LaTeX `array` tables can include fractions in their cells.
+- **Fonts and paper**　Choose separate Chinese and Latin fonts and let digits follow the Latin font if desired. Select blank, ruled, grid, or dot paper, or upload a photo and detect or select the writing area.
+- **Fine editing and export**　Preview one page or all pages. Select characters to move them, adjust their ink, or reshape a selection using corner perspective. A full-screen editor is available on phones. Save one PNG, or export all pages as a PDF or image ZIP.
+
+Open **Guide** in the workbench to follow the four steps from writing your first draft to exporting it.
 
 ## Layout
 
@@ -33,6 +63,10 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 
 For cross-origin development, configure `HANDWRITING_ALLOWED_ORIGINS`. See the [client guide](app/README.md), [Rust workspace guide](crates/README.md), and [deployment guide](deploy/rust/README.md) for builds, tests, signing, and platform limitations.
 
-[Download Panache](https://github.com/SXP-Simon/Panache/releases/latest). Releases build Flutter and Rust from a checked commit on `main`. See the [release guide](docs/release.md). The former Web/Electron source is archived on `backup`.
+Releases build Flutter and Rust from a checked commit on `main`. See the [release guide](docs/release.md). The former Web/Electron source is archived on `backup`.
+
+## Credits and licensing
+
+Panache is based on [handwriting-web](https://github.com/14790897/handwriting-web). Thanks to [HakimYu](https://github.com/HakimYu) for the Flutter/Rust migration.
 
 See [LICENSE](LICENSE) and the algorithm [NOTICE](crates/handwriting-core/NOTICE). Font redistribution is subject to each font's license.
