@@ -20,6 +20,12 @@ class WorkbenchGuide extends StatelessWidget {
       (l.guideExportTitle, l.guideExportHint, GuideTarget.preview),
     ];
     final topics = [
+      (
+        'preview',
+        Icons.visibility_outlined,
+        l.guidePreviewOptionsTitle,
+        l.guidePreviewOptionsHint,
+      ),
       ('math', Icons.functions, l.guideMathTitle, l.guideMathHint),
       (
         'table',

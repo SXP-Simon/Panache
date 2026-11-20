@@ -168,6 +168,14 @@ void main() {
     expect(keyed('open-beginner-guide'), findsNothing);
 
     await openGuide();
+    final options = find.text(l.guidePreviewOptionsTitle);
+    await tester.ensureVisible(options);
+    await tester.tap(options);
+    await tester.pumpAndSettle();
+    expect(find.text(l.guidePreviewOptionsHint), findsOneWidget);
+    await tester.ensureVisible(options);
+    await tester.tap(options);
+    await tester.pumpAndSettle();
     final math = find.text(l.guideMathTitle);
     await tester.ensureVisible(math);
     expect(find.text(l.guideMathHint), findsNothing);
