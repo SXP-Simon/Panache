@@ -1,10 +1,10 @@
 name: Rust 后端
 on:
   push:
-    branches: ["flutter"]
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "vendor/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
+    branches: ["main"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
   pull_request:
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "vendor/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
+    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
   workflow_dispatch:
 jobs:
   verify:
