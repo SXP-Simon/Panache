@@ -10,8 +10,8 @@ Panache 的 Flutter + Rust 跨平台手写体生成器。Android/iOS 使用 C AB
 
 ## 分支与同步
 
-- `flutter` 独立维护 Flutter/Rust 客户端与引擎；选择性通过 `cherry-pick -x` 接收 `hakimyu/refactor/flutter-rust`。
-- `custom-base` 是 React/Python/Electron 自用主线；`main` 只同步 `upstream/main`。两种实现不整分支互相合入，功能分别移植和验证。
+- `main` 维护 Flutter/Rust 客户端与引擎，是默认开发和发布分支。
+- `backup` 归档原 React/Python/Electron 实现；`upstream-backup` 归档原 `main`。保留历史提交和许可。
 - 自用远端是 `origin`（`SXP-Simon/Panache`），原项目是 `upstream`，Flutter 迁移来源是 `hakimyu`。
 
 ## 目录与资源
@@ -54,8 +54,8 @@ python3 scripts/build-flutter-web.py
 - 业务状态与任务协调在 `services/workspace.dart`，持久化通过 `WorkspaceStorage` 适配，平台引擎通过 API 契约接入。
 - 页面组合独立的 `widgets/` 和 `screens/dialogs/`；输入控制器与局部导航由页面持有，不通过 part 或 extension 共享父 State。职责和存储边界见 [客户端架构](docs/flutter-architecture.md)。
 - 使用绿色 Material Design 3 主题及中英文霞鹜文楷 UI；纸张渲染字体由用户选择，不能被主题字体覆盖。第三方字体保留各自许可。
-- 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开当前 fork 的 GitHub Issues，不接入旧邮件服务。
-- `flutter` 分支的相关路径 push 和 pull request 触发 Flutter、Rust 与 Android/iOS 模拟器验证；桌面检查保持 pull request/手动入口。发布由 `custom-base` 的 Flutter Release Assets 工作流编排，使用固定且通过检查的 Flutter SHA，产物加入同一个 Release。
+- 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开项目的 GitHub Issues，不接入旧邮件服务。
+- `main` 的相关推送和 pull request 触发 Flutter、Rust 与 Android/iOS 验证。Publish Flutter Release 从通过检查的 `main` 提交构建，由 CI 创建版本与安装包。使用入口见[发布说明](docs/release.md)。
 
 ## 编码与协作约定
 

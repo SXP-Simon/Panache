@@ -15,7 +15,7 @@ UI 使用绿色 Material Design 3 主题，中英文统一使用霞鹜文楷。�
 - 内置预设、自定义预设保存/加载、JSON 导入/导出、设备草稿自动保存。
 - 「纸张 → 页面排版 → 排版预设」可切换标准排版与作业笔记；作业笔记增加正文留白和条目续行缩进，长公式优先在关系符处换行，保留原文、字体、背景及横线对齐。选择随草稿和参数预设保存，旧草稿默认使用标准排版。
 - 单页/多页预览、缩放、页码切换、PNG 保存、PDF/ZIP 导出、任务进度与队列满提示。
-- 使用指南、项目入口、开源许可，以及指向[当前 fork GitHub Issues](https://github.com/SXP-Simon/Panache/issues)的反馈入口；不依赖邮件服务。账户功能未启用，旧登录/注册路由展示不可用说明。
+- 使用指南、项目入口、开源许可，以及指向[GitHub Issues](https://github.com/SXP-Simon/Panache/issues)的反馈入口；不依赖邮件服务。账户功能未启用，旧登录/注册路由展示不可用说明。
 
 Web 第一次使用时读取同源旧 Vue `localStorage` 中的草稿与参数，保留原键；新数据写入独立的 `flutter.workspace`。旧版参数 JSON 的 camelCase 字段也可导入。字体与背景文件需重新选择；插图随草稿保存，浏览器存储容量仍有限。
 
@@ -93,7 +93,7 @@ flutter drive --driver=test_driver/workflow.dart --target=integration_test/edito
 flutter test test/mobile_api_test.dart --dart-define=MOBILE_ENGINE_LIBRARY=<仓库绝对路径>/target/release/libhandwriting_bridge.dylib
 ```
 
-移动构建与模拟器集成测试 CI 见 `.github/workflows/flutter_mobile.yml`，在相关路径的 `flutter` 推送和 pull request 时执行，也可手动触发。Android 在 x86_64 模拟器运行随包引擎测试，iOS 在 macOS runner 的 iPhone 模拟器运行同一集成测试。系统文件选择和保存使用现有 Flutter 插件；需要真机检查系统授权、分享/保存目标和后台切换。
+移动构建与模拟器集成测试 CI 见 `.github/workflows/flutter_mobile.yml`，在相关路径的 `main` 推送和 pull request 时执行，也可手动触发。Android 在 x86_64 模拟器运行随包引擎测试，iOS 在 macOS runner 的 iPhone 模拟器运行同一集成测试。系统文件选择和保存使用现有 Flutter 插件；需要真机检查系统授权、分享/保存目标和后台切换。
 
 ## 验证
 

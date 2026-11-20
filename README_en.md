@@ -33,6 +33,6 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5006
 
 For cross-origin development, configure `HANDWRITING_ALLOWED_ORIGINS`. See the [client guide](app/README.md), [Rust workspace guide](crates/README.md), and [deployment guide](deploy/rust/README.md) for builds, tests, signing, and platform limitations.
 
-The product version comes from the root `VERSION` file. The legacy release pipeline has been removed; automated releases for the rewrite are not yet configured. `CHANGELOG.md` retains historical releases.
+[Download Panache](https://github.com/SXP-Simon/Panache/releases/latest). Releases build Flutter and Rust from a checked commit on `main`. See the [release guide](docs/release.md). The former Web/Electron source is archived on `backup`.
 
 See [LICENSE](LICENSE) and the algorithm [NOTICE](crates/handwriting-core/NOTICE). Font redistribution is subject to each font's license.
