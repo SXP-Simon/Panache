@@ -1,6 +1,28 @@
-# Panache · Flutter / Rust
+# Panache
 
-使用 Flutter + Rust 实现的跨平台手写体生成工具，支持文字与文档导入、字体和背景选择、排版扰动、图片预览及 PNG / PDF / ZIP 导出。
+[English](README_en.md)
+
+> 老实写作业，很无聊吧
+
+Panache 是基于 **Flutter + Rust** 的开源手写体生成器。把课堂笔记、实验报告里的正文、数学公式、表格和电路图排到纸上，再保存为手写稿。
+
+[下载客户端](https://github.com/SXP-Simon/Panache/releases/latest) · [使用指南](app/README.md#功能入口) · [自行部署](deploy/rust/README.md)
+
+
+<table>
+  <thead>
+    <tr>
+      <th width="45%">云烟体横线纸效果</th>
+      <th width="55%">自定义背景与生成效果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center" valign="top"><a href="./docs/assets/images/panache-showcase.webp"><img src="./docs/assets/images/panache-showcase.webp" width="380" alt="Panache 云烟体横线纸上的电路、矩阵、概率表格、化学式与微积分作业"></a></td>
+      <td align="center" valign="top"><a href="./docs/assets/images/panache-custom-background.webp"><img src="./docs/assets/images/panache-custom-background.webp" width="460" alt="南昌大学横线纸和武汉理工大学点线纸，左列是上传的背景图，右列是生成的手写效果"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 - Android / iOS：通过 Dart FFI 调用随包 Rust 引擎，支持离线生成。
 - Windows / macOS / Linux：Flutter 原生界面自动启动随包 Rust sidecar，支持离线生成。
@@ -9,6 +31,16 @@
 界面采用绿色 Material Design 3 主题，中英文 UI 统一使用霞鹜文楷；纸张中的手写文字仍使用用户所选字体。手机工具入口同时显示图标和名称，展开菜单提供用途说明；生成任务可在工作台直接取消。
 
 模块边界与状态管理见 [客户端架构](docs/flutter-architecture.md)，移动工具链与 Windows 环境入口见 [移动开发环境](scripts/MOBILE_ENVIRONMENT.md)。
+
+## 手写排版功能
+
+- **正文和文档**　支持输入、粘贴或导入 TXT、DOCX、PDF、RTF，在光标处插入图片。单独一行 `---` 插入分页，以 `>>>` 开头的行右对齐。
+- **理工科公式**　支持上下竖式分数、带横线的根式、矩阵、上下标和常见数学符号。主字体缺少字形时，使用备用字体补字。可直接渲染常见的 CircuiTikZ 电路。
+- **Markdown 表格**　用「编辑工具 → 整理文本」清理粘贴的内容，选择手写方格、对齐文本或清单等表格格式。支持带格线的 LaTeX `array` 表格，单元格可以包含分数。
+- **字体和纸张**　中英文字体可分别选择，数字可跟随英文字体。支持空白、横线、方格和点阵纸，也可以上传纸张照片，识别横线或手动框选书写区。
+- **精细编辑和导出**　可预览单页或全部页面。点选或圈选一组字后，可移动、改笔迹或拉四角透视。手机支持全屏精细编辑。可保存单页 PNG，或导出 PDF 和图片 ZIP。
+
+首次使用可在工作台打开「使用指南」，按**写内容 → 选字体 → 生成预览 → 导出**操作。
 
 ## 目录
 
@@ -66,7 +98,7 @@ python3 scripts/build-flutter-desktop.py
 bash scripts/build-rust-service.sh
 ```
 
-移动端构建、原生库集成、各平台签名与限制见 [Flutter 客户端说明](app/README.md)，Rust 架构见 [workspace 说明](crates/README.md)。[下载 Flutter/Rust 客户端](https://github.com/SXP-Simon/Panache/releases/latest)。正式包从通过检查的 `main` 构建，流程见[发布说明](docs/release.md)。
+移动端构建、原生库集成、各平台签名与限制见 [Flutter 客户端说明](app/README.md)，Rust 架构见 [workspace 说明](crates/README.md)。正式包从通过检查的 `main` 构建，流程见[发布说明](docs/release.md)。
 
 ## 持续验证与反馈
 
@@ -74,7 +106,10 @@ bash scripts/build-rust-service.sh
 
 问题与建议通过[GitHub Issues](https://github.com/SXP-Simon/Panache/issues)提交，客户端反馈入口会打开该页面。
 
-## 许可
+## 来源与许可
+
+项目基于 [handwriting-web](https://github.com/14790897/handwriting-web)。感谢 [HakimYu](https://github.com/HakimYu) 提供 Flutter/Rust 迁移。
+
 
 项目许可见 [LICENSE](LICENSE)，移植算法的声明与许可见 [NOTICE](crates/handwriting-core/NOTICE)。客户端可在“关于与反馈 → 开源许可”查看项目、算法及已确认的 OFL 字体许可；服务包、桌面包和 Rust Docker 镜像同时携带 LICENSE 与 licenses/。
 
