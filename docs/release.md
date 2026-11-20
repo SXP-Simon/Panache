@@ -1,12 +1,10 @@
-# Flutter 发布
+# Flutter / Rust 发布
 
-开源仓库：[SXP-Simon/Panache](https://github.com/SXP-Simon/Panache)。
-Flutter 与 React/Python 保持独立源码分支；共同的 GitHub Release 由 `custom-base`
-的 [Flutter Release Assets](https://github.com/SXP-Simon/Panache/blob/custom-base/.github/workflows/flutter_release.yml) 编排。
+[Publish Flutter Release](../.github/workflows/publish_flutter.yml) 使用 `main` 上的确切提交构建。Flutter UI、Rust 后端和 Flutter Mobile 必须在同一仓库、分支和 SHA 上全部通过。每次发布将 SHA、检查运行 ID 和版本固定在 `Flutter-source.json`，包旁的 JSON 记录 SHA-256。
 
-发布使用通过 Flutter、Rust 和移动端检查的完整提交 SHA，并在 Release 的
-`Flutter-source.json` 中固定来源。补跑复用该来源，不自动换成分支最新代码。
-Flutter 产物带 `Flutter-` 前缀，和 Electron 安装包区分。
+自动发布从上一个稳定 Release 的 Flutter SHA 起识别常规提交。功能升次版本，修复和性能变更升补丁版本，破坏性变更升主版本。只改发布流程时不会自动发包。也可在 Actions 手动运行 Publish Flutter Release，选择 `main` 并填写递增的 `vX.Y.Z`。任务中断后可重试同一提交产生的草稿。通过版本与签名校验并上传全部适用包后，CI 才公开 Release。
+
+安装包包括 Windows x64、Linux x64、macOS arm64 和已配置正式签名时的 Android arm64-v8a / x86_64。历史 Release 和已有下载链接继续保留。旧 Web/Electron 源码可以在 `backup` 查看。
 
 桌面构建可通过 `scripts/build-flutter-desktop.py --version <版本> --build-number <构建号>`
 注入版本；普通开发不需要这些参数。`HANDWRITING_BUILD_VERSION` 同时决定 Rust

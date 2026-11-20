@@ -66,13 +66,13 @@ python3 scripts/build-flutter-desktop.py
 bash scripts/build-rust-service.sh
 ```
 
-移动端构建、原生库集成、各平台签名与限制见 [Flutter 客户端说明](app/README.md)，Rust 架构见 [workspace 说明](crates/README.md)。产品版本读取根目录 `VERSION`；旧版发布流水线已移除，重写版自动发版尚未接入。`CHANGELOG.md` 保留历史发布记录。
+移动端构建、原生库集成、各平台签名与限制见 [Flutter 客户端说明](app/README.md)，Rust 架构见 [workspace 说明](crates/README.md)。[下载 Flutter/Rust 客户端](https://github.com/SXP-Simon/Panache/releases/latest)。正式包从通过检查的 `main` 构建，流程见[发布说明](docs/release.md)。
 
 ## 持续验证与反馈
 
-`flutter` 分支推送与相关 pull request 按路径触发 Flutter 检查、Rust 跨平台检查，以及 Android/iOS 模拟器上的随包引擎集成测试。独立桌面打包保留 pull request 与手动入口；这些工作流不发布版本。
+`main` 分支推送与相关 pull request 按路径触发 Flutter 检查、Rust 跨平台检查，以及 Android/iOS 模拟器上的随包引擎集成测试。独立桌面打包保留 pull request 与手动入口。旧 Web/Electron 源码归档在 `backup` 分支。
 
-问题与建议通过[当前 fork 的 GitHub Issues](https://github.com/SXP-Simon/Panache/issues)提交，客户端反馈入口会打开该页面。
+问题与建议通过[GitHub Issues](https://github.com/SXP-Simon/Panache/issues)提交，客户端反馈入口会打开该页面。
 
 ## 许可
 
