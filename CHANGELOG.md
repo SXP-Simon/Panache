@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/SXP-Simon/Panache/compare/v1.14.0...v1.15.0) (2026-11-20)
+
+
+### Features
+
+* 提升包含新手教程与全屏精细编辑的 Flutter 来源 ([b509c93](https://github.com/SXP-Simon/Panache/commit/b509c93de6ef9ae845e23fed886286ee9f49e723))
+
 # [1.14.0](https://github.com/SXP-Simon/Panache/compare/v1.13.0...v1.14.0) (2026-11-19)
 
 
