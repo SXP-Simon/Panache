@@ -136,6 +136,63 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('quick start opens each panel and preserves the draft', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(390, 820));
+    final l = labels(tester);
+    Finder keyed(String key) => find.byKey(ValueKey(key));
+    Future<void> openGuide() async {
+      await tester.tap(keyed('app-preferences'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, l.guide));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> openStep(int step) async {
+      final tile = keyed('guide-step-$step');
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(keyed('open-beginner-guide'));
+    await tester.pumpAndSettle();
+    expect(find.text(l.guideBeginner), findsOneWidget);
+    await openStep(1);
+    final editor = keyed('text-editor');
+    expect(editor, findsOneWidget);
+    await tester.enterText(editor, '保留这段草稿');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    expect(keyed('open-beginner-guide'), findsNothing);
+
+    await openGuide();
+    final math = find.text(l.guideMathTitle);
+    await tester.ensureVisible(math);
+    expect(find.text(l.guideMathHint), findsNothing);
+    await tester.tap(math);
+    await tester.pumpAndSettle();
+    expect(find.text(l.guideMathHint), findsOneWidget);
+    await openStep(2);
+    expect(find.text(l.fontChoices), findsOneWidget);
+
+    await openGuide();
+    await openStep(3);
+    expect(keyed('generate-preview'), findsOneWidget);
+    expect(keyed('full-preview'), findsOneWidget);
+
+    await openGuide();
+    await openStep(4);
+    await tester.tap(keyed('open-export'));
+    await tester.pumpAndSettle();
+    expect(keyed('export-pdf'), findsOneWidget);
+    expect(keyed('export-zip'), findsOneWidget);
+    expect(workspace.text, '保留这段草稿');
+    expect((workspace.api as MobileTestApi).submissions, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [375.0, 1440.0]) {
     testWidgets(
       'live workbench keeps the latest draft and selected paper at $width px',
