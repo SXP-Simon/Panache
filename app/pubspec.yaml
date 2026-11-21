@@ -52,5 +52,10 @@ dependency_overrides:
 flutter:
   generate: true
   uses-material-design: true
+  fonts:
+    - family: Playfair Display
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay.ttf
   assets:
     - assets/branding/panache.png
+    - assets/illustrations/iris-quill.webp

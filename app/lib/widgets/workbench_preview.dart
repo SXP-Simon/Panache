@@ -293,7 +293,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                 border: fullscreen
                     ? null
                     : Border.all(color: colors.outlineVariant),
-                borderRadius: fullscreen ? null : BorderRadius.circular(12),
+                borderRadius: fullscreen ? null : BorderRadius.circular(28),
               ),
               clipBehavior: Clip.antiAlias,
               child: widget.pages.isEmpty
@@ -302,35 +302,33 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                             widget.backgroundBytes!,
                             fit: BoxFit.contain,
                           )
-                        : Center(
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: colors.surfaceContainerHigh,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(10),
-                                      child: Icon(
-                                        Icons.description_outlined,
-                                        size: 24,
-                                        color: colors.onSurfaceVariant,
+                        : LayoutBuilder(
+                            builder: (context, space) => Center(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/illustrations/iris-quill.webp',
+                                      height: (space.maxHeight * .48).clamp(
+                                        42.0,
+                                        300.0,
                                       ),
+                                      fit: BoxFit.contain,
+                                      excludeFromSemantics: true,
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    l.previewHint,
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colors.onSurfaceVariant,
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      l.previewHint,
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colors.onSurfaceVariant,
+                                          ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           )

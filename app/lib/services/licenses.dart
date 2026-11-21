@@ -7,6 +7,7 @@ void registerBundledLicenses() {
       'handwriting-web': 'project-MIT.txt',
       'handright / handwriting-core': 'handright-BSD-3-Clause.txt',
       '霞鹜文楷 / LXGW WenKai': 'lxgw-wenkai-OFL.txt',
+      'Playfair Display': 'PlayfairDisplay-OFL.txt',
       '霞鹜漫黑 / LXGW Marker Gothic': 'lxgw-marker-gothic-OFL.txt',
       '悠哉手写体 / Yozai': 'yozai-OFL.txt',
       '志莽行书 / Zhi Mang Xing': 'zhimangxing-OFL.txt',

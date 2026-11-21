@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/services/desktop_bootstrap.dart';
 import 'package:handwriting_app/theme/handwriting_theme.dart';
+import 'package:handwriting_app/theme/nouveau_ornament.dart';
 
 void main() {
-  test('shared UI themes use WenKai, neutral surfaces and Material 3', () {
+  test('day and night workspaces use botanical surfaces and legible type', () {
     for (final brightness in Brightness.values) {
       final theme = handwritingTheme(brightness);
       expect(theme.useMaterial3, isTrue);
@@ -15,8 +16,32 @@ void main() {
       );
       expect(
         theme.scaffoldBackgroundColor,
-        brightness == Brightness.light ? Colors.white : const Color(0x6B000000),
+        brightness == Brightness.light
+            ? NouveauColors.ivory
+            : NouveauColors.night,
       );
+      final title = theme.textTheme.titleLarge!;
+      expect(title.fontFamily, 'Playfair Display');
+      expect(
+        title.fontFamilyFallback,
+        contains(theme.textTheme.bodyMedium!.fontFamily),
+      );
+      final scheme = theme.colorScheme;
+      for (final pair in [
+        (scheme.onSurface, scheme.surface),
+        (scheme.onSurfaceVariant, scheme.surface),
+        (scheme.onPrimary, scheme.primary),
+        (scheme.onSecondaryContainer, scheme.secondaryContainer),
+      ]) {
+        final lightness = [
+          pair.$1.computeLuminance(),
+          pair.$2.computeLuminance(),
+        ]..sort();
+        expect(
+          (lightness.last + .05) / (lightness.first + .05),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
       expect(theme.colorScheme.surfaceTint, Colors.transparent);
       expect(
         theme.navigationRailTheme.selectedLabelTextStyle!.fontFamily,

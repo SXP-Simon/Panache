@@ -53,6 +53,30 @@ void main() {
     restarted.dispose();
   });
 
+  test(
+    'mode chosen during restore persists and can return to the system',
+    () async {
+      final delayed = Completer<SharedPreferences>();
+      final appearance = AppearancePreferences(open: () => delayed.future);
+      final restore = appearance.restore();
+      final save = appearance.setMode(ThemeMode.dark);
+      delayed.complete(await SharedPreferences.getInstance());
+      await restore;
+      expect(await save, isTrue);
+      expect(appearance.mode, ThemeMode.dark);
+      appearance.dispose();
+      final restarted = AppearancePreferences();
+      await restarted.restore();
+      expect(restarted.mode, ThemeMode.dark);
+      expect(await restarted.setMode(ThemeMode.system), isTrue);
+      restarted.dispose();
+      final following = AppearancePreferences();
+      await following.restore();
+      expect(following.mode, ThemeMode.system);
+      following.dispose();
+    },
+  );
+
   test('dispose while restore or save is pending is safe', () async {
     final delayed = Completer<SharedPreferences>();
     final appearance = AppearancePreferences(open: () => delayed.future);

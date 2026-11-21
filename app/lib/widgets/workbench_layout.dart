@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/nouveau_ornament.dart';
+import 'atelier_ornament.dart';
 import 'fine_preview.dart';
 import 'workbench_motion.dart';
 import 'workbench_settings.dart';
@@ -169,7 +171,7 @@ class WorkbenchLayout extends StatelessWidget {
               ? taskStatus
               : AnimatedSize(
                   duration: WorkbenchMotion.pane,
-                  curve: Curves.easeOutCubic,
+                  curve: Curves.easeInOut,
                   alignment: Alignment.topCenter,
                   child: taskStatus,
                 ),
@@ -196,7 +198,7 @@ class WorkbenchLayout extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: previewActions(context, mobile: true),
             ),
-          const Divider(height: 1),
+          const NouveauWaveDivider(height: 6),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Row(
@@ -257,43 +259,46 @@ class WorkbenchLayout extends StatelessWidget {
   ButtonStyle selectedToolStyle(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return TextButton.styleFrom(
-      backgroundColor: colors.primaryContainer,
-      foregroundColor: colors.onPrimaryContainer,
+      backgroundColor: colors.primary,
+      foregroundColor: colors.onPrimary,
     );
   }
 
   Widget wideWorkspace(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ValueListenableBuilder(
-          valueListenable: fineInspector,
-          builder: (context, inspector, _) => _wideTools(
-            context,
-            inspector?.hasSelection == true ? inspector : null,
+    return Padding(
+      padding: EdgeInsets.all(width >= 1100 ? 16 : 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ValueListenableBuilder(
+            valueListenable: fineInspector,
+            builder: (context, inspector, _) => _wideTools(
+              context,
+              inspector?.hasSelection == true ? inspector : null,
+            ),
           ),
-        ),
-        const VerticalDivider(width: 1),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: buildPreview(previewActions(context, mobile: false)),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: exportButtons(context),
+          SizedBox(width: width >= 1100 ? 16 : 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: buildPreview(previewActions(context, mobile: false)),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: exportButtons(context),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -304,37 +309,78 @@ class WorkbenchLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          width: 105,
-          child: ListView(
-            padding: const EdgeInsets.all(6),
-            children: [
-              tool(
-                context,
-                l.mobileEditor,
-                Icons.edit_outlined,
-                'edit',
-                editing && inspector == null,
-                () {
-                  inspector?.close();
-                  onTabChanged(0);
-                },
+          width: width >= 1100 ? 134 : 108,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: const Color(0x55c9a227)),
+            ),
+            child: LayoutBuilder(
+              builder: (context, bounds) => Stack(
+                children: [
+                  if (bounds.maxHeight > 570 &&
+                      width >= 1100 &&
+                      MediaQuery.textScalerOf(context).scale(16) < 24)
+                    Positioned(
+                      bottom: 16,
+                      left: 12,
+                      right: 12,
+                      child: ExcludeSemantics(
+                        child: Center(
+                          child: CustomPaint(
+                            size: const Size(94, 157),
+                            painter: AtelierBud(
+                              Theme.of(context).colorScheme.onSurfaceVariant
+                                  .withValues(alpha: .7),
+                              Theme.of(context).colorScheme.primary
+                                  .withValues(alpha: .14),
+                              Theme.of(context).colorScheme.secondary
+                                  .withValues(alpha: .34),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 12,
+                    ),
+                    children: [
+                      tool(
+                        context,
+                        l.mobileEditor,
+                        Icons.edit_outlined,
+                        'edit',
+                        editing && inspector == null,
+                        () {
+                          inspector?.close();
+                          onTabChanged(0);
+                        },
+                      ),
+                      for (final section in SettingsSection.values)
+                        tool(
+                          context,
+                          section.label(l),
+                          section.icon,
+                          section.name,
+                          !editing &&
+                              inspector == null &&
+                              section == settingsSection,
+                          () {
+                            inspector?.close();
+                            onSectionSelected(section);
+                          },
+                        ),
+                    ],
+                  ),
+                ],
               ),
-              for (final section in SettingsSection.values)
-                tool(
-                  context,
-                  section.label(l),
-                  section.icon,
-                  section.name,
-                  !editing && inspector == null && section == settingsSection,
-                  () {
-                    inspector?.close();
-                    onSectionSelected(section);
-                  },
-                ),
-            ],
+            ),
           ),
         ),
-        const VerticalDivider(width: 1),
+        SizedBox(width: width >= 1100 ? 16 : 8),
         SizedBox(
           width: (width * .29).clamp(260.0, 430.0),
           child: RetainedPaneSwitcher(

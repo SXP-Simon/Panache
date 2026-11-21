@@ -567,7 +567,16 @@ void main() {
           expect(find.widgetWithText(ListTile, l.importText), findsOneWidget);
           expect(find.widgetWithText(ListTile, l.insertImage), findsOneWidget);
           final pageBreak = find.widgetWithText(ListTile, l.pageBreak);
-          await tester.ensureVisible(pageBreak);
+          await tester.scrollUntilVisible(
+            pageBreak,
+            120,
+            scrollable: find
+                .descendant(
+                  of: find.byType(BottomSheet),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
           await tester.pumpAndSettle();
           expect(find.text(l.pageBreakHelp), findsOneWidget);
           await tester.tap(pageBreak);

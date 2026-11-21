@@ -2,7 +2,7 @@
 
 Panache 的 Flutter 客户端使用 Material Design 3 手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 随包内置 Rust FFI 引擎，生成、导入和导出可离线完成。
 
-UI 使用绿色 Material Design 3 主题，中英文统一使用霞鹜文楷。该主题字体只用于界面，纸张渲染继续使用选定的手写字体；数学预览使用数学排版组件。
+UI 采用新艺术运动风格的 Material Design 3 主题，提供象牙纸色和夜间森林色两套外观。应用设置可以切换浅色、深色或跟随系统，并记住选择。标题使用随包提供的 Playfair Display 和霞鹜文楷，纸张使用用户选定的手写字体。
 
 架构与职责划分见 [客户端架构](../docs/flutter-architecture.md)，环境安装和 Windows 工具链入口见 [移动开发环境](../scripts/MOBILE_ENVIRONMENT.md)。
 

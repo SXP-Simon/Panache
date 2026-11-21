@@ -48,6 +48,8 @@ class Workbench extends StatefulWidget {
     this.secondaryThemeColor = defaultSecondaryThemeColor,
     this.onSecondaryThemeColorChanged,
     this.onThemeColorChanged,
+    this.themeMode = ThemeMode.system,
+    this.onThemeModeChanged,
     this.reduceMotion = false,
     this.onReduceMotionChanged,
     this.initialDestination = 0,
@@ -59,6 +61,8 @@ class Workbench extends StatefulWidget {
   final Workspace? workspace;
   final UpdateController? updates;
   final Color themeColor, secondaryThemeColor;
+  final ThemeMode themeMode;
+  final Future<bool> Function(ThemeMode)? onThemeModeChanged;
   final bool reduceMotion;
   final Future<bool> Function(bool)? onReduceMotionChanged;
   final Future<bool> Function(Color)? onThemeColorChanged,
@@ -537,6 +541,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
           onToggleLocale: widget.toggleLocale,
           onToggleTheme: widget.toggleTheme,
           themeColor: widget.themeColor,
+          themeMode: widget.themeMode,
+          onThemeModeChanged: widget.onThemeModeChanged,
           secondaryThemeColor: widget.secondaryThemeColor,
           onSecondaryThemeColorChanged: widget.onSecondaryThemeColorChanged,
           reduceMotion: widget.reduceMotion,

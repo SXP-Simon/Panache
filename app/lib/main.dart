@@ -40,7 +40,6 @@ class _HandwritingAppState extends State<HandwritingApp> {
   final appearance = AppearancePreferences();
   late final updates = UpdateController(host: createUpdateHost());
   Color get themeColor => appearance.color;
-  ThemeMode mode = ThemeMode.system;
   @override
   void initState() {
     super.initState();
@@ -79,23 +78,31 @@ class _HandwritingAppState extends State<HandwritingApp> {
     reduceMotion: appearance.reduceMotion,
     onReduceMotionChanged: appearance.setReduceMotion,
     onThemeColorChanged: appearance.setColor,
-    toggleTheme: () => setState(
-      () => mode =
-          (mode == ThemeMode.dark ||
-              (mode == ThemeMode.system &&
-                  WidgetsBinding
-                          .instance
-                          .platformDispatcher
-                          .platformBrightness ==
-                      Brightness.dark))
-          ? ThemeMode.light
-          : ThemeMode.dark,
-    ),
+    themeMode: appearance.mode,
+    onThemeModeChanged: appearance.setMode,
+    toggleTheme: () {
+      final dark = switch (appearance.mode) {
+        ThemeMode.dark => true,
+        ThemeMode.light => false,
+        ThemeMode.system =>
+          WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+              Brightness.dark,
+      };
+      appearance.setMode(dark ? ThemeMode.light : ThemeMode.dark);
+    },
   );
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
+    themeAnimationStyle:
+        appearance.reduceMotion ||
+            (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+        ? AnimationStyle.noAnimation
+        : const AnimationStyle(
+            duration: Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
+          ),
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -110,7 +117,7 @@ class _HandwritingAppState extends State<HandwritingApp> {
       seedColor: themeColor,
       secondaryColor: appearance.secondaryColor,
     ),
-    themeMode: mode,
+    themeMode: appearance.mode,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(
         disableAnimations:
