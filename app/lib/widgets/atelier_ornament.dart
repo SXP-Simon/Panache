@@ -179,7 +179,7 @@ class AtelierTendrils extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 1
       ..color =
-          palette?.tertiary?.withValues(alpha: .52) ?? const Color(0x99dfc47a);
+          palette?.tertiary.withValues(alpha: .52) ?? const Color(0x99dfc47a);
     canvas.drawPath(
       Path()
         ..moveTo(-6, 86)
