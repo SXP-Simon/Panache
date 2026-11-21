@@ -12,6 +12,7 @@ import 'ink_parameter_controls.dart';
 import 'preview_image_actions.dart';
 import 'workbench_controls.dart';
 import 'preview_pager.dart';
+import 'iris_quill.dart';
 import 'fine_preview.dart';
 
 class WorkbenchPreview extends StatefulWidget {
@@ -315,14 +316,11 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Image.asset(
-                                      'assets/illustrations/iris-quill.webp',
+                                    IrisQuill(
                                       height: (space.maxHeight * .48).clamp(
                                         42.0,
                                         300.0,
                                       ),
-                                      fit: BoxFit.contain,
-                                      excludeFromSemantics: true,
                                     ),
                                     const SizedBox(height: 16),
                                     Text(

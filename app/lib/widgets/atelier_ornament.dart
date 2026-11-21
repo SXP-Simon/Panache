@@ -27,7 +27,7 @@ class AtelierIris extends CustomPainter {
           ? Color(dayColor)
           : Color.lerp(
               colors.surfaceContainerLow,
-              petal ? colors.secondary : colors.primary,
+              petal ? colors.primary : colors.secondary,
               depth,
             )!;
       canvas.drawPath(path, fill);
@@ -216,7 +216,7 @@ class AtelierTendrils extends CustomPainter {
         blade,
         Paint()
           ..color =
-              palette?.primary.withValues(alpha: .18) ??
+              palette?.secondary.withValues(alpha: .18) ??
               const Color(0x666f8850),
       );
       canvas.drawPath(blade, line);

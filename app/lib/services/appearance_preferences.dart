@@ -10,7 +10,8 @@ class AppearancePreferences extends ChangeNotifier {
   final Future<SharedPreferences> Function() _open;
   static const colorKey = 'panache.themeColor';
   static const secondaryColorKey = 'panache.secondaryThemeColor';
-  static const paletteKey = 'panache.themePalette';
+  static const paletteKey = 'panache.themePalette.v2';
+  static const _oldPaletteKey = 'panache.themePalette';
   static const modeKey = 'panache.themeMode';
   static const motionKey = 'panache.reduceMotion';
   static const guideReadKey = 'panache.quickStartRead';
@@ -72,25 +73,32 @@ class AppearancePreferences extends ChangeNotifier {
   }
 
   (Color, Color) _readPalette(SharedPreferences storage) {
-    final pair = storage.getStringList(paletteKey);
-    if (pair != null && pair.length == 2) {
+    for (final key in [paletteKey, _oldPaletteKey]) {
+      final pair = storage.getStringList(key);
+      if (pair == null || pair.length != 2) continue;
       final primary = int.tryParse(pair[0]);
       final accent = int.tryParse(pair[1]);
       if (primary != null && accent != null) {
-        return (Color(primary | 0xff000000), Color(accent | 0xff000000));
+        final colors = (
+          Color(primary | 0xff000000),
+          Color(accent | 0xff000000),
+        );
+        return key == paletteKey ? colors : _upgradeOldIris(colors);
       }
     }
-    return (
-      Color(
-        (storage.getInt(colorKey) ?? defaultThemeColor.toARGB32()) | 0xff000000,
-      ),
-      Color(
-        (storage.getInt(secondaryColorKey) ??
-                defaultSecondaryThemeColor.toARGB32()) |
-            0xff000000,
-      ),
-    );
+    // The original individual keys omitted any channel left at its default.
+    final primary = storage.getInt(colorKey) ?? 0xff2d5016;
+    final accent = storage.getInt(secondaryColorKey) ?? 0xff8b6db5;
+    return _upgradeOldIris((
+      Color(primary | 0xff000000),
+      Color(accent | 0xff000000),
+    ));
   }
+
+  (Color, Color) _upgradeOldIris((Color, Color) pair) =>
+      pair == (const Color(0xff2d5016), const Color(0xff8b6db5))
+      ? (defaultThemeColor, defaultSecondaryThemeColor)
+      : pair;
 
   Future<bool> setPalette(Color primary, Color accent) =>
       _updatePalette(primary, accent);

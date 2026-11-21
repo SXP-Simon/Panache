@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'nouveau_ornament.dart';
 
-const defaultThemeColor = NouveauColors.forest;
-const defaultSecondaryThemeColor = NouveauColors.wisteria;
+const defaultThemeColor = NouveauColors.wisteria;
+const defaultSecondaryThemeColor = NouveauColors.forest;
 
 /// Black ink layers over a single opaque, neutral workbench background.
 abstract final class NightSurfaces {
@@ -59,14 +59,14 @@ ThemeData handwritingTheme(
   final outline = surfaceTone(.45, .66);
   final base = ColorScheme.fromSeed(
     seedColor: dark && seedColor == defaultThemeColor
-        ? NouveauColors.nightSage
+        ? NouveauColors.moonIris
         : seedColor,
     brightness: brightness,
   );
   final primary = dark
-      ? (seedColor == defaultThemeColor
-            ? NouveauColors.nightSage
-            : base.primary)
+      ? (seedColor == defaultThemeColor ? NouveauColors.moonIris : base.primary)
+      : seedColor == defaultThemeColor
+      ? _contrastingInk(seedColor, NouveauColors.ivory, false)
       : _readableAccent(seedColor, surface, foreground, 0, 4.5);
   final primaryContainer = Color.alphaBlend(
     (dark ? primary : seedColor).withValues(alpha: dark ? .16 : .20),
@@ -74,14 +74,14 @@ ThemeData handwritingTheme(
   );
   final secondaryContainer = Color.alphaBlend(
     (dark && secondaryColor == defaultSecondaryThemeColor
-            ? NouveauColors.moonIris
+            ? NouveauColors.nightSage
             : secondaryColor)
         .withValues(alpha: dark ? .16 : .13),
     dark ? const Color(0xFF383B41) : const Color(0xFFFAF9F7),
   );
   final secondary = dark && secondaryColor == defaultSecondaryThemeColor
-      ? NouveauColors.moonIris
-      : _secondaryInk(secondaryColor, secondaryContainer, dark);
+      ? NouveauColors.nightSage
+      : _contrastingInk(secondaryColor, secondaryContainer, dark);
   final trim = iris ? NouveauColors.gold : hue.withLightness(.60).toColor();
   final border = Color.lerp(
     surfaceTone(.81, .325),
@@ -326,7 +326,7 @@ Color _onSolidColor(Color background) =>
 
 // Keep the chosen hue and saturation, adjusting lightness only when the
 // selected control's label would otherwise fall below 4.5:1 contrast.
-Color _secondaryInk(Color seed, Color container, bool dark) {
+Color _contrastingInk(Color seed, Color container, bool dark) {
   final background = container.computeLuminance() + .05;
   bool readable(Color color) {
     final ink = color.computeLuminance() + .05;

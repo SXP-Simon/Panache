@@ -58,4 +58,3 @@ flutter:
         - asset: assets/fonts/PlayfairDisplay.ttf
   assets:
     - assets/branding/panache.png
-    - assets/illustrations/iris-quill.webp

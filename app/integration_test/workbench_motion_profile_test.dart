@@ -73,7 +73,7 @@ void main() {
     final hz = display.refreshRate;
     expect(hz, greaterThan(0));
     SharedPreferences.setMockInitialValues({});
-    final plate = await rootBundle.load('assets/illustrations/iris-quill.webp');
+    final plate = await rootBundle.load('assets/branding/panache.png');
     final page = Uint8List.sublistView(plate);
     final workspace = Workspace()
       ..text = '墨色与鸢尾'

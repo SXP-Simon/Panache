@@ -4,8 +4,48 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:handwriting_app/services/appearance_preferences.dart';
+import 'package:handwriting_app/theme/handwriting_theme.dart';
 
 void main() {
+  test(
+    'old Iris becomes petal-first while custom palettes retain their order',
+    () async {
+      const green = Color(0xff2d5016), violet = Color(0xff8b6db5);
+      final oldPair = [
+        green.toARGB32().toString(),
+        violet.toARGB32().toString(),
+      ];
+      for (final stored in <Map<String, Object>>[
+        {},
+        {'panache.themePalette': oldPair},
+        {
+          AppearancePreferences.colorKey: green.toARGB32(),
+          AppearancePreferences.secondaryColorKey: violet.toARGB32(),
+        },
+      ]) {
+        SharedPreferences.setMockInitialValues(stored);
+        final prefs = AppearancePreferences();
+        await prefs.restore();
+        expect((prefs.color, prefs.secondaryColor), (violet, green));
+        await prefs.setPalette(green, violet);
+        final restarted = AppearancePreferences();
+        await restarted.restore();
+        expect((restarted.color, restarted.secondaryColor), (green, violet));
+        restarted.dispose();
+        prefs.dispose();
+      }
+      SharedPreferences.setMockInitialValues({
+        AppearancePreferences.colorKey: 0xff347566,
+      });
+      final partial = AppearancePreferences();
+      await partial.restore();
+      expect(
+        (partial.color, partial.secondaryColor),
+        (const Color(0xff347566), defaultThemeColor),
+      );
+      partial.dispose();
+    },
+  );
   setUp(
     () => SharedPreferences.setMockInitialValues({
       AppearancePreferences.colorKey: 0xFF123456,

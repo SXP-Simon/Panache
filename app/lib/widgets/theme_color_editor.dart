@@ -242,7 +242,7 @@ class _PaletteProof extends StatelessWidget {
 
 /// A two-ink botanical proof. Both colors come directly from the selection.
 class _PaletteFlower extends CustomPainter {
-  const _PaletteFlower(this.leaf, this.petals);
+  const _PaletteFlower(this.petals, this.leaf);
   final Color leaf, petals;
 
   @override
