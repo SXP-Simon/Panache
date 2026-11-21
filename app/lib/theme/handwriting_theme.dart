@@ -64,7 +64,9 @@ ThemeData handwritingTheme(
     brightness: brightness,
   );
   final primary = dark
-      ? (seedColor == defaultThemeColor ? NouveauColors.nightSage : base.primary)
+      ? (seedColor == defaultThemeColor
+            ? NouveauColors.nightSage
+            : base.primary)
       : _readableAccent(seedColor, surface, foreground, 0, 4.5);
   final primaryContainer = Color.alphaBlend(
     (dark ? primary : seedColor).withValues(alpha: dark ? .16 : .20),
@@ -79,13 +81,7 @@ ThemeData handwritingTheme(
   );
   final secondary = dark && secondaryColor == defaultSecondaryThemeColor
       ? NouveauColors.moonIris
-      : _readableAccent(
-          secondaryColor,
-          secondaryContainer,
-          foreground,
-          dark ? .55 : .22,
-          4.5,
-        );
+      : _secondaryInk(secondaryColor, secondaryContainer, dark);
   final trim = iris ? NouveauColors.gold : hue.withLightness(.60).toColor();
   final border = Color.lerp(
     surfaceTone(.81, .325),
@@ -148,11 +144,36 @@ ThemeData handwritingTheme(
       scrolledUnderElevation: 0,
     ),
     dividerTheme: DividerThemeData(color: border),
+    sliderTheme: SliderThemeData(
+      activeTrackColor: secondary,
+      thumbColor: secondary,
+      inactiveTrackColor: secondaryContainer,
+      activeTickMarkColor: scheme.onSecondary,
+      inactiveTickMarkColor: scheme.onSecondaryContainer,
+      overlayColor: secondary.withValues(alpha: .12),
+    ),
+    switchTheme: SwitchThemeData(
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) =>
+            states.contains(WidgetState.selected) &&
+                !states.contains(WidgetState.disabled)
+            ? secondary
+            : null,
+      ),
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) =>
+            states.contains(WidgetState.selected) &&
+                !states.contains(WidgetState.disabled)
+            ? scheme.onSecondary
+            : null,
+      ),
+    ),
     chipTheme: ChipThemeData(
       shape: const StadiumBorder(),
       side: BorderSide(color: border),
-      selectedColor: primaryContainer,
-      checkmarkColor: foreground,
+      selectedColor: secondaryContainer,
+      secondarySelectedColor: secondaryContainer,
+      checkmarkColor: secondary,
     ),
     inputDecorationTheme: InputDecorationTheme(
       isDense: true,
@@ -160,7 +181,7 @@ ThemeData handwritingTheme(
       fillColor: dark ? NightSurfaces.writing : scheme.surfaceContainerLowest,
       border: fieldBorder(border),
       enabledBorder: fieldBorder(border),
-      focusedBorder: fieldBorder(primary, width: 2),
+      focusedBorder: fieldBorder(secondary, width: 2),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     ),
     cardTheme: CardThemeData(
@@ -242,16 +263,15 @@ ThemeData handwritingTheme(
           (states) =>
               states.contains(WidgetState.selected) &&
                   !states.contains(WidgetState.disabled)
-              ? primaryContainer
+              ? secondaryContainer
               : null,
         ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (states) =>
-              states.contains(WidgetState.selected) &&
-                  !states.contains(WidgetState.disabled)
-              ? foreground
-              : null,
-        ),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return null;
+          return states.contains(WidgetState.selected)
+              ? scheme.onSecondaryContainer
+              : scheme.onSurfaceVariant;
+        }),
       ),
     ),
     dialogTheme: DialogThemeData(backgroundColor: raised, shape: cardShape),
@@ -303,6 +323,30 @@ ThemeData handwritingTheme(
 
 Color _onSolidColor(Color background) =>
     background.computeLuminance() > .179 ? Colors.black : Colors.white;
+
+// Keep the chosen hue and saturation, adjusting lightness only when the
+// selected control's label would otherwise fall below 4.5:1 contrast.
+Color _secondaryInk(Color seed, Color container, bool dark) {
+  final background = container.computeLuminance() + .05;
+  bool readable(Color color) {
+    final ink = color.computeLuminance() + .05;
+    return (dark ? ink / background : background / ink) >= 4.5;
+  }
+
+  if (readable(seed)) return seed;
+  final hsl = HSLColor.fromColor(seed);
+  var near = hsl.lightness;
+  var far = dark ? 1.0 : 0.0;
+  for (var i = 0; i < 8; i++) {
+    final middle = (near + far) / 2;
+    if (readable(hsl.withLightness(middle).toColor())) {
+      far = middle;
+    } else {
+      near = middle;
+    }
+  }
+  return hsl.withLightness(far).toColor();
+}
 
 Color _readableAccent(
   Color seed,

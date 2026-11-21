@@ -161,7 +161,7 @@
   "editIllustrationHelp": "Tap an illustration below to resize or remove this occurrence.",
   "invalidIllustration": "Cannot read this image, or it is too large. Choose a PNG, JPEG, WebP, GIF or BMP up to 12 MB and 16 megapixels.",
   "themeColor": "Theme colors",
-  "themeColorHint": "Interface colors adapt to light and dark modes. Set paper and ink separately in the workbench.",
+  "themeColorHint": "The primary color highlights generation and navigation. The accent color highlights sliders, switches, and parameter choices. Set paper and ink separately in the workbench.",
   "themeColorHex": "HEX color",
   "themeColorInvalid": "Enter six hexadecimal digits, e.g. #3C96CA",
   "paletteIris": "Iris",

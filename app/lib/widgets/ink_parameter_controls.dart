@@ -148,6 +148,11 @@ class _NumericSliderState extends State<NumericSlider> {
                     controller: _controller,
                     focusNode: _focus,
                     enabled: widget.onChanged != null,
+                    style: widget.onChanged == null
+                        ? null
+                        : TextStyle(
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
                     keyboardType: TextInputType.numberWithOptions(
                       decimal: digits > 0,
                       signed: min < 0,

@@ -104,9 +104,9 @@ class NouveauIconSeal extends StatelessWidget {
     return SizedBox.square(
       dimension: 36,
       child: CustomPaint(
-        painter: _SealPainter(colors.primaryContainer, colors.tertiary),
+        painter: _SealPainter(colors.secondaryContainer, colors.secondary),
         child: Center(
-          child: Icon(icon, size: 17, color: colors.onPrimaryContainer),
+          child: Icon(icon, size: 17, color: colors.onSecondaryContainer),
         ),
       ),
     );
