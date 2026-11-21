@@ -39,8 +39,8 @@ Panache 是基于 **Flutter + Rust** 的开源手写体生成器。把课堂笔�
   </thead>
   <tbody>
     <tr>
-      <td valign="top"><a href="docs/assets/images/panache-themes-light-025bb236deac.webp"><img src="docs/assets/images/panache-themes-light-025bb236deac.webp" width="460" alt="浅色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，右侧显示生成前的矢量占位插画，从上至下排列"></a></td>
-      <td valign="top"><a href="docs/assets/images/panache-themes-dark-566740cb37a6.webp"><img src="docs/assets/images/panache-themes-dark-566740cb37a6.webp" width="460" alt="深色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，右侧显示生成前的矢量占位插画，从上至下排列"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-light-d13d5ad454b9.webp"><img src="docs/assets/images/panache-themes-light-d13d5ad454b9.webp" width="460" alt="浅色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列。右侧是用志莽行书排成三节的「桂枝和玫瑰」手稿"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-138a044cb61a.webp"><img src="docs/assets/images/panache-themes-dark-138a044cb61a.webp" width="460" alt="深色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列。右侧是用志莽行书排成三节的「桂枝和玫瑰」手稿"></a></td>
     </tr>
   </tbody>
 </table>

@@ -37,8 +37,8 @@ Light mode uses a paper-white background with a subtle tint from the primary col
   </thead>
   <tbody>
     <tr>
-      <td valign="top"><a href="docs/assets/images/panache-themes-light-025bb236deac.webp"><img src="docs/assets/images/panache-themes-light-025bb236deac.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes from top to bottom, each showing its vector illustration before handwriting is generated"></a></td>
-      <td valign="top"><a href="docs/assets/images/panache-themes-dark-566740cb37a6.webp"><img src="docs/assets/images/panache-themes-dark-566740cb37a6.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes from top to bottom, each showing its vector illustration before handwriting is generated"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-light-d13d5ad454b9.webp"><img src="docs/assets/images/panache-themes-light-d13d5ad454b9.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes from top to bottom, each showing the same three-stanza Chinese manuscript in Zhi Mang Xing calligraphy"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-138a044cb61a.webp"><img src="docs/assets/images/panache-themes-dark-138a044cb61a.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes from top to bottom, each showing the same three-stanza Chinese manuscript in Zhi Mang Xing calligraphy"></a></td>
     </tr>
   </tbody>
 </table>
