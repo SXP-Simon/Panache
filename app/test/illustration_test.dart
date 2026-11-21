@@ -187,6 +187,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(workspace.text, '![插图 1|50%]\n![插图 1|120%]\n');
         expect(workspace.images.containsKey('1'), isTrue);
+        // The workspace saves edits after its own debounce, independently of
+        // how quickly the dialog animation settles.
+        await tester.pump(const Duration(milliseconds: 400));
         expect(tester.takeException(), isNull);
       },
     );
