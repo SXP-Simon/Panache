@@ -234,7 +234,14 @@ class WorkbenchShell extends StatelessWidget {
                 ),
               ],
             );
-            return content;
+            return dark
+                ? DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: NightSurfaces.backdrop(colors.surface),
+                    ),
+                    child: content,
+                  )
+                : content;
           },
         ),
       ),

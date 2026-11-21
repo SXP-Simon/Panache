@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/handwriting_theme.dart';
 import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
 import 'workbench_controls.dart';
@@ -97,10 +98,14 @@ class WorkbenchEditor extends StatelessWidget {
                   identifier: 'text-input',
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: colors.surface,
+                      color: theme.brightness == Brightness.dark
+                          ? NightSurfaces.writing
+                          : colors.surface,
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: colors.tertiary.withValues(alpha: .5),
+                        color: theme.brightness == Brightness.dark
+                            ? colors.outlineVariant
+                            : colors.tertiary.withValues(alpha: .5),
                       ),
                     ),
                     child: CustomPaint(
