@@ -1,0 +1,8 @@
+<section class="gallery {{ 'wrap' if not key else '' }}" data-gallery>
+<div class="gallery-title"><h2>{{ 'Workbench palettes' if en else '工作台配色' }}</h2><p>{{ 'One manuscript, six views.' if en else '同一页手稿，六种工作台外观。' }}</p></div>
+<div class="selectors" hidden><div role="group" aria-label="{{ 'Palette' if en else '配色' }}">
+{% for id,zh,title in [('iris','鸢尾','Iris'),('celadon','青瓷','Celadon'),('coral','珊瑚玫瑰','Coral rose')] %}<button type="button" data-preset="{{ id }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><i class="{{ id }}"></i>{{ title if en else zh }}</button>{% endfor %}</div>
+<div role="group" aria-label="{{ 'Appearance' if en else '明暗模式' }}"><button type="button" data-mode="light" aria-pressed="true">{{ 'Light' if en else '浅色' }}</button><button type="button" data-mode="dark" aria-pressed="false">{{ 'Dark' if en else '深色' }}</button></div></div>
+<figure class="screen"><a href="{{ asset(gallery['iris-light']) }}"><img width="1280" height="800" src="{{ asset(gallery['iris-light']) }}" loading="lazy" alt="{{ 'Iris · Light' if en else '鸢尾 · 浅色' }}"></a></figure>
+<script type="application/json">{{ gallery|tojson }}</script>
+</section>

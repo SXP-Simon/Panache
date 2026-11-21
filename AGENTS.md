@@ -24,6 +24,7 @@ Panache 的 Flutter + Rust 跨平台手写体生成器。Android/iOS 使用 C AB
 - `scripts/`：Python 和 shell 构建脚本，运行应用无需 Python。
 - `deploy/rust/`：Docker 与独立服务部署。
 - `VERSION`：产品版本；不要手动改版本值。
+- `website/`：项目官网与工坊手记。中英文正文分别在 `content/zh/`、`content/en/`，主题展示使用 README 同一组图。安装 `website/requirements.txt` 后用 `python website/build.py --out <输出目录>` 构建；`main` 的站点变更通过 GitHub Pages 发布。
 
 ## 开发与验证
 

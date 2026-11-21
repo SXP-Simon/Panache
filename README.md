@@ -6,7 +6,7 @@
 
 Panache 是基于 **Flutter + Rust** 的开源手写体生成器。把课堂笔记、实验报告里的正文、数学公式、表格和电路图排到纸上，再保存为手写稿。
 
-[下载客户端](https://github.com/SXP-Simon/Panache/releases/latest) · [使用指南](app/README.md#功能入口) · [自行部署](deploy/rust/README.md)
+[下载客户端](https://github.com/SXP-Simon/Panache/releases/latest) · [项目官网与工坊手记](https://heliannuits.me/Panache/) · [使用指南](app/README.md#功能入口) · [自行部署](deploy/rust/README.md)
 
 
 <table>

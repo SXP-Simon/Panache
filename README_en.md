@@ -4,7 +4,7 @@
 
 Panache is an open-source handwriting generator built with **Flutter and Rust**. Lay out class notes and lab reports with prose, formulas, tables, and circuit diagrams, then export handwritten pages.
 
-[Download](https://github.com/SXP-Simon/Panache/releases/latest) · [Client guide](app/README.md) · [Self-hosting](deploy/rust/README.md)
+[Download](https://github.com/SXP-Simon/Panache/releases/latest) · [Project site and journal](https://heliannuits.me/Panache/en/) · [Client guide](app/README.md) · [Self-hosting](deploy/rust/README.md)
 
 
 <table>
