@@ -2,14 +2,14 @@
 
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { nextTag, planRelease } = require("../release-plan.cjs");
+const { planRelease } = require("../release-plan.cjs");
 const { REQUIRED_WORKFLOWS, androidVersionCode, verifyAndroidPackage } = require("../flutter-release.cjs");
 
 const repository = "SXP-Simon/Panache";
 const oldSha = "a".repeat(40);
 const sha = "b".repeat(40);
 const stableTag = "v1.15.0";
-const input = { repository, sha, signing: true };
+const input = { repository, sha, signing: true, manualTag: "v1.16.0" };
 
 function run(overrides = {}) {
   return {
@@ -50,13 +50,10 @@ function fixture() {
   };
 }
 
-test("versions continue from the shipped Flutter manifest and follow conventional commits", () => {
-  const commit = (subject, body = "") => ({ subject, body });
-  assert.equal(nextTag(stableTag, [commit("ci: migrate branches")]), null);
-  assert.equal(nextTag(stableTag, [commit("fix(app): restore preview")]), "v1.15.1");
-  assert.equal(nextTag(stableTag, [commit("feat(app): improve preview")]), "v1.16.0");
-  assert.equal(nextTag(stableTag, [commit("feat!: change format")]), "v2.0.0");
-  assert.equal(nextTag(stableTag, [commit("feat: change format", "BREAKING CHANGE: format")]), "v2.0.0");
+test("a release requires an explicitly supplied stable version", async () => {
+  for (const manualTag of [undefined, "", "v1.16.0-beta.1"]) {
+    await assert.rejects(planRelease({ ...input, manualTag }, fixture()), /stable semantic release tag/);
+  }
 });
 
 test("a release pins exact successful main checks and preserves Android upgrade codes", async () => {
@@ -86,10 +83,10 @@ test("missing, fork, old branch, PR, wrong SHA and unsuccessful checks cannot pu
   }
 });
 
-test("migration-only or superseded pushes skip automatic releases and manual tags must increase", async () => {
+test("manual releases require current, unreleased main and an increasing version", async () => {
   const io = { ...fixture(), history: () => [{ subject: "ci: migrate release", body: "" }] };
-  assert.equal(await planRelease(input, io), null);
-  assert.equal(await planRelease(input, { ...fixture(), mainSha: () => oldSha }), null);
+  await assert.rejects(planRelease(input, { ...io, mainSha: () => oldSha }), /current main commit/);
+  await assert.rejects(planRelease({ ...input, sha: oldSha }, { ...io, mainSha: () => oldSha }), /already released/);
   await assert.rejects(planRelease({ ...input, manualTag: stableTag }, io), /must increase/);
   const { manifest } = await planRelease({ ...input, signing: false, manualTag: "v1.15.1" }, io);
   assert.equal(manifest.release_tag, "v1.15.1");

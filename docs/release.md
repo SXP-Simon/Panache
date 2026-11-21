@@ -2,7 +2,7 @@
 
 [Publish Flutter Release](../.github/workflows/publish_flutter.yml) 使用 `main` 上的确切提交构建。Flutter UI、Rust 后端和 Flutter Mobile 必须在同一仓库、分支和 SHA 上全部通过。每次发布将 SHA、检查运行 ID 和版本固定在 `Flutter-source.json`，包旁的 JSON 记录 SHA-256。
 
-自动发布从上一个稳定 Release 的 Flutter SHA 起识别常规提交。功能升次版本，修复和性能变更升补丁版本，破坏性变更升主版本。只改发布流程时不会自动发包。也可在 Actions 手动运行 Publish Flutter Release，选择 `main` 并填写递增的 `vX.Y.Z`。任务中断后可重试同一提交产生的草稿。通过版本与签名校验并上传全部适用包后，CI 才公开 Release。
+推送到 `main` 后，GitHub Actions 会对相关改动运行 CI。准备发版时，在 Actions 中打开 **Publish Flutter Release**，点击 **Run workflow**，选择 `main` 并填写比上次发布更高的稳定版本号，例如 `v1.18.1`。工作流会核验所选提交的三项检查，并从上次发布的源码提交起收集变更说明。任务中断后可重试同一提交产生的草稿。通过版本与签名校验并上传全部适用包后，CI 才公开 Release。
 
 安装包包括 Windows x64、Linux x64、macOS arm64 和已配置正式签名时的 Android arm64-v8a / x86_64。历史 Release 和已有下载链接继续保留。旧 Web/Electron 源码可以在 `backup` 查看。
 

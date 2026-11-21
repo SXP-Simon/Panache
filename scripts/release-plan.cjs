@@ -4,47 +4,20 @@ const fs = require("node:fs");
 const { execFileSync, spawnSync } = require("node:child_process");
 const { MANIFEST, REQUIRED_WORKFLOWS, approvedRun, releaseVersion, sourceSha, validateManifest, waitForWorkflow } = require("./flutter-release.cjs");
 
-function nextTag(previousTag, commits) {
-  const { version } = releaseVersion(previousTag);
-  const types = commits.map(({ subject, body }) => {
-    const header = /^([a-z]+)(?:\([^)\n]+\))?(!)?: /u.exec(subject);
-    if (header?.[2] || /^BREAKING[ -]CHANGE:/mu.test(body)) return 3;
-    if (header?.[1] === "feat") return 2;
-    return ["fix", "perf", "revert"].includes(header?.[1]) ? 1 : 0;
-  });
-  const level = Math.max(0, ...types);
-  if (!level) return null;
-  const [major, minor, patch] = version.split(".").map(Number);
-  const next = [
-    null,
-    [major, minor, patch + 1],
-    [major, minor + 1, 0],
-    [major + 1, 0, 0],
-  ][level];
-  const tag = "v" + next.join(".");
-  releaseVersion(tag);
-  return tag;
-}
-
 async function planRelease({ repository, sha, manualTag, signing }, io) {
   sourceSha(sha);
-  // Keep the trigger's SHA fixed. A newer main push will plan its own release.
+  const version = releaseVersion(manualTag);
   if (await io.mainSha() !== sha) {
-    if (manualTag) throw new Error("Manual releases require the current main commit.");
-    return null;
+    throw new Error("Manual releases require the current main commit.");
   }
   const previous = await io.latest();
   const pin = previous.assets.find((asset) => asset.name === MANIFEST);
   if (!pin) throw new Error("The latest stable release has no Flutter source manifest.");
   const baseline = validateManifest(await io.manifest(pin.id), repository, previous.tag_name);
   if (sha === baseline.flutter_sha) {
-    if (manualTag) throw new Error("This Flutter commit was already released.");
-    return null;
+    throw new Error("This Flutter commit was already released.");
   }
   const commits = await io.history(baseline.flutter_sha, sha);
-  const tag = manualTag || nextTag(previous.tag_name, commits);
-  if (!tag) return null;
-  const version = releaseVersion(tag);
   if (version.build_number <= baseline.build_number) throw new Error("Release versions must increase.");
 
   const qualityRuns = {};
@@ -56,7 +29,7 @@ async function planRelease({ repository, sha, manualTag, signing }, io) {
       schema_version: 1,
       repository,
       product_name: "Panache",
-      release_tag: tag,
+      release_tag: manualTag,
       ...version,
       flutter_sha: sha,
       quality_runs: qualityRuns,
@@ -110,10 +83,6 @@ async function main() {
   const plan = await planRelease({
     repository, sha: process.env.SOURCE_SHA, manualTag: process.env.MANUAL_TAG, signing,
   }, github(repository));
-  if (!plan) {
-    console.log("No new Flutter release is required.");
-    return;
-  }
   const manifest = plan.manifest;
   fs.mkdirSync("release-plan", { recursive: true });
   fs.writeFileSync("release-plan/" + MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
@@ -135,5 +104,5 @@ async function main() {
   ].join("\n"));
 }
 
-module.exports = { nextTag, planRelease };
+module.exports = { planRelease };
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });

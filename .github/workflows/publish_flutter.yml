@@ -1,10 +1,6 @@
 name: Publish Flutter Release
 
 on:
-  workflow_run:
-    workflows: ["Flutter Mobile"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
@@ -26,13 +22,7 @@ env:
 
 jobs:
   resolve:
-    if: >-
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-      || (github.event_name == 'workflow_run'
-          && github.event.workflow_run.conclusion == 'success'
-          && github.event.workflow_run.event == 'push'
-          && github.event.workflow_run.head_branch == 'main'
-          && github.event.workflow_run.head_repository.full_name == github.repository)
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -44,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -54,7 +44,7 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          SOURCE_SHA: ${{ github.sha }}
           MANUAL_TAG: ${{ inputs.tag }}
           ANDROID_SIGNING_READY: ${{ secrets.HANDWRITING_ANDROID_KEYSTORE_BASE64 != '' && secrets.HANDWRITING_ANDROID_STORE_PASSWORD != '' && secrets.HANDWRITING_ANDROID_KEY_ALIAS != '' && secrets.HANDWRITING_ANDROID_KEY_PASSWORD != '' }}
         run: node scripts/release-plan.cjs
