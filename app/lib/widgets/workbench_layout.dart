@@ -201,37 +201,88 @@ class WorkbenchLayout extends StatelessWidget {
           const NouveauWaveDivider(height: 6),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
+            child: Column(
               children: [
-                for (final (i, key, icon, label) in [
-                  (0, 'back-to-editor', Icons.edit_outlined, l.mobileEditor),
-                  (1, 'open-paper', Icons.tune, l.parametersShort),
-                  (
-                    2,
-                    'open-preview',
-                    Icons.visibility_outlined,
-                    l.mobilePreview,
-                  ),
-                ])
-                  Expanded(
-                    child: Semantics(
-                      selected: mobileTab == i,
-                      child: TextButton(
-                        key: ValueKey(key),
-                        style: mobileTab == i
-                            ? selectedToolStyle(context)
-                            : null,
-                        onPressed: () => onTabChanged(i),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(icon, size: 20),
-                            Text(label, textAlign: TextAlign.center),
-                          ],
+                Row(
+                  children: [
+                    for (final (i, key, icon, label) in [
+                      (
+                        0,
+                        'back-to-editor',
+                        Icons.edit_outlined,
+                        l.mobileEditor,
+                      ),
+                      (1, 'open-paper', Icons.tune, l.parametersShort),
+                      (
+                        2,
+                        'open-preview',
+                        Icons.visibility_outlined,
+                        l.mobilePreview,
+                      ),
+                    ])
+                      Expanded(
+                        child: Semantics(
+                          selected: mobileTab == i,
+                          child: TextButton(
+                            key: ValueKey(key),
+                            style: mobileTab == i
+                                ? selectedToolStyle(context)
+                                : null,
+                            onPressed: () => onTabChanged(i),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AnimatedSlide(
+                                  offset: mobileTab == i
+                                      ? const Offset(0, -.1)
+                                      : Offset.zero,
+                                  duration:
+                                      MediaQuery.disableAnimationsOf(context)
+                                      ? Duration.zero
+                                      : WorkbenchMotion.selection,
+                                  curve: WorkbenchMotion.enter,
+                                  child: Icon(icon, size: 20),
+                                ),
+                                Text(label, textAlign: TextAlign.center),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(
+                  height: 4,
+                  width: double.infinity,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / 3,
+                      child: AnimatedSlide(
+                        offset: Offset(
+                          mobileTab.toDouble() *
+                              (Directionality.of(context) == TextDirection.rtl
+                                  ? -1
+                                  : 1),
+                          0,
+                        ),
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : WorkbenchMotion.selection,
+                        curve: WorkbenchMotion.enter,
+                        child: Center(
+                          child: DecoratedBox(
+                            decoration: ShapeDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: const StadiumBorder(),
+                            ),
+                            child: const SizedBox(width: 22, height: 3),
+                          ),
                         ),
                       ),
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -314,7 +365,11 @@ class WorkbenchLayout extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0x55c9a227)),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.outlineVariant
+                    : const Color(0x55c9a227),
+              ),
             ),
             child: LayoutBuilder(
               builder: (context, bounds) => Stack(
@@ -426,7 +481,14 @@ class WorkbenchLayout extends StatelessWidget {
       onPressed: select,
       child: Row(
         children: [
-          Icon(icon, size: 18),
+          AnimatedSlide(
+            offset: selected ? const Offset(.15, 0) : Offset.zero,
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : WorkbenchMotion.selection,
+            curve: WorkbenchMotion.enter,
+            child: Icon(icon, size: 18),
+          ),
           const SizedBox(width: 6),
           Flexible(child: Text(title)),
         ],

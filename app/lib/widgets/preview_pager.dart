@@ -66,6 +66,13 @@ class _PreviewPagerState extends State<PreviewPager> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (reduced && _target != null) _move(animate: false);
+  }
+
+  @override
   void didUpdateWidget(PreviewPager oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.pages, widget.pages)) {
@@ -98,7 +105,7 @@ class _PreviewPagerState extends State<PreviewPager> {
         await _pager.animateToPage(
           destination,
           duration: WorkbenchMotion.page,
-          curve: Curves.easeOutCubic,
+          curve: WorkbenchMotion.enter,
         );
       }
       if (mounted && ticket == _navigation) _target = null;
@@ -191,7 +198,11 @@ class _PreviewPagerState extends State<PreviewPager> {
               icon: const Icon(Icons.chevron_left),
               label: Text(l.previousPage),
             ),
-            Text('${_selected + 1} / ${widget.pages.length}'),
+            _PageNumber(
+              page: _selected,
+              count: widget.pages.length,
+              pager: _pager,
+            ),
             TextButton.icon(
               key: const ValueKey('preview-next'),
               onPressed: _selected < widget.pages.length - 1
@@ -213,6 +224,56 @@ class _PreviewPagerState extends State<PreviewPager> {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Roll the counter directly from the physical page position, including drags.
+class _PageNumber extends StatelessWidget {
+  const _PageNumber({
+    required this.page,
+    required this.count,
+    required this.pager,
+  });
+  final PageController pager;
+  final int page, count;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = '${page + 1} / $count';
+    if (MediaQuery.disableAnimationsOf(context)) return Text(label);
+    return Semantics(
+      label: label,
+      child: ExcludeSemantics(
+        child: ClipRect(
+          child: ListenableBuilder(
+            listenable: pager,
+            builder: (_, _) {
+              final position =
+                  (pager.hasClients && pager.position.hasContentDimensions
+                          ? pager.page ?? page.toDouble()
+                          : page.toDouble())
+                      .clamp(0.0, count - 1.0);
+              final first = position.floor().clamp(0, count - 1);
+              final fraction = position - first;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  FractionalTranslation(
+                    translation: Offset(0, -fraction),
+                    child: Text('${first + 1} / $count'),
+                  ),
+                  if (fraction > 0 && first + 1 < count)
+                    FractionalTranslation(
+                      translation: Offset(0, 1 - fraction),
+                      child: Text('${first + 2} / $count'),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }
@@ -308,7 +369,7 @@ class _ZoomablePageState extends State<_ZoomablePage>
               _transform.value.getTranslation().length > .1
         : _scale > 1.01;
     final changed = zoomed != _zoomed;
-    if (!changed && !widget.readerMode) return;
+    if (!changed) return;
     setState(() => _zoomed = zoomed);
     if (changed && widget.active) widget.onZoomChanged(zoomed);
   }
@@ -509,40 +570,43 @@ class _ZoomablePageState extends State<_ZoomablePage>
     return Column(
       children: [
         Expanded(child: viewer),
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            TextButton.icon(
-              key: const ValueKey('reader-zoom-out'),
-              onPressed: _scale > _minScale + .001
-                  ? () => _zoomTo(_scale / 1.5, _viewport.center(Offset.zero))
-                  : null,
-              icon: const Icon(Icons.zoom_out),
-              label: Text(l.previewZoomOut),
-            ),
-            Tooltip(
-              message: l.previewZoomRatioHint,
-              child: Text(
-                '${(_scale * 100).round()}%',
-                key: const ValueKey('reader-zoom-ratio'),
+        ListenableBuilder(
+          listenable: _transform,
+          builder: (_, _) => Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton.icon(
+                key: const ValueKey('reader-zoom-out'),
+                onPressed: _scale > _minScale + .001
+                    ? () => _zoomTo(_scale / 1.5, _viewport.center(Offset.zero))
+                    : null,
+                icon: const Icon(Icons.zoom_out),
+                label: Text(l.previewZoomOut),
               ),
-            ),
-            TextButton.icon(
-              key: const ValueKey('reader-zoom-in'),
-              onPressed: _scale < _maxScale - .001
-                  ? () => _zoomTo(_scale * 1.5, _viewport.center(Offset.zero))
-                  : null,
-              icon: const Icon(Icons.zoom_in),
-              label: Text(l.previewZoomIn),
-            ),
-            TextButton.icon(
-              key: const ValueKey('preview-reset-zoom'),
-              onPressed: _reset,
-              icon: const Icon(Icons.fit_screen_outlined),
-              label: Text(l.resetPreviewZoom),
-            ),
-          ],
+              Tooltip(
+                message: l.previewZoomRatioHint,
+                child: Text(
+                  '${(_scale * 100).round()}%',
+                  key: const ValueKey('reader-zoom-ratio'),
+                ),
+              ),
+              TextButton.icon(
+                key: const ValueKey('reader-zoom-in'),
+                onPressed: _scale < _maxScale - .001
+                    ? () => _zoomTo(_scale * 1.5, _viewport.center(Offset.zero))
+                    : null,
+                icon: const Icon(Icons.zoom_in),
+                label: Text(l.previewZoomIn),
+              ),
+              TextButton.icon(
+                key: const ValueKey('preview-reset-zoom'),
+                onPressed: _reset,
+                icon: const Icon(Icons.fit_screen_outlined),
+                label: Text(l.resetPreviewZoom),
+              ),
+            ],
+          ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

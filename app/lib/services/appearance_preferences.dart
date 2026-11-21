@@ -10,6 +10,7 @@ class AppearancePreferences extends ChangeNotifier {
   final Future<SharedPreferences> Function() _open;
   static const colorKey = 'panache.themeColor';
   static const secondaryColorKey = 'panache.secondaryThemeColor';
+  static const paletteKey = 'panache.themePalette';
   static const modeKey = 'panache.themeMode';
   static const motionKey = 'panache.reduceMotion';
   static const guideReadKey = 'panache.quickStartRead';
@@ -22,6 +23,7 @@ class AppearancePreferences extends ChangeNotifier {
   Color color = defaultThemeColor;
   Color secondaryColor = defaultSecondaryThemeColor;
   int _secondaryRevision = 0;
+  int _paletteRevision = 0;
   bool saveFailed = false;
   bool _disposed = false;
   int _revision = 0;
@@ -39,8 +41,7 @@ class AppearancePreferences extends ChangeNotifier {
       final preferences = await _open();
       if (_disposed) return;
       if (preferences.getBool(guideReadKey) == true) _guideRead = true;
-      final value = preferences.getInt(colorKey);
-      final secondaryValue = preferences.getInt(secondaryColorKey);
+      final (storedPrimary, storedSecondary) = _readPalette(preferences);
       if (modeRevision == _modeRevision) {
         mode = switch (preferences.getString(modeKey)) {
           'light' => ThemeMode.light,
@@ -51,11 +52,9 @@ class AppearancePreferences extends ChangeNotifier {
       if (motionRevision == _motionRevision) {
         reduceMotion = preferences.getBool(motionKey) ?? false;
       }
-      if (revision == _revision && value != null) {
-        color = Color(value | 0xFF000000);
-      }
-      if (secondaryRevision == _secondaryRevision && secondaryValue != null) {
-        secondaryColor = Color(secondaryValue | 0xFF000000);
+      if (revision == _revision) color = storedPrimary;
+      if (secondaryRevision == _secondaryRevision) {
+        secondaryColor = storedSecondary;
       }
     } catch (_) {
       /* Unavailable storage keeps the usable default theme. */
@@ -72,13 +71,56 @@ class AppearancePreferences extends ChangeNotifier {
     await _save((storage) => storage.setBool(guideReadKey, true));
   }
 
-  Future<bool> setSecondaryColor(Color value) {
-    secondaryColor = value;
-    ++_secondaryRevision;
-    _emit();
-    return _save(
-      (storage) => storage.setInt(secondaryColorKey, value.toARGB32()),
+  (Color, Color) _readPalette(SharedPreferences storage) {
+    final pair = storage.getStringList(paletteKey);
+    if (pair != null && pair.length == 2) {
+      final primary = int.tryParse(pair[0]);
+      final accent = int.tryParse(pair[1]);
+      if (primary != null && accent != null) {
+        return (Color(primary | 0xff000000), Color(accent | 0xff000000));
+      }
+    }
+    return (
+      Color(
+        (storage.getInt(colorKey) ?? defaultThemeColor.toARGB32()) | 0xff000000,
+      ),
+      Color(
+        (storage.getInt(secondaryColorKey) ??
+                defaultSecondaryThemeColor.toARGB32()) |
+            0xff000000,
+      ),
     );
+  }
+
+  Future<bool> setPalette(Color primary, Color accent) =>
+      _updatePalette(primary, accent);
+  Future<bool> setColor(Color value) => _updatePalette(value, null);
+  Future<bool> setSecondaryColor(Color value) => _updatePalette(null, value);
+
+  Future<bool> _updatePalette(Color? primary, Color? accent) async {
+    final generation = ++_paletteRevision;
+    if (primary != null) {
+      color = primary;
+      ++_revision;
+    }
+    if (accent != null) {
+      secondaryColor = accent;
+      ++_secondaryRevision;
+    }
+    saveFailed = false;
+    _emit();
+    final saved = await _save((storage) {
+      final previous = _readPalette(storage);
+      return storage.setStringList(paletteKey, [
+        (primary ?? previous.$1).toARGB32().toString(),
+        (accent ?? previous.$2).toARGB32().toString(),
+      ]);
+    });
+    if (generation == _paletteRevision && !saved) {
+      saveFailed = true;
+      _emit();
+    }
+    return saved;
   }
 
   Future<bool> setMode(ThemeMode value) {
@@ -86,21 +128,6 @@ class AppearancePreferences extends ChangeNotifier {
     ++_modeRevision;
     _emit();
     return _save((storage) => storage.setString(modeKey, value.name));
-  }
-
-  Future<bool> setColor(Color value) async {
-    color = value;
-    saveFailed = false;
-    final revision = ++_revision;
-    _emit();
-    final success = await _save(
-      (storage) => storage.setInt(colorKey, value.toARGB32()),
-    );
-    if (revision == _revision) {
-      saveFailed = !success;
-      _emit();
-    }
-    return success;
   }
 
   Future<bool> setReduceMotion(bool value) {

@@ -2,7 +2,7 @@
 
 Panache 的 Flutter 客户端使用 Material Design 3 手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 随包内置 Rust FFI 引擎，生成、导入和导出可离线完成。
 
-UI 采用新艺术运动风格的 Material Design 3 主题，提供象牙纸色和夜间森林色两套外观。应用设置可以切换浅色、深色或跟随系统，并记住选择。标题使用随包提供的 Playfair Display 和霞鹜文楷，纸张使用用户选定的手写字体。
+UI 采用新艺术运动风格的 Material Design 3 主题，浅色采用象牙纸色，深色采用墨蓝底与薄荷绿、鸢尾紫点缀。配色面板提供鸢尾、青瓷、珊瑚玫瑰三组预设，可预览当前组合或自定义双色。应用设置可以切换浅色、深色或跟随系统，并记住选择。标题使用随包提供的 Playfair Display 和霞鹜文楷，纸张使用用户选定的手写字体。
 
 架构与职责划分见 [客户端架构](../docs/flutter-architecture.md)，环境安装和 Windows 工具链入口见 [移动开发环境](../scripts/MOBILE_ENVIRONMENT.md)。
 
@@ -114,6 +114,17 @@ flutter test test/live_api_test.dart --dart-define=LIVE_API_BASE=http://127.0.0.
 python3 ../scripts/build-flutter-web.py
 # 完整原生桌面包在仓库根目录构建：python3 scripts/build-flutter-desktop.py
 ```
+
+### 动效性能回归
+
+在目标刷新率的显示器上，以原生 Windows Profile 构建运行以下命令。保持应用窗口可见，使用同一显示器、窗口尺寸及缩放比例比较改动前后的结果。
+
+```bash
+cd app
+flutter drive --profile -d windows --driver=test_driver/motion_profile.dart --target=integration_test/workbench_motion_profile_test.dart
+```
+
+测试先用轻量 ticker 校准实际刷新间隔，取校准间隔与系统报告周期中较短者作为每帧预算，再预热并重复操作分区、翻页、明暗切换、设置面板和配色预设。结果写入 `app/build/workbench_motion.json`。各操作的 UI 构建和光栅化 P95 均须在一帧预算内，连续动效的刷新间隔 P95 须在 1.5 个周期以内。报告同时记录 P99、最长间隔及超时次数，供定位偶发卡顿。手机布局测试覆盖交互，移动设备的刷新表现需要在目标设备上测量。
 
 测试涵盖 LaTeX 兼容与数学片段、文本工具、API multipart 和返回格式、异步工作区持久化与取消，以及中英文移动/桌面布局、键盘、横屏和文字缩放交互。桌面进程测试见 `test/desktop_backend_test.dart`。
 

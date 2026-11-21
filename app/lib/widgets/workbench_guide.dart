@@ -19,7 +19,9 @@ class GuideUnreadBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Badge(
     smallSize: 8,
-    backgroundColor: const Color(0xFF4BC542),
+    backgroundColor: Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.primary
+        : const Color(0xFF4BC542),
     isLabelVisible: unread,
     child: child,
   );

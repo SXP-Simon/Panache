@@ -32,8 +32,7 @@ void main() {
               child: ThemeColorEditor(
                 color: defaultThemeColor,
                 secondaryColor: defaultSecondaryThemeColor,
-                onChanged: (_) async => true,
-                onSecondaryChanged: (value) async {
+                onPaletteChanged: (_, value) async {
                   saved = value;
                   return false;
                 },
@@ -43,9 +42,9 @@ void main() {
         ),
       );
 
-      await tester.tap(
-        find.byKey(const ValueKey('pick-secondary-theme-color')),
-      );
+      final row = find.byKey(const ValueKey('pick-secondary-theme-color'));
+      await tester.ensureVisible(row);
+      await tester.tap(row);
       await tester.pumpAndSettle();
       final area = find.byKey(const ValueKey('secondary-theme-color-area'));
       expect(area, findsOneWidget);
@@ -137,11 +136,10 @@ void main() {
       );
       expect(workspace.settings.toJson(), paper);
       final preferences = await SharedPreferences.getInstance();
-      expect(preferences.getInt(AppearancePreferences.colorKey), 0xFF7955A3);
-      expect(
-        preferences.getInt(AppearancePreferences.secondaryColorKey),
-        0xFF168478,
-      );
+      expect(preferences.getStringList(AppearancePreferences.paletteKey), [
+        0xFF7955A3.toString(),
+        0xFF168478.toString(),
+      ]);
 
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -149,6 +147,27 @@ void main() {
       await tester.pumpAndSettle();
       expect(app().theme!.colorScheme, light);
       expect(app().darkTheme!.colorScheme, dark);
+      await tester.tap(find.byKey(const ValueKey('app-preferences')));
+      await tester.pumpAndSettle();
+      final celadon = find.byKey(const ValueKey('palette-celadon'));
+      await tester.ensureVisible(celadon);
+      await tester.tap(celadon);
+      await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(celadon).selected, isTrue);
+      final afterRecipe = app().theme!.colorScheme;
+      expect(afterRecipe.primary, isNot(light.primary));
+      expect(afterRecipe.secondaryContainer, isNot(light.secondaryContainer));
+      Navigator.of(tester.element(celadon)).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('app-preferences')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(celadon).selected, isTrue);
+      final reset = find.text('Restore default palette');
+      await tester.ensureVisible(reset);
+      await tester.tap(reset);
+      await tester.pumpAndSettle();
+      expect(app().theme!.colorScheme, initial);
+      expect(workspace.settings.toJson(), paper);
     },
   );
 }

@@ -22,7 +22,10 @@ void main() {
     await restoring;
     await appearance.settled;
     expect(appearance.color, const Color(0xFF147D79));
-    expect(preferences.getInt(AppearancePreferences.colorKey), 0xFF147D79);
+    final restarted = AppearancePreferences();
+    await restarted.restore();
+    expect(restarted.color, const Color(0xFF147D79));
+    restarted.dispose();
     appearance.dispose();
   });
   test('storage errors retain the chosen session color and are reported without escaping', () async {
@@ -34,6 +37,32 @@ void main() {
     await appearance.settled;
     expect(appearance.color, const Color(0xFF7955A3));
     expect(appearance.saveFailed, isTrue);
+    appearance.dispose();
+  });
+  test('legacy blue and its accent restore exactly until a paired palette is chosen', () async {
+    SharedPreferences.setMockInitialValues({
+      AppearancePreferences.colorKey: 0xff438fc1,
+      AppearancePreferences.secondaryColorKey: 0xff438fc1,
+    });
+    final appearance = AppearancePreferences();
+    await appearance.restore();
+    expect(appearance.color, const Color(0xff438fc1));
+    expect(appearance.secondaryColor, const Color(0xff438fc1));
+    var notifications = 0;
+    appearance.addListener(() => notifications++);
+    expect(
+      await appearance.setPalette(
+        const Color(0xff27665d),
+        const Color(0xffa28247),
+      ),
+      isTrue,
+    );
+    expect(notifications, 1);
+    final restarted = AppearancePreferences();
+    await restarted.restore();
+    expect(restarted.color, appearance.color);
+    expect(restarted.secondaryColor, appearance.secondaryColor);
+    restarted.dispose();
     appearance.dispose();
   });
   test('opening the guide during restore keeps it read on restart', () async {

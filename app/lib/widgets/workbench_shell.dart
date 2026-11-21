@@ -16,8 +16,7 @@ class WorkbenchShell extends StatelessWidget {
     super.key,
     this.themeColor = defaultThemeColor,
     this.secondaryThemeColor = defaultSecondaryThemeColor,
-    this.onSecondaryThemeColorChanged,
-    this.onThemeColorChanged,
+    this.onPaletteChanged,
     this.themeMode = ThemeMode.system,
     this.onThemeModeChanged,
     this.reduceMotion = false,
@@ -42,8 +41,7 @@ class WorkbenchShell extends StatelessWidget {
   final Future<bool> Function(ThemeMode)? onThemeModeChanged;
   final bool reduceMotion;
   final Future<bool> Function(bool)? onReduceMotionChanged;
-  final Future<bool> Function(Color)? onThemeColorChanged,
-      onSecondaryThemeColorChanged;
+  final Future<bool> Function(Color, Color)? onPaletteChanged;
   final bool updateAvailable, fineFullscreen, guideUnread;
   final String version;
   final int destination;
@@ -62,11 +60,17 @@ class WorkbenchShell extends StatelessWidget {
     final labels = [l.workspace, l.guide, l.about];
     final compact = MediaQuery.sizeOf(context).width < 900;
     final colors = Theme.of(context).colorScheme;
-    const ivory = Color(0xfffaf7ef);
-    final forest = Color.alphaBlend(
-      const Color(0xff1b2918).withValues(alpha: .60),
-      themeColor,
-    );
+    final dark = colors.brightness == Brightness.dark;
+    final mastheadInk = dark ? colors.onSurface : NouveauColors.softIvory;
+    final masthead = dark
+        ? Color.alphaBlend(
+            colors.secondary.withValues(alpha: .075),
+            colors.surfaceContainerLow,
+          )
+        : Color.alphaBlend(
+            const Color(0xff1b2918).withValues(alpha: .60),
+            themeColor,
+          );
     return Scaffold(
       appBar: fineFullscreen
           ? null
@@ -75,8 +79,8 @@ class WorkbenchShell extends StatelessWidget {
               titleSpacing: compact ? 6 : 18,
               automaticallyImplyLeading: false,
               centerTitle: false,
-              backgroundColor: forest,
-              foregroundColor: ivory,
+              backgroundColor: masthead,
+              foregroundColor: mastheadInk,
               surfaceTintColor: Colors.transparent,
               flexibleSpace: Stack(
                 children: [
@@ -90,7 +94,9 @@ class WorkbenchShell extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         child: CustomPaint(
                           size: const Size(340, 84),
-                          painter: const AtelierTendrils(),
+                          painter: AtelierTendrils(
+                            nightColors: dark ? colors : null,
+                          ),
                         ),
                       ),
                     ),
@@ -104,7 +110,7 @@ class WorkbenchShell extends StatelessWidget {
                 children: [
                   CustomPaint(
                     size: Size.square(compact ? 48 : 78),
-                    painter: const AtelierIris(),
+                    painter: AtelierIris(nightColors: dark ? colors : null),
                   ),
                   SizedBox(width: compact ? 7 : 12),
                   Flexible(
@@ -114,7 +120,7 @@ class WorkbenchShell extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.headlineLarge
                           ?.copyWith(
-                            color: ivory,
+                            color: mastheadInk,
                             fontSize: compact ? 22 : 37,
                             fontFamily: 'Playfair Display',
                             fontFamilyFallback: const [
@@ -128,13 +134,15 @@ class WorkbenchShell extends StatelessWidget {
                   if (!compact) ...[
                     const SizedBox(width: 20),
                     Material(
-                      color: ivory.withValues(alpha: .07),
+                      color: mastheadInk.withValues(alpha: .07),
                       borderRadius: BorderRadius.circular(32),
                       child: Theme(
                         data: Theme.of(context).copyWith(
-                          colorScheme: colors.copyWith(primary: ivory),
+                          colorScheme: colors.copyWith(primary: mastheadInk),
                           textButtonTheme: TextButtonThemeData(
-                            style: TextButton.styleFrom(foregroundColor: ivory),
+                            style: TextButton.styleFrom(
+                              foregroundColor: mastheadInk,
+                            ),
                           ),
                         ),
                         child: const ProjectSourceLink(),
@@ -149,7 +157,9 @@ class WorkbenchShell extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
-                          style: TextButton.styleFrom(foregroundColor: ivory),
+                          style: TextButton.styleFrom(
+                            foregroundColor: mastheadInk,
+                          ),
                           onPressed: () => FocusScope.of(context).unfocus(),
                           icon: const Icon(Icons.keyboard_hide_outlined),
                           label: Text(l.dismissKeyboard),
@@ -183,14 +193,16 @@ class WorkbenchShell extends StatelessWidget {
                   hint: guideUnread && compact ? l.guideUnread : null,
                   child: TextButton.icon(
                     key: const ValueKey('app-preferences'),
-                    style: TextButton.styleFrom(foregroundColor: ivory),
+                    style: TextButton.styleFrom(foregroundColor: mastheadInk),
                     onPressed: () => preferencesSheet(context),
                     icon: Badge(
                       isLabelVisible:
                           compact && (updateAvailable || guideUnread),
                       backgroundColor: updateAvailable
                           ? null
-                          : const Color(0xffc9a227),
+                          : dark
+                          ? colors.secondary
+                          : NouveauColors.gold,
                       child: const Icon(Icons.tune),
                     ),
                     label: Text(l.appPreferences),
@@ -361,9 +373,7 @@ class WorkbenchShell extends StatelessWidget {
                   ThemeColorEditor(
                     color: themeColor,
                     secondaryColor: secondaryThemeColor,
-                    onSecondaryChanged:
-                        onSecondaryThemeColorChanged ?? (_) async => true,
-                    onChanged: onThemeColorChanged ?? (_) async => true,
+                    onPaletteChanged: onPaletteChanged,
                   ),
                   ListTile(
                     leading: const Icon(Icons.info_outline),
