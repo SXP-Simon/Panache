@@ -10,6 +10,67 @@ import 'package:handwriting_app/widgets/workbench_settings.dart';
 import 'package:handwriting_app/widgets/ink_parameter_controls.dart';
 
 void main() {
+  testWidgets('mobile numeric fields show the entire value beside its unit', (
+    tester,
+  ) async {
+    for (final scale in [1.0, 2.0]) {
+      for (final (id, parameter, value, unit) in [
+        ('latin', latinScaleParameter, 100.0, '%'),
+        ('opacity', inkParameters[0], 100.0, '%'),
+        ('thickness', inkParameters[1], -2.0, 'px'),
+        ('softness', inkParameters[2], 1.0, 'px'),
+      ]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: handwritingTheme(Brightness.light),
+            home: Scaffold(
+              body: MediaQuery(
+                data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 260,
+                    child: NumericSlider(
+                      key: ValueKey(id),
+                      id: id,
+                      label: '参数',
+                      parameter: parameter,
+                      value: value,
+                      unit: unit,
+                      onChanged: (_) {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final field = find.byType(EditableText);
+        final editable = tester.state<EditableTextState>(field).renderEditable;
+        final text = tester.widget<EditableText>(field).controller.text;
+        final boxes = editable.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: text.length),
+        );
+        expect(boxes, isNotEmpty);
+        for (final box in boxes) {
+          expect(
+            box.left,
+            greaterThanOrEqualTo(0),
+            reason: '$id at scale $scale',
+          );
+          expect(
+            box.right,
+            lessThanOrEqualTo(editable.size.width),
+            reason: '$id at scale $scale',
+          );
+        }
+        expect(find.text(unit), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    }
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
   testWidgets('Windows keeps a hidden slider indicator inside its pane', (
     tester,
   ) async {

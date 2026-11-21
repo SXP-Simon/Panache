@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -110,6 +112,15 @@ class _NumericSliderState extends State<NumericSlider> {
   Widget build(BuildContext context) {
     final min = widget.parameter.minimum.toDouble();
     final max = widget.parameter.maximum!.toDouble();
+    final theme = Theme.of(context);
+    final numberStyle = theme.textTheme.bodyLarge!;
+    final numberLength = math.max(
+      min.toStringAsFixed(digits).length,
+      max.toStringAsFixed(digits).length,
+    );
+    // Reserve space for the signed value, suffix, caret and input padding.
+    final em = MediaQuery.textScalerOf(context).scale(numberStyle.fontSize!);
+    final numberWidth = 24 + em * (numberLength + widget.unit.length + 1);
     final multiplier = digits == 0 ? 1 : 10;
     final slider = Semantics(
       label: widget.label,
@@ -133,14 +144,14 @@ class _NumericSliderState extends State<NumericSlider> {
       padding: const EdgeInsets.only(top: 6),
       child: Column(
         children: [
-          Row(
+          OverflowBar(
+            alignment: MainAxisAlignment.spaceBetween,
+            overflowAlignment: OverflowBarAlignment.end,
+            spacing: 8,
             children: [
-              Expanded(child: Text(widget.label)),
+              Text(widget.label),
               SizedBox(
-                width: MediaQuery.textScalerOf(context)
-                    .scale(68)
-                    .clamp(68, 112)
-                    .toDouble(),
+                width: numberWidth,
                 child: Semantics(
                   label: widget.label,
                   child: TextField(
@@ -150,8 +161,8 @@ class _NumericSliderState extends State<NumericSlider> {
                     enabled: widget.onChanged != null,
                     style: widget.onChanged == null
                         ? null
-                        : TextStyle(
-                            color: Theme.of(context).colorScheme.secondary,
+                        : numberStyle.copyWith(
+                            color: theme.colorScheme.secondary,
                           ),
                     keyboardType: TextInputType.numberWithOptions(
                       decimal: digits > 0,
@@ -160,6 +171,10 @@ class _NumericSliderState extends State<NumericSlider> {
                     textAlign: TextAlign.end,
                     decoration: InputDecoration(
                       isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 10,
+                      ),
                       suffixText: widget.unit,
                     ),
                     onChanged: (raw) {
