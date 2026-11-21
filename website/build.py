@@ -42,6 +42,8 @@ def prepare_gallery(assets):
 def build(out):
     assets = out / "assets"
     shutil.copytree(SITE / "static", assets, dirs_exist_ok=True)
+    shutil.copyfile(ROOT / "app/assets/fonts/PlayfairDisplay.ttf", assets / "PlayfairDisplay.ttf")
+    shutil.copyfile(ROOT / "assets/licenses/PlayfairDisplay-OFL.txt", assets / "PlayfairDisplay-OFL.txt")
     gallery = prepare_gallery(assets)
     for name in ("panache-showcase.webp", "panache-custom-background.webp"):
         shutil.copyfile(ROOT / "docs/assets/images" / name, assets / name)

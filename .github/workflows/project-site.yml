@@ -6,6 +6,8 @@ on:
     paths:
       - "website/**"
       - "docs/assets/images/**"
+      - "app/assets/fonts/PlayfairDisplay.ttf"
+      - "assets/licenses/PlayfairDisplay-OFL.txt"
       - ".github/workflows/project-site.yml"
   workflow_dispatch:
 
