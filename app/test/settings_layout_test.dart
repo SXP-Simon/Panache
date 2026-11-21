@@ -1,11 +1,75 @@
+import 'dart:ui' show SemanticsFlag;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/models/settings.dart';
 import 'package:handwriting_app/theme/handwriting_theme.dart';
 import 'package:handwriting_app/widgets/workbench_settings.dart';
+import 'package:handwriting_app/widgets/ink_parameter_controls.dart';
 
 void main() {
+  testWidgets('Windows keeps a hidden slider indicator inside its pane', (
+    tester,
+  ) async {
+    var hidden = true;
+    var value = 100.0;
+    late StateSetter change;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (_, setState) {
+              change = setState;
+              return Offstage(
+                offstage: hidden,
+                child: NumericSlider(
+                  id: 'latin-font-scale',
+                  label: 'Latin font scale',
+                  unit: '%',
+                  value: value,
+                  parameter: latinScaleParameter,
+                  onChanged: (next) => setState(() => value = next),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    final semantics = find.semantics.byFlag(SemanticsFlag.isSlider);
+    expect(semantics, findsNothing);
+    // The mounted value indicator must target an overlay below Offstage.
+    // A route-level target would serialize an orphan on Windows.
+    final portal = find.descendant(
+      of: find.byType(Slider, skipOffstage: false),
+      matching: find.byType(OverlayPortal, skipOffstage: false),
+      skipOffstage: false,
+    );
+    final context = tester.element(portal);
+    expect(
+      Overlay.of(context),
+      isNot(same(Overlay.of(context, rootOverlay: true))),
+    );
+
+    change(() => hidden = false);
+    await tester.pumpAndSettle();
+    expect(semantics, findsOne);
+    tester.semantics.increase(semantics);
+    await tester.pump();
+    expect(value, greaterThan(100));
+    tester.semantics.decrease(semantics);
+    await tester.pump();
+    expect(value, 100);
+    // Tab through the number field to the slider.
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(value, greaterThan(100));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
   for (final brightness in Brightness.values) {
     for (final locale in [const Locale('zh'), const Locale('en')]) {
       for (final scale in [1.0, 2.0]) {

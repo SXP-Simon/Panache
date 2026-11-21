@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'workbench_card.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
@@ -35,7 +38,7 @@ class WorkbenchInformation extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Card.outlined(
+            WorkbenchCard(
               margin: EdgeInsets.zero,
               child: Padding(
                 padding: const EdgeInsets.all(20),

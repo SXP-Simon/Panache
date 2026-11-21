@@ -41,18 +41,23 @@ class _HandwritingAppState extends State<HandwritingApp> {
   final appearance = AppearancePreferences();
   late final updates = UpdateController(host: createUpdateHost());
   Color get themeColor => appearance.color;
-  late (Color, Color) themeSeeds;
-  late ThemeData lightTheme, darkTheme;
+  // Keep recently used immutable pairs so revisiting a palette does not
+  // regenerate two Material tonal palettes in the input callback.
+  final themes = <(Color, Color), (ThemeData, ThemeData)>{};
+  late (ThemeData, ThemeData) activeThemes;
 
   void resolveThemes() {
-    themeSeeds = (appearance.color, appearance.secondaryColor);
+    final seeds = (appearance.color, appearance.secondaryColor);
+    final existing = themes.remove(seeds);
     ThemeData resolve(Brightness brightness) => handwritingTheme(
       brightness,
-      seedColor: appearance.color,
-      secondaryColor: appearance.secondaryColor,
+      seedColor: seeds.$1,
+      secondaryColor: seeds.$2,
     );
-    lightTheme = resolve(Brightness.light);
-    darkTheme = resolve(Brightness.dark);
+    activeThemes =
+        existing ?? (resolve(Brightness.light), resolve(Brightness.dark));
+    themes[seeds] = activeThemes;
+    if (themes.length > 4) themes.remove(themes.keys.first);
   }
 
   @override
@@ -68,9 +73,7 @@ class _HandwritingAppState extends State<HandwritingApp> {
 
   void refreshAppearance() {
     if (!mounted) return;
-    if (themeSeeds != (appearance.color, appearance.secondaryColor)) {
-      resolveThemes();
-    }
+    resolveThemes();
     setState(() {});
   }
 
@@ -131,8 +134,8 @@ class _HandwritingAppState extends State<HandwritingApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-      theme: lightTheme,
-      darkTheme: darkTheme,
+      theme: activeThemes.$1,
+      darkTheme: activeThemes.$2,
       themeMode: appearance.mode,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(

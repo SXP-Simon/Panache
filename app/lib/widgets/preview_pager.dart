@@ -318,6 +318,8 @@ class _ZoomablePageState extends State<_ZoomablePage>
     vsync: this,
     duration: WorkbenchMotion.page,
   )..addListener(_animate);
+  // Translation events leave the reader scale controls unchanged.
+  final _readerControls = ValueNotifier((100, true, true));
   Matrix4Tween? _tween;
   bool _zoomed = false;
   bool _mouse = false;
@@ -363,7 +365,18 @@ class _ZoomablePageState extends State<_ZoomablePage>
 
   void _reset() => _to(Matrix4.identity());
 
+  void _updateReaderControls() {
+    if (!widget.readerMode) return;
+    final scale = _scale;
+    _readerControls.value = (
+      (scale * 100).round(),
+      scale > _minScale + .001,
+      scale < _maxScale - .001,
+    );
+  }
+
   void _changed() {
+    _updateReaderControls();
     final zoomed = widget.readerMode
         ? (_scale - 1).abs() > .001 ||
               _transform.value.getTranslation().length > .1
@@ -394,6 +407,7 @@ class _ZoomablePageState extends State<_ZoomablePage>
       _zoomed = false;
       _transform.addListener(_changed);
     }
+    _updateReaderControls();
   }
 
   void _scheduleInitialZoom() {
@@ -432,6 +446,7 @@ class _ZoomablePageState extends State<_ZoomablePage>
   void dispose() {
     _animation.dispose();
     _transform.dispose();
+    _readerControls.dispose();
     super.dispose();
   }
 
@@ -570,15 +585,15 @@ class _ZoomablePageState extends State<_ZoomablePage>
     return Column(
       children: [
         Expanded(child: viewer),
-        ListenableBuilder(
-          listenable: _transform,
-          builder: (_, _) => Wrap(
+        ValueListenableBuilder(
+          valueListenable: _readerControls,
+          builder: (_, controls, _) => Wrap(
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               TextButton.icon(
                 key: const ValueKey('reader-zoom-out'),
-                onPressed: _scale > _minScale + .001
+                onPressed: controls.$2
                     ? () => _zoomTo(_scale / 1.5, _viewport.center(Offset.zero))
                     : null,
                 icon: const Icon(Icons.zoom_out),
@@ -587,13 +602,13 @@ class _ZoomablePageState extends State<_ZoomablePage>
               Tooltip(
                 message: l.previewZoomRatioHint,
                 child: Text(
-                  '${(_scale * 100).round()}%',
+                  '${controls.$1}%',
                   key: const ValueKey('reader-zoom-ratio'),
                 ),
               ),
               TextButton.icon(
                 key: const ValueKey('reader-zoom-in'),
-                onPressed: _scale < _maxScale - .001
+                onPressed: controls.$3
                     ? () => _zoomTo(_scale * 1.5, _viewport.center(Offset.zero))
                     : null,
                 icon: const Icon(Icons.zoom_in),

@@ -124,6 +124,7 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
                               const AlwaysStoppedAnimation(Offset.zero),
                           child: RepaintBoundary(
                             child: Material(
+                              animationDuration: Duration.zero,
                               color: Theme.of(context).colorScheme.surface,
                               child: widget.children[index],
                             ),

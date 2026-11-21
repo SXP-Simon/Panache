@@ -106,6 +106,7 @@ void main() {
       Future<void> choose(String role, String hex) async {
         final row = find.byKey(ValueKey('pick-$role-theme-color'));
         await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
         await tester.tap(row);
         await tester.pumpAndSettle();
         final input = find.byKey(ValueKey('$role-theme-color-hex'));
@@ -164,6 +165,7 @@ void main() {
       expect(tester.widget<ChoiceChip>(celadon).selected, isTrue);
       final reset = find.text('Restore default palette');
       await tester.ensureVisible(reset);
+      await tester.pumpAndSettle();
       await tester.tap(reset);
       await tester.pumpAndSettle();
       expect(app().theme!.colorScheme, initial);
