@@ -5,6 +5,42 @@ import 'package:handwriting_app/theme/handwriting_theme.dart';
 import 'package:handwriting_app/theme/nouveau_ornament.dart';
 
 void main() {
+  testWidgets(
+    'buttons use the workbench color transition and keep ink feedback',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: handwritingTheme(Brightness.light),
+          home: Scaffold(
+            body: Row(
+              children: [
+                FilledButton(onPressed: () {}, child: const Text('Fill')),
+                OutlinedButton(onPressed: () {}, child: const Text('Outline')),
+                TextButton(onPressed: () {}, child: const Text('Text')),
+                IconButton(onPressed: () {}, icon: const Icon(Icons.edit)),
+              ],
+            ),
+          ),
+        ),
+      );
+      for (final button in [
+        find.text('Fill'),
+        find.text('Outline'),
+        find.text('Text'),
+        find.byIcon(Icons.edit),
+      ]) {
+        final local = tester.widgetList<AnimatedTheme>(
+          find.ancestor(of: button, matching: find.byType(AnimatedTheme)),
+        );
+        expect(local.first.duration, Duration.zero);
+        expect(
+          find.ancestor(of: button, matching: find.byType(InkWell)),
+          findsWidgets,
+        );
+      }
+    },
+  );
+
   test('day and night workspaces use botanical surfaces and legible type', () {
     for (final brightness in Brightness.values) {
       final theme = handwritingTheme(brightness);
