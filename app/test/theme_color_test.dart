@@ -127,6 +127,27 @@ void main() {
       final dark = app().darkTheme!.colorScheme;
       expect(light.primary, afterPrimary.primary);
       expect(light.secondaryContainer, isNot(afterPrimary.secondaryContainer));
+      for (final theme in [app().theme!, app().darkTheme!]) {
+        final colors = theme.colorScheme;
+        const selected = {WidgetState.selected};
+        const unavailable = {WidgetState.disabled, WidgetState.selected};
+        expect(theme.sliderTheme.activeTrackColor, colors.secondary);
+        expect(theme.sliderTheme.thumbColor, colors.secondary);
+        expect(
+          theme.switchTheme.trackColor!.resolve(selected),
+          colors.secondary,
+        );
+        expect(theme.switchTheme.trackColor!.resolve(unavailable), isNull);
+        expect(theme.chipTheme.selectedColor, colors.secondaryContainer);
+        expect(
+          theme.segmentedButtonTheme.style!.backgroundColor!.resolve(selected),
+          colors.secondaryContainer,
+        );
+        expect(
+          theme.inputDecorationTheme.focusedBorder!.borderSide.color,
+          colors.secondary,
+        );
+      }
       expect(
         dark,
         handwritingTheme(

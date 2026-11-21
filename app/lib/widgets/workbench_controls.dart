@@ -108,7 +108,7 @@ class SettingsGroup extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                     child: Row(
                       children: [
-                        Icon(icon, color: colors.onSurfaceVariant, size: 18),
+                        Icon(icon, color: colors.secondary, size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(title, style: theme.textTheme.titleSmall),
@@ -133,7 +133,7 @@ class SettingsGroup extends StatelessWidget {
                 collapsedBackgroundColor: colors.secondaryContainer,
                 collapsedIconColor: colors.onSecondaryContainer,
                 collapsedTextColor: colors.onSecondaryContainer,
-                iconColor: colors.primary,
+                iconColor: colors.secondary,
                 textColor: colors.onPrimaryContainer,
                 expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
                     ? AnimationStyle.noAnimation

@@ -161,7 +161,7 @@
   "editIllustrationHelp": "点击下方插图，调整宽度或移除此处的插图。",
   "invalidIllustration": "图片无法读取或过大。请选择不超过 12 MB、1600 万像素的 PNG、JPEG、WebP、GIF 或 BMP 图片。",
   "themeColor": "主题配色",
-  "themeColorHint": "界面配色会随明暗模式调整。纸张和墨色在工作台单独设置。",
+  "themeColorHint": "主色用于生成和导航，辅助色用于滑块、开关和参数选项。纸张和墨色在工作台单独设置。",
   "themeColorHex": "十六进制颜色（HEX）",
   "themeColorInvalid": "请输入六位十六进制颜色，例如 #3C96CA",
   "paletteIris": "鸢尾",
