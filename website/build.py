@@ -1,6 +1,7 @@
 """Build the bilingual project site. Run with --out pointing to an output directory."""
 import argparse
 import datetime
+import hashlib
 import json
 import posixpath
 import re
@@ -42,6 +43,9 @@ def prepare_gallery(assets):
 def build(out):
     assets = out / "assets"
     shutil.copytree(SITE / "static", assets, dirs_exist_ok=True)
+    shutil.copyfile(ROOT / "app/assets/branding/panache.png", assets / "app-icon.png")
+    revisions = {name: hashlib.sha256((assets / name).read_bytes()).hexdigest()[:12]
+                 for name in ("atelier.css", "appearance.js", "studio.js", "app-icon.png")}
     shutil.copyfile(ROOT / "app/assets/fonts/PlayfairDisplay.ttf", assets / "PlayfairDisplay.ttf")
     shutil.copyfile(ROOT / "assets/licenses/PlayfairDisplay-OFL.txt", assets / "PlayfairDisplay-OFL.txt")
     gallery = prepare_gallery(assets)
@@ -70,7 +74,8 @@ def build(out):
             def local(target):
                 return link(("/".join((lang, target)).rstrip("/") if lang == "en" else target))
             def asset(filename):
-                return posixpath.relpath("assets/" + filename, route or ".")
+                url = posixpath.relpath("assets/" + filename, route or ".")
+                return url + "?v=" + revisions[filename] if filename in revisions else url
             content = ""
             if key in articles:
                 source = "\n".join(articles[key].splitlines()[1:])

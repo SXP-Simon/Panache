@@ -4,56 +4,57 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ titles[key] ~ ' · ' if key else '' }}Panache · {{ 'Handwriting studio' if en else '手写工坊' }}</title>
   <meta name="description" content="{{ 'Handwritten pages, studio notes and a practical guide to Panache.' if en else 'Panache 手写工坊。读开发手记，选字体和纸张，把文字、公式和表格排成手稿。' }}">
+  <script src="{{ asset('appearance.js') }}"></script>
   <link rel="stylesheet" href="{{ asset('atelier.css') }}">
-  <link rel="icon" type="image/png" href="{{ asset('iris.png') }}">
+  <link rel="icon" type="image/png" href="{{ asset('app-icon.png') }}">
   <script src="{{ asset('studio.js') }}" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">{{ 'Skip to content' if en else '跳到正文' }}</a>
 <header><div class="mast wrap">
-<a class="brand" href="{{ local('') }}">Panache<span>{{ 'Handwriting studio' if en else '手写工坊' }}</span></a>
+<a class="brand" href="{{ local('') }}">Panache</a>
 <nav aria-label="{{ 'Main navigation' if en else '主导航' }}">
 <a href="{{ local('journal') }}">{{ 'Journal' if en else '工坊手记' }}</a>
 <a href="{{ local('guide/getting-started') }}">{{ 'Guide' if en else '使用手册' }}</a>
 <a href="{{ local('self-hosting/docker') }}">{{ 'Self-hosting' if en else '自行部署' }}</a>
 <a href="{{ local('search') }}">{{ 'Search' if en else '搜索' }}</a>
-</nav><a class="language" href="{{ other }}" hreflang="{{ 'zh-CN' if en else 'en' }}">{{ '中文' if en else 'English' }}</a>
+</nav>
+<div class="site-appearance" role="group" aria-label="{{ 'Website appearance' if en else '网站外观' }}" hidden>
+{% for mode, zh, english in [('light','浅色','Light'),('dark','深色','Dark'),('system','系统','Auto')] %}
+<button type="button" data-appearance="{{ mode }}" aria-label="{{ ('Follow system appearance' if en else '跟随系统') if mode=='system' else (english if en else zh) }}">{{ english if en else zh }}</button>{% endfor %}
+</div><a class="language" href="{{ other }}" hreflang="{{ 'zh-CN' if en else 'en' }}">{{ '中文' if en else 'English' }}</a>
 </div></header>
 <main id="main">
 {% if not key %}
 <section class="hero wrap">
 <div class="hero-copy">
-<p class="eyebrow">Windows · macOS · Linux · Android</p>
-<h1>{{ 'From words' if en else '让文字' }}<br><em>{{ 'to handwriting.' if en else '落在纸上。' }}</em></h1>
-<p class="intro">{{ 'Turn a poem, a page of notes or a line of mathematics into a handwritten sheet. Choose the pen, the paper and the pace of each line.' if en else '一段诗，一页笔记，一行公式。选好字体与纸张，留出行间的呼吸，把它们写成自己的手稿。' }}</p>
+<h1>{{ 'Handwriting generator' if en else '手写体生成器' }}</h1>
 <div class="actions"><a class="button" href="{{ repo }}/releases/latest">{{ 'Download Panache' if en else '下载 Panache' }} <span>↓</span></a><a class="text-link" href="{{ local('guide/getting-started') }}">{{ 'Write your first page' if en else '写下第一页' }} ↗</a></div>
 </div>
-<figure class="botanical"><img src="{{ asset('iris-quill.webp') }}" width="732" height="800" alt=""><figcaption><i>Iris</i> <span>·</span> {{ 'The iris, quill and inkwell' if en else '鸢尾、羽笔与墨水瓶' }}</figcaption></figure>
+<img class="app-mark" src="{{ asset('app-icon.png') }}" width="512" height="512" alt="{{ 'Panache app icon' if en else 'Panache 应用图标' }}">
 </section>
 <section class="journal-band"><div class="wrap journal-feature">
-<a class="paper-thumb" href="{{ local('journal/iris-and-ink') }}" aria-label="{{ titles['journal/iris-and-ink'] }}"><img src="{{ asset('poem.webp') }}" width="551" height="465" loading="lazy" alt="{{ 'The monologue in three handwritten stanzas' if en else '用志莽行书排成三节的独白' }}"></a>
-<div><p class="eyebrow">{{ 'STUDIO JOURNAL' if en else '工坊手记' }} <span></span> 2026.11.21</p><h2><a href="{{ local('journal/iris-and-ink') }}">{{ titles['journal/iris-and-ink'] }}</a></h2>
-<p>{{ 'How an iris became a palette, and how a monologue found its rhythm in eight handwritten lines.' if en else '从鸢尾花瓣里取一抹紫，再把一句独白拆成八行。看看花色、墨色和留白怎样在同一张纸上相处。' }}</p>
-<a class="text-link" href="{{ local('journal/iris-and-ink') }}">{{ 'Read the journal' if en else '读这篇手记' }} →</a></div>
+{% for path,picture in [('journal/iris-and-ink','poem.webp'),('journal/paper-studies','panache-custom-background.webp')] %}
+<a href="{{ local(path) }}"><div class="paper-thumb"><img src="{{ asset(picture) }}" loading="lazy" alt=""></div><h2>{{ titles[path] }}</h2></a>
+{% endfor %}
 </div></section>
 {% include "gallery.html" %}
-<section class="resources wrap"><h2>{{ 'At the writing desk' if en else '案头手册' }}</h2><div class="resource-grid">
-{% for path,desc in [('guide/getting-started', 'From the first line to a PNG or PDF.' if en else '从输入第一行文字，到导出一页 PNG 或 PDF。'),('guide/parameters','Type, ink, line spacing and paper.' if en else '选字体、调行距，给书写区留好四边。'),('self-hosting/docker','Run the web workbench on your own server.' if en else '在自己的服务器上运行浏览器工作台。')] %}
-<a href="{{ local(path) }}"><h3>{{ titles[path] }} ↗</h3><p>{{ desc }}</p></a>{% endfor %}</div></section>
+<section class="resources wrap"><h2>{{ 'Guides' if en else '使用手册' }}</h2><div class="resource-grid">
+{% for path in ['guide/getting-started','guide/parameters','self-hosting/docker'] %}
+<a href="{{ local(path) }}">{{ titles[path] }} ↗</a>{% endfor %}</div></section>
 {% else %}
 <div class="wrap reading-layout">
 <aside><details open><summary>{{ 'Contents' if en else '站内目录' }}</summary>
 <a {% if key=='journal' %}aria-current="page"{% endif %} href="{{ local('journal') }}">{{ 'Studio journal' if en else '工坊手记' }}</a>
 {% for path in guides %}<a {% if key==path %}aria-current="page"{% endif %} href="{{ local(path) }}">{{ titles[path] }}</a>{% endfor %}
 </details></aside>
-<article><p class="eyebrow">{{ ('STUDIO JOURNAL' if en else '工坊手记') if key.startswith('journal') else ('FIELD GUIDE' if en else '案头手册') }} <span></span> PANACHE</p>
+<article>
 <h1>{{ titles[key] }}</h1>{{ content }}
 {% if key=='search' %}
 <form class="search" method="get" data-search data-index="{{ asset('search-' ~ lang ~ '.json') }}"
       data-root="{{ local('') }}" data-empty="{{ 'No matching pages.' if en else '没有找到相关页面。' }}"
       data-error="{{ 'Search could not load. Browse the contents or try again.' if en else '搜索暂时无法加载，可以浏览站内目录或重试。' }}">
-<label for="query">{{ 'Search the journal and guides' if en else '搜索手记和使用手册' }}</label>
-<div><input id="query" name="q" type="search" required><button class="button">{{ 'Search' if en else '搜索' }}</button></div>
+<div><input aria-label="{{ 'Search the journal and guides' if en else '搜索手记和使用手册' }}" id="query" name="q" type="search" required><button class="button">{{ 'Search' if en else '搜索' }}</button></div>
 </form><p aria-live="polite" data-status></p><ul data-results></ul>{% endif %}
 {% if key=='journal/iris-and-ink' %}<figure class="poem"><img src="{{ asset('poem.webp') }}" alt="{{ 'Full manuscript in Zhi Mang Xing' if en else '完整的三节行书诗稿' }}"></figure>{% include "gallery.html" %}{% endif %}
 {% if key=='journal/paper-studies' %}<figure class="poem"><a href="{{ asset('panache-custom-background.webp') }}"><img src="{{ asset('panache-custom-background.webp') }}" alt="{{ 'Two original paper backgrounds beside the completed handwritten pages' if en else '两张校用纸底图与生成后的手稿并排对照' }}"></a></figure>{% endif %}

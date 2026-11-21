@@ -5,17 +5,30 @@ for (const gallery of document.querySelectorAll('[data-gallery]')) {
   const base = new URL('.', image.src);
   const controls = gallery.querySelector('.selectors');
   controls.hidden = false;
-  controls.addEventListener('click', event => {
-    const button = event.target.closest('button');
-    if (!button) return;
+  const system = window.matchMedia('(prefers-color-scheme: dark)');
+  function select(button) {
     for (const peer of button.parentElement.querySelectorAll('button')) {
       peer.setAttribute('aria-pressed', String(peer === button));
     }
     const preset = controls.querySelector('[data-preset][aria-pressed="true"]');
     const mode = controls.querySelector('[data-mode][aria-pressed="true"]');
     const source = new URL(choices[preset.dataset.preset + '-' + mode.dataset.mode], base);
-    image.src = link.href = source.href;
+    if (image.src !== source.href) image.src = link.href = source.href;
     image.alt = preset.textContent.trim() + ' · ' + mode.textContent.trim();
+  }
+  function matchSite() {
+    const preference = document.documentElement.dataset.appearance;
+    const mode = preference === 'system' || !preference ? (system.matches ? 'dark' : 'light') : preference;
+    select(controls.querySelector('[data-mode="' + mode + '"]'));
+  }
+  matchSite();
+  document.addEventListener('panache:appearance', matchSite);
+  system.addEventListener('change', () => {
+    if (document.documentElement.dataset.appearance === 'system') matchSite();
+  });
+  controls.addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (button) select(button);
   });
 }
 
