@@ -113,7 +113,7 @@ class _ThemeColorEditorState extends State<ThemeColorEditor> {
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(24),
                   ),
                   title: Text(title),
                   subtitle: Text(hint),

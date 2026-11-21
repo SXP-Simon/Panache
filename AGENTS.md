@@ -53,7 +53,7 @@ python3 scripts/build-flutter-web.py
 
 - 业务状态与任务协调在 `services/workspace.dart`，持久化通过 `WorkspaceStorage` 适配，平台引擎通过 API 契约接入。
 - 页面组合独立的 `widgets/` 和 `screens/dialogs/`；输入控制器与局部导航由页面持有，不通过 part 或 extension 共享父 State。职责和存储边界见 [客户端架构](docs/flutter-architecture.md)。
-- 使用绿色 Material Design 3 主题及中英文霞鹜文楷 UI；纸张渲染字体由用户选择，不能被主题字体覆盖。第三方字体保留各自许可。
+- 界面采用新艺术运动风格的深浅色 Material Design 3 主题。标题使用 Playfair Display，中文回退霞鹜文楷，正文使用霞鹜文楷。纸张渲染字体由用户选择。第三方字体保留各自许可。
 - 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开项目的 GitHub Issues，不接入旧邮件服务。
 - `main` 的相关推送和 pull request 触发 Flutter、Rust 与 Android/iOS 验证。Publish Flutter Release 从通过检查的 `main` 提交构建，由 CI 创建版本与安装包。使用入口见[发布说明](docs/release.md)。
 

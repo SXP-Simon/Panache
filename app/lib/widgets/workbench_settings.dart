@@ -102,6 +102,12 @@ class WorkbenchSettings extends StatelessWidget {
               child: DropdownButtonFormField<SettingsSection>(
                 key: const ValueKey('settings-section'),
                 initialValue: activeSection,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.secondaryContainer,
+                  prefixIcon: Icon(activeSection?.icon ?? Icons.tune),
+                ),
+                borderRadius: BorderRadius.circular(24),
                 isExpanded: true,
                 items: [
                   for (final section in SettingsSection.values)
@@ -125,109 +131,117 @@ class WorkbenchSettings extends StatelessWidget {
               key: PageStorageKey(activeSection),
               children: [
                 if (show(SettingsSection.layout)) ...[
-                  section('font', l.fontChoices, Icons.font_download_outlined, [
-                    Semantics(
-                      identifier: 'font-select',
-                      child: SettingsFieldLabel(
-                        label: l.font,
-                        child: DropdownButtonFormField<String>(
-                          key: ValueKey(
-                            'font-${settings.font}-${fontFile?.name}',
-                          ),
-                          initialValue: fonts.contains(settings.font)
-                              ? settings.font
-                              : null,
-                          isExpanded: true,
-                          items: fonts
-                              .map(
-                                (f) => DropdownMenuItem(
-                                  value: f,
-                                  child: Text(
-                                    f,
-                                    overflow: TextOverflow.ellipsis,
+                  section(
+                    'font',
+                    l.fontChoices,
+                    Icons.font_download_outlined,
+                    [
+                      Semantics(
+                        identifier: 'font-select',
+                        child: SettingsFieldLabel(
+                          label: l.font,
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey(
+                              'font-${settings.font}-${fontFile?.name}',
+                            ),
+                            initialValue: fonts.contains(settings.font)
+                                ? settings.font
+                                : null,
+                            isExpanded: true,
+                            items: fonts
+                                .map(
+                                  (f) => DropdownMenuItem(
+                                    value: f,
+                                    child: Text(
+                                      f,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
+                                )
+                                .toList(),
+                            onChanged: locked
+                                ? null
+                                : (value) {
+                                    onSelectFont(value);
+                                  },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      FilledButton.tonalIcon(
+                        onPressed: locked ? null : onUploadFont,
+                        icon: const Icon(Icons.upload),
+                        label: Text(
+                          fontFile?.name ?? l.uploadFont,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (fontFile != null)
+                        TextButton(
+                          onPressed: locked ? null : onRemoveFont,
+                          child: Text(l.remove),
+                        ),
+                      const SizedBox(height: 10),
+                      SettingsFieldLabel(
+                        label: l.latinFont,
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey('latin-font-$settingsRevision'),
+                          isExpanded: true,
+                          initialValue: settings.latinFont ?? '',
+                          items: [
+                            DropdownMenuItem(
+                              value: '',
+                              child: Text(l.inheritLatinFont),
+                            ),
+                            for (final entry in latinFonts.entries)
+                              DropdownMenuItem(
+                                value: entry.key,
+                                child: Text(
+                                  entry.value,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              )
-                              .toList(),
+                              ),
+                          ],
                           onChanged: locked
                               ? null
                               : (value) {
-                                  onSelectFont(value);
+                                  settings.latinFont = value == ''
+                                      ? null
+                                      : value;
+                                  onEdited();
                                 },
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    FilledButton.tonalIcon(
-                      onPressed: locked ? null : onUploadFont,
-                      icon: const Icon(Icons.upload),
-                      label: Text(
-                        fontFile?.name ?? l.uploadFont,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (fontFile != null)
-                      TextButton(
-                        onPressed: locked ? null : onRemoveFont,
-                        child: Text(l.remove),
-                      ),
-                    const SizedBox(height: 10),
-                    SettingsFieldLabel(
-                      label: l.latinFont,
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey('latin-font-$settingsRevision'),
-                        isExpanded: true,
-                        initialValue: settings.latinFont ?? '',
-                        items: [
-                          DropdownMenuItem(
-                            value: '',
-                            child: Text(l.inheritLatinFont),
-                          ),
-                          for (final entry in latinFonts.entries)
-                            DropdownMenuItem(
-                              value: entry.key,
-                              child: Text(
-                                entry.value,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
+                      NumericSlider(
+                        label: l.latinFontScale,
+                        id: 'latin-font-scale',
+                        value: settings.latinScale.toDouble(),
+                        parameter: latinScaleParameter,
+                        unit: '%',
                         onChanged: locked
                             ? null
                             : (value) {
-                                settings.latinFont = value == '' ? null : value;
+                                settings.latinScale = value.round();
                                 onEdited();
                               },
                       ),
-                    ),
-                    NumericSlider(
-                      label: l.latinFontScale,
-                      id: 'latin-font-scale',
-                      value: settings.latinScale.toDouble(),
-                      parameter: latinScaleParameter,
-                      unit: '%',
-                      onChanged: locked
-                          ? null
-                          : (value) {
-                              settings.latinScale = value.round();
-                              onEdited();
-                            },
-                    ),
-                    settingSwitch(
-                      l.digitsLatin,
-                      settings.latinDigits,
-                      (value) => settings.latinDigits = value,
-                    ),
-                    if (activeSection == null)
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: InkColorControl(
-                          key: const ValueKey('settings-ink-color'),
-                          color: Color(settings.inkLook.color),
-                          onChanged: locked ? null : onColorSelected,
-                        ),
+                      settingSwitch(
+                        l.digitsLatin,
+                        settings.latinDigits,
+                        (value) => settings.latinDigits = value,
                       ),
-                  ], collapsible: false),
+                      if (activeSection == null)
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: InkColorControl(
+                            key: const ValueKey('settings-ink-color'),
+                            color: Color(settings.inkLook.color),
+                            onChanged: locked ? null : onColorSelected,
+                          ),
+                        ),
+                    ],
+                    collapsible: false,
+                  ),
                   section('layout', l.layoutPreset, Icons.space_bar, [
                     LayoutBuilder(
                       builder: (context, constraints) =>

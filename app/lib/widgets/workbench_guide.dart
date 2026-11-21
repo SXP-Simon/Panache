@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/nouveau_ornament.dart';
+import 'workbench_chapter_heading.dart';
 
 enum GuideTarget { editor, layout, preview }
 
@@ -17,7 +19,7 @@ class GuideUnreadBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Badge(
     smallSize: 8,
-    backgroundColor: Theme.of(context).colorScheme.primary,
+    backgroundColor: const Color(0xFF4BC542),
     isLabelVisible: unread,
     child: child,
   );
@@ -69,16 +71,12 @@ class WorkbenchGuide extends StatelessWidget {
           key: const ValueKey('beginner-guide'),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            Semantics(
-              header: true,
-              child: Text(
-                l.guideBeginner,
-                style: theme.textTheme.headlineSmall,
-              ),
+            WorkbenchChapterHeading(
+              title: l.guideBeginner,
+              introduction: l.guideIntro,
+              emblem: const NouveauIconSeal(Icons.menu_book_outlined),
             ),
-            const SizedBox(height: 4),
-            Text(l.guideIntro, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Card.outlined(
               margin: EdgeInsets.zero,
               clipBehavior: Clip.antiAlias,
@@ -86,17 +84,22 @@ class WorkbenchGuide extends StatelessWidget {
                 children: [
                   for (final (index, (title, hint, target))
                       in steps.indexed) ...[
-                    if (index > 0) const Divider(height: 1),
+                    if (index > 0) const NouveauWaveDivider(height: 8),
                     ListTile(
                       key: ValueKey('guide-step-${index + 1}'),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
+                        horizontal: 16,
                       ),
                       leading: CircleAvatar(
-                        radius: 14,
+                        radius: 16,
                         backgroundColor: theme.colorScheme.primaryContainer,
                         foregroundColor: theme.colorScheme.onPrimaryContainer,
-                        child: Text('${index + 1}'),
+                        child: Text(
+                          '${index + 1}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
                       ),
                       title: Text(title),
                       subtitle: Text(hint),
@@ -110,15 +113,15 @@ class WorkbenchGuide extends StatelessWidget {
             const SizedBox(height: 20),
             Semantics(
               header: true,
-              child: Text(l.guidePractice, style: theme.textTheme.titleMedium),
+              child: Text(l.guidePractice, style: theme.textTheme.titleLarge),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             for (final (id, icon, title, hint) in topics)
               ExpansionTile(
                 key: PageStorageKey('guide-topic-$id'),
                 tilePadding: const EdgeInsets.symmetric(horizontal: 8),
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                leading: Icon(icon, size: 20),
+                leading: NouveauIconSeal(icon),
                 title: Text(title),
                 expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [Text(hint, style: theme.textTheme.bodyMedium)],

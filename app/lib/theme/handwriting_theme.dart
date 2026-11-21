@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 
-const defaultThemeColor = Color(0xFF3C96CA);
-const defaultSecondaryThemeColor = Color(0xFF2F86BD);
-const _darkBase = Color(0xFF222327);
+import 'nouveau_ornament.dart';
+
+const defaultThemeColor = NouveauColors.forest;
+const defaultSecondaryThemeColor = NouveauColors.wisteria;
 
 /// An opaque base lets translucent dark surfaces composite consistently.
-Widget handwritingBackdrop(BuildContext context, Widget? child) => ColoredBox(
-  color: Theme.of(context).brightness == Brightness.dark
-      ? _darkBase
-      : Colors.white,
-  child: child!,
-);
+Widget handwritingBackdrop(BuildContext context, Widget? child) =>
+    ColoredBox(color: Theme.of(context).scaffoldBackgroundColor, child: child!);
 
 /// Shared appearance for the workbench, startup and recovery screens.
 ThemeData handwritingTheme(
@@ -19,18 +16,21 @@ ThemeData handwritingTheme(
   Color secondaryColor = defaultSecondaryThemeColor,
 }) {
   final dark = brightness == Brightness.dark;
-  final surface = dark ? const Color(0xFF1B1C1F) : Colors.white;
-  final raised = dark ? const Color(0xFF282A2E) : const Color(0xFFF7F8FA);
-  final foreground = dark ? const Color(0xFFF2F3F6) : const Color(0xFF20232A);
-  final muted = dark ? const Color(0xFFB5BAC3) : const Color(0xFF5C626D);
-  final outline = dark ? const Color(0xFF747984) : const Color(0xFF707785);
-  final border = dark ? const Color(0xFF373A41) : const Color(0xFFDEE1E7);
+  final surface = dark ? NouveauColors.night : NouveauColors.ivory;
+  final raised = dark ? const Color(0xFF283329) : NouveauColors.softIvory;
+  final foreground = dark ? NouveauColors.ivory : NouveauColors.forest;
+  final muted = dark ? const Color(0xFFBFC9B5) : const Color(0xFF526047);
+  final outline = dark ? const Color(0xFF9B997C) : const Color(0xFF797456);
+  final border = Color.alphaBlend(
+    NouveauColors.gold.withValues(alpha: dark ? .50 : .40),
+    raised,
+  );
   final primary = _readableAccent(
     seedColor,
     surface,
     foreground,
-    dark ? .36 : .28,
-    3,
+    dark ? .55 : 0,
+    4.5,
   );
   final primaryContainer = Color.alphaBlend(
     seedColor.withValues(alpha: dark ? .32 : .20),
@@ -44,49 +44,56 @@ ThemeData handwritingTheme(
     secondaryColor,
     secondaryContainer,
     foreground,
-    dark ? .48 : .55,
+    dark ? .48 : .22,
     4.5,
   );
   final scheme =
       ColorScheme.fromSeed(
-        seedColor: defaultThemeColor,
+        seedColor: seedColor,
         brightness: brightness,
       ).copyWith(
         primary: primary,
-        onPrimary: _onSolidColor(primary),
+        onPrimary: !dark && seedColor == defaultThemeColor
+            ? NouveauColors.ivory
+            : _onSolidColor(primary),
         primaryContainer: primaryContainer,
         onPrimaryContainer: foreground,
         secondary: secondary,
         onSecondary: _onSolidColor(secondary),
         secondaryContainer: secondaryContainer,
         onSecondaryContainer: secondary,
+        tertiary: dark ? NouveauColors.gold : const Color(0xFF78601B),
         surface: surface,
         onSurface: foreground,
         onSurfaceVariant: muted,
-        surfaceDim: dark ? const Color(0xFF151619) : const Color(0xFFF0F1F4),
-        surfaceBright: dark ? const Color(0xFF303238) : Colors.white,
-        surfaceContainerLowest: dark ? const Color(0xFF141518) : Colors.white,
+        surfaceDim: dark ? const Color(0xFF131B15) : const Color(0xFFE9E3D1),
+        surfaceBright: dark ? const Color(0xFF343F32) : NouveauColors.softIvory,
+        surfaceContainerLowest: dark
+            ? const Color(0xFF121B14)
+            : NouveauColors.softIvory,
         surfaceContainerLow: dark
-            ? const Color(0xFF232529)
-            : const Color(0xFFFAFAFB),
+            ? const Color(0xFF202B22)
+            : const Color(0xFFFBF8EE),
         surfaceContainer: raised,
         surfaceContainerHigh: dark
-            ? const Color(0xFF2E3035)
-            : const Color(0xFFF0F2F5),
+            ? const Color(0xFF303D30)
+            : const Color(0xFFEEE9D8),
         surfaceContainerHighest: dark
-            ? const Color(0xFF34363C)
-            : const Color(0xFFEAEDF2),
+            ? const Color(0xFF3A4738)
+            : const Color(0xFFE5DFCA),
         outline: outline,
         outlineVariant: border,
         surfaceTint: Colors.transparent,
       );
 
-  const controlShape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.all(Radius.circular(12)),
+  const controlShape = StadiumBorder();
+  final cardShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(32),
+    side: BorderSide(color: border),
   );
   OutlineInputBorder fieldBorder(Color color, {double width = 1}) =>
       OutlineInputBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        borderRadius: const BorderRadius.all(Radius.circular(28)),
         borderSide: BorderSide(color: color, width: width),
       );
 
@@ -94,15 +101,20 @@ ThemeData handwritingTheme(
     useMaterial3: true,
     fontFamily: 'packages/handwriting_assets/LXGW WenKai',
     colorScheme: scheme,
-    scaffoldBackgroundColor: dark ? const Color(0x6B000000) : Colors.white,
+    scaffoldBackgroundColor: surface,
     appBarTheme: AppBarThemeData(
       backgroundColor: surface,
       foregroundColor: foreground,
       elevation: 0,
       scrolledUnderElevation: 0,
-      shape: Border(bottom: BorderSide(color: border)),
     ),
     dividerTheme: DividerThemeData(color: border),
+    chipTheme: ChipThemeData(
+      shape: const StadiumBorder(),
+      side: BorderSide(color: border),
+      selectedColor: primaryContainer,
+      checkmarkColor: foreground,
+    ),
     inputDecorationTheme: InputDecorationTheme(
       isDense: true,
       filled: true,
@@ -113,18 +125,40 @@ ThemeData handwritingTheme(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     ),
     cardTheme: CardThemeData(
-      elevation: 0,
+      elevation: 2,
+      shadowColor: NouveauColors.forest.withValues(alpha: .22),
       margin: EdgeInsets.zero,
-      color: dark ? const Color(0x26000000) : Colors.white,
-      shape: controlShape.copyWith(side: BorderSide(color: border)),
+      color: raised,
+      shape: cardShape,
     ),
-    filledButtonTheme: const FilledButtonThemeData(
-      style: ButtonStyle(shape: WidgetStatePropertyAll(controlShape)),
+    filledButtonTheme: FilledButtonThemeData(
+      style: ButtonStyle(
+        animationDuration: const Duration(milliseconds: 500),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.hovered) &&
+                  !states.contains(WidgetState.disabled)
+              ? NouveauColors.gold
+              : null,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.hovered) &&
+                  !states.contains(WidgetState.disabled)
+              ? NouveauColors.night
+              : null,
+        ),
+        shape: const WidgetStatePropertyAll(controlShape),
+        side: const WidgetStatePropertyAll(
+          BorderSide(color: NouveauColors.gold),
+        ),
+      ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         shape: controlShape,
         side: BorderSide(color: border),
+        animationDuration: const Duration(milliseconds: 500),
         foregroundColor: foreground,
       ),
     ),
@@ -153,12 +187,7 @@ ThemeData handwritingTheme(
         ),
       ),
     ),
-    dialogTheme: DialogThemeData(
-      backgroundColor: raised,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-      ),
-    ),
+    dialogTheme: DialogThemeData(backgroundColor: raised, shape: cardShape),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: raised,
       modalBackgroundColor: raised,
@@ -166,7 +195,31 @@ ThemeData handwritingTheme(
     ),
   );
   final railLabel = theme.textTheme.labelMedium!;
+  TextStyle? heading(TextStyle? style) => style?.copyWith(
+    fontFamily: 'Playfair Display',
+    fontFamilyFallback: const [
+      'packages/handwriting_assets/LXGW WenKai',
+      'Georgia',
+      'serif',
+    ],
+  );
   return theme.copyWith(
+    textTheme: theme.textTheme.copyWith(
+      displayLarge: heading(theme.textTheme.displayLarge)
+          ?.copyWith(fontSize: 60, height: 1.1, fontWeight: FontWeight.w700),
+      displayMedium: heading(theme.textTheme.displayMedium),
+      displaySmall: heading(theme.textTheme.displaySmall),
+      headlineSmall: heading(theme.textTheme.headlineSmall),
+      headlineMedium: heading(theme.textTheme.headlineMedium),
+      titleSmall: heading(theme.textTheme.titleSmall),
+      headlineLarge: heading(theme.textTheme.headlineLarge)
+          ?.copyWith(fontSize: 36, height: 1.25, fontWeight: FontWeight.w700),
+      titleLarge: heading(theme.textTheme.titleLarge)
+          ?.copyWith(fontSize: 26, height: 1.35, fontWeight: FontWeight.w700),
+      titleMedium: heading(theme.textTheme.titleMedium)
+          ?.copyWith(fontSize: 20, height: 1.25, fontWeight: FontWeight.w700),
+      bodyLarge: theme.textTheme.bodyLarge?.copyWith(height: 1.8),
+    ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: surface,
       indicatorColor: primaryContainer,

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:handwriting_app/widgets/workbench_motion.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
@@ -84,7 +85,7 @@ void main() {
       );
       await tester.tap(keyed('open-preview'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(WorkbenchMotion.pane);
       expect(keyed('expand-preview'), findsOneWidget);
       expect(keyed('fullscreen-fine-edit'), findsNothing);
 

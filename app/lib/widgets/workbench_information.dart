@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import '../services/updates/update_controller.dart';
 import 'app_update_card.dart';
+import 'workbench_chapter_heading.dart';
 
 class WorkbenchInformation extends StatelessWidget {
   const WorkbenchInformation({
@@ -23,41 +24,55 @@ class WorkbenchInformation extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Image.asset(
-              'assets/branding/panache.png',
-              width: 64,
-              height: 64,
-              excludeFromSemantics: true,
+            WorkbenchChapterHeading(
+              title: l.about,
+              introduction: l.aboutText,
+              emblem: Image.asset(
+                'assets/branding/panache.png',
+                width: 52,
+                height: 52,
+                excludeFromSemantics: true,
+              ),
             ),
             const SizedBox(height: 24),
-            Text(l.about, style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 24),
-            Text(l.aboutText, style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 24),
-            Text(l.localDataNote),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => showLicensePage(
-                    context: context,
-                    applicationName: l.appTitle,
-                  ),
-                  icon: const Icon(Icons.description_outlined),
-                  label: Text(l.licenses),
+            Card.outlined(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.localDataNote),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => showLicensePage(
+                            context: context,
+                            applicationName: l.appTitle,
+                          ),
+                          icon: const Icon(Icons.description_outlined),
+                          label: Text(l.licenses),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => launchUrl(
+                            Uri.parse(
+                              'https://github.com/SXP-Simon/Panache/issues',
+                            ),
+                          ),
+                          icon: const Icon(Icons.bug_report_outlined),
+                          label: Text(l.feedback),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(l.feedbackHelp),
+                  ],
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => launchUrl(
-                    Uri.parse('https://github.com/SXP-Simon/Panache/issues'),
-                  ),
-                  icon: const Icon(Icons.bug_report_outlined),
-                  label: Text(l.feedback),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 24),
-            Text(l.feedbackHelp),
             if (updates != null && onReload != null) ...[
               const SizedBox(height: 24),
               AppUpdateCard(

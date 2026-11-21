@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/nouveau_ornament.dart';
+
 class WorkbenchPanel extends StatelessWidget {
   const WorkbenchPanel({
     super.key,
@@ -35,22 +37,7 @@ class WorkbenchPanel extends StatelessWidget {
                         MediaQuery.textScalerOf(context).scale(570);
                 final heading = Row(
                   children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(7),
-                        child: Icon(
-                          icon,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
+                    NouveauIconSeal(icon),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -70,7 +57,7 @@ class WorkbenchPanel extends StatelessWidget {
                 );
               },
             ),
-          if (!frameless) const Divider(height: 20),
+          if (!frameless) const NouveauWaveDivider(),
           Expanded(child: child),
         ],
       ),
@@ -97,7 +84,7 @@ class SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    const corners = BorderRadius.all(Radius.circular(12));
+    const corners = BorderRadius.all(Radius.circular(32));
     final expanded = initiallyExpanded;
     final body = Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -148,14 +135,11 @@ class SettingsGroup extends StatelessWidget {
                 textColor: colors.onPrimaryContainer,
                 expansionAnimationStyle: MediaQuery.disableAnimationsOf(context)
                     ? AnimationStyle.noAnimation
-                    : null,
-                children: [
-                  Divider(
-                    height: 1,
-                    color: colors.primary.withValues(alpha: .55),
-                  ),
-                  body,
-                ],
+                    : const AnimationStyle(
+                        duration: Duration(milliseconds: 500),
+                        curve: Curves.easeInOut,
+                      ),
+                children: [const NouveauWaveDivider(height: 12), body],
               ),
       ),
     );
@@ -199,7 +183,12 @@ class EditorToolbar extends StatelessWidget {
   Future<void> showTools(BuildContext context) => showModalBottomSheet<void>(
     sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
         ? AnimationStyle.noAnimation
-        : null,
+        : const AnimationStyle(
+            duration: Duration(milliseconds: 500),
+            reverseDuration: Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+            reverseCurve: Curves.easeInOut,
+          ),
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

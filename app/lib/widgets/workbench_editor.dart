@@ -42,6 +42,8 @@ class WorkbenchEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final markers = illustrationMarkers(controller.text);
     return WorkbenchPanel(
       title: l.editor,
@@ -63,137 +65,197 @@ class WorkbenchEditor extends StatelessWidget {
       ],
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
-          child: SizedBox(
-            height: math.max(
-              constraints.maxHeight,
-              markers.isEmpty ? 250 : 360,
-            ),
-            child: Column(
-              children: [
-                if (preparing) ...[
-                  const LinearProgressIndicator(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          preparationStopping
-                              ? l.stoppingTask
-                              : l.preparingText,
-                        ),
-                      ),
-                      TextButton.icon(
-                        key: const ValueKey('stop-text-preparation'),
-                        onPressed: preparationStopping
-                            ? null
-                            : onStopPreparation,
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        label: Text(l.stopTextPreparation),
-                      ),
-                    ],
-                  ),
-                ],
-                toolbar,
-                const SizedBox(height: 12),
-                Expanded(
-                  child: Semantics(
-                    identifier: 'text-input',
-                    child: TextField(
-                      key: const ValueKey('text-editor'),
-                      controller: controller,
-                      focusNode: focusNode,
-                      undoController: undo,
-                      enabled: !locked,
-                      expands: true,
-                      maxLines: null,
-                      minLines: null,
-                      textAlignVertical: TextAlignVertical.top,
-                      keyboardType: TextInputType.multiline,
-                      decoration: InputDecoration(
-                        hintText: l.editorHint,
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
-                      ),
-                      onChanged: onChanged,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+          child: Column(
+            children: [
+              if (preparing) ...[
+                const LinearProgressIndicator(),
+                Row(
                   children: [
-                    Text('${controller.text.runes.length} ${l.characters}'),
-                    TextButton.icon(
-                      label: Text(l.undo),
-                      onPressed: locked ? null : (onUndo ?? undo.undo),
-                      icon: const Icon(Icons.undo),
+                    Expanded(
+                      child: Text(
+                        preparationStopping ? l.stoppingTask : l.preparingText,
+                      ),
                     ),
                     TextButton.icon(
-                      label: Text(l.redo),
-                      onPressed: locked ? null : (onRedo ?? undo.redo),
-                      icon: const Icon(Icons.redo),
+                      key: const ValueKey('stop-text-preparation'),
+                      onPressed: preparationStopping ? null : onStopPreparation,
+                      icon: const Icon(Icons.stop_circle_outlined),
+                      label: Text(l.stopTextPreparation),
                     ),
                   ],
                 ),
-                if (markers.isEmpty)
-                  Text(
-                    l.editorNote,
-                    style: Theme.of(context).textTheme.bodySmall,
+              ],
+              toolbar,
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: math.max(
+                  152,
+                  constraints.maxHeight - (markers.isEmpty ? 168 : 248),
+                ),
+                child: Semantics(
+                  identifier: 'text-input',
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: colors.tertiary.withValues(alpha: .5),
+                      ),
+                    ),
+                    child: CustomPaint(
+                      painter: controller.text.isEmpty
+                          ? _ManuscriptRuling(colors.tertiary)
+                          : null,
+                      child: TextField(
+                        key: const ValueKey('text-editor'),
+                        controller: controller,
+                        focusNode: focusNode,
+                        undoController: undo,
+                        enabled: !locked,
+                        expands: true,
+                        maxLines: null,
+                        minLines: null,
+                        textAlignVertical: TextAlignVertical.top,
+                        keyboardType: TextInputType.multiline,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          height: 1.75,
+                        ),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 17,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(28),
+                            borderSide: BorderSide(
+                              color: colors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          hintText: l.editorHint,
+                          filled: false,
+                        ),
+                        onChanged: onChanged,
+                      ),
+                    ),
                   ),
-                if (markers.isNotEmpty) ...[
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
                   Text(
-                    l.editIllustrationHelp,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    '${controller.text.runes.length} ${l.characters}',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
-                  SizedBox(
-                    height: 72,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        for (final marker in markers)
-                          Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Semantics(
-                              identifier: 'illustration-${marker.start}',
-                              button: true,
-                              child: OutlinedButton(
-                                key: ValueKey('illustration-${marker.start}'),
-                                onPressed: locked || onEditImage == null
-                                    ? null
-                                    : () => onEditImage!(marker),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _IllustrationThumbnail(
-                                      source: images[marker.id] ?? '',
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          '#${marker.id} · ${marker.scale}%',
-                                        ),
-                                        const Icon(Icons.tune, size: 20),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                  TextButton.icon(
+                    label: Text(l.undo),
+                    onPressed: locked ? null : (onUndo ?? undo.undo),
+                    icon: const Icon(Icons.undo),
+                  ),
+                  TextButton.icon(
+                    label: Text(l.redo),
+                    onPressed: locked ? null : (onRedo ?? undo.redo),
+                    icon: const Icon(Icons.redo),
+                  ),
+                ],
+              ),
+              if (markers.isEmpty)
+                Text(
+                  l.editorNote,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if (markers.isNotEmpty) ...[
+                Text(
+                  l.editIllustrationHelp,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                SizedBox(
+                  height: 72,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final marker in markers)
+                        Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Semantics(
+                            identifier: 'illustration-${marker.start}',
+                            button: true,
+                            child: OutlinedButton(
+                              key: ValueKey('illustration-${marker.start}'),
+                              onPressed: locked || onEditImage == null
+                                  ? null
+                                  : () => onEditImage!(marker),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _IllustrationThumbnail(
+                                    source: images[marker.id] ?? '',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text('#${marker.id} · ${marker.scale}%'),
+                                      const Icon(Icons.tune, size: 20),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Faint writing guides on the unused portion of the blank manuscript.
+class _ManuscriptRuling extends CustomPainter {
+  const _ManuscriptRuling(this.ink);
+  final Color ink;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width < 72) return;
+    final pen = Paint()
+      ..color = ink.withValues(alpha: .18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .8;
+    for (double y = 78; y < size.height - 23; y += 32) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(23, y)
+          ..cubicTo(
+            size.width * .34,
+            y - 1.6,
+            size.width * .67,
+            y + 1.6,
+            size.width - 23,
+            y,
+          ),
+        pen,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ManuscriptRuling oldDelegate) => ink != oldDelegate.ink;
 }
 
 /// Retain decoded bytes across editor rebuilds instead of decoding base64 on

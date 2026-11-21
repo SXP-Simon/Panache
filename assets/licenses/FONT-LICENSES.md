@@ -27,6 +27,8 @@ OFL 允许将字体与软件一起分发和销售，但不能单独销售字体�
 
 ## 许可文件维护
 
+客户端的标题字体 Playfair Display 使用 Google Fonts 分发的原始可变字体，仅供界面排版。版权声明和完整许可随包提供。[字体来源](https://github.com/google/fonts/tree/main/ofl/playfairdisplay) · [OFL 1.1 许可](PlayfairDisplay-OFL.txt)
+
 内部数学备用字体 `HandwritingMathSymbols.ttf` 来自 KaTeX AMS，`PanacheMathScript.ttf` 来自 KaTeX Caligraphic。两个原始 TTF 的内部许可字段均指定 **SIL OFL 1.1**，随附[完整字体许可与版权](katex-math-fonts-OFL.txt)；KaTeX 仓库的 MIT 许可不替代字体许可。
 
 两个字库分别重映射黑板粗体和花体大写字母，均已修改家族名称以遵守 Reserved Font Name；只在所选手写字体缺字时回退，不作为用户可选字体。分别通过 `scripts/build-math-symbol-font.py` 和 `scripts/build-math-script-font.py` 从 KaTeX 原始 TTF 重建；后者接受 `--source` 与 `--output` 参数。字体内原始版权与许可记录保留。

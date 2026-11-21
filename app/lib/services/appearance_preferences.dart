@@ -10,11 +10,14 @@ class AppearancePreferences extends ChangeNotifier {
   final Future<SharedPreferences> Function() _open;
   static const colorKey = 'panache.themeColor';
   static const secondaryColorKey = 'panache.secondaryThemeColor';
+  static const modeKey = 'panache.themeMode';
   static const motionKey = 'panache.reduceMotion';
   static const guideReadKey = 'panache.quickStartRead';
   bool? _guideRead;
   bool get guideUnread => _guideRead == false;
   bool reduceMotion = false;
+  ThemeMode mode = ThemeMode.system;
+  int _modeRevision = 0;
   int _motionRevision = 0;
   Color color = defaultThemeColor;
   Color secondaryColor = defaultSecondaryThemeColor;
@@ -29,6 +32,7 @@ class AppearancePreferences extends ChangeNotifier {
 
   Future<void> restore() async {
     final revision = _revision;
+    final modeRevision = _modeRevision;
     final motionRevision = _motionRevision;
     final secondaryRevision = _secondaryRevision;
     try {
@@ -37,6 +41,13 @@ class AppearancePreferences extends ChangeNotifier {
       if (preferences.getBool(guideReadKey) == true) _guideRead = true;
       final value = preferences.getInt(colorKey);
       final secondaryValue = preferences.getInt(secondaryColorKey);
+      if (modeRevision == _modeRevision) {
+        mode = switch (preferences.getString(modeKey)) {
+          'light' => ThemeMode.light,
+          'dark' => ThemeMode.dark,
+          _ => ThemeMode.system,
+        };
+      }
       if (motionRevision == _motionRevision) {
         reduceMotion = preferences.getBool(motionKey) ?? false;
       }
@@ -68,6 +79,13 @@ class AppearancePreferences extends ChangeNotifier {
     return _save(
       (storage) => storage.setInt(secondaryColorKey, value.toARGB32()),
     );
+  }
+
+  Future<bool> setMode(ThemeMode value) {
+    mode = value;
+    ++_modeRevision;
+    _emit();
+    return _save((storage) => storage.setString(modeKey, value.name));
   }
 
   Future<bool> setColor(Color value) async {

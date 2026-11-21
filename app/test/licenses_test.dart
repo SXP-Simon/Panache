@@ -30,6 +30,7 @@ void main() {
     }
     for (final font in [
       'lxgw-wenkai',
+      'PlayfairDisplay',
       'lxgw-marker-gothic',
       'yozai',
       'zhimangxing',

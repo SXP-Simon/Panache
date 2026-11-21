@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Motion belongs to presentation. Business operations never wait for this clock.
 abstract final class WorkbenchMotion {
-  static const pane = Duration(milliseconds: 240);
-  static const page = Duration(milliseconds: 280);
+  static const pane = Duration(milliseconds: 500);
+  static const page = Duration(milliseconds: 600);
 }
 
 /// Keeps each pane mounted once, including its form fields and scroll position.
@@ -29,7 +29,7 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
     duration: WorkbenchMotion.pane,
     value: 1,
   )..addStatusListener(_finished);
-  late final _progress = _clock.drive(CurveTween(curve: Curves.easeOutCubic));
+  late final _progress = _clock.drive(CurveTween(curve: Curves.easeInOut));
   late int _to = widget.index;
   int? _from;
   double _direction = 1;

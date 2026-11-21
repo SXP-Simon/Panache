@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/nouveau_ornament.dart';
+import 'atelier_ornament.dart';
 import 'project_source_link.dart';
 import 'workbench_guide.dart';
 import 'workbench_motion.dart';
@@ -16,6 +18,8 @@ class WorkbenchShell extends StatelessWidget {
     this.secondaryThemeColor = defaultSecondaryThemeColor,
     this.onSecondaryThemeColorChanged,
     this.onThemeColorChanged,
+    this.themeMode = ThemeMode.system,
+    this.onThemeModeChanged,
     this.reduceMotion = false,
     this.onReduceMotionChanged,
     this.updateAvailable = false,
@@ -34,6 +38,8 @@ class WorkbenchShell extends StatelessWidget {
     required this.informationBuilder,
   });
   final Color themeColor, secondaryThemeColor;
+  final ThemeMode themeMode;
+  final Future<bool> Function(ThemeMode)? onThemeModeChanged;
   final bool reduceMotion;
   final Future<bool> Function(bool)? onReduceMotionChanged;
   final Future<bool> Function(Color)? onThemeColorChanged,
@@ -54,39 +60,96 @@ class WorkbenchShell extends StatelessWidget {
         MediaQuery.sizeOf(context).width < 1100 &&
         MediaQuery.viewInsetsOf(context).bottom > 0;
     final labels = [l.workspace, l.guide, l.about];
+    final compact = MediaQuery.sizeOf(context).width < 900;
+    final colors = Theme.of(context).colorScheme;
+    const ivory = Color(0xfffaf7ef);
+    final forest = Color.alphaBlend(
+      const Color(0xff1b2918).withValues(alpha: .60),
+      themeColor,
+    );
     return Scaffold(
       appBar: fineFullscreen
           ? null
-          : MediaQuery.sizeOf(context).width < 900
-          ? AppBar(
-              title: Text(labels[destination]),
-              automaticallyImplyLeading: false,
-              actions: [
-                Semantics(
-                  hint: guideUnread ? l.guideUnread : null,
-                  child: TextButton.icon(
-                    key: const ValueKey('app-preferences'),
-                    onPressed: () => preferencesSheet(context),
-                    icon: Badge(
-                      isLabelVisible: updateAvailable || guideUnread,
-                      backgroundColor: updateAvailable
-                          ? null
-                          : Theme.of(context).colorScheme.primary,
-                      child: const Icon(Icons.settings_outlined),
-                    ),
-                    label: Text(l.appPreferences),
-                  ),
-                ),
-              ],
-            )
           : AppBar(
-              title: const ProjectSourceLink(),
-              bottom: showKeyboardDismiss
+              toolbarHeight: compact ? 64 : 84,
+              titleSpacing: compact ? 6 : 18,
+              automaticallyImplyLeading: false,
+              centerTitle: false,
+              backgroundColor: forest,
+              foregroundColor: ivory,
+              surfaceTintColor: Colors.transparent,
+              flexibleSpace: Stack(
+                children: [
+                  if (MediaQuery.sizeOf(context).width >= 1100)
+                    Positioned(
+                      top: 0,
+                      bottom: 0,
+                      left: 425,
+                      right: 355,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: CustomPaint(
+                          size: const Size(340, 84),
+                          painter: const AtelierTendrils(),
+                        ),
+                      ),
+                    ),
+                  const Align(
+                    alignment: Alignment.bottomCenter,
+                    child: NouveauWaveDivider(height: 7),
+                  ),
+                ],
+              ),
+              title: Row(
+                children: [
+                  CustomPaint(
+                    size: Size.square(compact ? 48 : 78),
+                    painter: const AtelierIris(),
+                  ),
+                  SizedBox(width: compact ? 7 : 12),
+                  Flexible(
+                    child: Text(
+                      compact ? labels[destination] : 'Panache',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineLarge
+                          ?.copyWith(
+                            color: ivory,
+                            fontSize: compact ? 22 : 37,
+                            fontFamily: 'Playfair Display',
+                            fontFamilyFallback: const [
+                              'packages/handwriting_assets/LXGW WenKai',
+                            ],
+                            height: 1.1,
+                            letterSpacing: compact ? 0 : 1,
+                          ),
+                    ),
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: 20),
+                    Material(
+                      color: ivory.withValues(alpha: .07),
+                      borderRadius: BorderRadius.circular(32),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: colors.copyWith(primary: ivory),
+                          textButtonTheme: TextButtonThemeData(
+                            style: TextButton.styleFrom(foregroundColor: ivory),
+                          ),
+                        ),
+                        child: const ProjectSourceLink(),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              bottom: !compact && showKeyboardDismiss
                   ? PreferredSize(
                       preferredSize: const Size.fromHeight(40),
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
+                          style: TextButton.styleFrom(foregroundColor: ivory),
                           onPressed: () => FocusScope.of(context).unfocus(),
                           icon: const Icon(Icons.keyboard_hide_outlined),
                           label: Text(l.dismissKeyboard),
@@ -95,39 +158,45 @@ class WorkbenchShell extends StatelessWidget {
                     )
                   : null,
               actions: [
-                IconButton(
-                  key: const ValueKey('open-guide'),
-                  tooltip: guideUnread
-                      ? '${l.guide} · ${l.guideUnread}'
-                      : l.guide,
-                  onPressed: () => onDestinationSelected(1),
-                  icon: GuideUnreadBadge(
-                    unread: guideUnread,
-                    child: const Icon(Icons.menu_book_outlined),
+                if (!compact) ...[
+                  IconButton(
+                    key: const ValueKey('open-guide'),
+                    tooltip: guideUnread
+                        ? '${l.guide} · ${l.guideUnread}'
+                        : l.guide,
+                    onPressed: () => onDestinationSelected(1),
+                    icon: GuideUnreadBadge(
+                      unread: guideUnread,
+                      child: const Icon(Icons.menu_book_outlined),
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: l.about,
-                  onPressed: () => onDestinationSelected(2),
-                  icon: Badge(
-                    isLabelVisible: updateAvailable,
-                    child: const Icon(Icons.info_outline),
+                  IconButton(
+                    tooltip: l.about,
+                    onPressed: () => onDestinationSelected(2),
+                    icon: Badge(
+                      isLabelVisible: updateAvailable,
+                      child: const Icon(Icons.info_outline),
+                    ),
                   ),
-                ),
-                if (MediaQuery.sizeOf(context).width < 1100) ...[
-                  TextButton.icon(
+                ],
+                Semantics(
+                  hint: guideUnread && compact ? l.guideUnread : null,
+                  child: TextButton.icon(
                     key: const ValueKey('app-preferences'),
+                    style: TextButton.styleFrom(foregroundColor: ivory),
                     onPressed: () => preferencesSheet(context),
-                    icon: const Icon(Icons.settings_outlined),
+                    icon: Badge(
+                      isLabelVisible:
+                          compact && (updateAvailable || guideUnread),
+                      backgroundColor: updateAvailable
+                          ? null
+                          : const Color(0xffc9a227),
+                      child: const Icon(Icons.tune),
+                    ),
                     label: Text(l.appPreferences),
                   ),
-                ] else ...[
-                  TextButton.icon(
-                    key: const ValueKey('app-preferences'),
-                    onPressed: () => preferencesSheet(context),
-                    icon: const Icon(Icons.palette_outlined),
-                    label: Text(l.appPreferences),
-                  ),
+                ),
+                if (MediaQuery.sizeOf(context).width >= 1100) ...[
                   IconButton(
                     tooltip: l.language,
                     onPressed: onToggleLocale,
@@ -139,6 +208,7 @@ class WorkbenchShell extends StatelessWidget {
                     icon: const Icon(Icons.contrast),
                   ),
                 ],
+                SizedBox(width: compact ? 3 : 16),
               ],
             ),
       body: SafeArea(
@@ -255,6 +325,34 @@ class WorkbenchShell extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.contrast),
                     title: Text(l.theme),
+                    subtitle: Text(switch (themeMode) {
+                      ThemeMode.system => l.themeSystem,
+                      ThemeMode.light => l.themeLight,
+                      ThemeMode.dark => l.themeDark,
+                    }),
+                    trailing: onThemeModeChanged == null
+                        ? null
+                        : PopupMenuButton<ThemeMode>(
+                            tooltip: l.chooseTheme,
+                            icon: const Icon(Icons.expand_more),
+                            initialValue: themeMode,
+                            itemBuilder: (_) => [
+                              for (final (mode, label) in [
+                                (ThemeMode.system, l.themeSystem),
+                                (ThemeMode.light, l.themeLight),
+                                (ThemeMode.dark, l.themeDark),
+                              ])
+                                CheckedPopupMenuItem(
+                                  value: mode,
+                                  checked: themeMode == mode,
+                                  child: Text(label),
+                                ),
+                            ],
+                            onSelected: (value) {
+                              Navigator.pop(sheetContext);
+                              onThemeModeChanged!(value);
+                            },
+                          ),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       onToggleTheme();
