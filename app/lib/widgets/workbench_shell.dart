@@ -64,7 +64,6 @@ class WorkbenchShell extends StatelessWidget {
     final mastheadInk =
         Theme.of(context).appBarTheme.foregroundColor ?? colors.onSurface;
     final usePaletteArt =
-        dark ||
         themeColor != defaultThemeColor ||
         secondaryThemeColor != defaultSecondaryThemeColor;
     return Scaffold(
