@@ -56,11 +56,16 @@ void main() {
         await tester.pumpAndSettle();
       }
       final link = find.byKey(const ValueKey('project-source-link'));
+      if (width < 900) {
+        final scrollable = find.descendant(
+          of: find.byKey(const ValueKey('app-settings-list')),
+          matching: find.byType(Scrollable),
+        );
+        await tester.scrollUntilVisible(link, 160, scrollable: scrollable);
+        await tester.pumpAndSettle();
+      }
       expect(link, findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('panache-brand-mark')),
-        findsNothing,
-      );
+      expect(find.byKey(const ValueKey('panache-brand-mark')), findsNothing);
       expect(find.text('SXP-Simon/Panache'), findsOneWidget);
 
       await tester.ensureVisible(link);

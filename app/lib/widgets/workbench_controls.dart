@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'workbench_card.dart';
+
 import '../theme/nouveau_ornament.dart';
 
 class WorkbenchPanel extends StatelessWidget {
@@ -20,7 +22,7 @@ class WorkbenchPanel extends StatelessWidget {
   final bool frameless;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => WorkbenchCard(
     margin: frameless ? EdgeInsets.zero : null,
     shape: frameless ? const RoundedRectangleBorder() : null,
     child: Padding(
@@ -95,7 +97,7 @@ class SettingsGroup extends StatelessWidget {
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Card.outlined(
+      child: WorkbenchCard(
         color: colors.surfaceContainerLow,
         clipBehavior: Clip.antiAlias,
         child: expanded == null

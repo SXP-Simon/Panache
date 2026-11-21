@@ -5,7 +5,9 @@ import '../l10n/app_localizations.dart';
 
 /// The repository stays visible in the application header on every screen.
 class ProjectSourceLink extends StatelessWidget {
-  const ProjectSourceLink({super.key});
+  const ProjectSourceLink({super.key, this.foreground});
+
+  final Color? foreground;
 
   static final uri = Uri.parse('https://github.com/SXP-Simon/Panache');
 
@@ -16,13 +18,16 @@ class ProjectSourceLink extends StatelessWidget {
       key: const ValueKey('project-source-link'),
       onPressed: () => launchUrl(uri),
       style: TextButton.styleFrom(
+        foregroundColor: foreground,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         visualDensity: VisualDensity.compact,
       ),
       icon: ExcludeSemantics(
         child: CustomPaint(
           size: const Size.square(18),
-          painter: _GitHubMark(Theme.of(context).colorScheme.primary),
+          painter: _GitHubMark(
+            foreground ?? Theme.of(context).colorScheme.primary,
+          ),
         ),
       ),
       label: const Text('SXP-Simon/Panache', style: TextStyle(fontSize: 13)),

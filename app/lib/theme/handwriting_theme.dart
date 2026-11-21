@@ -16,11 +16,29 @@ ThemeData handwritingTheme(
   Color secondaryColor = defaultSecondaryThemeColor,
 }) {
   final dark = brightness == Brightness.dark;
-  final surface = dark ? NouveauColors.night : NouveauColors.ivory;
-  final raised = dark ? const Color(0xFF202634) : NouveauColors.softIvory;
-  final foreground = dark ? const Color(0xFFEDF1FC) : NouveauColors.forest;
-  final muted = dark ? const Color(0xFFBBC3D5) : const Color(0xFF526047);
-  final outline = dark ? const Color(0xFF8793AB) : const Color(0xFF797456);
+  final iris =
+      seedColor == defaultThemeColor &&
+      secondaryColor == defaultSecondaryThemeColor;
+  final hue = HSLColor.fromColor(
+    seedColor == defaultThemeColor ? secondaryColor : seedColor,
+  );
+  // Large surfaces share a neutral ramp. Hue adds only a trace of warmth or
+  // coolness; saturated user-picked colors stay on small interactive elements.
+  final surfaceHue = iris ? (dark ? 226.0 : 38.0) : hue.hue;
+  final saturation = iris
+      ? (dark ? .108 : .13)
+      : hue.saturation.clamp(0.0, .085);
+  Color surfaceTone(double daylight, double moonlight) => HSLColor.fromAHSL(
+    1,
+    surfaceHue,
+    saturation,
+    dark ? moonlight : daylight,
+  ).toColor();
+  final surface = surfaceTone(.943, .18);
+  final raised = surfaceTone(.982, .232);
+  final foreground = surfaceTone(.17, .943);
+  final muted = surfaceTone(.355, .788);
+  final outline = surfaceTone(.45, .66);
   final base = ColorScheme.fromSeed(
     seedColor: dark && seedColor == defaultThemeColor
         ? NouveauColors.moonMint
@@ -39,7 +57,7 @@ ThemeData handwritingTheme(
             ? NouveauColors.moonIris
             : secondaryColor)
         .withValues(alpha: dark ? .16 : .13),
-    raised,
+    dark ? const Color(0xFF383B41) : const Color(0xFFFAF9F7),
   );
   final secondary = dark && secondaryColor == defaultSecondaryThemeColor
       ? NouveauColors.moonIris
@@ -50,9 +68,12 @@ ThemeData handwritingTheme(
           dark ? .55 : .22,
           4.5,
         );
-  final border = dark
-      ? Color.lerp(const Color(0xFF394055), primary, .09)!
-      : Color.alphaBlend(NouveauColors.gold.withValues(alpha: .40), raised);
+  final trim = iris ? NouveauColors.gold : hue.withLightness(.60).toColor();
+  final border = Color.lerp(
+    surfaceTone(.81, .325),
+    dark ? primary : trim,
+    dark ? .08 : .15,
+  )!;
   final scheme = base.copyWith(
     primary: primary,
     onPrimary: !dark && seedColor == defaultThemeColor
@@ -66,25 +87,19 @@ ThemeData handwritingTheme(
     onSecondaryContainer: secondary,
     tertiary: dark
         ? Color.lerp(primary, secondary, .65)!
-        : const Color(0xFF78601B),
+        : iris
+        ? const Color(0xFF78601B)
+        : hue.withLightness(.34).toColor(),
     surface: surface,
     onSurface: foreground,
     onSurfaceVariant: muted,
-    surfaceDim: dark ? const Color(0xFF0D101A) : const Color(0xFFE9E3D1),
-    surfaceBright: dark ? const Color(0xFF394155) : NouveauColors.softIvory,
-    surfaceContainerLowest: dark
-        ? const Color(0xFF0C1019)
-        : NouveauColors.softIvory,
-    surfaceContainerLow: dark
-        ? const Color(0xFF181D29)
-        : const Color(0xFFFBF8EE),
+    surfaceDim: surfaceTone(.907, .166),
+    surfaceBright: surfaceTone(.995, .315),
+    surfaceContainerLowest: surfaceTone(.963, .198),
+    surfaceContainerLow: surfaceTone(.971, .212),
     surfaceContainer: raised,
-    surfaceContainerHigh: dark
-        ? const Color(0xFF293043)
-        : const Color(0xFFEEE9D8),
-    surfaceContainerHighest: dark
-        ? const Color(0xFF343C50)
-        : const Color(0xFFE5DFCA),
+    surfaceContainerHigh: surfaceTone(.924, .258),
+    surfaceContainerHighest: surfaceTone(.899, .28),
     outline: outline,
     outlineVariant: border,
     surfaceTint: Colors.transparent,
@@ -107,7 +122,7 @@ ThemeData handwritingTheme(
     colorScheme: scheme,
     scaffoldBackgroundColor: surface,
     appBarTheme: AppBarThemeData(
-      backgroundColor: surface,
+      backgroundColor: surfaceTone(.966, .222),
       foregroundColor: foreground,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -130,9 +145,7 @@ ThemeData handwritingTheme(
     ),
     cardTheme: CardThemeData(
       elevation: 2,
-      shadowColor: dark
-          ? Colors.black54
-          : NouveauColors.forest.withValues(alpha: .22),
+      shadowColor: dark ? Colors.black54 : foreground.withValues(alpha: .22),
       margin: EdgeInsets.zero,
       color: raised,
       shape: cardShape,
@@ -146,20 +159,18 @@ ThemeData handwritingTheme(
                 (states) =>
                     states.contains(WidgetState.hovered) &&
                         !states.contains(WidgetState.disabled)
-                    ? NouveauColors.gold
+                    ? trim
                     : null,
               ),
               foregroundColor: WidgetStateProperty.resolveWith(
                 (states) =>
                     states.contains(WidgetState.hovered) &&
                         !states.contains(WidgetState.disabled)
-                    ? const Color(0xFF172019)
+                    ? _onSolidColor(trim)
                     : null,
               ),
               shape: const WidgetStatePropertyAll(controlShape),
-              side: const WidgetStatePropertyAll(
-                BorderSide(color: NouveauColors.gold),
-              ),
+              side: WidgetStatePropertyAll(BorderSide(color: trim)),
             ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(

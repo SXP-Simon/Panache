@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'workbench_card.dart';
+
 import '../l10n/app_localizations.dart';
 import '../theme/nouveau_ornament.dart';
 import 'workbench_chapter_heading.dart';
@@ -79,7 +81,7 @@ class WorkbenchGuide extends StatelessWidget {
               emblem: const NouveauIconSeal(Icons.menu_book_outlined),
             ),
             const SizedBox(height: 16),
-            Card.outlined(
+            WorkbenchCard(
               margin: EdgeInsets.zero,
               clipBehavior: Clip.antiAlias,
               child: Column(

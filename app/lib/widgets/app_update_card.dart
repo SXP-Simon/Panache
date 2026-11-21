@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'workbench_card.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
@@ -55,7 +58,7 @@ class AppUpdateCard extends StatelessWidget {
         UpdateProblem.restartCancelled => l.updateRestartCancelled,
         UpdateProblem.anotherInstance => l.updateAnotherInstance,
       };
-      return Card(
+      return WorkbenchCard(
         key: const ValueKey('app-updates'),
         child: Padding(
           padding: const EdgeInsets.all(20),

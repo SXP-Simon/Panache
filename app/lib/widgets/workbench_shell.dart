@@ -61,16 +61,12 @@ class WorkbenchShell extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 900;
     final colors = Theme.of(context).colorScheme;
     final dark = colors.brightness == Brightness.dark;
-    final mastheadInk = dark ? colors.onSurface : NouveauColors.softIvory;
-    final masthead = dark
-        ? Color.alphaBlend(
-            colors.secondary.withValues(alpha: .075),
-            colors.surfaceContainerLow,
-          )
-        : Color.alphaBlend(
-            const Color(0xff1b2918).withValues(alpha: .60),
-            themeColor,
-          );
+    final mastheadInk =
+        Theme.of(context).appBarTheme.foregroundColor ?? colors.onSurface;
+    final usePaletteArt =
+        dark ||
+        themeColor != defaultThemeColor ||
+        secondaryThemeColor != defaultSecondaryThemeColor;
     return Scaffold(
       appBar: fineFullscreen
           ? null
@@ -79,8 +75,6 @@ class WorkbenchShell extends StatelessWidget {
               titleSpacing: compact ? 6 : 18,
               automaticallyImplyLeading: false,
               centerTitle: false,
-              backgroundColor: masthead,
-              foregroundColor: mastheadInk,
               surfaceTintColor: Colors.transparent,
               flexibleSpace: Stack(
                 children: [
@@ -95,7 +89,7 @@ class WorkbenchShell extends StatelessWidget {
                         child: CustomPaint(
                           size: const Size(340, 84),
                           painter: AtelierTendrils(
-                            nightColors: dark ? colors : null,
+                            palette: usePaletteArt ? colors : null,
                           ),
                         ),
                       ),
@@ -110,7 +104,9 @@ class WorkbenchShell extends StatelessWidget {
                 children: [
                   CustomPaint(
                     size: Size.square(compact ? 48 : 78),
-                    painter: AtelierIris(nightColors: dark ? colors : null),
+                    painter: AtelierIris(
+                      palette: usePaletteArt ? colors : null,
+                    ),
                   ),
                   SizedBox(width: compact ? 7 : 12),
                   Flexible(
@@ -134,19 +130,10 @@ class WorkbenchShell extends StatelessWidget {
                   if (!compact) ...[
                     const SizedBox(width: 20),
                     Material(
+                      animationDuration: Duration.zero,
                       color: mastheadInk.withValues(alpha: .07),
                       borderRadius: BorderRadius.circular(32),
-                      child: Theme(
-                        data: Theme.of(context).copyWith(
-                          colorScheme: colors.copyWith(primary: mastheadInk),
-                          textButtonTheme: TextButtonThemeData(
-                            style: TextButton.styleFrom(
-                              foregroundColor: mastheadInk,
-                            ),
-                          ),
-                        ),
-                        child: const ProjectSourceLink(),
-                      ),
+                      child: ProjectSourceLink(foreground: mastheadInk),
                     ),
                   ],
                 ],
@@ -200,7 +187,7 @@ class WorkbenchShell extends StatelessWidget {
                           compact && (updateAvailable || guideUnread),
                       backgroundColor: updateAvailable
                           ? null
-                          : dark
+                          : usePaletteArt
                           ? colors.secondary
                           : NouveauColors.gold,
                       child: const Icon(Icons.tune),
@@ -289,132 +276,132 @@ class WorkbenchShell extends StatelessWidget {
                           80)
                       .clamp(100, double.infinity),
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    title: Text(
-                      l.appPreferences,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+            child: ListView(
+              key: const ValueKey('app-settings-list'),
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: [
+                ListTile(
+                  title: Text(
+                    l.appPreferences,
+                    style: Theme.of(sheetContext).textTheme.titleLarge,
                   ),
-                  ListTile(
-                    leading: GuideUnreadBadge(
-                      unread: guideUnread,
-                      child: const Icon(Icons.menu_book_outlined),
-                    ),
-                    title: Text(l.guide),
-                    subtitle: guideUnread ? Text(l.guideUnread) : null,
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      onDestinationSelected(1);
-                    },
+                ),
+                ListTile(
+                  leading: GuideUnreadBadge(
+                    unread: guideUnread,
+                    child: const Icon(Icons.menu_book_outlined),
                   ),
-                  ListTile(
-                    leading: Icon(
-                      connected
-                          ? Icons.cloud_done_outlined
-                          : Icons.cloud_off_outlined,
-                    ),
-                    title: Text(managedBackend ? l.localEngine : l.connection),
-                    subtitle: Text(connected ? l.connected : l.disconnected),
-                    onTap: locked || managedBackend
-                        ? null
-                        : () {
+                  title: Text(l.guide),
+                  subtitle: guideUnread ? Text(l.guideUnread) : null,
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onDestinationSelected(1);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    connected
+                        ? Icons.cloud_done_outlined
+                        : Icons.cloud_off_outlined,
+                  ),
+                  title: Text(managedBackend ? l.localEngine : l.connection),
+                  subtitle: Text(connected ? l.connected : l.disconnected),
+                  onTap: locked || managedBackend
+                      ? null
+                      : () {
+                          Navigator.pop(sheetContext);
+                          onConnection();
+                        },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.translate),
+                  title: Text(l.language),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onToggleLocale();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.contrast),
+                  title: Text(l.theme),
+                  subtitle: Text(switch (themeMode) {
+                    ThemeMode.system => l.themeSystem,
+                    ThemeMode.light => l.themeLight,
+                    ThemeMode.dark => l.themeDark,
+                  }),
+                  trailing: onThemeModeChanged == null
+                      ? null
+                      : PopupMenuButton<ThemeMode>(
+                          tooltip: l.chooseTheme,
+                          icon: const Icon(Icons.expand_more),
+                          initialValue: themeMode,
+                          itemBuilder: (_) => [
+                            for (final (mode, label) in [
+                              (ThemeMode.system, l.themeSystem),
+                              (ThemeMode.light, l.themeLight),
+                              (ThemeMode.dark, l.themeDark),
+                            ])
+                              CheckedPopupMenuItem(
+                                value: mode,
+                                checked: themeMode == mode,
+                                child: Text(label),
+                              ),
+                          ],
+                          onSelected: (value) {
                             Navigator.pop(sheetContext);
-                            onConnection();
+                            onThemeModeChanged!(value);
+                          },
+                        ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onToggleTheme();
+                  },
+                ),
+                ThemeColorEditor(
+                  color: themeColor,
+                  secondaryColor: secondaryThemeColor,
+                  onPaletteChanged: onPaletteChanged,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(l.about),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onDestinationSelected(2);
+                  },
+                ),
+                StatefulBuilder(
+                  builder: (context, update) => SwitchListTile(
+                    key: const ValueKey('reduce-motion'),
+                    secondary: const Icon(Icons.animation),
+                    title: Text(l.reduceMotion),
+                    subtitle: Text(l.reduceMotionHint),
+                    value: motion,
+                    onChanged: onReduceMotionChanged == null
+                        ? null
+                        : (value) async {
+                            update(() => motion = value);
+                            final saved = await onReduceMotionChanged!(value);
+                            if (!saved && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(l.motionSaveFailed)),
+                              );
+                            }
                           },
                   ),
+                ),
+                if (version.isNotEmpty)
                   ListTile(
-                    leading: const Icon(Icons.translate),
-                    title: Text(l.language),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      onToggleLocale();
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.contrast),
-                    title: Text(l.theme),
-                    subtitle: Text(switch (themeMode) {
-                      ThemeMode.system => l.themeSystem,
-                      ThemeMode.light => l.themeLight,
-                      ThemeMode.dark => l.themeDark,
-                    }),
-                    trailing: onThemeModeChanged == null
-                        ? null
-                        : PopupMenuButton<ThemeMode>(
-                            tooltip: l.chooseTheme,
-                            icon: const Icon(Icons.expand_more),
-                            initialValue: themeMode,
-                            itemBuilder: (_) => [
-                              for (final (mode, label) in [
-                                (ThemeMode.system, l.themeSystem),
-                                (ThemeMode.light, l.themeLight),
-                                (ThemeMode.dark, l.themeDark),
-                              ])
-                                CheckedPopupMenuItem(
-                                  value: mode,
-                                  checked: themeMode == mode,
-                                  child: Text(label),
-                                ),
-                            ],
-                            onSelected: (value) {
-                              Navigator.pop(sheetContext);
-                              onThemeModeChanged!(value);
-                            },
-                          ),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      onToggleTheme();
-                    },
-                  ),
-                  ThemeColorEditor(
-                    color: themeColor,
-                    secondaryColor: secondaryThemeColor,
-                    onPaletteChanged: onPaletteChanged,
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: Text(l.about),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      onDestinationSelected(2);
-                    },
-                  ),
-                  StatefulBuilder(
-                    builder: (context, update) => SwitchListTile(
-                      key: const ValueKey('reduce-motion'),
-                      secondary: const Icon(Icons.animation),
-                      title: Text(l.reduceMotion),
-                      subtitle: Text(l.reduceMotionHint),
-                      value: motion,
-                      onChanged: onReduceMotionChanged == null
-                          ? null
-                          : (value) async {
-                              update(() => motion = value);
-                              final saved = await onReduceMotionChanged!(value);
-                              if (!saved && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(l.motionSaveFailed)),
-                                );
-                              }
-                            },
+                    title: Text(l.installedEngineVersion),
+                    trailing: Semantics(
+                      identifier: 'app-version',
+                      child: Text('v$version'),
                     ),
                   ),
-                  if (version.isNotEmpty)
-                    ListTile(
-                      title: Text(l.installedEngineVersion),
-                      trailing: Semantics(
-                        identifier: 'app-version',
-                        child: Text('v$version'),
-                      ),
-                    ),
-                  const ProjectSourceLink(),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                const ProjectSourceLink(),
+                const SizedBox(height: 16),
+              ],
             ),
           ),
         ),

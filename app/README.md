@@ -2,7 +2,7 @@
 
 Panache 的 Flutter 客户端使用 Material Design 3 手写体生成界面。Windows/macOS/Linux 桌面分发包内置 Rust 引擎和字体，打开客户端即可离线生成，无需安装 Python、Rust 或手动启动服务器。Web 连接 HTTP 后端；Android/iOS 随包内置 Rust FFI 引擎，生成、导入和导出可离线完成。
 
-UI 采用新艺术运动风格的 Material Design 3 主题，浅色采用象牙纸色，深色采用墨蓝底与薄荷绿、鸢尾紫点缀。配色面板提供鸢尾、青瓷、珊瑚玫瑰三组预设，可预览当前组合或自定义双色。应用设置可以切换浅色、深色或跟随系统，并记住选择。标题使用随包提供的 Playfair Display 和霞鹜文楷，纸张使用用户选定的手写字体。
+UI 采用新艺术运动风格的 Material Design 3 主题，浅色使用暖白纸面，深色使用石板灰分层背景。每套配色为中性底色加入轻微的冷暖倾向，主色和辅助色用于选中项、操作按钮与花饰。配色面板提供鸢尾、青瓷、珊瑚玫瑰三组预设，可预览当前组合或自定义双色。应用设置可以切换浅色、深色或跟随系统，并记住选择。标题使用随包提供的 Playfair Display 和霞鹜文楷，纸张使用用户选定的手写字体。
 
 架构与职责划分见 [客户端架构](../docs/flutter-architecture.md)，环境安装和 Windows 工具链入口见 [移动开发环境](../scripts/MOBILE_ENVIRONMENT.md)。
 
@@ -117,14 +117,16 @@ python3 ../scripts/build-flutter-web.py
 
 ### 动效性能回归
 
-在目标刷新率的显示器上，以原生 Windows Profile 构建运行以下命令。保持应用窗口可见，使用同一显示器、窗口尺寸及缩放比例比较改动前后的结果。
+在 Windows 上从仓库根目录运行。先查看已启用的显示器及其当前刷新率，再指定要验证的屏幕。
 
-```bash
-cd app
-flutter drive --profile -d windows --driver=test_driver/motion_profile.dart --target=integration_test/workbench_motion_profile_test.dart
+```powershell
+python scripts/place-motion-window.py --list
+python scripts/place-motion-window.py --drive --hz 165 --passes 8
 ```
 
-测试先用轻量 ticker 校准实际刷新间隔，取校准间隔与系统报告周期中较短者作为每帧预算，再预热并重复操作分区、翻页、明暗切换、设置面板和配色预设。结果写入 `app/build/workbench_motion.json`。各操作的 UI 构建和光栅化 P95 均须在一帧预算内，连续动效的刷新间隔 P95 须在 1.5 个周期以内。报告同时记录 P99、最长间隔及超时次数，供定位偶发卡顿。手机布局测试覆盖交互，移动设备的刷新表现需要在目标设备上测量。
+脚本构建原生 Profile 测试程序，启动 Flutter driver，并把本次窗口移动到匹配的显示器。默认客户区为 960 × 650 逻辑像素，可用 `--width` 和 `--height` 调整。同刷新率有多块屏幕时，用 `--device` 指定列表中的设备名。自定义 Flutter SDK 可通过 `--flutter C:\path\to\flutter\bin\flutter.bat` 指定。脚本核对窗口所属进程、目标显示器、DPI 和完整客户区后，测试才开始预热及测量。
+
+每帧预算取已验证显示器的刷新周期（165 Hz 约为 6.06 ms）。测试另行记录 Flutter 报告的刷新率与轻量 ticker 对照。分区切换、翻页、明暗切换、设置面板和配色预设的结果写入 `app/build/workbench_motion.json`，包含动作内帧序号、连续帧间隔、VSync 等待、UI 构建和光栅化耗时。各操作的 UI 构建和光栅化 P95 均须在一帧预算内，连续帧间隔 P95 须在 1.5 个周期以内。报告单列超出预算不超过 50 微秒的间隔，以及达到 1.5 个周期的疑似漏刷；实际呈现时间需要显示链路测量。前后版本可在同一显示器、DPI、客户区和负载下交错重复，比较漏刷率和 P99。定位长帧时，可将环境变量 `PANACHE_MOTION_TIMELINE` 设为可写的 JSON 文件路径，驱动会在采样结束后保存 VM 时间线尾段。按帧号关联 `Animator::BeginFrame` 可以检查场景提交以后的语义更新和 GC，这部分工作可能超出 `FrameTiming.buildDuration`。移动设备的刷新表现需在目标设备上测量。
 
 测试涵盖 LaTeX 兼容与数学片段、文本工具、API multipart 和返回格式、异步工作区持久化与取消，以及中英文移动/桌面布局、键盘、横屏和文字缩放交互。桌面进程测试见 `test/desktop_backend_test.dart`。
 

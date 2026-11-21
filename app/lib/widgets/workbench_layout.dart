@@ -147,6 +147,7 @@ class WorkbenchLayout extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Material(
+              animationDuration: Duration.zero,
               color: Theme.of(context).colorScheme.errorContainer,
               borderRadius: BorderRadius.circular(16),
               child: ListTile(
@@ -366,9 +367,7 @@ class WorkbenchLayout extends StatelessWidget {
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.outlineVariant
-                    : const Color(0x55c9a227),
+                color: Theme.of(context).colorScheme.outlineVariant,
               ),
             ),
             child: LayoutBuilder(

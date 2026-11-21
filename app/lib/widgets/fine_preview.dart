@@ -938,6 +938,7 @@ class _FinePreviewState extends State<FinePreview> {
       ),
     );
     return Material(
+      animationDuration: Duration.zero,
       color: colors.surface,
       child: Column(
         mainAxisSize: MainAxisSize.min,

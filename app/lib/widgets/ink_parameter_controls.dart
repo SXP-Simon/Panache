@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -110,6 +111,24 @@ class _NumericSliderState extends State<NumericSlider> {
     final min = widget.parameter.minimum.toDouble();
     final max = widget.parameter.maximum!.toDouble();
     final multiplier = digits == 0 ? 1 : 10;
+    final slider = Semantics(
+      label: widget.label,
+      child: Slider(
+        key: ValueKey(widget.id),
+        min: min,
+        max: max,
+        divisions: ((max - min) * multiplier).round(),
+        value: widget.value,
+        label: formatted,
+        onChanged: widget.onChanged == null
+            ? null
+            : (value) {
+                final next = (value * multiplier).round() / multiplier;
+                _controller.text = next.toStringAsFixed(digits);
+                widget.onChanged!(next);
+              },
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Column(
@@ -148,24 +167,16 @@ class _NumericSliderState extends State<NumericSlider> {
               ),
             ],
           ),
-          Semantics(
-            label: widget.label,
-            child: Slider(
-              key: ValueKey(widget.id),
-              min: min,
-              max: max,
-              divisions: ((max - min) * multiplier).round(),
-              value: widget.value,
-              label: formatted,
-              onChanged: widget.onChanged == null
-                  ? null
-                  : (value) {
-                      final next = (value * multiplier).round() / multiplier;
-                      _controller.text = next.toStringAsFixed(digits);
-                      widget.onChanged!(next);
-                    },
-            ),
-          ),
+          // Keep the SDK's always-mounted value-indicator portal in the same
+          // semantics subtree as its slider when the settings pane is hidden.
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows)
+            Overlay.wrap(
+              alwaysSizeToContent: true,
+              clipBehavior: Clip.none,
+              child: slider,
+            )
+          else
+            slider,
         ],
       ),
     );

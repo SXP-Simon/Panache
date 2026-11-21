@@ -50,7 +50,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('app-preferences')));
       await tester.pumpAndSettle();
       final toggle = find.byKey(const ValueKey('reduce-motion'));
-      await tester.ensureVisible(toggle);
+      final settingsScroll = find.descendant(
+        of: find.byKey(const ValueKey('app-settings-list')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(toggle, 160, scrollable: settingsScroll);
+      await tester.pumpAndSettle();
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       expect(MediaQuery.disableAnimationsOf(tester.element(toggle)), isTrue);

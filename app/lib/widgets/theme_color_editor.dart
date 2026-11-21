@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'workbench_card.dart';
+
 import '../l10n/app_localizations.dart';
 import '../theme/handwriting_theme.dart';
 import 'color_picker_dialog.dart';
@@ -21,7 +23,12 @@ class ThemeColorEditor extends StatefulWidget {
   State<ThemeColorEditor> createState() => _ThemeColorEditorState();
 }
 
-class _ThemeColorEditorState extends State<ThemeColorEditor> {
+class _ThemeColorEditorState extends State<ThemeColorEditor>
+    with AutomaticKeepAliveClientMixin {
+  // A scrolled-away palette retains its unsaved selection and retry state.
+  @override
+  bool get wantKeepAlive => true;
+
   late Color primary = widget.color;
   late Color secondary = widget.secondaryColor;
   bool failed = false;
@@ -77,6 +84,7 @@ class _ThemeColorEditorState extends State<ThemeColorEditor> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final l = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final options = [
@@ -98,7 +106,7 @@ class _ThemeColorEditorState extends State<ThemeColorEditor> {
         .where((recipe) => recipe.$3 == primary && recipe.$4 == secondary)
         .firstOrNull;
     final editable = widget.onPaletteChanged != null;
-    return Card.outlined(
+    return WorkbenchCard(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Padding(
         padding: const EdgeInsets.all(16),
