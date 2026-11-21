@@ -26,7 +26,7 @@ Panache is an open-source handwriting generator built with **Flutter and Rust**.
 - Windows / macOS / Linux automatically start a bundled Rust sidecar.
 - Flutter Web connects to a Rust HTTP service that can also host the UI.
 
-Light mode uses a warm, paper-white background. Dark mode layers translucent black over neutral gray to distinguish the navigation, writing area, and preview.
+Light mode uses a paper-white background with a subtle tint from the primary color. Dark mode layers translucent black over neutral gray to distinguish the navigation, writing area, and preview.
 
 <table>
   <thead>
@@ -37,8 +37,8 @@ Light mode uses a warm, paper-white background. Dark mode layers translucent bla
   </thead>
   <tbody>
     <tr>
-      <td valign="top"><a href="docs/assets/images/panache-themes-light-8e8def432541.webp"><img src="docs/assets/images/panache-themes-light-8e8def432541.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
-      <td valign="top"><a href="docs/assets/images/panache-themes-dark-d9961bc35858.webp"><img src="docs/assets/images/panache-themes-dark-d9961bc35858.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-light-025bb236deac.webp"><img src="docs/assets/images/panache-themes-light-025bb236deac.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes from top to bottom, each showing its vector illustration before handwriting is generated"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-566740cb37a6.webp"><img src="docs/assets/images/panache-themes-dark-566740cb37a6.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes from top to bottom, each showing its vector illustration before handwriting is generated"></a></td>
     </tr>
   </tbody>
 </table>
