@@ -102,7 +102,10 @@ class MainActivity : FlutterActivity() {
         val uri = FileProvider.getUriForFile(this, "$packageName.updates", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            // Replacing this app tears down its activities. Keep the system
+            // installer's completion screen in its own task so Open can launch
+            // the newly installed app independently of the old activity.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(intent)
         pending?.success(null)
