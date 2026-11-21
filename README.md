@@ -28,7 +28,7 @@ Panache 是基于 **Flutter + Rust** 的开源手写体生成器。把课堂笔�
 - Windows / macOS / Linux：Flutter 原生界面自动启动随包 Rust sidecar，支持离线生成。
 - Web：Flutter Web 连接 Rust HTTP 服务，服务可同时托管页面。
 
-界面采用新艺术运动风格的 Material Design 3 主题。浅色工作台以暖白纸面为底，深色使用石板灰，各套配色在背景中保留轻微的冷暖倾向，配色可按整套预设或自定义双色切换，应用设置支持跟随系统。界面标题使用 Playfair Display 和霞鹜文楷，纸张中的手写文字使用用户所选字体。手机工具入口同时显示图标和名称，生成任务可在工作台直接取消。
+界面采用新艺术运动风格的 Material Design 3 主题。浅色工作台以暖白纸面为底。深色工作台在中性灰底上叠加半透明黑，用明暗区分导航、书写和预览区域。应用设置支持跟随系统、切换预设和自定义双色。界面标题使用 Playfair Display 和霞鹜文楷，纸张中的手写文字使用用户所选字体。手机工具入口同时显示图标和名称，生成任务可在工作台直接取消。
 
 <table>
   <thead>
@@ -40,7 +40,7 @@ Panache 是基于 **Flutter + Rust** 的开源手写体生成器。把课堂笔�
   <tbody>
     <tr>
       <td valign="top"><a href="docs/assets/images/panache-themes-light-392cf122e893.webp"><img src="docs/assets/images/panache-themes-light-392cf122e893.webp" width="460" alt="浅色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
-      <td valign="top"><a href="docs/assets/images/panache-themes-dark-9e9ac535da40.webp"><img src="docs/assets/images/panache-themes-dark-9e9ac535da40.webp" width="460" alt="深色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-345fc743686a.webp"><img src="docs/assets/images/panache-themes-dark-345fc743686a.webp" width="460" alt="深色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
     </tr>
   </tbody>
 </table>
