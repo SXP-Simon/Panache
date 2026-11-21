@@ -46,8 +46,7 @@ class Workbench extends StatefulWidget {
     this.updates,
     this.themeColor = defaultThemeColor,
     this.secondaryThemeColor = defaultSecondaryThemeColor,
-    this.onSecondaryThemeColorChanged,
-    this.onThemeColorChanged,
+    this.onPaletteChanged,
     this.themeMode = ThemeMode.system,
     this.onThemeModeChanged,
     this.reduceMotion = false,
@@ -65,8 +64,7 @@ class Workbench extends StatefulWidget {
   final Future<bool> Function(ThemeMode)? onThemeModeChanged;
   final bool reduceMotion;
   final Future<bool> Function(bool)? onReduceMotionChanged;
-  final Future<bool> Function(Color)? onThemeColorChanged,
-      onSecondaryThemeColorChanged;
+  final Future<bool> Function(Color, Color)? onPaletteChanged;
   final int initialDestination;
   final bool guideUnread;
   final VoidCallback? onGuideOpened;
@@ -544,10 +542,9 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
           themeMode: widget.themeMode,
           onThemeModeChanged: widget.onThemeModeChanged,
           secondaryThemeColor: widget.secondaryThemeColor,
-          onSecondaryThemeColorChanged: widget.onSecondaryThemeColorChanged,
+          onPaletteChanged: widget.onPaletteChanged,
           reduceMotion: widget.reduceMotion,
           onReduceMotionChanged: widget.onReduceMotionChanged,
-          onThemeColorChanged: widget.onThemeColorChanged,
           workspaceBuilder: workspace,
           informationBuilder: information,
         ),

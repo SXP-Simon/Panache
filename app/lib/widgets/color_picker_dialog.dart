@@ -12,12 +12,14 @@ class ColorPickerDialog extends StatefulWidget {
     required this.color,
     required this.presets,
     this.onPreview,
+    this.previewBuilder,
   });
 
   final String id, title;
   final Color color;
   final List<(String, Color)> presets;
   final ValueChanged<Color>? onPreview;
+  final Widget Function(Color)? previewBuilder;
 
   static String hexOf(Color color) =>
       '#${(color.toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0').toUpperCase()}';
@@ -71,6 +73,10 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.previewBuilder case final preview?) ...[
+              preview(selection.toColor()),
+              const SizedBox(height: 12),
+            ],
             Text(l.inkColorArea),
             const SizedBox(height: 6),
             SizedBox(
@@ -118,7 +124,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                         clipBehavior: Clip.none,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(20),
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
@@ -291,7 +297,7 @@ class ColorSwatchIndicator extends StatelessWidget {
     decoration: BoxDecoration(
       color: color.withValues(alpha: 1),
       border: Border.all(color: Theme.of(context).colorScheme.outline),
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(12),
     ),
   );
 }

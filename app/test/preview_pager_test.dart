@@ -376,6 +376,56 @@ void main() {
     );
   }
 
+  testWidgets(
+    'rapid page commands and reversal leave the reader on the last requested sheet',
+    (tester) async {
+      final pages = List.generate(4, (_) => picture());
+      final owner = Object();
+      final intents = <int>[];
+      var page = 0;
+      var reduced = false;
+      late StateSetter update;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: StatefulBuilder(
+            builder: (_, setState) {
+              update = setState;
+              return MediaQuery(
+                data: MediaQueryData(disableAnimations: reduced),
+                child: PreviewPager(
+                  pages: pages,
+                  page: page,
+                  heroOwner: owner,
+                  onPageChanged: (value) {
+                    intents.add(value);
+                    update(() => page = value);
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final key in ['preview-next', 'preview-next', 'preview-previous']) {
+        await tester.tap(find.byKey(ValueKey(key)));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 35));
+      }
+      update(() => reduced = true);
+      await tester.pump();
+      await tester.pump();
+      final pager = tester.widget<PageView>(find.byType(PageView));
+      expect(pager.controller!.page, 1);
+      expect(find.text('2 / 4'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(intents, [1, 2, 1]);
+      expect(tester.binding.transientCallbackCount, 0);
+    },
+  );
+
   testWidgets('page feedback never takes control from a held finger', (
     tester,
   ) async {

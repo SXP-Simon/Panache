@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// An engraved iris, composed of recurved standards, drooping falls and leaves.
 class AtelierIris extends CustomPainter {
-  const AtelierIris();
+  const AtelierIris({this.nightColors});
+  final ColorScheme? nightColors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -13,10 +14,23 @@ class AtelierIris extends CustomPainter {
       ..strokeWidth = .95
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xffe4c76c);
+      ..color = nightColors?.tertiary ?? const Color(0xffe4c76c);
     final fill = Paint();
-    void shape(Path path, int color) {
-      canvas.drawPath(path, fill..color = Color(color));
+    void shape(
+      Path path,
+      int dayColor, {
+      required bool petal,
+      required double depth,
+    }) {
+      final colors = nightColors;
+      fill.color = colors == null
+          ? Color(dayColor)
+          : Color.lerp(
+              colors.surfaceContainerLow,
+              petal ? colors.secondary : colors.primary,
+              depth,
+            )!;
+      canvas.drawPath(path, fill);
       canvas.drawPath(path, line);
     }
 
@@ -30,6 +44,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(62, 59, 54, 85, 25, 101)
         ..close(),
       0xff678051,
+      petal: false,
+      depth: .40,
     );
     shape(
       Path()
@@ -38,6 +54,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(33, 52, 36, 78, 24, 100)
         ..close(),
       0xff73885a,
+      petal: false,
+      depth: .54,
     );
     shape(
       Path()
@@ -46,6 +64,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(75, 72, 71, 96, 32, 95)
         ..close(),
       0xff516f45,
+      petal: false,
+      depth: .28,
     );
     canvas.drawPath(
       Path()
@@ -64,6 +84,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(54, 24, 53, 35, 56, 44)
         ..close(),
       0xff9e81b0,
+      petal: true,
+      depth: .60,
     );
     shape(
       Path()
@@ -73,6 +95,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(72, 17, 64, 32, 56, 42)
         ..close(),
       0xffc4a6c9,
+      petal: true,
+      depth: .90,
     );
     shape(
       Path()
@@ -82,6 +106,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(80, 35, 70, 38, 57, 43)
         ..close(),
       0xffa68ab9,
+      petal: true,
+      depth: .68,
     );
     shape(
       Path()
@@ -91,6 +117,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(42, 48, 37, 39, 56, 40)
         ..close(),
       0xffb6a0c5,
+      petal: true,
+      depth: .80,
     );
     shape(
       Path()
@@ -100,6 +128,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(70, 47, 66, 42, 57, 41)
         ..close(),
       0xffaa8eb9,
+      petal: true,
+      depth: .70,
     );
     shape(
       Path()
@@ -109,6 +139,8 @@ class AtelierIris extends CustomPainter {
         ..cubicTo(66, 55, 65, 45, 60, 39)
         ..close(),
       0xff94749e,
+      petal: true,
+      depth: .46,
     );
     canvas.drawPath(
       Path()
@@ -124,18 +156,20 @@ class AtelierIris extends CustomPainter {
     );
     canvas.drawOval(
       Rect.fromCenter(center: const Offset(56, 41), width: 8, height: 4),
-      fill..color = const Color(0xffecd27c),
+      fill..color = nightColors?.onSurface ?? const Color(0xffecd27c),
     );
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(AtelierIris oldDelegate) => false;
+  bool shouldRepaint(AtelierIris oldDelegate) =>
+      nightColors != oldDelegate.nightColors;
 }
 
 /// A pair of whiplash stems filling the negative space in the wide masthead.
 class AtelierTendrils extends CustomPainter {
-  const AtelierTendrils();
+  const AtelierTendrils({this.nightColors});
+  final ColorScheme? nightColors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -145,7 +179,9 @@ class AtelierTendrils extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 1
-      ..color = const Color(0x99dfc47a);
+      ..color =
+          nightColors?.tertiary.withValues(alpha: .52) ??
+          const Color(0x99dfc47a);
     canvas.drawPath(
       Path()
         ..moveTo(-6, 86)
@@ -178,7 +214,13 @@ class AtelierTendrils extends CustomPainter {
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(angle);
-      canvas.drawPath(blade, Paint()..color = const Color(0x666f8850));
+      canvas.drawPath(
+        blade,
+        Paint()
+          ..color =
+              nightColors?.primary.withValues(alpha: .18) ??
+              const Color(0x666f8850),
+      );
       canvas.drawPath(blade, line);
       canvas.drawPath(
         Path()
@@ -192,7 +234,8 @@ class AtelierTendrils extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(AtelierTendrils oldDelegate) => false;
+  bool shouldRepaint(AtelierTendrils oldDelegate) =>
+      nightColors != oldDelegate.nightColors;
 }
 
 /// A closed iris bud with tapered sword leaves for the foot of the tool rail.

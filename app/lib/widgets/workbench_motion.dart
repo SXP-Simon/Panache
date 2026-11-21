@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Motion belongs to presentation. Business operations never wait for this clock.
 abstract final class WorkbenchMotion {
-  static const pane = Duration(milliseconds: 500);
-  static const page = Duration(milliseconds: 600);
+  static const enter = Cubic(.22, 1, .36, 1);
+  static const selection = Duration(milliseconds: 180);
+  static const pane = Duration(milliseconds: 300);
+  static const page = Duration(milliseconds: 360);
 }
 
 /// Keeps each pane mounted once, including its form fields and scroll position.
@@ -29,20 +31,20 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
     duration: WorkbenchMotion.pane,
     value: 1,
   )..addStatusListener(_finished);
-  late final _progress = _clock.drive(CurveTween(curve: Curves.easeInOut));
-  late int _to = widget.index;
-  int? _from;
-  double _direction = 1;
+  // Preserve every still-visible layer when a third destination interrupts.
+  // The tracks share a vsync clock but the departing surface settles first.
+  final _slides = <int, Animation<Offset>>{};
+  final _fades = <int, Animation<double>>{};
   bool _reduced = false;
 
+  void _clear() {
+    _slides.clear();
+    _fades.clear();
+  }
+
   void _finished(AnimationStatus status) {
-    if (_from == null) return;
-    if (status == AnimationStatus.completed && widget.index == _to ||
-        status == AnimationStatus.dismissed && widget.index == _from) {
-      setState(() {
-        _from = null;
-        _to = widget.index;
-      });
+    if (status == AnimationStatus.completed && _slides.isNotEmpty) {
+      setState(_clear);
     }
   }
 
@@ -52,28 +54,41 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
     _reduced = MediaQuery.disableAnimationsOf(context);
     if (_reduced) {
       _clock.stop();
-      _from = null;
-      _to = widget.index;
+      _clear();
     }
   }
 
   @override
   void didUpdateWidget(RetainedPaneSwitcher oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.index == widget.index) return;
-    if (_reduced) {
-      _from = null;
-      _to = widget.index;
-    } else if (_from != null && widget.index == _from) {
-      _clock.reverse();
-    } else if (_from != null && widget.index == _to) {
-      _clock.forward();
-    } else {
-      _from = oldWidget.index;
-      _to = widget.index;
-      _direction = _to > _from! ? 1 : -1;
-      _clock.forward(from: 0);
+    if (_reduced || oldWidget.index == widget.index) return;
+    final direction = widget.index > oldWidget.index ? 1.0 : -1.0;
+    final entering = _clock.drive(CurveTween(curve: WorkbenchMotion.enter));
+    final leaving = _clock.drive(
+      CurveTween(curve: const Interval(0, .72, curve: Curves.easeOut)),
+    );
+    for (var i = 0; i < widget.children.length; i++) {
+      final selected = i == widget.index;
+      final alpha = _fades[i]?.value ?? (i == oldWidget.index ? 1.0 : 0.0);
+      if (!selected && alpha == 0) {
+        _slides.remove(i);
+        _fades.remove(i);
+        continue;
+      }
+      final offset =
+          _slides[i]?.value ??
+          (selected ? Offset(.085 * direction, 0) : Offset.zero);
+      final progress = selected ? entering : leaving;
+      _slides[i] = Tween<Offset>(
+        begin: offset,
+        end: selected ? Offset.zero : Offset(-.035 * direction, 0),
+      ).animate(progress);
+      _fades[i] = Tween<double>(
+        begin: alpha,
+        end: selected ? 1 : 0,
+      ).animate(progress);
     }
+    _clock.forward(from: 0);
   }
 
   @override
@@ -87,16 +102,11 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
     child: Stack(
       fit: StackFit.expand,
       children: [
-        for (final index in [
-          for (var i = 0; i < widget.children.length; i++)
-            if (i != _to && i != _from) i,
-          if (_direction > 0) ...[?_from, _to] else ...[_to, ?_from],
-        ])
+        for (var index = 0; index < widget.children.length; index++)
           Positioned.fill(
             key: ValueKey(index),
-            // Stable widget ancestry is essential for EditableText and Form.
             child: Offstage(
-              offstage: index != _to && index != _from,
+              offstage: index != widget.index && !_slides.containsKey(index),
               child: TickerMode(
                 enabled: index == widget.index,
                 child: ExcludeFocus(
@@ -105,21 +115,18 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
                     ignoring: index != widget.index,
                     child: ExcludeSemantics(
                       excluding: index != widget.index,
-                      child: SlideTransition(
-                        position: _from == null
-                            ? const AlwaysStoppedAnimation(Offset.zero)
-                            : Tween<Offset>(
-                                begin: index == _to
-                                    ? Offset(_direction > 0 ? 1 : -.15, 0)
-                                    : Offset.zero,
-                                end: index == _to
-                                    ? Offset.zero
-                                    : Offset(_direction > 0 ? -.15 : 1, 0),
-                              ).animate(_progress),
-                        child: RepaintBoundary(
-                          child: Material(
-                            color: Theme.of(context).colorScheme.surface,
-                            child: widget.children[index],
+                      child: FadeTransition(
+                        opacity:
+                            _fades[index] ?? const AlwaysStoppedAnimation(1),
+                        child: SlideTransition(
+                          position:
+                              _slides[index] ??
+                              const AlwaysStoppedAnimation(Offset.zero),
+                          child: RepaintBoundary(
+                            child: Material(
+                              color: Theme.of(context).colorScheme.surface,
+                              child: widget.children[index],
+                            ),
                           ),
                         ),
                       ),

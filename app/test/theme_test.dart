@@ -54,6 +54,47 @@ void main() {
     }
   });
 
+  test(
+    'night accents follow the saved seed without tinting reading surfaces',
+    () {
+      final defaults = handwritingTheme(Brightness.dark).colorScheme;
+      expect(defaults.primary, NouveauColors.moonMint);
+      expect(defaults.secondary, NouveauColors.moonIris);
+      final theme = handwritingTheme(
+        Brightness.dark,
+        seedColor: const Color(0xFF3C96CA),
+      );
+      final custom = theme.colorScheme;
+      expect(custom.primary, isNot(defaults.primary));
+      expect(custom.primary.b, greaterThan(custom.primary.r));
+      expect(custom.surface, defaults.surface);
+      expect(custom.surfaceContainerHigh, defaults.surfaceContainerHigh);
+      expect(custom.outlineVariant, isNot(defaults.outlineVariant));
+      expect(custom.secondary, defaults.secondary);
+      final style = theme.filledButtonTheme.style!;
+      Color? overlay(Set<WidgetState> states) =>
+          style.overlayColor!.resolve(states);
+      expect(style.backgroundColor!.resolve({}), isNull);
+      expect(
+        overlay({WidgetState.pressed}),
+        isNot(overlay({WidgetState.hovered})),
+      );
+      expect(
+        overlay({WidgetState.disabled, WidgetState.hovered}),
+        Colors.transparent,
+      );
+      expect(
+        style.backgroundColor!.resolve({WidgetState.disabled}),
+        custom.surfaceContainerHigh,
+      );
+      expect(style.side!.resolve({WidgetState.focused})!.width, greaterThan(1));
+      expect(
+        style.side!.resolve({WidgetState.focused, WidgetState.disabled}),
+        BorderSide.none,
+      );
+    },
+  );
+
   testWidgets('startup and recovery app use the shared system dark theme', (
     tester,
   ) async {

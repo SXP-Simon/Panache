@@ -8,6 +8,7 @@ import 'services/updates/update_host.dart';
 
 import 'l10n/app_localizations.dart';
 import 'theme/handwriting_theme.dart';
+import 'widgets/appearance_transition.dart';
 import 'screens/workbench.dart';
 import 'services/workspace.dart';
 import 'services/licenses.dart';
@@ -40,18 +41,37 @@ class _HandwritingAppState extends State<HandwritingApp> {
   final appearance = AppearancePreferences();
   late final updates = UpdateController(host: createUpdateHost());
   Color get themeColor => appearance.color;
+  late (Color, Color) themeSeeds;
+  late ThemeData lightTheme, darkTheme;
+
+  void resolveThemes() {
+    themeSeeds = (appearance.color, appearance.secondaryColor);
+    ThemeData resolve(Brightness brightness) => handwritingTheme(
+      brightness,
+      seedColor: appearance.color,
+      secondaryColor: appearance.secondaryColor,
+    );
+    lightTheme = resolve(Brightness.light);
+    darkTheme = resolve(Brightness.dark);
+  }
+
   @override
   void initState() {
     super.initState();
     if (kIsWeb) semantics = WidgetsBinding.instance.ensureSemantics();
     locale = widget.locale ?? const Locale('zh');
+    resolveThemes();
     appearance.addListener(refreshAppearance);
     appearance.restore();
     updates.initialize();
   }
 
   void refreshAppearance() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (themeSeeds != (appearance.color, appearance.secondaryColor)) {
+      resolveThemes();
+    }
+    setState(() {});
   }
 
   @override
@@ -74,10 +94,9 @@ class _HandwritingAppState extends State<HandwritingApp> {
     ),
     themeColor: themeColor,
     secondaryThemeColor: appearance.secondaryColor,
-    onSecondaryThemeColorChanged: appearance.setSecondaryColor,
+    onPaletteChanged: appearance.setPalette,
     reduceMotion: appearance.reduceMotion,
     onReduceMotionChanged: appearance.setReduceMotion,
-    onThemeColorChanged: appearance.setColor,
     themeMode: appearance.mode,
     onThemeModeChanged: appearance.setMode,
     toggleTheme: () {
@@ -93,45 +112,44 @@ class _HandwritingAppState extends State<HandwritingApp> {
   );
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    themeAnimationStyle:
-        appearance.reduceMotion ||
-            (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
-        ? AnimationStyle.noAnimation
-        : const AnimationStyle(
-            duration: Duration(milliseconds: 600),
-            curve: Curves.easeInOut,
-          ),
-    locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-    theme: handwritingTheme(
-      Brightness.light,
-      seedColor: themeColor,
-      secondaryColor: appearance.secondaryColor,
+  Widget build(BuildContext context) => AppearanceTransition(
+    appearance: (
+      switch (appearance.mode) {
+        ThemeMode.system => MediaQuery.platformBrightnessOf(context),
+        ThemeMode.light => Brightness.light,
+        ThemeMode.dark => Brightness.dark,
+      },
+      themeColor,
+      appearance.secondaryColor,
     ),
-    darkTheme: handwritingTheme(
-      Brightness.dark,
-      seedColor: themeColor,
-      secondaryColor: appearance.secondaryColor,
-    ),
-    themeMode: appearance.mode,
-    builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        disableAnimations:
-            MediaQuery.disableAnimationsOf(context) || appearance.reduceMotion,
+    reduceMotion:
+        appearance.reduceMotion || MediaQuery.disableAnimationsOf(context),
+    child: MaterialApp(
+      debugShowCheckedModeBanner: false,
+      themeAnimationStyle: AnimationStyle.noAnimation,
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: appearance.mode,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          disableAnimations:
+              MediaQuery.disableAnimationsOf(context) ||
+              appearance.reduceMotion,
+        ),
+        child: handwritingBackdrop(context, child),
       ),
-      child: handwritingBackdrop(context, child),
+      home: workbench(),
+      routes: {
+        '/About': (_) => workbench(destination: 2),
+        '/Feedback': (_) => workbench(destination: 2),
+        '/Introduce': (_) => workbench(destination: 1),
+        '/Login': (_) => workbench(destination: 2),
+        '/Register': (_) => workbench(destination: 2),
+      },
     ),
-    home: workbench(),
-    routes: {
-      '/About': (_) => workbench(destination: 2),
-      '/Feedback': (_) => workbench(destination: 2),
-      '/Introduce': (_) => workbench(destination: 1),
-      '/Login': (_) => workbench(destination: 2),
-      '/Register': (_) => workbench(destination: 2),
-    },
   );
 }

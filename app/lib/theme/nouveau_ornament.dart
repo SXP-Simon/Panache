@@ -9,7 +9,9 @@ abstract final class NouveauColors {
   static const softIvory = Color(0xFFFAF7EF);
   static const gold = Color(0xFFC9A227);
   static const wisteria = Color(0xFF8B6DB5);
-  static const night = Color(0xFF172019);
+  static const moonMint = Color(0xFF97E5D8);
+  static const moonIris = Color(0xFFC8BAFF);
+  static const night = Color(0xFF10131D);
 }
 
 class NouveauWaveDivider extends StatelessWidget {
