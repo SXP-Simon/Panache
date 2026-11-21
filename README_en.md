@@ -26,6 +26,21 @@ Panache is an open-source handwriting generator built with **Flutter and Rust**.
 - Windows / macOS / Linux automatically start a bundled Rust sidecar.
 - Flutter Web connects to a Rust HTTP service that can also host the UI.
 
+<table>
+  <thead>
+    <tr>
+      <th width="50%">Light workbench</th>
+      <th width="50%">Dark workbench</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top"><a href="docs/assets/images/panache-themes-light-392cf122e893.webp"><img src="docs/assets/images/panache-themes-light-392cf122e893.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-9e9ac535da40.webp"><img src="docs/assets/images/panache-themes-dark-9e9ac535da40.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
+    </tr>
+  </tbody>
+</table>
+
 ## Handwriting and layout
 
 - **Text and documents**　Type, paste, or import TXT, DOCX, PDF, or RTF. Insert an illustration at the cursor. Use a line containing `---` to start a new page or prefix a line with `>>>` to align it to the right.
