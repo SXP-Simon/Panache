@@ -34,21 +34,13 @@ ThemeData handwritingTheme(
   Color secondaryColor = defaultSecondaryThemeColor,
 }) {
   final dark = brightness == Brightness.dark;
-  final iris =
-      seedColor == defaultThemeColor &&
-      secondaryColor == defaultSecondaryThemeColor;
-  final hue = HSLColor.fromColor(
-    seedColor == defaultThemeColor ? secondaryColor : seedColor,
-  );
+  final hue = HSLColor.fromColor(seedColor);
   // Large surfaces share a neutral ramp. Hue adds only a trace of warmth or
   // coolness; saturated user-picked colors stay on small interactive elements.
-  final surfaceHue = iris ? (dark ? 226.0 : 38.0) : hue.hue;
-  final saturation = iris
-      ? (dark ? .036 : .13)
-      : hue.saturation.clamp(0.0, dark ? .035 : .085);
+  final saturation = hue.saturation.clamp(0.0, dark ? .035 : .085);
   Color surfaceTone(double daylight, double moonlight) => HSLColor.fromAHSL(
     1,
-    surfaceHue,
+    hue.hue,
     saturation,
     dark ? moonlight : daylight,
   ).toColor();
@@ -82,7 +74,7 @@ ThemeData handwritingTheme(
   final secondary = dark && secondaryColor == defaultSecondaryThemeColor
       ? NouveauColors.nightSage
       : _contrastingInk(secondaryColor, secondaryContainer, dark);
-  final trim = iris ? NouveauColors.gold : hue.withLightness(.60).toColor();
+  final trim = hue.withLightness(.60).toColor();
   final border = Color.lerp(
     surfaceTone(.81, .325),
     dark ? primary : trim,
@@ -99,11 +91,7 @@ ThemeData handwritingTheme(
     onSecondary: _onSolidColor(secondary),
     secondaryContainer: secondaryContainer,
     onSecondaryContainer: secondary,
-    tertiary: dark
-        ? const Color(0xFFB8A982)
-        : iris
-        ? const Color(0xFF78601B)
-        : hue.withLightness(.34).toColor(),
+    tertiary: dark ? const Color(0xFFB8A982) : hue.withLightness(.34).toColor(),
     surface: surface,
     onSurface: foreground,
     onSurfaceVariant: muted,

@@ -85,6 +85,40 @@ void main() {
     }
   });
 
+  test(
+    'iris surfaces follow the petals even when only the leaf color changes',
+    () {
+      for (final brightness in Brightness.values) {
+        final original = handwritingTheme(brightness);
+        final edited = handwritingTheme(
+          brightness,
+          secondaryColor: const Color(0xFFD58943),
+        );
+        final surface = original.scaffoldBackgroundColor;
+        expect(surface.b, greaterThan(surface.r));
+        expect(surface.r, greaterThan(surface.g));
+        expect(edited.scaffoldBackgroundColor, surface);
+        expect(
+          edited.appBarTheme.backgroundColor,
+          original.appBarTheme.backgroundColor,
+        );
+        expect(
+          edited.colorScheme.surfaceContainerLow,
+          original.colorScheme.surfaceContainerLow,
+        );
+        expect(
+          edited.colorScheme.outlineVariant,
+          original.colorScheme.outlineVariant,
+        );
+        expect(edited.colorScheme.tertiary, original.colorScheme.tertiary);
+        expect(
+          edited.colorScheme.secondary,
+          isNot(original.colorScheme.secondary),
+        );
+      }
+    },
+  );
+
   test('night accents follow the saved seed across reading surfaces', () {
     final defaults = handwritingTheme(Brightness.dark).colorScheme;
     expect(defaults.primary, NouveauColors.moonIris);
