@@ -9,7 +9,7 @@ abstract final class NouveauColors {
   static const softIvory = Color(0xFFFAF7EF);
   static const gold = Color(0xFFC9A227);
   static const wisteria = Color(0xFF8B6DB5);
-  static const nightSage = Color(0xFFB5C3A3);
+  static const nightSage = Color(0xFFBDCAAB);
   static const moonIris = Color(0xFFC8BAFF);
   static const night = Color(0xFF10131D);
 }

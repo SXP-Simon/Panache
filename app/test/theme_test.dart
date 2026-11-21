@@ -87,8 +87,8 @@ void main() {
 
   test('night accents follow the saved seed across reading surfaces', () {
     final defaults = handwritingTheme(Brightness.dark).colorScheme;
-    expect(defaults.primary, NouveauColors.nightSage);
-    expect(defaults.secondary, NouveauColors.moonIris);
+    expect(defaults.primary, NouveauColors.moonIris);
+    expect(defaults.secondary, NouveauColors.nightSage);
     final theme = handwritingTheme(
       Brightness.dark,
       seedColor: const Color(0xFF3C96CA),

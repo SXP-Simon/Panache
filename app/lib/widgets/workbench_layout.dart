@@ -395,9 +395,9 @@ class WorkbenchLayout extends StatelessWidget {
                             painter: AtelierBud(
                               Theme.of(context).colorScheme.onSurfaceVariant
                                   .withValues(alpha: .7),
-                              Theme.of(context).colorScheme.primary
-                                  .withValues(alpha: .14),
                               Theme.of(context).colorScheme.secondary
+                                  .withValues(alpha: .14),
+                              Theme.of(context).colorScheme.primary
                                   .withValues(alpha: .34),
                             ),
                           ),
