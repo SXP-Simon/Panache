@@ -349,12 +349,23 @@ class WorkbenchShell extends StatelessWidget {
                               ),
                           ],
                           onSelected: (value) {
-                            Navigator.pop(sheetContext);
+                            final nextBrightness = switch (value) {
+                              ThemeMode.system =>
+                                MediaQuery.platformBrightnessOf(sheetContext),
+                              ThemeMode.light => Brightness.light,
+                              ThemeMode.dark => Brightness.dark,
+                            };
+                            if (Theme.of(sheetContext).brightness ==
+                                nextBrightness) {
+                              Navigator.pop(sheetContext);
+                            } else {
+                              _dismissForAppearanceChange(sheetContext);
+                            }
                             onThemeModeChanged!(value);
                           },
                         ),
                   onTap: () {
-                    Navigator.pop(sheetContext);
+                    _dismissForAppearanceChange(sheetContext);
                     onToggleTheme();
                   },
                 ),
@@ -408,4 +419,11 @@ class WorkbenchShell extends StatelessWidget {
       ),
     );
   }
+}
+
+// The global appearance transition already blends the painted sheet into the
+// new workbench. Retiring its route immediately avoids laying out and animating
+// the outgoing sheet in a second theme on every frame of that same gesture.
+void _dismissForAppearanceChange(BuildContext sheetContext) {
+  Navigator.of(sheetContext).removeRoute(ModalRoute.of(sheetContext)!);
 }

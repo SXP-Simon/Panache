@@ -8,6 +8,32 @@ import 'package:handwriting_app/services/appearance_preferences.dart';
 import 'package:handwriting_app/services/workspace.dart';
 
 void main() {
+  testWidgets(
+    'compact theme switch uses one transition to return to the workbench',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        AppearancePreferences.modeKey: 'light',
+      });
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(960, 650);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final workspace = Workspace();
+      addTearDown(workspace.dispose);
+      await tester.pumpWidget(HandwritingApp(workspace: workspace));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('app-preferences')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('切换明暗主题'));
+      await tester.pump();
+      expect(find.byType(BottomSheet), findsNothing);
+      final context = tester.element(find.byType(Scaffold).first);
+      expect(Theme.of(context).brightness, Brightness.dark);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('app-preferences')), findsOneWidget);
+    },
+  );
+
   test(
     'motion choice beats late restore without losing stored theme color',
     () async {

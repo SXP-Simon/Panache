@@ -150,11 +150,20 @@ ThemeData handwritingTheme(
       color: raised,
       shape: cardShape,
     ),
+    // ButtonStyleButton interpolates an entire nested ThemeData per button.
+    // The appearance transition already blends those colors; InkWell still
+    // animates hover, press and focus on the control itself.
+    iconButtonTheme: const IconButtonThemeData(
+      style: ButtonStyle(animationDuration: Duration.zero),
+    ),
+    elevatedButtonTheme: const ElevatedButtonThemeData(
+      style: ButtonStyle(animationDuration: Duration.zero),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: dark
           ? _nightFilledButton(scheme)
           : ButtonStyle(
-              animationDuration: const Duration(milliseconds: 500),
+              animationDuration: Duration.zero,
               backgroundColor: WidgetStateProperty.resolveWith(
                 (states) =>
                     states.contains(WidgetState.hovered) &&
@@ -178,7 +187,7 @@ ThemeData handwritingTheme(
           OutlinedButton.styleFrom(
             shape: controlShape,
             side: BorderSide(color: border),
-            animationDuration: const Duration(milliseconds: 500),
+            animationDuration: Duration.zero,
             foregroundColor: foreground,
           ).copyWith(
             side: dark
@@ -200,12 +209,14 @@ ThemeData handwritingTheme(
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
+        animationDuration: Duration.zero,
         shape: controlShape,
         foregroundColor: foreground,
       ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(
+        animationDuration: Duration.zero,
         shape: const WidgetStatePropertyAll(controlShape),
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) =>
@@ -294,7 +305,7 @@ Color _readableAccent(
 ButtonStyle _nightFilledButton(ColorScheme colors) {
   return ButtonStyle(
     shape: const WidgetStatePropertyAll(StadiumBorder()),
-    animationDuration: const Duration(milliseconds: 500),
+    animationDuration: Duration.zero,
     // Keep the native base colors of filled and tonal variants.
     overlayColor: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.disabled)) return Colors.transparent;
