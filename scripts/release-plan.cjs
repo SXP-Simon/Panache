@@ -5,6 +5,10 @@ const { execFileSync, spawnSync } = require("node:child_process");
 const { MANIFEST, REQUIRED_WORKFLOWS, approvedRun, releaseVersion, sourceSha, validateManifest, waitForWorkflow } = require("./flutter-release.cjs");
 const { releaseNotes } = require("./prepare-release.cjs");
 
+// The published manifest retains its original build SHA across the main history rewrite.
+const published118 = "9f12198f601b4e2a698d877861c6bc1cfdbddc01";
+const rebased118 = "5e8623b0a1640374a35183e23d44d5775faa59cf";
+
 function readReleaseCommit(sha, tag) {
   const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trimEnd();
   const changed = git("diff", "--name-only", sha + "^", sha).split("\n").sort();
@@ -29,7 +33,12 @@ async function planRelease({ repository, sha, tag, signing }, io) {
   if (sha === baseline.flutter_sha) {
     throw new Error("This Flutter commit was already released.");
   }
-  if (!await io.isAncestor(baseline.flutter_sha, sha)) throw new Error("The tag must descend from the previous release.");
+  let previousSource = baseline.flutter_sha;
+  if (baseline.release_tag === "v1.18.0" && previousSource === published118) {
+    if (io.tree(published118) !== io.tree(rebased118)) throw new Error("Rebased v1.18.0 source tree mismatch.");
+    previousSource = rebased118;
+  }
+  if (!await io.isAncestor(previousSource, sha)) throw new Error("The tag must descend from the previous release.");
   if (version.build_number <= baseline.build_number) throw new Error("Release versions must increase.");
 
   const notes = io.notes(sha, tag);
@@ -62,6 +71,7 @@ function github(repository) {
   const deadline = Date.now() + 30 * 60 * 1000;
   return {
     latest: () => api("releases/latest"),
+    tree: (commit) => execFileSync("git", ["rev-parse", "--verify", commit + "^{tree}"], { encoding: "utf8" }).trim(),
     isAncestor: (base, head) => spawnSync("git", ["merge-base", "--is-ancestor", base, head]).status === 0,
     notes: readReleaseCommit,
     manifest: (id) => {

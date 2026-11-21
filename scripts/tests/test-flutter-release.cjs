@@ -98,6 +98,32 @@ test("tag releases require main history, previous release ancestry, and an incre
   assert.equal(manifest.android_initial_status, "skipped-missing-release-signing-secrets");
 });
 
+test("the first release after the history rewrite requires the exact v1.18.0 trees and ancestry", async () => {
+  const published = "9f12198f601b4e2a698d877861c6bc1cfdbddc01";
+  const rebased = "5e8623b0a1640374a35183e23d44d5775faa59cf";
+  const io = fixture();
+  const baseline = {
+    ...io.manifest(), release_tag: "v1.18.0", version: "1.18.0", build_number: 1_018_000,
+    flutter_sha: published,
+    quality_runs: Object.fromEntries(REQUIRED_WORKFLOWS.map((name) => [name, { id: 1, head_sha: published }])),
+  };
+  const next = { ...input, tag: "v1.18.1" };
+  const migrated = {
+    ...io,
+    latest: () => ({ ...io.latest(), tag_name: baseline.release_tag }),
+    manifest: () => baseline,
+    tree: (commit) => {
+      assert.ok([published, rebased].includes(commit));
+      return "d579adae385abc7c637f26a4d6cbaa61f0b6e3b8";
+    },
+    isAncestor: (base, head) => (base === sha && head === "refs/remotes/origin/main") ||
+      (base === rebased && head === sha),
+  };
+  assert.equal((await planRelease(next, migrated)).manifest.flutter_sha, sha);
+  await assert.rejects(planRelease(next, { ...migrated, tree: (commit) => commit }), /tree mismatch/);
+  await assert.rejects(planRelease(next, { ...migrated, isAncestor: (base) => base === sha }), /previous release/);
+});
+
 test("prepare a dedicated version commit and verify the tagged source after main advances", (t) => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "panache-version-test-"));
   t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
