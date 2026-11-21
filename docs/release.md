@@ -2,7 +2,29 @@
 
 [Publish Flutter Release](../.github/workflows/publish_flutter.yml) 使用 `main` 上的确切提交构建。Flutter UI、Rust 后端和 Flutter Mobile 必须在同一仓库、分支和 SHA 上全部通过。每次发布将 SHA、检查运行 ID 和版本固定在 `Flutter-source.json`，包旁的 JSON 记录 SHA-256。
 
-推送到 `main` 后，GitHub Actions 会对相关改动运行 CI。准备发版时，在 Actions 中打开 **Publish Flutter Release**，点击 **Run workflow**，选择 `main` 并填写比上次发布更高的稳定版本号，例如 `v1.18.1`。工作流会核验所选提交的三项检查，并从上次发布的源码提交起收集变更说明。任务中断后可重试同一提交产生的草稿。通过版本与签名校验并上传全部适用包后，CI 才公开 Release。
+## 准备与发布
+
+日常改动记入 [CHANGELOG.md](../CHANGELOG.md) 的「未发布」。准备发版时，在 `main` 的仓库根目录运行以下命令。示例中的版本号替换为要发的版本。
+
+```bash
+node scripts/prepare-release.cjs v1.18.1
+git show --stat HEAD
+```
+
+脚本将未发布说明移到新版本标题下，更新根目录 `VERSION`，创建只含这两个文件的 `chore(release): v1.18.1` 提交。标题中的日期是北京时间的版本准备日期。推送版本提交后，GitHub Actions 会在该提交上运行 Flutter、Rust 和移动端检查。
+
+```bash
+git -c push.followTags=false push origin main
+```
+
+确定公开发布时，为刚才的版本提交创建同名标签，并只推送该标签。如果此时分支已有后续提交，用版本提交的 SHA 替换下例的 `HEAD`。
+
+```bash
+git tag -a v1.18.1 HEAD -m "Panache v1.18.1"
+git push origin refs/tags/v1.18.1
+```
+
+发布工作流检查标签指向的提交在 `main` 历史上、版本递增、提交标题与 `VERSION` 和更新记录匹配，并等待该 SHA 的三项验证通过。从对应的更新记录生成 Release 说明；安装包校验与上传完成后公开 Release。实际公开时间见 [GitHub Releases](https://github.com/SXP-Simon/Panache/releases)。发布中断时可以在 Actions 重跑同一次标签运行，继续同一提交的草稿。
 
 安装包包括 Windows x64、Linux x64、macOS arm64 和已配置正式签名时的 Android arm64-v8a / x86_64。历史 Release 和已有下载链接继续保留。旧 Web/Electron 源码可以在 `backup` 查看。
 

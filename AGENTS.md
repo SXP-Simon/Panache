@@ -23,7 +23,7 @@ Panache 的 Flutter + Rust 跨平台手写体生成器。Android/iOS 使用 C AB
 - `crates/handwriting-server/`：HTTP API、WebSocket、SQLite 队列与静态托管。
 - `scripts/`：Python 和 shell 构建脚本，运行应用无需 Python。
 - `deploy/rust/`：Docker 与独立服务部署。
-- `VERSION`：产品版本；不要手动改版本值。
+- `VERSION`：产品版本，格式为 `X.Y.Z`；通过版本准备脚本更新。
 - `website/`：项目官网与工坊手记。中英文正文分别在 `content/zh/`、`content/en/`，主题展示使用 README 同一组图。安装 `website/requirements.txt` 后用 `python website/build.py --out <输出目录>` 构建；`main` 的站点变更通过 GitHub Pages 发布。
 
 ## 开发与验证
@@ -56,7 +56,7 @@ python3 scripts/build-flutter-web.py
 - 页面组合独立的 `widgets/` 和 `screens/dialogs/`；输入控制器与局部导航由页面持有，不通过 part 或 extension 共享父 State。职责和存储边界见 [客户端架构](docs/flutter-architecture.md)。
 - 界面采用新艺术运动风格的深浅色 Material Design 3 主题。标题使用 Playfair Display，中文回退霞鹜文楷，正文使用霞鹜文楷。纸张渲染字体由用户选择。第三方字体保留各自许可。
 - 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开项目的 GitHub Issues，不接入旧邮件服务。
-- `main` 的相关推送和 pull request 触发 Flutter、Rust 与 Android/iOS 验证。发版时手动运行 Publish Flutter Release 并指定版本号，由 CI 从通过检查的 `main` 提交构建安装包。使用入口见[发布说明](docs/release.md)。
+- `main` 的相关推送和 pull request 触发 Flutter、Rust 与 Android/iOS 验证。推送与版本提交同名的 `vX.Y.Z` 标签触发 Publish Flutter Release，由 CI 从通过检查的标签提交构建安装包。使用入口见[发布说明](docs/release.md)。
 
 ## 编码与协作约定
 
@@ -66,7 +66,7 @@ python3 scripts/build-flutter-web.py
 - 每次远程推送都需要用户明确授权。
 - UI 复用现有 Flutter Material Design 3 主题；用户可见文字同时维护 `app/lib/l10n/app_zh.arb` 和 `app_en.arb`。
 - 除非用户明确要求，不使用 Browser Use 验证。
-- 保留 `CHANGELOG.md` 历史记录，不手改版本号或手动打 tag。发布构建通过参数和 `HANDWRITING_BUILD_VERSION` 注入发布版本，不修改分支源码版本文件；补跑使用 Release 中固定的来源清单。
+- 在 `CHANGELOG.md` 的「未发布」维护变更说明；用 `node scripts/prepare-release.cjs vX.Y.Z` 生成版本提交，确认发版时才创建并推送同名标签。发布构建通过参数和 `HANDWRITING_BUILD_VERSION` 注入发布版本，不修改分支源码版本文件；补跑使用 Release 中固定的来源清单。
 
 ## 平台约束
 

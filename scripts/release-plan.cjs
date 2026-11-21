@@ -3,12 +3,24 @@
 const fs = require("node:fs");
 const { execFileSync, spawnSync } = require("node:child_process");
 const { MANIFEST, REQUIRED_WORKFLOWS, approvedRun, releaseVersion, sourceSha, validateManifest, waitForWorkflow } = require("./flutter-release.cjs");
+const { releaseNotes } = require("./prepare-release.cjs");
 
-async function planRelease({ repository, sha, manualTag, signing }, io) {
+function readReleaseCommit(sha, tag) {
+  const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trimEnd();
+  const changed = git("diff", "--name-only", sha + "^", sha).split("\n").sort();
+  if (git("show", "-s", "--format=%s", sha) !== "chore(release): " + tag ||
+      git("show", sha + ":VERSION") !== tag.slice(1) ||
+      changed.join("\n") !== "CHANGELOG.md\nVERSION") {
+    throw new Error("Expected a matching version commit updating VERSION and CHANGELOG.md.");
+  }
+  return releaseNotes(git("show", sha + ":CHANGELOG.md"), tag);
+}
+
+async function planRelease({ repository, sha, tag, signing }, io) {
   sourceSha(sha);
-  const version = releaseVersion(manualTag);
-  if (await io.mainSha() !== sha) {
-    throw new Error("Manual releases require the current main commit.");
+  const version = releaseVersion(tag);
+  if (!await io.isAncestor(sha, "refs/remotes/origin/main")) {
+    throw new Error("The tagged commit must be on main.");
   }
   const previous = await io.latest();
   const pin = previous.assets.find((asset) => asset.name === MANIFEST);
@@ -17,9 +29,10 @@ async function planRelease({ repository, sha, manualTag, signing }, io) {
   if (sha === baseline.flutter_sha) {
     throw new Error("This Flutter commit was already released.");
   }
-  const commits = await io.history(baseline.flutter_sha, sha);
+  if (!await io.isAncestor(baseline.flutter_sha, sha)) throw new Error("The tag must descend from the previous release.");
   if (version.build_number <= baseline.build_number) throw new Error("Release versions must increase.");
 
+  const notes = io.notes(sha, tag);
   const qualityRuns = {};
   for (const workflow of REQUIRED_WORKFLOWS) {
     qualityRuns[workflow] = approvedRun(await io.runs(workflow, sha), sha, repository);
@@ -29,7 +42,7 @@ async function planRelease({ repository, sha, manualTag, signing }, io) {
       schema_version: 1,
       repository,
       product_name: "Panache",
-      release_tag: manualTag,
+      release_tag: tag,
       ...version,
       flutter_sha: sha,
       quality_runs: qualityRuns,
@@ -37,8 +50,7 @@ async function planRelease({ repository, sha, manualTag, signing }, io) {
       android_policy: "Release-signed APKs only.",
       ios_policy: "No IPA without distribution signing and provisioning.",
     },
-    previousTag: previous.tag_name,
-    commits,
+    notes,
   };
 }
 
@@ -50,24 +62,11 @@ function github(repository) {
   const deadline = Date.now() + 30 * 60 * 1000;
   return {
     latest: () => api("releases/latest"),
-    mainSha: () => api("git/ref/heads/main").object.sha,
+    isAncestor: (base, head) => spawnSync("git", ["merge-base", "--is-ancestor", base, head]).status === 0,
+    notes: readReleaseCommit,
     manifest: (id) => {
       if (!Number.isSafeInteger(id) || id < 1) throw new Error("Invalid manifest asset ID.");
       return api("releases/assets/" + id, "-H", "Accept: application/octet-stream");
-    },
-    history: (base, sha) => {
-      if (spawnSync("git", ["merge-base", "--is-ancestor", base, sha]).status !== 0) {
-        throw new Error("The previous Flutter release is not in main history.");
-      }
-      const fields = execFileSync("git", [
-        "log", "--format=%s%x00%b%x00", base + ".." + sha, "--",
-        "app", "crates", "assets", "vendor", "Cargo.toml", "Cargo.lock",
-      ], { encoding: "utf8" }).split("\0");
-      const commits = [];
-      for (let i = 0; i + 1 < fields.length; i += 2) {
-        commits.push({ subject: fields[i].trim(), body: fields[i + 1] });
-      }
-      return commits;
     },
     runs: (workflow, sha) => waitForWorkflow({
       workflow, sha, repository, deadline,
@@ -81,15 +80,15 @@ async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   const signing = process.env.ANDROID_SIGNING_READY === "true";
   const plan = await planRelease({
-    repository, sha: process.env.SOURCE_SHA, manualTag: process.env.MANUAL_TAG, signing,
+    repository, sha: execFileSync("git", ["rev-parse", "HEAD^{commit}"], { encoding: "utf8" }).trim(),
+    tag: process.env.RELEASE_TAG, signing,
   }, github(repository));
   const manifest = plan.manifest;
   fs.mkdirSync("release-plan", { recursive: true });
   fs.writeFileSync("release-plan/" + MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
-  const changes = plan.commits.map(({ subject }) => "- " + subject);
   fs.writeFileSync("release-plan/notes.md", [
     "## Flutter / Rust", "",
-    ...changes, "",
+    plan.notes, "",
     "Windows x64 · Linux x64 · macOS arm64" + (signing ? " · Android arm64 / x86_64" : ""),
     "",
     "Source: " + manifest.flutter_sha,
@@ -104,5 +103,5 @@ async function main() {
   ].join("\n"));
 }
 
-module.exports = { planRelease };
+module.exports = { planRelease, readReleaseCommit };
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });

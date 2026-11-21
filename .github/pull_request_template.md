@@ -12,4 +12,4 @@
 
 - [ ] 用户可见文字已同时提供中英文翻译（`app/lib/l10n/app_zh.arb` / `app_en.arb`）
 - [ ] 相关 Flutter / Rust 检查通过
-- [ ] 未手动修改 `CHANGELOG.md` 和版本值
+- [ ] 用户可见改动已记入 `CHANGELOG.md` 的「未发布」；版本号仅在版本提交中更新
