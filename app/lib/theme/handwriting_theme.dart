@@ -5,6 +5,24 @@ import 'nouveau_ornament.dart';
 const defaultThemeColor = NouveauColors.forest;
 const defaultSecondaryThemeColor = NouveauColors.wisteria;
 
+/// Black ink layers over a single opaque, neutral workbench background.
+abstract final class NightSurfaces {
+  static const panel = Color(0x40000000);
+  static const navigation = Color(0x52000000);
+  static const writing = Color(0x35000000);
+  static const preview = Color(0x20000000);
+
+  static LinearGradient backdrop(Color base) => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color.lerp(base, const Color(0xffa7a8ad), .22)!,
+      base,
+      Color.lerp(base, const Color(0xff202124), .48)!,
+    ],
+  );
+}
+
 /// An opaque base lets translucent dark surfaces composite consistently.
 Widget handwritingBackdrop(BuildContext context, Widget? child) =>
     ColoredBox(color: Theme.of(context).scaffoldBackgroundColor, child: child!);
@@ -26,15 +44,15 @@ ThemeData handwritingTheme(
   // coolness; saturated user-picked colors stay on small interactive elements.
   final surfaceHue = iris ? (dark ? 226.0 : 38.0) : hue.hue;
   final saturation = iris
-      ? (dark ? .108 : .13)
-      : hue.saturation.clamp(0.0, .085);
+      ? (dark ? .036 : .13)
+      : hue.saturation.clamp(0.0, dark ? .035 : .085);
   Color surfaceTone(double daylight, double moonlight) => HSLColor.fromAHSL(
     1,
     surfaceHue,
     saturation,
     dark ? moonlight : daylight,
   ).toColor();
-  final surface = surfaceTone(.943, .18);
+  final surface = surfaceTone(.943, .285);
   final raised = surfaceTone(.982, .232);
   final foreground = surfaceTone(.17, .943);
   final muted = surfaceTone(.355, .788);
@@ -86,7 +104,7 @@ ThemeData handwritingTheme(
     secondaryContainer: secondaryContainer,
     onSecondaryContainer: secondary,
     tertiary: dark
-        ? Color.lerp(primary, secondary, .65)!
+        ? const Color(0xFFB5B2B5)
         : iris
         ? const Color(0xFF78601B)
         : hue.withLightness(.34).toColor(),
@@ -122,7 +140,9 @@ ThemeData handwritingTheme(
     colorScheme: scheme,
     scaffoldBackgroundColor: surface,
     appBarTheme: AppBarThemeData(
-      backgroundColor: surfaceTone(.966, .222),
+      backgroundColor: dark
+          ? Color.alphaBlend(NightSurfaces.navigation, surface)
+          : surfaceTone(.966, .222),
       foregroundColor: foreground,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -137,17 +157,17 @@ ThemeData handwritingTheme(
     inputDecorationTheme: InputDecorationTheme(
       isDense: true,
       filled: true,
-      fillColor: scheme.surfaceContainerLowest,
+      fillColor: dark ? NightSurfaces.writing : scheme.surfaceContainerLowest,
       border: fieldBorder(border),
       enabledBorder: fieldBorder(border),
       focusedBorder: fieldBorder(primary, width: 2),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     ),
     cardTheme: CardThemeData(
-      elevation: 2,
+      elevation: dark ? 0 : 2,
       shadowColor: dark ? Colors.black54 : foreground.withValues(alpha: .22),
       margin: EdgeInsets.zero,
-      color: raised,
+      color: dark ? NightSurfaces.panel : raised,
       shape: cardShape,
     ),
     // ButtonStyleButton interpolates an entire nested ThemeData per button.

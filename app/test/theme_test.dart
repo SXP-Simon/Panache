@@ -123,7 +123,7 @@ void main() {
     );
   });
 
-  test('neutral reading surfaces stay lifted and legible for vivid and preset colors', () {
+  test('neutral reading surfaces stay legible for vivid and preset colors', () {
     for (final brightness in Brightness.values) {
       final accents = <Color>{};
       for (final (primary, accent) in [
@@ -140,8 +140,10 @@ void main() {
         );
         final scheme = theme.colorScheme;
         final masthead = theme.appBarTheme.backgroundColor!;
-        final field = theme.inputDecorationTheme.fillColor!;
-        final panel = theme.cardTheme.color!;
+        final panelPaint = theme.cardTheme.color!;
+        final fieldPaint = theme.inputDecorationTheme.fillColor!;
+        final panel = Color.alphaBlend(panelPaint, scheme.surface);
+        final field = Color.alphaBlend(fieldPaint, panel);
         expect(accents.add(scheme.primary), isTrue);
         for (final background in [scheme.surface, panel, masthead, field]) {
           final channels = [background.r, background.g, background.b]..sort();
@@ -153,13 +155,20 @@ void main() {
                 : greaterThan(.80),
           );
         }
-        expect(
-          panel.computeLuminance(),
-          greaterThan(scheme.surface.computeLuminance()),
-        );
         if (brightness == Brightness.dark) {
+          for (final paint in [
+            panelPaint,
+            fieldPaint,
+            NightSurfaces.navigation,
+            NightSurfaces.preview,
+          ]) {
+            expect(paint.toARGB32() & 0x00ffffff, 0);
+            expect(paint.a, inExclusiveRange(0.0, 1.0));
+          }
+          expect(field.computeLuminance(), lessThan(panel.computeLuminance()));
+        } else {
           expect(
-            field.computeLuminance(),
+            panel.computeLuminance(),
             greaterThan(scheme.surface.computeLuminance()),
           );
         }
@@ -170,6 +179,9 @@ void main() {
           (theme.appBarTheme.foregroundColor!, masthead),
           (scheme.onSecondaryContainer, scheme.secondaryContainer),
           (scheme.onPrimary, scheme.primary),
+          if (brightness == Brightness.dark)
+            for (final base in NightSurfaces.backdrop(scheme.surface).colors)
+              (scheme.onSurfaceVariant, Color.alphaBlend(panelPaint, base)),
         ]) {
           final values = [ink.computeLuminance(), fill.computeLuminance()]
             ..sort();

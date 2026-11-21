@@ -125,6 +125,11 @@ class _RetainedPaneSwitcherState extends State<RetainedPaneSwitcher>
                           child: RepaintBoundary(
                             child: Material(
                               animationDuration: Duration.zero,
+                              type:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? MaterialType.transparency
+                                  : MaterialType.canvas,
                               color: Theme.of(context).colorScheme.surface,
                               child: widget.children[index],
                             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/handwriting_theme.dart';
 import '../theme/nouveau_ornament.dart';
 import 'atelier_ornament.dart';
 import 'fine_preview.dart';
@@ -311,8 +312,12 @@ class WorkbenchLayout extends StatelessWidget {
   ButtonStyle selectedToolStyle(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return TextButton.styleFrom(
-      backgroundColor: colors.primary,
-      foregroundColor: colors.onPrimary,
+      backgroundColor: colors.brightness == Brightness.dark
+          ? colors.primary.withValues(alpha: .12)
+          : colors.primary,
+      foregroundColor: colors.brightness == Brightness.dark
+          ? colors.primary
+          : colors.onPrimary,
     );
   }
 
@@ -356,6 +361,7 @@ class WorkbenchLayout extends StatelessWidget {
 
   Widget _wideTools(BuildContext context, FineInspector? inspector) {
     final l = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
     final editing = mobileTab != 1;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -364,7 +370,9 @@ class WorkbenchLayout extends StatelessWidget {
           width: width >= 1100 ? 134 : 108,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              color: colors.brightness == Brightness.dark
+                  ? NightSurfaces.navigation
+                  : colors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
                 color: Theme.of(context).colorScheme.outlineVariant,

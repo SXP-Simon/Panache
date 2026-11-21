@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../theme/handwriting_theme.dart';
 import '../models/ink_page.dart';
 import '../models/fine_edit.dart';
 import '../services/image_clipboard.dart';
@@ -289,7 +290,12 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: colors.surfaceContainerLow,
+                color:
+                    theme.brightness == Brightness.dark &&
+                        !hasPages &&
+                        widget.backgroundBytes == null
+                    ? NightSurfaces.preview
+                    : colors.surfaceContainerLow,
                 border: fullscreen
                     ? null
                     : Border.all(color: colors.outlineVariant),
