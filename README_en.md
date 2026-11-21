@@ -37,8 +37,8 @@ Light mode uses a warm, paper-white background. Dark mode layers translucent bla
   </thead>
   <tbody>
     <tr>
-      <td valign="top"><a href="docs/assets/images/panache-themes-light-392cf122e893.webp"><img src="docs/assets/images/panache-themes-light-392cf122e893.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
-      <td valign="top"><a href="docs/assets/images/panache-themes-dark-345fc743686a.webp"><img src="docs/assets/images/panache-themes-dark-345fc743686a.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-light-4afebd8c822b.webp"><img src="docs/assets/images/panache-themes-light-4afebd8c822b.webp" width="460" alt="Light mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-256296ea03f2.webp"><img src="docs/assets/images/panache-themes-dark-256296ea03f2.webp" width="460" alt="Dark mode with the Iris, Celadon, and Coral rose palettes, from top to bottom"></a></td>
     </tr>
   </tbody>
 </table>

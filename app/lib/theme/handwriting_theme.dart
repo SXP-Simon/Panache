@@ -54,17 +54,17 @@ ThemeData handwritingTheme(
   ).toColor();
   final surface = surfaceTone(.943, .285);
   final raised = surfaceTone(.982, .232);
-  final foreground = surfaceTone(.17, .943);
+  final foreground = dark ? NouveauColors.ivory : surfaceTone(.17, .943);
   final muted = surfaceTone(.355, .788);
   final outline = surfaceTone(.45, .66);
   final base = ColorScheme.fromSeed(
     seedColor: dark && seedColor == defaultThemeColor
-        ? NouveauColors.moonMint
+        ? NouveauColors.nightSage
         : seedColor,
     brightness: brightness,
   );
   final primary = dark
-      ? (seedColor == defaultThemeColor ? NouveauColors.moonMint : base.primary)
+      ? (seedColor == defaultThemeColor ? NouveauColors.nightSage : base.primary)
       : _readableAccent(seedColor, surface, foreground, 0, 4.5);
   final primaryContainer = Color.alphaBlend(
     (dark ? primary : seedColor).withValues(alpha: dark ? .16 : .20),
@@ -104,7 +104,7 @@ ThemeData handwritingTheme(
     secondaryContainer: secondaryContainer,
     onSecondaryContainer: secondary,
     tertiary: dark
-        ? const Color(0xFFB5B2B5)
+        ? const Color(0xFFB8A982)
         : iris
         ? const Color(0xFF78601B)
         : hue.withLightness(.34).toColor(),

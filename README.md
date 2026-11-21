@@ -39,8 +39,8 @@ Panache 是基于 **Flutter + Rust** 的开源手写体生成器。把课堂笔�
   </thead>
   <tbody>
     <tr>
-      <td valign="top"><a href="docs/assets/images/panache-themes-light-392cf122e893.webp"><img src="docs/assets/images/panache-themes-light-392cf122e893.webp" width="460" alt="浅色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
-      <td valign="top"><a href="docs/assets/images/panache-themes-dark-345fc743686a.webp"><img src="docs/assets/images/panache-themes-dark-345fc743686a.webp" width="460" alt="深色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-light-4afebd8c822b.webp"><img src="docs/assets/images/panache-themes-light-4afebd8c822b.webp" width="460" alt="浅色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
+      <td valign="top"><a href="docs/assets/images/panache-themes-dark-256296ea03f2.webp"><img src="docs/assets/images/panache-themes-dark-256296ea03f2.webp" width="460" alt="深色模式下的鸢尾、青瓷和珊瑚玫瑰工作台，从上至下排列"></a></td>
     </tr>
   </tbody>
 </table>
