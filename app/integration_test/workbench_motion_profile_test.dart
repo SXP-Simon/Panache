@@ -226,7 +226,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     final byId = {for (final t in timings) t.frameNumber: t};
     final report = <String, dynamic>{
-      if (monitor != null) 'monitor': monitor,
+      'monitor': ?monitor,
       'reported_refresh_hz': hz,
       'calibrated_interval_us': measuredUs,
       'budget_us': budgetUs,
