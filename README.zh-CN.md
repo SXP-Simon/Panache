@@ -22,6 +22,18 @@ Panache 能把正文、公式、表格和电路图排成手写稿。导入文档
 
 可下载的离线客户端支持 Windows x64、Apple 芯片 Mac、Linux x64 和 Android（arm64-v8a、x86_64）。iOS 客户端目前需要从源码构建。
 
+## 用 AI 客户端生成手写稿
+
+Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 → 连接 AI 客户端** 复制配置，加入支持 stdio MCP 的客户端，就可以对它说：
+
+> 用这张斜拍的信纸排我的笔记，画出进程状态转换图。先给我看第一页，确认后把整份导出成 PDF。
+
+可以让 AI 列出字体、按节保存 Markdown、回查旧稿，也可以只预览指定页，按纸上横线微调流程图和表格。[MCP 工具与配置说明](crates/panache-mcp/README.md)
+
+| 进程状态转换图 | 资源分配表 | 《钱塘湖春行》 |
+| --- | --- | --- |
+| [![进程状态转换图](assets/examples/process-states-258a9cf83c58.webp)](assets/examples/process-states-258a9cf83c58.webp) | [![资源分配表](assets/examples/bankers-algorithm-203c48282b49.webp)](assets/examples/bankers-algorithm-203c48282b49.webp) | [![《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp) |
+
 ## 参与贡献
 
 遇到问题可以到 [GitHub Issues](https://github.com/SXP-Simon/Panache/issues) 反馈。本地开发、测试和提交 PR 的说明见[贡献指南](CONTRIBUTING.md#中文贡献指南)。
@@ -35,3 +47,5 @@ Panache 能把正文、公式、表格和电路图排成手写稿。导入文档
 - 感谢 [14790897/handwriting-web](https://github.com/14790897/handwriting-web) 提供原版项目，为 Panache 带来灵感。
 - 感谢 [AnxForever 的 StyleKit](https://github.com/AnxForever/stylekit)。工作台的花卉装饰和曲线设计参考了它的[新艺术运动风格指南](https://www.stylekit.top/zh/styles/art-nouveau)。
 - 感谢 [HakimYu](https://github.com/HakimYu) 完成 Flutter 与 Rust 迁移，也感谢每一位[为 Panache 作出贡献的人](https://github.com/SXP-Simon/Panache/graphs/contributors)。
+
+Friendship links: [LINUX DO](https://linux.do/)

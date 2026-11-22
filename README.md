@@ -22,6 +22,18 @@ Import TXT, DOCX, PDF, or RTF, or paste text directly. Preview the document, the
 
 Offline downloads are available for Windows x64, macOS on Apple silicon, Linux x64, and Android (arm64-v8a and x86_64). The iOS client currently requires a source build.
 
+## Local MCP for AI clients
+
+The Windows, macOS, and Linux desktop packages include a local MCP server. Open **App settings → Connect AI client** and copy the configuration into a client that supports stdio MCP. Try asking:
+
+> Write my notes and the process diagram on this photo of my stationery. Show me the first page, then export the whole draft as a PDF.
+
+The client can list fonts, save Markdown in sections, revisit earlier revisions, preview individual pages, and adjust a diagram or table against the paper’s rulings. [MCP tools and configuration](crates/panache-mcp/README.md)
+
+| Process state diagram | Resource allocation table | Handwritten poem |
+| --- | --- | --- |
+| [![Process state diagram](assets/examples/process-states-258a9cf83c58.webp)](assets/examples/process-states-258a9cf83c58.webp) | [![Resource allocation table](assets/examples/bankers-algorithm-203c48282b49.webp)](assets/examples/bankers-algorithm-203c48282b49.webp) | [![Handwritten poem](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp) |
+
 ## Contributing
 
 Report bugs in [GitHub Issues](https://github.com/SXP-Simon/Panache/issues). For local setup, tests, and pull requests, see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -35,3 +47,5 @@ Report bugs in [GitHub Issues](https://github.com/SXP-Simon/Panache/issues). For
 - Thanks to [14790897/handwriting-web](https://github.com/14790897/handwriting-web) for the original project that inspired Panache.
 - Thanks to [AnxForever’s StyleKit](https://github.com/AnxForever/stylekit) for the [Art Nouveau guide](https://www.stylekit.top/zh/styles/art-nouveau) that inspired the workbench’s floral motifs and curves.
 - Thanks to [HakimYu](https://github.com/HakimYu) for the Flutter and Rust migration, and to everyone who has [contributed to Panache](https://github.com/SXP-Simon/Panache/graphs/contributors).
+
+Friendship links: [LINUX DO](https://linux.do/)
