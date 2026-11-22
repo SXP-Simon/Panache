@@ -30,9 +30,11 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 
 可以让 AI 列出字体、按节保存 Markdown、回查旧稿，也可以只预览指定页，按纸上横线微调流程图和表格。[MCP 工具与配置说明](crates/panache-mcp/README.md)
 
-| 进程状态转换图 | 资源分配表 | 《钱塘湖春行》 |
-| --- | --- | --- |
-| [![进程状态转换图](assets/examples/process-states-32471b116f51.webp)](assets/examples/process-states-32471b116f51.webp) | [![资源分配表](assets/examples/bankers-algorithm-34116f1eda06.webp)](assets/examples/bankers-algorithm-34116f1eda06.webp) | [![《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp) |
+| 进程状态转换图 | 资源分配表 |
+| --- | --- |
+| [![进程状态转换图](assets/examples/process-states-6fcceb20526a.webp)](assets/examples/process-states-6fcceb20526a.webp) | [![资源分配表](assets/examples/bankers-algorithm-3d87bc66b1db.webp)](assets/examples/bankers-algorithm-3d87bc66b1db.webp) |
+
+[《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 
 ## 参与贡献
 

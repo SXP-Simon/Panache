@@ -30,9 +30,11 @@ The Windows, macOS, and Linux desktop packages include a local MCP server. Open 
 
 The client can list fonts, save Markdown in sections, revisit earlier revisions, preview individual pages, and adjust a diagram or table against the paper’s rulings. [MCP tools and configuration](crates/panache-mcp/README.md)
 
-| Process state diagram | Resource allocation table | Handwritten poem |
-| --- | --- | --- |
-| [![Process state diagram](assets/examples/process-states-32471b116f51.webp)](assets/examples/process-states-32471b116f51.webp) | [![Resource allocation table](assets/examples/bankers-algorithm-34116f1eda06.webp)](assets/examples/bankers-algorithm-34116f1eda06.webp) | [![Handwritten poem](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp) |
+| Process state diagram | Resource allocation table |
+| --- | --- |
+| [![Process state diagram](assets/examples/process-states-6fcceb20526a.webp)](assets/examples/process-states-6fcceb20526a.webp) | [![Resource allocation table](assets/examples/bankers-algorithm-3d87bc66b1db.webp)](assets/examples/bankers-algorithm-3d87bc66b1db.webp) |
+
+[Handwritten poem](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 
 ## Contributing
 
