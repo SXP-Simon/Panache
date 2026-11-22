@@ -16,11 +16,15 @@ use crate::{
     drafts::{Section, Snapshot},
 };
 
+use handwriting_core::fine_edit::{self, Adjustment, Adjustments};
+use serde_json::{Value, json};
+
 struct CachedPage {
     draft: String,
     section: u32,
     version: u32,
     settings: u32,
+    edits: u32,
     page: usize,
     png: String,
 }
@@ -82,6 +86,7 @@ impl Engine {
         draft: &Snapshot<'_>,
         section: Section,
         background: Option<Vec<u8>>,
+        edits: Option<Adjustments>,
     ) -> Result<RenderRequest> {
         let font_name = draft
             .controls
@@ -101,7 +106,9 @@ impl Engine {
                 Ok(None)
             }
         })?;
-        let params = crate::controls::parameters(draft, section.number, &draft.controls)?;
+        let mut params = crate::controls::parameters(draft, section.number, &draft.controls)?;
+        params.fine_edit = edits.is_some();
+        params.fine_edits = edits;
         Ok(RenderRequest {
             text: section.text,
             params,
@@ -122,14 +129,16 @@ impl Engine {
             (1..=Limits::default().max_pages).contains(&page_number),
             "Invalid page number"
         );
+        let (edit_revision, edits) = draft.edits(&section)?;
         if let Some(hit) = self.cache.iter().find(|p| {
             p.draft == draft.id
                 && p.settings == draft.settings_revision
+                && p.edits == edit_revision
                 && (p.section, p.version, p.page) == (n, v, page_number)
         }) {
             return Ok((hit.png.clone(), true));
         }
-        let request = self.request(draft, section, draft.background()?)?;
+        let request = self.request(draft, section, draft.background()?, edits)?;
         let mut image = None;
         let pages = handwriting_core::render::render_until_page(
             &request,
@@ -152,10 +161,138 @@ impl Engine {
             section: n,
             version: v,
             settings: draft.settings_revision,
+            edits: edit_revision,
             page: page_number,
             png: png.clone(),
         });
         Ok((png, false))
+    }
+    fn fine_request(&mut self, draft: &Snapshot<'_>, section: Section) -> Result<RenderRequest> {
+        let (_, edits) = draft.edits(&section)?;
+        let mut req = self.request(draft, section, draft.background()?, edits)?;
+        req.params.fine_edit = true;
+        Ok(req)
+    }
+    pub fn layout(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        input: &crate::Preview,
+        cancel: &Cancellation,
+    ) -> Result<Value> {
+        let limit = input.limit.unwrap_or(12);
+        ensure!((1..=32).contains(&limit), "limit must be 1..32");
+        let offset = input.offset.unwrap_or(0);
+        let page = input.page.unwrap_or(1);
+        let number = section.number;
+        let req = self.fine_request(draft, section)?;
+        let (_, bounds) = fine_edit::inspect_page(&req, page, cancel)?;
+        let utf16: Vec<_> = req.text.encode_utf16().collect();
+        let rows: Vec<_> = bounds
+            .iter()
+            .skip(offset)
+            .take(limit)
+            .map(|g| {
+                let mut row = json!({"id":g.id,"bounds":g.bounds});
+                if let Some([a, b]) = g.source_utf16
+                    && let Some(chars) = utf16.get(a as usize..b as usize)
+                {
+                    row["text"] = json!(
+                        String::from_utf16_lossy(chars)
+                            .chars()
+                            .take(24)
+                            .collect::<String>()
+                    );
+                }
+                if let Some(edit) = req
+                    .params
+                    .fine_edits
+                    .as_ref()
+                    .and_then(|v| v.glyphs.iter().find(|e| e.id == g.id))
+                {
+                    row["adjustment"] = json!(edit);
+                }
+                row
+            })
+            .collect();
+        Ok(
+            json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page":page,
+            "glyphs":rows,"total":bounds.len(),"next_offset":offset.checked_add(limit).filter(|n|*n<bounds.len())}),
+        )
+    }
+    pub fn adjust(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        input: &crate::Nudge,
+        cancel: &Cancellation,
+    ) -> Result<u32> {
+        use std::collections::{BTreeMap, BTreeSet};
+        let ids: BTreeSet<_> = input.ids.iter().copied().collect();
+        ensure!(
+            !ids.is_empty() && ids.len() == input.ids.len() && ids.len() <= 32,
+            "Choose 1..32 distinct glyph IDs"
+        );
+        ensure!(
+            input.dx.is_some()
+                || input.dy.is_some()
+                || input.scale.is_some()
+                || input.angle.is_some()
+                || input.opacity.is_some(),
+            "Supply at least one adjustment"
+        );
+        ensure!(
+            input.dx.is_none_or(|v| (-65535..=65535).contains(&v))
+                && input.dy.is_none_or(|v| (-65535..=65535).contains(&v))
+                && input.scale.is_none_or(|v| (50..=200).contains(&v))
+                && input.angle.is_none_or(|v| (-45..=45).contains(&v))
+                && input.opacity.is_none_or(|v| v <= 100),
+            "Invalid glyph adjustment"
+        );
+        let version = section.version;
+        let mut req = self.fine_request(draft, section)?;
+        let (key, bounds) = fine_edit::inspect_page(&req, input.page, cancel)?;
+        ensure!(
+            ids.iter().all(|id| bounds.iter().any(|g| g.id == *id)),
+            "Glyph not on this page; inspect its layout first"
+        );
+        let mut edits: BTreeMap<_, _> = req
+            .params
+            .fine_edits
+            .take()
+            .into_iter()
+            .flat_map(|v| v.glyphs)
+            .map(|e| (e.id, e))
+            .collect();
+        for id in ids {
+            let e = edits.entry(id).or_insert(Adjustment {
+                id,
+                dx: 0,
+                dy: 0,
+                scale: 100,
+                angle: 0,
+                opacity: 100,
+                color: None,
+                thickness: 0,
+                softness: 0,
+                warp: None,
+            });
+            e.dx = input.dx.unwrap_or(e.dx);
+            e.dy = input.dy.unwrap_or(e.dy);
+            e.angle = input.angle.unwrap_or(e.angle);
+            e.scale = input.scale.unwrap_or(e.scale);
+            e.opacity = input.opacity.unwrap_or(e.opacity);
+        }
+        ensure!(edits.len() <= 10000, "Section glyph edit limit reached");
+        cancel.check()?;
+        draft.store_edits(
+            input.section,
+            version,
+            &Adjustments {
+                key,
+                glyphs: edits.into_values().collect(),
+            },
+        )
     }
     pub fn export(
         &mut self,
@@ -172,7 +309,8 @@ impl Engine {
         let render_sections = |emit: &mut PageSink<'_>| -> Result<()> {
             for section in sections {
                 cancel.check()?;
-                let mut request = self.request(draft, section, background.take())?;
+                let (_, edits) = draft.edits(&section)?;
+                let mut request = self.request(draft, section, background.take(), edits)?;
                 request.limits.max_pages -= count;
                 render(&request, cancel, |_, page| {
                     emit(count, &page)?;

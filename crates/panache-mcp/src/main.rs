@@ -206,6 +206,7 @@ impl Panache {
                 &input.changes.into_iter().collect(),
                 &self.0.fonts,
             )?;
+            ensure!(changes != draft.controls, "No control values changed");
             controls::parameters(&draft, 1, &changes)?;
             let next = self
                 .0
@@ -213,7 +214,7 @@ impl Panache {
                 .tune(draft.id, input.expected_revision, &changes)?;
             Ok(reply(
                 format!("Saved revision {next}."),
-                json!({"draft_id":draft.id,"revision":next,"controls":changes}),
+                json!({"draft_id":draft.id,"revision":next,"controls":changes,"fine_layout":"inspect_again"}),
             ))
         })())
     }
@@ -289,7 +290,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Preview one page as a PNG, defaulting to the first. Only lays out the selected section up to that page. Pin a revision for repeatable output."
+        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs."
     )]
     async fn preview_handwriting(
         &self,
@@ -306,6 +307,14 @@ impl Panache {
                     .pop()
                     .context("Empty draft")?;
                 let page = input.page.unwrap_or(1);
+                if input.view == Some(PreviewView::Layout) {
+                    let result = engine.layout(&draft, section, &input, cancel)?;
+                    return Ok(reply(result.to_string(), result));
+                }
+                ensure!(
+                    input.offset.is_none() && input.limit.is_none(),
+                    "offset and limit require view=layout"
+                );
                 let (png, cached) = engine.preview(&draft, section, page, cancel)?;
                 let mut result = reply(
                     format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision),
@@ -319,6 +328,34 @@ impl Panache {
             })
             .await;
         tool_result(result)
+    }
+
+    #[tool(
+        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets are absolute relative to base bounds."
+    )]
+    async fn adjust_glyphs(
+        &self,
+        Parameters(input): Parameters<Nudge>,
+        ctx: RequestContext<RoleServer>,
+    ) -> CallToolResult {
+        tool_result(
+            self.render(ctx, move |state, engine, cancel| {
+                let draft = state
+                    .drafts
+                    .snapshot(&input.draft_id, Some(input.expected_revision))?;
+                let section = state
+                    .drafts
+                    .sections(draft.id, draft.revision, Some(input.section))?
+                    .pop()
+                    .context("Unknown section")?;
+                let next = engine.adjust(&draft, section, &input, cancel)?;
+                Ok(reply(
+                    format!("Saved revision {next}."),
+                    json!({"draft_id":draft.id,"revision":next,"count":input.ids.len()}),
+                ))
+            })
+            .await,
+        )
     }
 
     #[tool(

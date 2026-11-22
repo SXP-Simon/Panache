@@ -54,6 +54,7 @@ async def smoke(command, arguments, out):
                 "list_fonts",
                 "describe_controls",
                 "tune_handwriting",
+                "adjust_glyphs",
                 "list_drafts",
                 "save_section",
                 "read_section",
@@ -247,6 +248,50 @@ async def smoke(command, arguments, out):
                 "changes": {"ink_opacity": 101},
             }
             assert (await client.call_tool("tune_handwriting", invalid)).isError
+            probe = dict(draft_id=paper_id, section=1, page=1, view="layout", limit=1)
+            layout = await call(client, "preview_handwriting", **probe)
+            assert not any(c.type == "image" for c in layout.content)
+            row = layout.structuredContent["glyphs"][0]
+            assert (
+                layout.structuredContent["next_offset"] == 1 and len(row["bounds"]) == 4
+            )
+            fine = dict(
+                draft_id=paper_id,
+                expected_revision=2,
+                section=1,
+                page=1,
+                ids=[row["id"]],
+                dx=11,
+                dy=-4,
+            )
+            assert (
+                await client.call_tool("adjust_glyphs", {**fine, "ids": [999999]})
+            ).isError
+            before = png(await call(client, "preview_handwriting", draft_id=paper_id))
+            assert (await call(client, "adjust_glyphs", **fine)).structuredContent[
+                "revision"
+            ] == 3
+            adjusted = png(await call(client, "preview_handwriting", draft_id=paper_id))
+            assert (
+                adjusted != before
+                and png(
+                    await call(
+                        client, "preview_handwriting", draft_id=paper_id, revision=2
+                    )
+                )
+                == before
+            )
+            again = (
+                await call(client, "preview_handwriting", **probe)
+            ).structuredContent["glyphs"][0]
+            assert again["adjustment"]["dx"] == 11 and again["adjustment"]["dy"] == -4
+            exported_fine = (
+                await call(
+                    client, "export_handwriting", draft_id=paper_id, format="zip"
+                )
+            ).structuredContent
+            with ZipFile(exported_fine["path"]) as pages:
+                assert pages.read("0.png") == adjusted
             # Exercise a long draft without ever exporting or rendering its tail.
             repeated = "逐题列出已知条件，检查解题步骤。\n" * 600
             large = (

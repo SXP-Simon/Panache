@@ -20,6 +20,44 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
+    pub fn edits(
+        &self,
+        section: &Section,
+    ) -> Result<(u32, Option<handwriting_core::fine_edit::Adjustments>)> {
+        let row:Option<(u32,String)>=self.drafts.connect()?.query_row(
+            "SELECT revision,edits FROM glyph_edits WHERE draft=?1 AND section=?2 AND source_revision=?3 AND settings_revision=?4 AND revision<=?5 ORDER BY revision DESC LIMIT 1",
+            params![self.id,section.number,section.version,self.settings_revision,self.revision],
+            |r|Ok((r.get(0)?,r.get(1)?))).optional()?;
+        match row {
+            Some((rev, json)) => Ok((rev, Some(serde_json::from_str(&json)?))),
+            None => Ok((0, None)),
+        }
+    }
+
+    pub fn store_edits(
+        &self,
+        section: u32,
+        version: u32,
+        edits: &handwriting_core::fine_edit::Adjustments,
+    ) -> Result<u32> {
+        let mut db = self.drafts.connect()?;
+        let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let next = Drafts::advance(&tx, self.id, self.revision)?;
+        tx.execute(
+            "INSERT INTO glyph_edits VALUES (?1,?2,?3,?4,?5,?6)",
+            params![
+                self.id,
+                section,
+                version,
+                self.settings_revision,
+                next,
+                serde_json::to_string(edits)?
+            ],
+        )?;
+        tx.commit()?;
+        Ok(next)
+    }
+
     pub fn background(&self) -> Result<Option<Vec<u8>>> {
         if self.paper.is_none() {
             return Ok(None);
@@ -47,6 +85,12 @@ impl Drafts {
             CREATE TABLE IF NOT EXISTS drafts (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL, style TEXT NOT NULL,
                 revision INTEGER NOT NULL, chars INTEGER NOT NULL, sections INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS glyph_edits (
+                draft TEXT NOT NULL REFERENCES drafts(id), section INTEGER NOT NULL,
+                source_revision INTEGER NOT NULL, settings_revision INTEGER NOT NULL,
+                revision INTEGER NOT NULL, edits TEXT NOT NULL,
+                PRIMARY KEY(draft,section,source_revision,settings_revision,revision)
             );
             CREATE TABLE IF NOT EXISTS settings (
                 draft TEXT NOT NULL REFERENCES drafts(id), revision INTEGER NOT NULL,

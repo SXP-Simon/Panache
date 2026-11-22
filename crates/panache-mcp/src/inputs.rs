@@ -112,9 +112,41 @@ pub struct Read {
     /// Defaults to 1000, maximum 4000 characters.
     pub limit: Option<u32>,
 }
+#[derive(Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PreviewView {
+    Image,
+    Layout,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Nudge {
+    pub draft_id: String,
+    pub expected_revision: u32,
+    pub section: u32,
+    pub page: usize,
+    /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
+    pub ids: Vec<u32>,
+    /// Absolute offsets in pixels from the original glyph position. Omitted fields retain their values.
+    pub dx: Option<i32>,
+    pub dy: Option<i32>,
+    /// Percent of original size, 50..200.
+    pub scale: Option<u8>,
+    /// Clockwise rotation in degrees, -45..45 (engine coordinates).
+    pub angle: Option<i8>,
+    /// Ink opacity in percent, 0..100.
+    pub opacity: Option<u8>,
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// "image" (default) or "layout" for bounded base glyph boxes without pixels.
+    pub view: Option<PreviewView>,
+    /// Layout mode: start index and number of glyphs (default 12, max 32).
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
     pub draft_id: String,
     pub revision: Option<u32>,
     /// Section number (one-based). Defaults to the first section.

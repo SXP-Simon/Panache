@@ -32,6 +32,47 @@ pub struct Adjustments {
     pub glyphs: Vec<Adjustment>,
 }
 
+/// Original paper-space ink bounds, before any per-glyph adjustment.
+#[derive(Serialize)]
+pub struct GlyphBounds {
+    pub id: u32,
+    pub bounds: [i32; 4],
+    pub source_utf16: Option<[u32; 2]>,
+}
+
+/// Inspect a one-based page without encoding or exposing its glyph mask atlas.
+pub fn inspect_page(
+    request: &crate::RenderRequest,
+    page: usize,
+    cancel: &Cancellation,
+) -> Result<(String, Vec<GlyphBounds>)> {
+    if !request.params.fine_edit || !(1..=request.limits.max_pages).contains(&page) {
+        return Err(Error::new("invalid_parameter", "Invalid fine edit page"));
+    }
+    let mut geometry = None;
+    crate::render::render_pages(request, cancel, page, |i, _, ink| {
+        if i + 1 == page
+            && let Some(crate::render::PageInk::Fine(tiles)) = ink
+        {
+            geometry = Some(
+                tiles
+                    .into_iter()
+                    .map(|t| GlyphBounds {
+                        id: t.id,
+                        bounds: [t.x, t.y, t.mask.width() as i32, t.mask.height() as i32],
+                        source_utf16: t.source,
+                    })
+                    .collect(),
+            );
+        }
+        Ok(())
+    })?;
+    Ok((
+        document_key(&request.text, &request.params),
+        geometry.ok_or_else(|| Error::new("invalid_page", "Page not found"))?,
+    ))
+}
+
 impl Adjustments {
     pub(crate) fn parse(raw: &str) -> Result<Self> {
         let invalid = || Error::new("invalid_parameter", "fine_edits");
