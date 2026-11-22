@@ -77,6 +77,7 @@ where
     dirty: bool,
     count: usize,
     max_pages: usize,
+    stop_after: usize,
     emit: F,
     stopped: bool,
 }
@@ -116,7 +117,8 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
         };
         (self.emit)(self.count, canvas, alpha)?;
         self.count += 1;
-        self.stopped = self.p.preview && !self.p.full_preview && !self.p.pdf_save;
+        self.stopped = self.count >= self.stop_after
+            || (self.p.preview && !self.p.full_preview && !self.p.pdf_save);
         self.x = self.p.left_margin;
         self.y = self.p.top_margin + self.p.line_spacing;
         self.previous_bottom = self.p.top_margin;
@@ -313,8 +315,21 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
 pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
     r: &RenderRequest,
     cancel: &Cancellation,
+    emit: F,
+) -> Result<usize> {
+    render_until_page(r, cancel, usize::MAX, emit)
+}
+
+/// Render a deterministic prefix and stop immediately after delivering its last page.
+pub fn render_until_page<F: FnMut(usize, RgbaImage) -> Result<()>>(
+    r: &RenderRequest,
+    cancel: &Cancellation,
+    stop_after: usize,
     mut emit: F,
 ) -> Result<usize> {
+    if stop_after == 0 {
+        return Ok(0);
+    }
     let key = r
         .params
         .fine_edit
@@ -323,7 +338,7 @@ pub fn render<F: FnMut(usize, RgbaImage) -> Result<()>>(
         .as_deref()
         .map(|key| fine_edit::overrides(key, &r.params))
         .unwrap_or_default();
-    render_pages(r, cancel, |i, paper, ink| {
+    render_pages(r, cancel, stop_after, |i, paper, ink| {
         let image = match ink {
             Some(PageInk::Flat(ink)) => ink_effects::composite(paper, ink, &r.params, cancel)?,
             Some(PageInk::Fine(tiles)) => {
@@ -381,6 +396,7 @@ fn fit_standard_ruled_row(
 pub(crate) fn render_pages(
     r: &RenderRequest,
     cancel: &Cancellation,
+    stop_after: usize,
     emit: impl FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>,
 ) -> Result<usize> {
     cancel.check()?;
@@ -468,6 +484,7 @@ pub(crate) fn render_pages(
         dirty: false,
         count: 0,
         max_pages: r.limits.max_pages,
+        stop_after,
         emit,
         stopped: false,
     };
@@ -832,6 +849,7 @@ mod ruled_tests {
                 dirty: false,
                 count: 0,
                 max_pages: 100,
+                stop_after: usize::MAX,
                 emit: |_, _, _| Ok(()),
                 stopped: false,
             };

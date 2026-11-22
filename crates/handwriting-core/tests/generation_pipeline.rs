@@ -49,6 +49,31 @@ fn request(text: &str) -> RenderRequest {
 }
 
 #[test]
+fn preview_prefix_stops_before_the_next_page_and_matches_export() {
+    let mut request = request("第一页\n---\n第二页\n---\n第三页");
+    request.params.preview = false;
+    let cancel = Cancellation::default();
+    let mut full = Vec::new();
+    assert_eq!(
+        render(&request, &cancel, |_, page| {
+            full.push(page);
+            Ok(())
+        })
+        .unwrap(),
+        3
+    );
+    request.limits.max_pages = 2;
+    let mut prefix = Vec::new();
+    let count = render::render_until_page(&request, &cancel, 2, |_, page| {
+        prefix.push(page);
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(count, 2);
+    assert_eq!(prefix, full[..2]);
+}
+
+#[test]
 fn shared_pipeline_preserves_pages_pdf_and_zip() {
     for scenario in 0..5 {
         let mut request = request("手写 Hello √((a)/(b)) + x²\n---\n第二页");

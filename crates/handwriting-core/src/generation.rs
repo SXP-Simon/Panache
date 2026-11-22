@@ -58,7 +58,7 @@ pub fn generate(
                 .params
                 .fine_edit
                 .then(|| fine_edit::document_key(&request.text, &request.params));
-            crate::render::render_pages(request, cancel, |index, paper, alpha| {
+            crate::render::render_pages(request, cancel, usize::MAX, |index, paper, alpha| {
                 let alpha = alpha.ok_or_else(|| Error::new("invalid_parameter", "ink_layers"))?;
                 cancel.check()?;
                 let paper = STANDARD.encode(export::png(&paper)?);
