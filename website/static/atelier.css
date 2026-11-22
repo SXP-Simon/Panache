@@ -78,6 +78,7 @@ aside summary { font: 600 18px var(--serif); margin-bottom: 15px; cursor: pointe
 aside a { display: block; padding: 3px 9px; font-size: 14px; color: var(--muted); }
 aside a[aria-current] { border-left: 2px solid var(--plum); color: var(--plum); font-weight: 700; }
 article { overflow-wrap: anywhere; }
+.journal-film { display: block; width: 100%; height: auto; border-radius: 12px; }
 article h1 { font-size: clamp(36px,5vw,61px); line-height: 1.15; letter-spacing: -.045em; margin: 17px 0 28px; }
 article h2 { font-size: 28px; margin: 34px 0 12px; }
 article h3 { font-size: 21px; }

@@ -34,7 +34,7 @@
 <img class="app-mark" src="{{ asset('app-icon.png') }}" width="512" height="512" alt="{{ 'Panache app icon' if en else 'Panache 应用图标' }}">
 </section>
 <section class="journal-band"><div class="wrap journal-feature">
-{% for path,picture in [('journal/iris-and-ink','poem.webp'),('journal/paper-studies','panache-custom-background.webp')] %}
+{% for path,picture in [('journal/ink-on-paper','panache-promo-5ba13fe6ea50e7.webp'),('journal/iris-and-ink','poem.webp')] %}
 <a href="{{ local(path) }}"><div class="paper-thumb"><img src="{{ asset(picture) }}" loading="lazy" alt=""></div><h2>{{ titles[path] }}</h2></a>
 {% endfor %}
 </div></section>
@@ -49,7 +49,14 @@
 {% for path in guides %}<a {% if key==path %}aria-current="page"{% endif %} href="{{ local(path) }}">{{ titles[path] }}</a>{% endfor %}
 </details></aside>
 <article>
-<h1>{{ titles[key] }}</h1>{{ content }}
+<h1>{{ titles[key] }}</h1>
+{% if key=='journal/ink-on-paper' %}
+<video class="journal-film" controls playsinline preload="none" width="1920" height="1080" poster="{{ asset('panache-promo-5ba13fe6ea50e7.webp') }}" aria-label="{{ 'Putting words on paper · Panache demo' if en else '让文字落在纸上 · Panache 展示视频' }}">
+  <source src="{{ asset('panache-promo-fe580853fbfa23.mp4') }}" type="video/mp4">
+  <a href="{{ asset('panache-promo-fe580853fbfa23.mp4') }}">{{ 'Download the film' if en else '下载视频' }}</a>
+</video>
+{% endif %}
+{{ content }}
 {% if key=='search' %}
 <form class="search" method="get" data-search data-index="{{ asset('search-' ~ lang ~ '.json') }}"
       data-root="{{ local('') }}" data-empty="{{ 'No matching pages.' if en else '没有找到相关页面。' }}"

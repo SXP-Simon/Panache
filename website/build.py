@@ -58,7 +58,7 @@ def build(out):
         articles = {p.relative_to(folder).with_suffix("").as_posix(): p.read_text(encoding="utf8")
                     for p in folder.rglob("*.md")}
         titles = {key: value.splitlines()[0].removeprefix("# ") for key, value in articles.items()}
-        if set(titles) != {*GUIDES, "journal", "journal/iris-and-ink", "journal/paper-studies"}:
+        if set(titles) != {*GUIDES, "journal", "journal/ink-on-paper", "journal/iris-and-ink", "journal/paper-studies"}:
             raise ValueError(f"Incomplete navigation in {lang}")
         search_index = [{"route": key, "title": titles[key],
                          "text": " ".join(value.splitlines()[1:])}
