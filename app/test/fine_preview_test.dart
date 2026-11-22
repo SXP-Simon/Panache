@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -54,6 +55,70 @@ Future<InkPage> _page() async => InkPage(
 );
 
 void main() {
+  testWidgets(
+    'diagram detail hit and whole illustration selection use the atlas groups',
+    (tester) async {
+      tester.view.physicalSize = const Size(1100, 850);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sample = (await tester.runAsync(_page))!;
+      final model = FinePage.fromJson({
+        'key': '0' * 64,
+        'atlas': base64Encode(sample.fine!.atlas),
+        'glyphs': [
+          [10, 24, 36, 40, 16, 0, 0, 52],
+          [11, 42, 36, 12, 12, 16, 0, 48],
+        ],
+        'illustrations': {
+          '10': [10, 11],
+        },
+      });
+      final page = InkPage(sample.paper, null, fine: model);
+      final changes = <int, FineAdjustment>{};
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: FinePreview(
+              page: page,
+              look: defaultInkLook,
+              edits: changes,
+              copyImage: (_) async {},
+              toolbar: true,
+              editing: true,
+              onEdit: (items) {
+                for (final item in items) {
+                  changes[item.id] = item;
+                }
+              },
+            ),
+          ),
+        ),
+      );
+      final canvas = find.byKey(const ValueKey('fine-canvas'));
+      for (var i = 0; i < 100 && canvas.evaluate().isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      final rect = tester.getRect(canvas);
+      await tester.tapAt(
+        rect.topLeft + Offset(48 * rect.width / 100, 42 * rect.height / 140),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump();
+      expect(find.text('Diagram detail'), findsOneWidget);
+      final all = find.byKey(const ValueKey('fine-select-drawing'));
+      await tester.ensureVisible(all);
+      await tester.tap(all);
+      await tester.pump();
+      expect(find.text('2 selected'), findsOneWidget);
+    },
+  );
   testWidgets(
     'phone fullscreen keeps the same canvas, selection and history',
     (tester) async {

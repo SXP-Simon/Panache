@@ -13,6 +13,11 @@ const defaultInkLook = (
   color: 0xff000000,
 );
 
+InkLook fineInkLook(FineGlyph glyph, InkLook textLook) =>
+    glyph.illustrationId == null
+    ? textLook
+    : (opacity: 100, thickness: 0.0, softness: 0.0, color: 0xff141419);
+
 Color composeInkColor(InkLook look) {
   final color = Color(look.color);
   return color.withValues(alpha: color.a * look.opacity / 100);

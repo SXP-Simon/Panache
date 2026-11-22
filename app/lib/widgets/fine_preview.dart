@@ -594,14 +594,14 @@ class _FinePreviewState extends State<FinePreview> {
     return KeyEventResult.handled;
   }
 
-  Future<void> _pickColor(FineAdjustment current) async {
+  Future<void> _pickColor(FineAdjustment current, InkLook baseLook) async {
     final l = AppLocalizations.of(context)!;
     final color = await showDialog<Color>(
       context: context,
       builder: (_) => ColorPickerDialog(
         id: 'fine-color',
         title: l.fineColor,
-        color: Color(current.color ?? widget.look.color),
+        color: Color(current.color ?? baseLook.color),
         presets: [
           (l.black, Colors.black),
           (l.blue, const Color(0xff003399)),
@@ -979,8 +979,17 @@ class _FinePreviewState extends State<FinePreview> {
     final scrollActions = settingsOnly || maxHeight < 160;
     final first = selection.firstOrNull;
     final current = _visible[first] ?? defaultFineAdjustment(first ?? 0);
+    final glyph = model.glyphs.where((g) => g.id == first).firstOrNull;
+    final group = glyph?.illustrationId;
+    final baseLook = glyph == null
+        ? widget.look
+        : fineInkLook(glyph, widget.look);
     final summary = Text(
-      first == null ? l.fineHint : l.fineSelected(selection.length),
+      first == null
+          ? l.fineHint
+          : selection.length == 1 && group != null
+          ? (first == group ? l.fineDrawingLines : l.fineDrawingDetail)
+          : l.fineSelected(selection.length),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: _compact || sidebar ? TextAlign.center : TextAlign.start,
@@ -993,10 +1002,26 @@ class _FinePreviewState extends State<FinePreview> {
       children: [
         TextButton.icon(
           key: const ValueKey('fine-color'),
-          onPressed: () => _pickColor(current),
-          icon: ColorSwatchIndicator(Color(current.color ?? widget.look.color)),
+          onPressed: () => _pickColor(current, baseLook),
+          icon: ColorSwatchIndicator(Color(current.color ?? baseLook.color)),
           label: Text(l.fineColor),
         ),
+        if (group != null)
+          TextButton.icon(
+            key: const ValueKey('fine-select-drawing'),
+            onPressed: () {
+              setState(
+                () => _selection.select(
+                  model.glyphs
+                      .where((g) => g.illustrationId == group)
+                      .map((g) => g.id),
+                ),
+              );
+              widget.onCanvasSelect?.call();
+            },
+            icon: const Icon(Icons.select_all),
+            label: Text(l.fineSelectDrawing),
+          ),
         FilterChip(
           label: Text(l.fineSnap),
           selected: _selection.snap,
@@ -1133,13 +1158,13 @@ class _FinePreviewState extends State<FinePreview> {
                             math
                                 .min(
                                   current.thickness,
-                                  -20 - (widget.look.thickness * 10).round(),
+                                  -20 - (baseLook.thickness * 10).round(),
                                 )
                                 .clamp(-20, 0),
                             math
                                 .max(
                                   current.thickness,
-                                  20 - (widget.look.thickness * 10).round(),
+                                  20 - (baseLook.thickness * 10).round(),
                                 )
                                 .clamp(0, 20),
                             ' px',
@@ -1152,11 +1177,11 @@ class _FinePreviewState extends State<FinePreview> {
                             current.softness,
                             math.min(
                               current.softness,
-                              -(widget.look.softness * 10).round(),
+                              -(baseLook.softness * 10).round(),
                             ),
                             math.max(
                               current.softness,
-                              20 - (widget.look.softness * 10).round(),
+                              20 - (baseLook.softness * 10).round(),
                             ),
                             ' px',
                             (v) => _adjust(softness: v),

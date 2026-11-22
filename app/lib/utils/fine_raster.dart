@@ -146,9 +146,10 @@ class FineRaster {
     final rebuild = _look != look;
     var changed = rebuild;
     for (final glyph in page.glyphs) {
-      final shape = _shape(look, edits[glyph.id]);
+      final base = fineInkLook(glyph, look);
+      final shape = _shape(base, edits[glyph.id]);
       if (!rebuild && _masks[glyph.id]?.shape == shape) continue;
-      final mask = _mask(glyph, look, shape);
+      final mask = _mask(glyph, base, shape);
       _masks[glyph.id] = (shape: shape, pixels: mask);
       changed = true;
       for (var y = 0; y < glyph.height; y++) {
@@ -186,7 +187,7 @@ class FineRaster {
     for (final glyph in page.glyphs) {
       final edit = edits[glyph.id];
       final pose = FinePose(glyph, edit);
-      final color = ui.Color(edit?.color ?? paintLook.color)
+      final color = ui.Color(edit?.color ?? fineInkLook(glyph, paintLook).color)
           .withValues(alpha: (edit?.opacity ?? 100) / 100);
       brush.colorFilter = ui.ColorFilter.mode(color, ui.BlendMode.srcIn);
       final w = glyph.width.toDouble(), h = glyph.height.toDouble();
@@ -237,13 +238,14 @@ class FineRaster {
       final rect = pose.bounds;
       final left = math.max(0, rect.left.floor());
       final right = math.min(width, rect.right.ceil());
-      final color = edit?.color ?? look.color;
+      final baseLook = fineInkLook(glyph, look);
+      final color = edit?.color ?? baseLook.color;
       final opacity = edit?.opacity ?? 100;
-      final shape = _shape(look, edit);
+      final shape = _shape(baseLook, edit);
       final cached = _masks[glyph.id];
       final mask = _look == look && cached?.shape == shape
           ? cached!.pixels
-          : _mask(glyph, look, shape);
+          : _mask(glyph, baseLook, shape);
       for (
         var y = math.max(0, rect.top.floor());
         y < math.min(height, rect.bottom.ceil());

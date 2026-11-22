@@ -15,13 +15,19 @@ class FineGlyph {
     this.ax,
     this.ay,
     this.baseline,
-    this.source,
-  );
+    this.source, [
+    this.illustrationId,
+  ]);
 
   final int id, x, y, width, height, ax, ay, baseline;
   final FineRange? source;
+  final int? illustrationId;
 
-  factory FineGlyph.fromJson(Object? data, Object? source) {
+  factory FineGlyph.fromJson(
+    Object? data,
+    Object? source, [
+    Map<int, int> parents = const {},
+  ]) {
     if (data is! List || data.length != 8 || data.any((v) => v is! int)) {
       throw const FormatException('Invalid fine edit glyph');
     }
@@ -36,7 +42,18 @@ class FineGlyph {
             source[1] is int
         ? (start: source[0] as int, end: source[1] as int)
         : null;
-    return FineGlyph(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], range);
+    return FineGlyph(
+      v[0],
+      v[1],
+      v[2],
+      v[3],
+      v[4],
+      v[5],
+      v[6],
+      v[7],
+      range,
+      parents[v[0]],
+    );
   }
 }
 
@@ -53,9 +70,18 @@ class FinePage {
     if (!_validKey(key) || (ranges != null && ranges.length != items.length)) {
       throw const FormatException('Invalid fine edit page');
     }
+    final parents = <int, int>{};
+    final groups = json['illustrations'] as Map<String, dynamic>?;
+    for (final entry
+        in groups?.entries ?? const <MapEntry<String, dynamic>>[]) {
+      final id = int.parse(entry.key);
+      for (final part in (entry.value as List).cast<int>()) {
+        parents[part] = id;
+      }
+    }
     final glyphs = [
       for (var i = 0; i < items.length; i++)
-        FineGlyph.fromJson(items[i], ranges?[i]),
+        FineGlyph.fromJson(items[i], ranges?[i], parents),
     ];
     if (glyphs.map((item) => item.id).toSet().length != glyphs.length) {
       throw const FormatException('Duplicate glyph IDs');
