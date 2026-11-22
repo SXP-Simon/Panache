@@ -322,9 +322,15 @@ async def smoke(command, arguments, out):
                 "ids": [row["id"]],
                 "dx": 11,
                 "dy": -4,
+                "thickness": 0.6,
+                "softness": 0.2,
+                "color": "#553322",
             }
             assert (
                 await client.call_tool("adjust_glyphs", {**fine, "ids": [999999]})
+            ).isError
+            assert (
+                await client.call_tool("adjust_glyphs", {**fine, "thickness": 0.25})
             ).isError
             before = png(await call(client, "preview_handwriting", draft_id=paper_id))
             assert (await call(client, "adjust_glyphs", **fine)).structuredContent[
@@ -343,6 +349,11 @@ async def smoke(command, arguments, out):
             again = (
                 await call(client, "preview_handwriting", **probe)
             ).structuredContent["glyphs"][0]
+            assert (
+                again["adjustment"]["thickness"] == 6
+                and again["adjustment"]["softness"] == 2
+            )
+            assert again["adjustment"]["color"] == [85, 51, 34]
             assert again["adjustment"]["dx"] == 11 and again["adjustment"]["dy"] == -4
             exported_fine = (
                 await call(

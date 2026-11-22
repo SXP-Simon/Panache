@@ -353,7 +353,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
+        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Set illustrations_only=true in layout for editable diagram outlines and details. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
     )]
     async fn preview_handwriting(
         &self,
@@ -363,6 +363,7 @@ impl Panache {
         let result = self
             .render(ctx, move |state, engine, cancel| {
                 let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
+                ensure!(input.illustrations_only.is_none() || input.view==Some(PreviewView::Layout),"illustrations_only requires view=layout");
                 if input.view==Some(PreviewView::Paper){
                     ensure!(input.offset.is_none() && input.limit.is_none() && input.section.is_none() && input.page.is_none(),"view=paper takes only draft_id and revision");
                     let bytes=draft.background()?.context("No imported paper for this draft")?;

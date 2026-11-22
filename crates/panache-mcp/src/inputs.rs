@@ -183,6 +183,12 @@ pub struct Nudge {
     pub angle: Option<i8>,
     /// Ink opacity in percent, 0..100.
     pub opacity: Option<u8>,
+    /// Stroke weight delta in pixels, -2..2, in 0.1 px steps.
+    pub thickness: Option<f64>,
+    /// Edge softness delta in pixels, -2..2, in 0.1 px steps.
+    pub softness: Option<f64>,
+    /// Local RGB ink, "#RRGGBB". Use "inherit" to restore the original ink.
+    pub color: Option<String>,
     /// Optional residual glyph shape in paper space. Replaces prior shape; 0 degrees and 100 percent resets.
     pub shape: Option<Shape>,
 }
@@ -190,6 +196,8 @@ pub struct Nudge {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// In layout view, only return illustration outlines and isolated details.
+    pub illustrations_only: Option<bool>,
     /// "image" (default), "paper" for the saved stationery alone, or "layout" for base glyph geometry.
     pub view: Option<PreviewView>,
     /// Layout mode: start index and number of glyphs (default 12, max 32).

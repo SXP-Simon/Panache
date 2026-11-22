@@ -107,7 +107,7 @@ impl Engine {
             }
         })?;
         let mut params = crate::controls::parameters(draft, section.number, &draft.controls)?;
-        params.fine_edit = edits.is_some();
+        params.fine_edit = edits.is_some() || section.text.contains("![");
         if let Some(paper) = draft.paper.as_ref().filter(|p| p.projection.is_some()) {
             params.width = Some(paper.width);
             params.height = Some(paper.height);
@@ -223,7 +223,10 @@ impl Engine {
         let page = input.page.unwrap_or(1);
         let number = section.number;
         let req = self.fine_request(draft, section)?;
-        let (_, bounds) = fine_edit::inspect_page(&req, page, cancel)?;
+        let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)?;
+        if input.illustrations_only == Some(true) {
+            bounds.retain(|g| g.illustration.is_some());
+        }
         let utf16: Vec<_> = req.text.encode_utf16().collect();
         let rows: Vec<_> = bounds
             .iter()
@@ -231,6 +234,14 @@ impl Engine {
             .take(limit)
             .map(|g| {
                 let mut row = json!({"id":g.id,"bounds":g.bounds});
+                if let Some(parent) = g.illustration {
+                    row["kind"] = json!(if parent == g.id {
+                        "illustration"
+                    } else {
+                        "illustration_detail"
+                    });
+                    row["illustration_id"] = json!(parent);
+                }
                 if let Some(map) = draft.paper.as_ref().and_then(|p| p.projection.as_ref()) {
                     let [x, y, w, h] = g.bounds;
                     let project = |x: i32, y: i32| {
@@ -243,8 +254,10 @@ impl Engine {
                         project(x + w, y + h),
                         project(x, y + h)
                     ]);
-                    row["photo_baseline"] =
-                        json!([project(x, g.baseline), project(x + w, g.baseline)]);
+                    if g.illustration.is_none() {
+                        row["photo_baseline"] =
+                            json!([project(x, g.baseline), project(x + w, g.baseline)]);
+                    }
                 }
                 if let Some([a, b]) = g.source_utf16
                     && let Some(chars) = utf16.get(a as usize..b as usize)
@@ -291,7 +304,10 @@ impl Engine {
                 || input.scale.is_some()
                 || input.angle.is_some()
                 || input.opacity.is_some()
-                || input.shape.is_some(),
+                || input.shape.is_some()
+                || input.thickness.is_some()
+                || input.softness.is_some()
+                || input.color.is_some(),
             "Supply at least one adjustment"
         );
         ensure!(
@@ -307,6 +323,30 @@ impl Engine {
                         && (80..=120).contains(&s.top_width_percent)),
             "Invalid glyph adjustment"
         );
+        let delta = |v: f64| -> Result<i8> {
+            ensure!(
+                (-2.0..=2.0).contains(&v) && (v * 10.).fract() == 0.,
+                "Expected -2..2 pixels in steps of 0.1"
+            );
+            Ok((v * 10.) as i8)
+        };
+        let thickness = input.thickness.map(delta).transpose()?;
+        let softness = input.softness.map(delta).transpose()?;
+        let color = input
+            .color
+            .as_ref()
+            .map(|c| -> Result<_> {
+                if c == "inherit" {
+                    return Ok(None);
+                }
+                let [r, g, b, _] = crate::Style {
+                    ink: c.clone(),
+                    ..draft.style.clone()
+                }
+                .ink_rgba()?;
+                Ok(Some([r, g, b]))
+            })
+            .transpose()?;
         let version = section.version;
         let mut req = self.fine_request(draft, section)?;
         let (key, bounds) = fine_edit::inspect_page(&req, input.page, cancel)?;
@@ -365,6 +405,11 @@ impl Engine {
             e.angle = input.angle.unwrap_or(e.angle);
             e.scale = input.scale.unwrap_or(e.scale);
             e.opacity = input.opacity.unwrap_or(e.opacity);
+            e.thickness = thickness.unwrap_or(e.thickness);
+            e.softness = softness.unwrap_or(e.softness);
+            if let Some(c) = color {
+                e.color = c;
+            }
             ensure!(
                 fine_edit::usable_shape(e, glyph.bounds[2], glyph.bounds[3]),
                 "Shape exceeds safe bounds at the requested scale or rotation"
