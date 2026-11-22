@@ -36,6 +36,7 @@ pub struct RenderRequest {
 mod fine;
 mod glyph;
 mod homework;
+mod illustration;
 mod ink;
 mod units;
 use glyph::{Glyph, Glyphs};
@@ -82,6 +83,14 @@ where
     stopped: bool,
 }
 impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
+    fn push_tile(&mut self, tile: fine_edit::Tile) -> Result<()> {
+        self.tile_area += tile.mask.len();
+        if self.tile_area > fine_edit::PAGE_TILE_BUDGET {
+            return Err(Error::new("invalid_layout", "当前页的墨迹超过内存预算"));
+        }
+        self.tiles.push(tile);
+        Ok(())
+    }
     fn flush_ink(&mut self) -> Result<()> {
         if self.p.fine_edit {
             return Ok(());
@@ -246,11 +255,7 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
             );
             if self.p.fine_edit {
                 for tile in fine::capture(u, origin, anchor.round() as i32, self.p, self.cancel)? {
-                    self.tile_area += tile.mask.len();
-                    if self.tile_area > fine_edit::PAGE_TILE_BUDGET {
-                        return Err(Error::new("invalid_layout", "当前页的字形超过内存预算"));
-                    }
-                    self.tiles.push(tile);
+                    self.push_tile(tile)?;
                 }
             } else if u.rigid {
                 paint_math_unit(
@@ -664,7 +669,21 @@ fn render_planes(
                 let x = p.left_margin
                     + ((w as f32 - p.left_margin - p.right_margin - image.width() as f32) / 2.)
                         .max(0.);
-                image::imageops::overlay(&mut pages.canvas, &image, x as i64, top as i64);
+                if p.fine_edit {
+                    for tile in illustration::tiles(
+                        &decoded,
+                        &image,
+                        node_index as u32,
+                        x as i32,
+                        top as i32,
+                        fine_edit::PAGE_TILE_BUDGET - pages.tile_area,
+                        cancel,
+                    )? {
+                        pages.push_tile(tile)?;
+                    }
+                } else {
+                    image::imageops::overlay(&mut pages.canvas, &image, x as i64, top as i64);
+                }
                 pages.dirty = true;
                 pages.x = p.left_margin;
                 pages.previous_bottom = top + image.height() as f32;

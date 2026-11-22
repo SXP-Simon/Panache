@@ -177,6 +177,7 @@ fn capture_one(
     ink::paste_mask(&mut mask, &crop, pad as i32, pad as i32);
     Ok(Some(fine_edit::Tile {
         id: unit.id,
+        illustration: None,
         x: origin.0 + left as i32 - radius as i32 - pad as i32,
         y: origin.1 + top as i32 - radius as i32 - pad as i32,
         baseline,

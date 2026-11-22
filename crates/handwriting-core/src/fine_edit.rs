@@ -35,6 +35,7 @@ pub struct Adjustments {
 /// Original paper-space ink bounds, before any per-glyph adjustment.
 #[derive(Serialize)]
 pub struct GlyphBounds {
+    pub illustration: Option<u32>,
     pub id: u32,
     pub bounds: [i32; 4],
     pub source_utf16: Option<[u32; 2]>,
@@ -60,6 +61,7 @@ pub fn inspect_page(
                     .into_iter()
                     .map(|t| GlyphBounds {
                         id: t.id,
+                        illustration: t.illustration,
                         bounds: [t.x, t.y, t.mask.width() as i32, t.mask.height() as i32],
                         source_utf16: t.source,
                         baseline: t.baseline,
@@ -120,6 +122,7 @@ pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
 }
 
 pub(crate) struct Tile {
+    pub illustration: Option<u32>,
     pub id: u32,
     pub x: i32,
     pub y: i32,
@@ -138,6 +141,8 @@ pub struct EncodedFinePage {
     // 2026-11-18：每项为编号、纸面坐标、蒙版大小、图集坐标、基线。
     pub glyphs: Vec<[i32; 8]>,
     pub source_ranges: Vec<Option<[u32; 2]>>,
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub illustrations: std::collections::BTreeMap<u32, Vec<u32>>,
 }
 
 pub(crate) fn encode(key: &str, tiles: &[Tile], cancel: &Cancellation) -> Result<EncodedFinePage> {
@@ -173,7 +178,14 @@ pub(crate) fn encode(key: &str, tiles: &[Tile], cancel: &Cancellation) -> Result
             atlas[(x + slot[5] as u32, y + slot[6] as u32)][0] = pixel[0];
         }
     }
+    let mut illustrations = std::collections::BTreeMap::<_, Vec<_>>::new();
+    for t in tiles {
+        if let Some(id) = t.illustration {
+            illustrations.entry(id).or_default().push(t.id);
+        }
+    }
     Ok(EncodedFinePage {
+        illustrations,
         key: key.to_owned(),
         atlas: STANDARD.encode(export::png(&atlas)?),
         glyphs,
@@ -272,10 +284,14 @@ pub(crate) fn paint(
     edit: Option<&Adjustment>,
     cancel: &Cancellation,
 ) -> Result<()> {
+    let (base_thickness, base_softness, base_fill, base_opacity) = if tile.illustration.is_some() {
+        (0., 0., [20, 20, 25, 255], 100)
+    } else {
+        (p.ink_thickness, p.ink_softness, p.fill, p.ink_opacity)
+    };
     let thickness =
-        (p.ink_thickness + edit.map_or(0., |v| f64::from(v.thickness) / 10.)).clamp(-2., 2.);
-    let softness =
-        (p.ink_softness + edit.map_or(0., |v| f64::from(v.softness) / 10.)).clamp(0., 2.);
+        (base_thickness + edit.map_or(0., |v| f64::from(v.thickness) / 10.)).clamp(-2., 2.);
+    let softness = (base_softness + edit.map_or(0., |v| f64::from(v.softness) / 10.)).clamp(0., 2.);
     let mask = ink_effects::shape(tile.mask, thickness, softness, cancel)?;
     let (w, h) = (f64::from(mask.width()), f64::from(mask.height()));
     let scale = edit.map_or(1., |v| f64::from(v.scale) / 100.);
@@ -291,7 +307,7 @@ pub(crate) fn paint(
     let [left, top, right, bottom] = projected.map_or([-rx, -ry, rx, ry], |p| p.0);
     let color = edit
         .and_then(|v| v.color)
-        .unwrap_or([p.fill[0], p.fill[1], p.fill[2]]);
+        .unwrap_or([base_fill[0], base_fill[1], base_fill[2]]);
     let opacity = u32::from(edit.map_or(100, |v| v.opacity));
     for y in ((cy + top).floor().max(0.) as u32)
         ..((cy + bottom).ceil().max(0.) as u32).min(paper.height())
@@ -314,8 +330,8 @@ pub(crate) fn paint(
                 continue;
             }
             let alpha = (u32::from(mask[(sx as u32, sy as u32)][0])
-                * u32::from(p.ink_opacity)
-                * u32::from(p.fill[3])
+                * u32::from(base_opacity)
+                * u32::from(base_fill[3])
                 + 12_750)
                 / 25_500;
             let alpha = (alpha * opacity + 50) / 100;
