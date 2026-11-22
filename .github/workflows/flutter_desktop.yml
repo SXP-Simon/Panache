@@ -32,6 +32,16 @@ jobs:
         run: flutter build macos --debug
         working-directory: app
       - run: python scripts/build-flutter-desktop.py
+      - name: 验证随包 MCP 的预览、导出和历史恢复
+        shell: bash
+        run: |
+          python -m pip install "mcp>=1.12,<2"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            python crates/panache-mcp/tests/smoke.py target/desktop-package/windows/Panache/handwriting_app.exe --server-arg=--mcp
+          else
+            binary=$(find target/desktop-package -type f -name panache-mcp -print -quit)
+            python crates/panache-mcp/tests/smoke.py "$binary"
+          fi
       - name: Flutter 检查
         working-directory: app
         run: flutter analyze

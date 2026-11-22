@@ -61,7 +61,7 @@ def bundle_updater(bundle, backend, target, version, build, flutter):
         brand_launcher(bundle / 'versions' / runtime_id / 'handwriting_app.exe', launcher)
         # GUI 子系统没有控制台；显式提供管道供 Dart 自检写入 stdout。
         run(str(launcher), '--self-check', capture_output=True, timeout=30)
-        write_json(bundle / marker_path, marker)
+        write_json(bundle / marker_path, {**marker, 'mcp_launcher': True})
         pointer = {'schema': 1, 'product': 'Panache', 'version': version,
                    'build_number': build, 'runtime': f'versions/{runtime_id}'}
         write_json(bundle / 'active.json', pointer)
@@ -83,8 +83,11 @@ def main():
         parser.error('Build number must be between 1 and 2100000000')
     os.environ['HANDWRITING_BUILD_VERSION'] = version
     target = {'Darwin': 'macos', 'Windows': 'windows', 'Linux': 'linux'}[platform.system()]
+    packages = ['-p', 'panache-mcp']
     if target != 'macos':
-        run('cargo', 'build', '--locked', '--release', '-p', 'handwriting-server')
+        packages.extend(['-p', 'handwriting-server'])
+    run('cargo', 'build', '--locked', '--release', *packages)
+    run(sys.executable, str(ROOT / 'scripts/build-text-worker.py'), '--flutter', args.flutter)
     run(args.flutter, 'pub', 'get', cwd=ROOT / 'app')
     build = int(args.build_number or 1)
     run(args.flutter, 'build', target, '--release', f'--build-name={version}', f'--build-number={build}', cwd=ROOT / 'app')
@@ -103,7 +106,9 @@ def main():
         else:
             source = ROOT / 'app/build/linux' / ('arm64' if platform.machine() in ('arm64', 'aarch64') else 'x64') / 'release/bundle'
         bundle = output / 'Panache'
-        shutil.copytree(source, bundle, symlinks=True)
+        # Rebuild backend from release inputs even when the Flutter build is incremental.
+        shutil.copytree(source, bundle, symlinks=True,
+                        ignore=lambda directory, names: {'backend'} if Path(directory) == source else set())
         backend = bundle / 'backend'
     # macOS 的 Xcode 构建阶段已包含 sidecar，分发时直接复用。
     if target != 'macos':
@@ -116,6 +121,12 @@ def main():
         shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
         shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
         shutil.copytree(ROOT / 'assets/licenses', backend / 'licenses', dirs_exist_ok=True)
+    mcp = 'panache-mcp.exe' if target == 'windows' else 'panache-mcp'
+    shutil.copy2(ROOT / 'target/release' / mcp, backend / mcp)
+    shutil.copy2(ROOT / 'app/web/prepare-text-worker.js', backend / 'prepare-text-worker.js')
+    shutil.copytree(ROOT / 'crates/panache-mcp/licenses', backend / 'licenses', dirs_exist_ok=True)
+    if target == 'macos':
+        run('codesign', '--force', '--sign', '-', str(backend / mcp))
     bundle_updater(bundle, backend, target, version, build, args.flutter)
     if target == 'macos':
         run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))

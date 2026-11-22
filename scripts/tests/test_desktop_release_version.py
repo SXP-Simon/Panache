@@ -19,6 +19,18 @@ with patch.object(sys, 'path', [str(SOURCE.parent), *sys.path]):
     SPEC.loader.exec_module(MODULE)
 
 
+def mcp_files(root, windows=False):
+    files = {
+        'target/release/panache-mcp' + ('.exe' if windows else ''): 'mcp',
+        'app/web/prepare-text-worker.js': 'worker',
+        'crates/panache-mcp/licenses/quickjs-MIT.txt': 'license',
+    }
+    for name, data in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(data)
+
+
 class DesktopReleaseVersionTest(unittest.TestCase):
     def test_linux_archive_keeps_permissions_markers_and_independent_helper(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -36,6 +48,7 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value)
+            mcp_files(root)
             def fake_run(*arguments, **_kwargs):
                 if 'compile' in arguments:
                     helper = root / 'target/panache-updater'
@@ -52,6 +65,8 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 marker = json.load(archive.extractfile('Panache/panache-install.json'))
                 self.assertEqual(marker['platform'], 'linux-x64')
                 self.assertEqual(marker['build_number'], 12)
+                self.assertEqual(archive.extractfile('Panache/backend/panache-mcp').read(), b'mcp')
+                self.assertEqual(archive.extractfile('Panache/backend/prepare-text-worker.js').read(), b'worker')
                 if os.name != 'nt':
                     self.assertEqual(archive.getmember('Panache/backend/panache-updater').mode & 0o111, 0o111)
 
@@ -67,11 +82,13 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 "assets/font_assets/font.ttf": "font",
                 "target/release/handwriting-server.exe": "backend",
                 "app/build/windows/x64/runner/Release/handwriting_app.exe": "app",
+                "app/build/windows/x64/runner/Release/backend/stale.dat": "old backend",
             }
             for name, value in files.items():
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value, encoding="utf-8")
+            mcp_files(root, windows=True)
             commands = []
 
             def fake_run(*arguments, **_kwargs):
@@ -94,11 +111,15 @@ class DesktopReleaseVersionTest(unittest.TestCase):
             archive = root / "target/desktop-package/windows/Panache-2.3.4-AMD64.zip"
             with zipfile.ZipFile(archive) as package:
                 runtime = 'Panache/versions/2.3.4-2003004'
+                self.assertNotIn(f"{runtime}/backend/stale.dat", package.namelist())
                 self.assertEqual(package.read(f"{runtime}/backend/VERSION"), b"2.3.4\n")
                 self.assertIn("Panache/handwriting_app.exe", package.namelist())
                 self.assertEqual(package.read('Panache/handwriting_app.exe'), b'independent updater')
                 self.assertIn(f"{runtime}/backend/licenses/font-license.txt", package.namelist())
                 self.assertIn(f"{runtime}/backend/panache-updater.exe", package.namelist())
+                self.assertEqual(package.read(f"{runtime}/backend/panache-mcp.exe"), b'mcp')
+                self.assertEqual(package.read(f"{runtime}/backend/prepare-text-worker.js"), b'worker')
+                self.assertTrue(json.loads(package.read('Panache/panache-install.json'))['mcp_launcher'])
                 active = json.loads(package.read('Panache/active.json'))
                 self.assertEqual(active['runtime'], 'versions/2.3.4-2003004')
                 self.assertEqual(package.read('Panache/active.json'), package.read('Panache/last-good.json'))
@@ -114,7 +135,7 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 binary = products / f"{name}.app/Contents/MacOS/{name}"
                 binary.parent.mkdir(parents=True)
                 binary.write_text(name)
-            (root / 'target').mkdir()
+            mcp_files(root)
             (root / 'target/panache-updater').write_text('updater')
             (products / 'Panache.app/Contents/Resources/backend').mkdir(parents=True)
             with patch.object(MODULE, "ROOT", root), \
@@ -125,6 +146,7 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 MODULE.main()
             output = root / "target/desktop-package/macos"
             self.assertTrue((output / "Panache.app/Contents/MacOS/Panache").is_file())
+            self.assertEqual((output / "Panache.app/Contents/Resources/backend/panache-mcp").read_text(), "mcp")
             self.assertFalse((output / "HandwritingWeb.app").exists())
             self.assertIn(str(output / "Panache-2.3.4-arm64.zip"), run.call_args.args)
 

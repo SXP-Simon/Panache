@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,27 @@ Future<void> main(List<String> arguments) async {
     if (arguments.length == 1 && arguments.single == '--self-check') {
       stdout.writeln('PANACHE_UPDATER_PROTOCOL 1');
       return;
+    }
+    if (Platform.isWindows &&
+        arguments.length == 1 &&
+        arguments.single == '--mcp') {
+      final root = p.dirname(Platform.resolvedExecutable);
+      final runtime = windowsRuntime(
+        root,
+        readJson(p.join(root, 'active.json')),
+      );
+      final server = await Process.start(
+        p.join(runtime, 'backend', 'panache-mcp.exe'),
+        const [],
+      );
+      // The Windows GUI launcher must explicitly bridge the client's stdio pipes.
+      unawaited(stdin.pipe(server.stdin).catchError((Object _) {}));
+      await Future.wait([
+        stdout.addStream(server.stdout),
+        stderr.addStream(server.stderr),
+      ]);
+      await Future.wait([stdout.flush(), stderr.flush()]);
+      exit(await server.exitCode);
     }
     if (arguments.isEmpty && Platform.isWindows) {
       await launchWindows(p.dirname(Platform.resolvedExecutable));
