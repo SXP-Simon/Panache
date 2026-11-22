@@ -8,9 +8,9 @@
 
 ## 展示视频
 
-[▶ 播放《让文字落在纸上》（48 秒）](https://heliannuits.me/Panache/assets/panache-promo-fe580853fbfa23.mp4)
+[▶ 播放《让文字落在纸上》（72 秒）](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
-[![播放 Panache 横屏展示视频](website/static/panache-promo-5ba13fe6ea50e7.webp)](https://heliannuits.me/Panache/assets/panache-promo-fe580853fbfa23.mp4)
+[![播放 Panache 横屏展示视频](website/static/panache-promo-f7d5275f09afde.webp)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
 ## 手写工作台
 

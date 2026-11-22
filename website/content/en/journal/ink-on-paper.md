@@ -1,6 +1,6 @@
 # Putting words on paper
 
-This 48-second film, in Chinese, starts with a poem. It follows a change of pen, a fraction, a radical, and a chemical equation onto the page. A photograph of ruled paper supplies the lines for the next manuscript. At the end, you can save a single sheet as an image or export the whole document as a PDF.
+This 72-second film, in Chinese, starts with a poem. It follows a change of pen, a fraction, a radical, and a chemical equation onto the page. A photograph of ruled paper supplies the lines for the next manuscript. At the end, you can save a single sheet as an image or export the whole document as a PDF.
 
 ## Reading parameters on a phone
 

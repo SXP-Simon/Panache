@@ -8,9 +8,9 @@
 
 ## Demo video
 
-[▶ Watch the Panache demo (48 seconds, in Chinese)](https://heliannuits.me/Panache/assets/panache-promo-fe580853fbfa23.mp4)
+[▶ Watch the Panache demo (72 seconds, in Chinese)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
-[![Play the Panache demo](website/static/panache-promo-5ba13fe6ea50e7.webp)](https://heliannuits.me/Panache/assets/panache-promo-fe580853fbfa23.mp4)
+[![Play the Panache demo](website/static/panache-promo-f7d5275f09afde.webp)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
 ## The workbench
 

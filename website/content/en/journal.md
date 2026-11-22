@@ -2,7 +2,7 @@
 
 ## [Putting words on paper](site:journal/ink-on-paper)
 
-Watch a poem, a formula, and a sheet of ruled paper become a manuscript in 48 seconds, then see what changed on phones in v1.18.1.
+Watch a poem, a formula, and a sheet of ruled paper become a manuscript in 72 seconds, then see what changed on phones in v1.18.1.
 
 ## [Iris and ink: a monologue in eight lines](site:journal/iris-and-ink)
 
