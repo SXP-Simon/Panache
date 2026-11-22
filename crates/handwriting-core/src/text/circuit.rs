@@ -17,6 +17,7 @@ pub struct Segment {
     pub kind: String,
     pub labels: Vec<Label>,
     pub marks: (char, char),
+    pub end_arrow: bool,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Decoration {
@@ -218,18 +219,22 @@ impl<'a> Parser<'a> {
             kind,
             labels,
             marks,
+            end_arrow: false,
         });
         self.current = end;
         Some(())
     }
     fn path(&mut self) -> Option<()> {
+        let start = self.circuit.segments.len();
+        let mut end_arrow = false;
         if self.source[self.at..].trim_start().starts_with('[') {
             let styles = self.group('[', ']')?;
-            if split_options(&styles)?
-                .iter()
-                .any(|s| !["thin", "semithick", "thick"].contains(s))
-            {
-                return None;
+            for style in split_options(&styles)? {
+                match style {
+                    "->" => end_arrow = true,
+                    "thin" | "semithick" | "thick" => {}
+                    _ => return None,
+                }
             }
         }
         self.current = self.point()?;
@@ -237,6 +242,13 @@ impl<'a> Parser<'a> {
         loop {
             self.space();
             if self.eat(";") {
+                if end_arrow {
+                    let last = self.circuit.segments[start..].last_mut()?;
+                    if last.kind != "short" {
+                        return None;
+                    }
+                    last.end_arrow = true;
+                }
                 return Some(());
             }
             if self.eat("node") {

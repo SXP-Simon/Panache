@@ -3,9 +3,15 @@ use super::*;
 use crate::text::circuit::{Circuit, Point};
 use std::f32::consts::PI;
 
+#[derive(Clone, Copy)]
+enum Stroke {
+    Pen,
+    DotFill,
+}
+type CircuitPath = (Vec<(i32, i32)>, Stroke);
+
 struct Drawing {
-    paths: Vec<Path>,
-    thickness: i32,
+    paths: Vec<CircuitPath>,
     scale: f32,
     holes: Vec<Point>,
     contacts: Vec<Point>,
@@ -61,7 +67,7 @@ impl Drawing {
             }
             screen_points.push(p2);
         }
-        self.paths.push((screen_points, self.thickness));
+        self.paths.push((screen_points, Stroke::Pen));
     }
     fn line(&mut self, a: Point, b: Point) {
         // 2026-10-23：长导线中间的 T 形分支同样固定，避免微扰把接点画离母线。
@@ -112,7 +118,7 @@ impl Drawing {
         if let Some(&first) = screen_points.first() {
             screen_points.push(first);
         }
-        self.paths.push((screen_points, self.thickness));
+        self.paths.push((screen_points, Stroke::Pen));
     }
     fn dot(&mut self, c: Point, open: bool) {
         if open {
@@ -123,11 +129,11 @@ impl Drawing {
             for dy in -radius..=radius {
                 let dx = ((radius * radius - dy * dy) as f32).sqrt().round() as i32;
                 self.paths
-                    .push((vec![(x - dx, y + dy), (x + dx, y + dy)], 1));
+                    .push((vec![(x - dx, y + dy), (x + dx, y + dy)], Stroke::DotFill));
             }
         }
     }
-    fn finish(mut self) -> Vec<Path> {
+    fn finish(mut self) -> Vec<CircuitPath> {
         // 2026-10-22：在合成前裁剪空心端口内的导线；保持透明背景与真实拓扑。
         for center in &self.holes {
             let (cx, cy) = self.point(*center);
@@ -181,19 +187,69 @@ impl Drawing {
     }
     fn arrow(&mut self, a: Point, b: Point) {
         self.line(a, b);
+        self.arrowhead(a, b);
+    }
+    fn arrowhead(&mut self, a: Point, b: Point) {
         let dx = b.0 - a.0;
         let dy = b.1 - a.1;
         let len = dx.hypot(dy);
         if len > 0. {
             let ux = dx / len;
             let uy = dy / len;
+            let back = 0.13_f32.min(len * 0.45);
+            let wing = back * 0.47;
             self.path(vec![
-                Point(b.0 - ux * 0.1 - uy * 0.055, b.1 - uy * 0.1 + ux * 0.055),
+                Point(b.0 - ux * back - uy * wing, b.1 - uy * back + ux * wing),
                 b,
-                Point(b.0 - ux * 0.1 + uy * 0.055, b.1 - uy * 0.1 - ux * 0.055),
+                Point(b.0 - ux * back + uy * wing, b.1 - uy * back - ux * wing),
             ]);
         }
     }
+}
+// 2026-11-22：按字体采样的小数笔宽覆盖像素，避免整数笔刷把两像素线扩成三像素。
+fn pen_paths(paths: Vec<CircuitPath>, width: f32) -> Result<Option<Glyph>> {
+    let mut points = paths.iter().flat_map(|(points, _)| points);
+    let Some(&(x, y)) = points.next() else {
+        return Ok(None);
+    };
+    let (x0, y0, x1, y1) = points.fold((x, y, x, y), |b, &(x, y)| {
+        (b.0.min(x), b.1.min(y), b.2.max(x), b.3.max(y))
+    });
+    let pad = (width * 0.5 + 0.5).ceil() as i32;
+    let (left, top) = (x0 - pad, y0 - pad);
+    let (w, h) = ((x1 - left + pad + 1) as u32, (y1 - top + pad + 1) as u32);
+    Glyphs::check_size(w, h)?;
+    let mut mask = GrayImage::new(w, h);
+    for (points, pen) in paths {
+        let diameter = match pen {
+            Stroke::Pen => width,
+            Stroke::DotFill => 1.,
+        };
+        let reach = (diameter + 1.) * 0.5;
+        for pair in points.windows(2) {
+            let ((ax, ay), (bx, by)) = (pair[0], pair[1]);
+            let (dx, dy) = ((bx - ax) as f32, (by - ay) as f32);
+            let length_sq = (dx * dx + dy * dy).max(1.);
+            for y in ay.min(by) - pad..=ay.max(by) + pad {
+                for x in ax.min(bx) - pad..=ax.max(bx) + pad {
+                    let (px, py) = ((x - ax) as f32, (y - ay) as f32);
+                    let t = ((px * dx + py * dy) / length_sq).clamp(0., 1.);
+                    let distance = (px - t * dx).hypot(py - t * dy);
+                    let alpha =
+                        ((reach - distance).clamp(0., diameter.min(1.)) * 255.).round() as u8;
+                    let value = &mut mask[((x - left) as u32, (y - top) as u32)][0];
+                    *value = (*value).max(alpha);
+                }
+            }
+        }
+    }
+    Ok(Some(Glyphs::trim(Glyph {
+        mask,
+        advance: 0.,
+        left,
+        top,
+        ink: true,
+    })))
 }
 impl Glyphs<'_> {
     pub(super) fn circuit(&mut self, circuit: &Circuit, size: f32, depth: usize) -> Result<Glyph> {
@@ -211,10 +267,8 @@ impl Glyphs<'_> {
         }
         let span = (bounds.2 - bounds.0).max(bounds.3 - bounds.1).max(1.);
         let scale = (size * 1.75).clamp(10., 160.).min(1800. / span);
-        let thickness = (size * 0.025).round().max(1.) as i32;
         let mut draw = Drawing {
             paths: Vec::new(),
-            thickness,
             scale,
             holes: Vec::new(),
             contacts: circuit
@@ -240,6 +294,9 @@ impl Glyphs<'_> {
             let kind = segment.kind.as_str();
             if kind == "short" {
                 draw.line(a, b);
+                if segment.end_arrow {
+                    draw.arrowhead(a, b);
+                }
             } else if kind != "open" {
                 draw.line(a, p(-half, 0.));
                 draw.line(p(half, 0.), b);
@@ -446,7 +503,10 @@ impl Glyphs<'_> {
             let y = y - (g.top + g.bottom()) / 2;
             children.push((g, x, y));
         }
-        let mut result = Self::compose(0., children, draw.finish())?;
+        if let Some(ink) = pen_paths(draw.finish(), self.pen.thickness(size))? {
+            children.push((ink, 0, 0));
+        }
+        let mut result = Self::compose(0., children, Vec::new())?;
         result.left = 0;
         result.top = -(result.mask.height() as i32) / 2;
         result.advance = result.mask.width() as f32 + size * 0.2;
@@ -459,12 +519,47 @@ mod tests {
     fn drawing(scale: f32) -> Drawing {
         Drawing {
             paths: Vec::new(),
-            thickness: 1,
             scale,
             holes: Vec::new(),
             contacts: Vec::new(),
         }
     }
+    #[test]
+    fn bent_flow_arrow_has_one_small_open_head_on_its_last_leg() {
+        let circuit = crate::text::circuit::parse(
+            r"\begin{circuitikz}\draw[->] (0,0) -| (2,1); \draw (0,0) -- (1,0);\end{circuitikz}",
+        )
+        .unwrap();
+        assert_eq!(
+            circuit
+                .segments
+                .iter()
+                .map(|s| s.end_arrow)
+                .collect::<Vec<_>>(),
+            [false, true, false]
+        );
+        let mut d = drawing(60.);
+        d.arrowhead(circuit.segments[1].start, circuit.segments[1].end);
+        let head = &d.paths[0].0;
+        assert_eq!(head.len(), 3);
+        assert_eq!(head[1], (120, -60));
+        assert!(head[0].0 < 120 && head[2].0 > 120);
+        assert!(head.iter().all(|p| (-60..=-51).contains(&p.1)));
+    }
+
+    #[test]
+    fn horizontal_ink_coverage_tracks_fractional_pen_width() {
+        for width in [0.75, 1., 1.4, 2., 2.8] {
+            let ink = pen_paths(vec![(vec![(0, 0), (20, 0)], Stroke::Pen)], width)
+                .unwrap()
+                .unwrap();
+            let coverage: f32 = (0..ink.mask.height())
+                .map(|y| ink.mask[((10 - ink.left) as u32, y)][0] as f32 / 255.)
+                .sum();
+            assert!((coverage - width).abs() < 0.01, "{coverage} vs {width}");
+        }
+    }
+
     #[test]
     fn natural_source_circles_pin_exact_contacts_for_rotated_and_fractional_centers() {
         for scale in [10., 24.5, 70., 122.5, 160.] {
