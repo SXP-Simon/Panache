@@ -8,4 +8,4 @@ Version 1.18.1 fixes clipped values on narrow screens. The font scale now shows 
 
 On Android, Panache now launches the system installer in a separate task so tapping Open after an update can take you back to the workbench. The first update from an older build still uses its installer flow. If Open returns you to the home screen, tap the Panache icon to continue.
 
-[Write your first page](site:guide/getting-started) · [Download Panache](https://github.com/SXP-Simon/Panache/releases/latest)
+[Write your first page](site:guide/getting-started) · [Download Panache (with mirror)](site:desktop)

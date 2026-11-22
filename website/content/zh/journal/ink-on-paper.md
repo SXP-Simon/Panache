@@ -8,4 +8,4 @@ v1.18.1 修复了窄屏上的数值显示。字号比例为 100% 时，末位数
 
 Android 应用内更新现在会单独启动系统安装器，改善安装后点「打开」返回桌面的情况。从旧版首次升级仍使用旧版的安装流程；若点「打开」回到了桌面，点一下 Panache 图标即可。
 
-[写下第一页](site:guide/getting-started) · [下载客户端](https://github.com/SXP-Simon/Panache/releases/latest)
+[写下第一页](site:guide/getting-started) · [下载客户端（含镜像入口）](site:desktop)
