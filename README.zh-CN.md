@@ -28,7 +28,7 @@ Panache 能把正文、公式、表格和电路图排成手写稿。导入文档
 
 ## 许可
 
-自 v1.18.1 起，Panache 整体按 [GNU Affero 通用公共许可证第 3 版](LICENSE)（`AGPL-3.0-only`）分发。此前发布的版本仍按各自原有许可使用。源自 handwriting-web 的代码保留其 [MIT 版权与授权声明](assets/licenses/project-MIT.txt)。部分渲染算法改编自 handright，遵循 [BSD 3-Clause 许可](crates/handwriting-core/licenses/handright-LICENSE.txt)。详见[算法来源声明](crates/handwriting-core/NOTICE)和[字体许可记录](assets/licenses/FONT-LICENSES.md)，其中单独列出了授权尚待确认的字体。
+[AGPL-3.0-only](LICENSE)
 
 ## 致谢
 

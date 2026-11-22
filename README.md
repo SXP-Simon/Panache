@@ -28,7 +28,7 @@ Report bugs in [GitHub Issues](https://github.com/SXP-Simon/Panache/issues). For
 
 ## License
 
-Starting with v1.18.1, Panache is distributed under the [GNU Affero General Public License, version 3 only](LICENSE) (`AGPL-3.0-only`). Earlier releases retain their original licenses. Code inherited from handwriting-web retains its [MIT copyright and permission notice](assets/licenses/project-MIT.txt). Parts of the rendering engine are adapted from handright under the [BSD 3-Clause license](crates/handwriting-core/licenses/handright-LICENSE.txt). See the [algorithm notice](crates/handwriting-core/NOTICE) and [font license records](assets/licenses/FONT-LICENSES.md), including fonts whose permissions are still being confirmed.
+[AGPL-3.0-only](LICENSE)
 
 ## Acknowledgments
 
