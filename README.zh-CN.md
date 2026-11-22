@@ -32,7 +32,7 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 
 | 进程状态转换图 | 资源分配表 | 《钱塘湖春行》 |
 | --- | --- | --- |
-| [![进程状态转换图](assets/examples/process-states-258a9cf83c58.webp)](assets/examples/process-states-258a9cf83c58.webp) | [![资源分配表](assets/examples/bankers-algorithm-203c48282b49.webp)](assets/examples/bankers-algorithm-203c48282b49.webp) | [![《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp) |
+| [![进程状态转换图](assets/examples/process-states-32471b116f51.webp)](assets/examples/process-states-32471b116f51.webp) | [![资源分配表](assets/examples/bankers-algorithm-34116f1eda06.webp)](assets/examples/bankers-algorithm-34116f1eda06.webp) | [![《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp) |
 
 ## 参与贡献
 
