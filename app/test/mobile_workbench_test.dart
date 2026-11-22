@@ -102,6 +102,38 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets(
+    'slash hint follows the edited ratio without changing the draft',
+    (tester) async {
+      final workspace = await openWorkbench(tester, size: const Size(375, 800));
+      final editor = find.byKey(const ValueKey('text-editor'));
+      final hint = find.text(labels(tester).editorSlashHint);
+      for (final draft in ['mol/', 'mol/L', 'mol / L']) {
+        await tester.enterText(editor, draft);
+        await tester.pump();
+        expect(hint, findsOneWidget);
+        expect(workspace.text, draft);
+      }
+      for (final draft in [
+        'https://example.org/a/b',
+        '2026/11/22',
+        'plain text',
+      ]) {
+        await tester.enterText(editor, draft);
+        await tester.pump();
+        expect(hint, findsNothing);
+      }
+      await tester.enterText(editor, 'a/b then more text');
+      final field = tester.widget<TextField>(editor);
+      field.controller!.selection = const TextSelection.collapsed(offset: 2);
+      await tester.pump();
+      expect(hint, findsOneWidget);
+      field.focusNode!.unfocus();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(hint, findsNothing);
+    },
+  );
+
   testWidgets('editor state survives paper, preview and guide navigation', (
     tester,
   ) async {

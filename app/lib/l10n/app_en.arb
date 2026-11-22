@@ -7,6 +7,7 @@
   "editor": "Your writing",
   "editorHint": "Type or paste your words to create a handwritten page…",
   "editorNote": "Use --- on its own line for a page break, and >>> for right alignment.",
+  "editorSlashHint": "Type a/b for a stacked fraction or a / b to keep the slash.",
   "importText": "Import document",
   "insertImage": "Insert illustration",
   "pageBreak": "Insert page break",

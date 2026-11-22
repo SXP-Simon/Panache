@@ -129,6 +129,30 @@ fn distribution_tables_fit_narrow_pages_and_move_as_complete_rows() {
     }
 }
 #[test]
+fn whitespace_disambiguates_literal_slashes_from_fractions() {
+    for english_spacing in [false, true] {
+        for spaced in [
+            "mol / L",
+            "mol /L",
+            "mol/ L",
+            "mol\u{a0}/\u{a0}L",
+            "(a) / (b)",
+        ] {
+            let source = text::normalize(spaced, english_spacing);
+            assert_eq!(
+                text::parse(&source),
+                source.chars().map(Node::Char).collect::<Vec<_>>()
+            );
+        }
+    }
+    for compact in ["1/2", "a/b", "(a+b)/(2*c)", "(1)/((2)/(3))"] {
+        assert!(matches!(
+            text::parse(compact).as_slice(),
+            [Node::Fraction(..)]
+        ));
+    }
+}
+#[test]
 fn protected_urls_dates_paths_and_code_remain_literal() {
     for source in [
         "https://example.com/a/b/x_1/√(x)",

@@ -9,6 +9,25 @@ import '../utils/image_markers.dart';
 import 'workbench_controls.dart';
 import 'workbench_guide.dart';
 
+// Inspect only the text near the caret, even for a long report.
+final _ratioInput = RegExp(
+  r'(?:^|[\s，。；：、（(=])([a-zA-Z0-9]+ */ *[a-zA-Z0-9]*)(?=$|[\s，。；：、）).,;!?])',
+);
+
+bool _editingRatio(TextEditingValue value) {
+  final selection = value.selection;
+  if (!selection.isCollapsed || !selection.isValid) return false;
+  final offset = selection.extentOffset;
+  final start = math.max(0, offset - 100);
+  final end = math.min(value.text.length, offset + 100);
+  final window = value.text.substring(start, end);
+  for (final match in _ratioInput.allMatches(window)) {
+    final tokenStart = match.end - match[1]!.length;
+    if (offset - start > tokenStart && offset - start <= match.end) return true;
+  }
+  return false;
+}
+
 class WorkbenchEditor extends StatelessWidget {
   const WorkbenchEditor({
     super.key,
@@ -173,11 +192,20 @@ class WorkbenchEditor extends StatelessWidget {
                   ),
                 ],
               ),
-              if (markers.isEmpty)
-                Text(
-                  l.editorNote,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+              ListenableBuilder(
+                listenable: Listenable.merge([controller, focusNode]),
+                builder: (context, _) {
+                  final showHint =
+                      focusNode.hasFocus && _editingRatio(controller.value);
+                  if (!showHint && markers.isNotEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    showHint ? l.editorSlashHint : l.editorNote,
+                    style: theme.textTheme.bodySmall,
+                  );
+                },
+              ),
               if (markers.isNotEmpty) ...[
                 Text(
                   l.editIllustrationHelp,

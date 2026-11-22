@@ -7,6 +7,7 @@
   "editor": "书写内容",
   "editorHint": "在这里输入或粘贴文字，让它成为一份手写稿……",
   "editorNote": "单独一行 --- 分页；>>> 开头的行右对齐。",
+  "editorSlashHint": "a/b 排成上下分式。想保留斜线，写成 a / b。",
   "importText": "导入文档",
   "insertImage": "插入插图",
   "pageBreak": "插入分页",

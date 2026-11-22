@@ -545,17 +545,11 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
             }
             numerator = Some(&cs[i..end]);
         }
-        let mut slash = end;
-        while cs.get(slash) == Some(&' ') {
-            slash += 1;
-        }
+        // 斜线紧邻两侧操作数时才视为分式简写。
         if let Some(num) = numerator
-            && cs.get(slash) == Some(&'/')
+            && cs.get(end) == Some(&'/')
         {
-            let mut start = slash + 1;
-            while cs.get(start) == Some(&' ') {
-                start += 1;
-            }
+            let start = end + 1;
             let mut den_end = start;
             let mut denominator = None;
             if cs.get(start) == Some(&'(') {
