@@ -48,6 +48,8 @@ h1,h2,h3 { font-family: var(--serif); text-wrap: balance; }
 .actions { gap: 25px; flex-wrap: wrap; margin-top: 31px; }
 .button { display: inline-flex; gap: 18px; align-items: center; border: 1px solid var(--gilt); border-radius: 999px; background: var(--leaf); color: var(--inverse); padding: 11px 24px; font: 600 16px/1.6 var(--serif); }
 .button:hover { color: var(--inverse); filter: brightness(1.12); }
+.button-secondary { background: transparent; color: var(--ink); border-color: var(--line); }
+.button-secondary:hover { background: var(--wash); color: var(--ink); border-color: var(--gilt); filter: none; }
 .button span { font-size: 19px; }
 .text-link { display: inline-block; font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--line); }
 .journal-band { position: relative; background: var(--wash); border-radius: 45% 12% 0 0 / 12px 6px 0 0; }
@@ -116,8 +118,10 @@ footer .brand { font-size: 27px; } footer span { margin-right: auto; color: var(
 @media(max-width:600px) {
   .hero { grid-template-columns: minmax(0,1fr) 25%; gap: 10px; padding-block: 32px; }
   .hero h1 { font-size: clamp(28px,7.4vw,44px); }
-  .app-mark { width: 100%; }
-  .actions { gap: 12px; margin-top: 16px; }
+  .hero-copy { display: contents; }
+  .app-mark { grid-column: 2; grid-row: 1; width: 100%; }
+  .actions { grid-column: 1 / -1; gap: 12px; margin-top: 6px; }
+  .actions .button { gap: 8px; padding-inline: 14px; }
   .journal-feature { grid-template-columns: 1fr; gap: 16px; padding-block: 22px; }
   .journal-feature a { grid-template-columns: 32% 1fr; }
   .paper-thumb { height: 72px; }

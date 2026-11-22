@@ -29,7 +29,11 @@
 <section class="hero wrap">
 <div class="hero-copy">
 <h1>{{ 'Handwriting generator' if en else '手写体生成器' }}</h1>
-<div class="actions"><a class="button" href="{{ repo }}/releases/latest">{{ 'Download Panache' if en else '下载 Panache' }} <span>↓</span></a><a class="text-link" href="{{ local('guide/getting-started') }}">{{ 'Write your first page' if en else '写下第一页' }} ↗</a></div>
+<div class="actions">
+  <a class="button" href="{{ repo }}/releases/latest">{{ 'Download Panache' if en else '下载 Panache' }} <span>↓</span></a>
+  <a class="button button-secondary" href="{{ local('desktop') }}">{{ 'Mirror download guide' if en else '镜像下载指南' }}</a>
+  <a class="text-link" href="{{ local('guide/getting-started') }}">{{ 'Write your first page' if en else '写下第一页' }} ↗</a>
+</div>
 </div>
 <img class="app-mark" src="{{ asset('app-icon.png') }}" width="512" height="512" alt="{{ 'Panache app icon' if en else 'Panache 应用图标' }}">
 </section>
