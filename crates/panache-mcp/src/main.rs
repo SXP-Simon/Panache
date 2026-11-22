@@ -1,3 +1,4 @@
+mod controls;
 mod drafts;
 mod engine;
 mod inputs;
@@ -175,6 +176,48 @@ impl ServerHandler for Panache {
 
 #[tool_router]
 impl Panache {
+    #[tool(
+        description = "Discover handwriting settings by group. Omit group for an index; request one group before tuning."
+    )]
+    fn describe_controls(&self, Parameters(input): Parameters<Describe>) -> CallToolResult {
+        tool_result((|| {
+            let catalog = controls::catalog();
+            let data = match input.group {
+                Some(group) => {
+                    json!({"group":group,"controls":catalog.get(&group).context("Unknown group; omit group for index")?})
+                }
+                None => json!({"groups":catalog.keys().collect::<Vec<_>>()}),
+            };
+            Ok(reply(data.to_string(), data))
+        })())
+    }
+
+    #[tool(
+        description = "Tune a saved draft with a sparse control patch; returns a new revision. Preview that revision before export."
+    )]
+    fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
+        tool_result((|| {
+            let draft = self
+                .0
+                .drafts
+                .snapshot(&input.draft_id, Some(input.expected_revision))?;
+            let changes = controls::merge(
+                &draft.controls,
+                &input.changes.into_iter().collect(),
+                &self.0.fonts,
+            )?;
+            controls::parameters(&draft, 1, &changes)?;
+            let next = self
+                .0
+                .drafts
+                .tune(draft.id, input.expected_revision, &changes)?;
+            Ok(reply(
+                format!("Saved revision {next}."),
+                json!({"draft_id":draft.id,"revision":next,"controls":changes}),
+            ))
+        })())
+    }
+
     #[tool(description = "List local font filenames accepted by save_section.")]
     fn list_fonts(&self) -> CallToolResult {
         let names = self
@@ -226,6 +269,9 @@ impl Panache {
                 input.limit.unwrap_or(1000),
             )?;
             result["style"] = serde_json::to_value(&draft.style)?;
+            if !draft.controls.is_empty() {
+                result["controls"] = json!(draft.controls);
+            }
             if let Some(layout) = &draft.paper {
                 result["paper"] = serde_json::to_value(layout)?;
             }

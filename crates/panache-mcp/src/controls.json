@@ -1,0 +1,45 @@
+{
+  "layout": {
+    "font_size": {"type":"number","min":1,"max":2048,"unit":"px"},
+    "line_spacing": {"type":"number","min":1,"max":10000,"unit":"px"},
+    "word_spacing": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "left_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "right_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "top_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "bottom_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "width": {"type":"integer","min":1,"max":16000,"unit":"px (preset paper)"},
+    "height": {"type":"integer","min":1,"max":16000,"unit":"px (preset paper)"},
+    "layout_style": {"type":"choice","values":["standard","homework"]},
+    "first_line_indent": {"type":"boolean"},
+    "monospaced": {"type":"boolean"},
+    "english_spacing": {"type":"boolean"}
+  },
+  "typography": {
+    "font": {"type":"font"},
+    "latin_font": {"type":"choice","values":["handlee","patrick_hand","indie_flower","kalam","shadows_into_light"]},
+    "latin_font_scale": {"type":"integer","min":50,"max":150,"unit":"%"},
+    "latin_digits": {"type":"boolean"}
+  },
+  "ink": {
+    "ink": {"type":"color"},
+    "ink_opacity": {"type":"integer","min":0,"max":100,"unit":"%"},
+    "ink_thickness": {"type":"number","min":-2,"max":2,"unit":"px","step":0.1},
+    "ink_softness": {"type":"number","min":0,"max":2,"unit":"px","step":0.1}
+  },
+  "variation": {
+    "line_spacing_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "font_size_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "word_spacing_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "perturb_x_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "perturb_y_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "perturb_theta_sigma": {"type":"number","min":0,"max":3.14,"unit":"rad"},
+    "ink_depth_sigma": {"type":"number","min":0,"max":255,"unit":"intensity"}
+  },
+  "strike": {
+    "strikethrough_probability": {"type":"number","min":0,"max":1,"unit":"probability"},
+    "strikethrough_width": {"type":"number","min":0,"max":100,"unit":"px"},
+    "strikethrough_length_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "strikethrough_width_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
+    "strikethrough_angle_sigma": {"type":"number","min":0,"max":3.14,"unit":"rad"}
+  }
+}

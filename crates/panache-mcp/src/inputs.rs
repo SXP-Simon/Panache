@@ -79,6 +79,22 @@ pub struct Save {
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct Describe {
+    /// Omit for group names. Supply a group to get field names, units and ranges.
+    pub group: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Tune {
+    pub draft_id: String,
+    pub expected_revision: u32,
+    /// Sparse name/value patch from describe_controls. Null restores the original setting.
+    pub changes: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct List {
     pub offset: Option<u32>,
 }

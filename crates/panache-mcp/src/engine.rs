@@ -1,9 +1,6 @@
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use handwriting_core::{
-    Cancellation, FontBook, LayoutStyle, Limits, PaperPattern, Parameters, RenderRequest, export,
-    render,
-};
+use handwriting_core::{Cancellation, FontBook, Limits, RenderRequest, export, render};
 use std::{
     collections::HashMap,
     fs,
@@ -15,7 +12,7 @@ use tempfile::NamedTempFile;
 use uuid::Uuid;
 
 use crate::{
-    Format, Paper,
+    Format,
     drafts::{Section, Snapshot},
 };
 
@@ -23,6 +20,7 @@ struct CachedPage {
     draft: String,
     section: u32,
     version: u32,
+    settings: u32,
     page: usize,
     png: String,
 }
@@ -85,13 +83,17 @@ impl Engine {
         section: Section,
         background: Option<Vec<u8>>,
     ) -> Result<RenderRequest> {
-        let style = &draft.style;
+        let font_name = draft
+            .controls
+            .get("font")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(&draft.style.font);
         ensure!(
-            self.names.contains(&style.font),
+            self.names.iter().any(|f| f == font_name),
             "Font no longer available: {}",
-            style.font
+            font_name
         );
-        let primary = self.font(&style.font)?;
+        let primary = self.font(font_name)?;
         let fonts = FontBook::with_text_fallbacks(primary, &section.text, |name| {
             if self.names.iter().any(|n| n == name) {
                 self.font(name).map(Some)
@@ -99,41 +101,7 @@ impl Engine {
                 Ok(None)
             }
         })?;
-        let size = f32::from(style.font_size);
-        let mut params = Parameters {
-            width: Some(794),
-            height: Some(1123),
-            font_size: size,
-            line_spacing: (size * 1.65).round(),
-            left_margin: 65.,
-            right_margin: 65.,
-            top_margin: 62.,
-            bottom_margin: 55.,
-            fill: style.ink_rgba()?,
-            strikethrough_probability: 0.,
-            perturb_x_sigma: 1.,
-            perturb_y_sigma: 1.,
-            ink_depth_sigma: 8.,
-            font_size_sigma: 1.,
-            seed: u64::from(style.seed) + u64::from(section.number) - 1,
-            layout_style: if style.homework {
-                LayoutStyle::Homework
-            } else {
-                LayoutStyle::Standard
-            },
-            underlined: matches!(style.paper, Paper::Ruled),
-            paper_pattern: match style.paper {
-                Paper::Grid => Some(PaperPattern::Grid),
-                Paper::Dots => Some(PaperPattern::Dots),
-                _ => None,
-            },
-            preview: false,
-            full_preview: false,
-            ..Default::default()
-        };
-        if let Some(layout) = &draft.paper {
-            layout.apply(&mut params);
-        }
+        let params = crate::controls::parameters(draft, section.number, &draft.controls)?;
         Ok(RenderRequest {
             text: section.text,
             params,
@@ -154,11 +122,11 @@ impl Engine {
             (1..=Limits::default().max_pages).contains(&page_number),
             "Invalid page number"
         );
-        if let Some(hit) = self
-            .cache
-            .iter()
-            .find(|p| p.draft == draft.id && (p.section, p.version, p.page) == (n, v, page_number))
-        {
+        if let Some(hit) = self.cache.iter().find(|p| {
+            p.draft == draft.id
+                && p.settings == draft.settings_revision
+                && (p.section, p.version, p.page) == (n, v, page_number)
+        }) {
             return Ok((hit.png.clone(), true));
         }
         let request = self.request(draft, section, draft.background()?)?;
@@ -183,6 +151,7 @@ impl Engine {
             draft: draft.id.to_owned(),
             section: n,
             version: v,
+            settings: draft.settings_revision,
             page: page_number,
             png: png.clone(),
         });

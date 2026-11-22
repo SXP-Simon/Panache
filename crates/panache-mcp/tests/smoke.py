@@ -52,6 +52,8 @@ async def smoke(command, arguments, out):
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
                 "list_fonts",
+                "describe_controls",
+                "tune_handwriting",
                 "list_drafts",
                 "save_section",
                 "read_section",
@@ -211,6 +213,40 @@ async def smoke(command, arguments, out):
             assert (await call(client, "read_section", draft_id=doc)).structuredContent[
                 "markdown"
             ] == "修订稿"
+            groups = (await call(client, "describe_controls")).structuredContent[
+                "groups"
+            ]
+            assert len(groups) == 5
+            ink = (
+                await call(client, "describe_controls", group="ink")
+            ).structuredContent["controls"]
+            assert "ink_opacity" in ink and "left_margin" not in ink
+            tuning = {
+                "draft_id": paper_id,
+                "expected_revision": 1,
+                "changes": {"ink_opacity": 55, "ink": "#665577", "word_spacing": 2},
+            }
+            tuned = (await call(client, "tune_handwriting", **tuning)).structuredContent
+            assert tuned["revision"] == 2
+            assert (await client.call_tool("tune_handwriting", tuning)).isError
+            assert (
+                png(await call(client, "preview_handwriting", draft_id=paper_id))
+                != paper_preview
+            )
+            assert (
+                png(
+                    await call(
+                        client, "preview_handwriting", draft_id=paper_id, revision=1
+                    )
+                )
+                == paper_preview
+            )
+            invalid = {
+                **tuning,
+                "expected_revision": 2,
+                "changes": {"ink_opacity": 101},
+            }
+            assert (await client.call_tool("tune_handwriting", invalid)).isError
             # Exercise a long draft without ever exporting or rendering its tail.
             repeated = "逐题列出已知条件，检查解题步骤。\n" * 600
             large = (

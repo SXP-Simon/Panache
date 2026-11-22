@@ -12,6 +12,8 @@ pub struct Drafts(PathBuf);
 pub struct Snapshot<'a> {
     pub revision: u32,
     pub style: Style,
+    pub controls: crate::controls::Changes,
+    pub settings_revision: u32,
     pub id: &'a str,
     pub paper: Option<PaperLayout>,
     drafts: &'a Drafts,
@@ -45,6 +47,10 @@ impl Drafts {
             CREATE TABLE IF NOT EXISTS drafts (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL, style TEXT NOT NULL,
                 revision INTEGER NOT NULL, chars INTEGER NOT NULL, sections INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS settings (
+                draft TEXT NOT NULL REFERENCES drafts(id), revision INTEGER NOT NULL,
+                controls TEXT NOT NULL, PRIMARY KEY(draft,revision)
             );
             CREATE TABLE IF NOT EXISTS sections (
                 draft TEXT NOT NULL REFERENCES drafts(id), number INTEGER NOT NULL,
@@ -164,13 +170,49 @@ impl Drafts {
             (1..=latest).contains(&revision),
             "Unknown revision (latest: {latest})"
         );
+        let settings: Option<(u32,String)> = self.connect()?.query_row(
+            "SELECT revision,controls FROM settings WHERE draft=?1 AND revision<=?2 ORDER BY revision DESC LIMIT 1",
+            params![id,revision], |r| Ok((r.get(0)?,r.get(1)?))).optional()?;
+        let (settings_revision, controls) = match settings {
+            Some((r, s)) => (r, serde_json::from_str(&s)?),
+            None => (0, crate::controls::Changes::new()),
+        };
         Ok(Snapshot {
+            controls,
+            settings_revision,
             id,
             drafts: self,
             paper: layout.as_deref().map(serde_json::from_str).transpose()?,
             revision,
             style: serde_json::from_str(&style)?,
         })
+    }
+    pub fn tune(
+        &self,
+        id: &str,
+        expected: u32,
+        controls: &crate::controls::Changes,
+    ) -> Result<u32> {
+        let mut db = self.connect()?;
+        let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let next = Self::advance(&tx, id, expected)?;
+        tx.execute(
+            "INSERT INTO settings VALUES (?1,?2,?3)",
+            params![id, next, serde_json::to_string(controls)?],
+        )?;
+        tx.commit()?;
+        Ok(next)
+    }
+    fn advance(tx: &rusqlite::Transaction<'_>, id: &str, expected: u32) -> Result<u32> {
+        let next = expected.checked_add(1).context("Revision overflow")?;
+        ensure!(
+            tx.execute(
+                "UPDATE drafts SET revision=?1 WHERE id=?2 AND revision=?3",
+                params![next, id, expected]
+            )? == 1,
+            "Revision conflict; read the latest revision before retrying"
+        );
+        Ok(next)
     }
     pub fn review(
         &self,
