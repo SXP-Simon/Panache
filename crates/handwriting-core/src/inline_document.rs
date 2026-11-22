@@ -57,6 +57,22 @@ pub(crate) fn image_payloads(text: &str) -> Vec<Range<usize>> {
     }
     spans
 }
+/// Replace recognized inline image payloads before slicing a Markdown excerpt.
+pub fn review_text(source: &str) -> std::borrow::Cow<'_, str> {
+    let spans = image_payloads(source);
+    if spans.is_empty() {
+        return std::borrow::Cow::Borrowed(source);
+    }
+    let mut view = String::new();
+    let mut last = 0;
+    for span in spans {
+        view.push_str(&source[last..span.start]);
+        view.push_str("attachment");
+        last = span.end;
+    }
+    view.push_str(&source[last..]);
+    std::borrow::Cow::Owned(view)
+}
 fn literal_end(s: &str, start: usize) -> Option<usize> {
     let rest = &s[start..];
     if rest.starts_with('`') {

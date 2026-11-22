@@ -80,6 +80,9 @@ pub struct Save {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Describe {
+    /// Optionally include this draft's effective values for the selected group.
+    pub draft_id: Option<String>,
+    pub revision: Option<u32>,
     /// Omit for group names. Supply a group to get field names, units and ranges.
     pub group: Option<String>,
 }
@@ -99,9 +102,20 @@ pub struct List {
     pub offset: Option<u32>,
 }
 
+#[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadView {
+    #[default]
+    Excerpt,
+    Summary,
+    Source,
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Read {
+    /// Default excerpt omits inline image bytes; summary omits text; source reads exact Markdown.
+    pub view: Option<ReadView>,
     pub draft_id: String,
     /// Omit for latest.
     pub revision: Option<u32>,

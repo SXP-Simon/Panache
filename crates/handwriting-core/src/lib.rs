@@ -7,7 +7,7 @@ pub mod generation;
 pub mod imaging;
 pub mod ink_effects;
 mod inline_document;
-pub use inline_document::validate as validate_document;
+pub use inline_document::{review_text, validate as validate_document};
 mod parameters;
 pub mod render;
 pub mod text;

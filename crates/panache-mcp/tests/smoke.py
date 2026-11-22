@@ -248,22 +248,28 @@ async def smoke(command, arguments, out):
                 "changes": {"ink_opacity": 101},
             }
             assert (await client.call_tool("tune_handwriting", invalid)).isError
-            probe = dict(draft_id=paper_id, section=1, page=1, view="layout", limit=1)
+            probe = {
+                "draft_id": paper_id,
+                "section": 1,
+                "page": 1,
+                "view": "layout",
+                "limit": 1,
+            }
             layout = await call(client, "preview_handwriting", **probe)
             assert not any(c.type == "image" for c in layout.content)
             row = layout.structuredContent["glyphs"][0]
             assert (
                 layout.structuredContent["next_offset"] == 1 and len(row["bounds"]) == 4
             )
-            fine = dict(
-                draft_id=paper_id,
-                expected_revision=2,
-                section=1,
-                page=1,
-                ids=[row["id"]],
-                dx=11,
-                dy=-4,
-            )
+            fine = {
+                "draft_id": paper_id,
+                "expected_revision": 2,
+                "section": 1,
+                "page": 1,
+                "ids": [row["id"]],
+                "dx": 11,
+                "dy": -4,
+            }
             assert (
                 await client.call_tool("adjust_glyphs", {**fine, "ids": [999999]})
             ).isError
@@ -330,6 +336,36 @@ async def smoke(command, arguments, out):
             assert selected.structuredContent["page_in_section"] == 2
             print(
                 f"Long draft: {large['prepared_chars']} prepared characters across {large['sections']} sections; read section 7, page 2."
+            )
+        async with stdio_client(params) as streams, ClientSession(*streams) as client:
+            await client.initialize()
+            assert (
+                png(
+                    await call(
+                        client, "preview_handwriting", draft_id=paper_id, revision=3
+                    )
+                )
+                == adjusted
+            )
+            await call(
+                client,
+                "save_section",
+                draft_id=paper_id,
+                expected_revision=3,
+                section=1,
+                markdown="重排后的版本",
+            )
+            refreshed = (
+                await call(client, "preview_handwriting", **probe)
+            ).structuredContent
+            assert all("adjustment" not in g for g in refreshed["glyphs"])
+            assert (
+                png(
+                    await call(
+                        client, "preview_handwriting", draft_id=paper_id, revision=3
+                    )
+                )
+                == adjusted
             )
         print(
             f"Poem: 1 page. Extended draft: {archive['pages']} pages. Cache, selected page, old revision, restart and conflicts verified."

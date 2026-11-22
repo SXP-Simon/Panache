@@ -170,24 +170,67 @@ impl ServerHandler for Panache {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
-            .with_instructions("Save Markdown by section. Keep the draft ID and revision. Review source with read_section, preview the desired page, then export that same revision.")
+            .with_instructions("Save Markdown by section. Keep draft_id and revision. Read a summary first. Discover settings by group, tune a revision, inspect one page for glyph edits, then preview and export the same revision.")
     }
 }
 
 #[tool_router]
 impl Panache {
     #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
         description = "Discover handwriting settings by group. Omit group for an index; request one group before tuning."
     )]
     fn describe_controls(&self, Parameters(input): Parameters<Describe>) -> CallToolResult {
         tool_result((|| {
             let catalog = controls::catalog();
-            let data = match input.group {
+            ensure!(
+                input.revision.is_none() || input.draft_id.is_some(),
+                "revision requires draft_id"
+            );
+            ensure!(
+                input.draft_id.is_none() || input.group.is_some(),
+                "Select a group to inspect values"
+            );
+            let mut data = match input.group {
                 Some(group) => {
                     json!({"group":group,"controls":catalog.get(&group).context("Unknown group; omit group for index")?})
                 }
                 None => json!({"groups":catalog.keys().collect::<Vec<_>>()}),
             };
+            if let Some(id) = input.draft_id {
+                let draft = self.0.drafts.snapshot(&id, input.revision)?;
+                let params = controls::parameters(&draft, 1, &draft.controls)?;
+                let values = serde_json::to_value(&params)?;
+                let mut effective = serde_json::Map::new();
+                for k in data["controls"].as_object().unwrap().keys() {
+                    let val = match k.as_str() {
+                        "font" => json!(
+                            draft
+                                .controls
+                                .get(k)
+                                .and_then(|v| v.as_str())
+                                .unwrap_or(&draft.style.font)
+                        ),
+                        "ink" => json!(
+                            draft
+                                .controls
+                                .get(k)
+                                .and_then(|v| v.as_str())
+                                .unwrap_or(&draft.style.ink)
+                        ),
+                        "width" if draft.paper.is_some() => {
+                            json!(draft.paper.as_ref().map(|p| p.width))
+                        }
+                        "height" if draft.paper.is_some() => {
+                            json!(draft.paper.as_ref().map(|p| p.height))
+                        }
+                        _ => values[k].clone(),
+                    };
+                    effective.insert(k.clone(), val);
+                }
+                data["values"] = json!(effective);
+                data["revision"] = json!(draft.revision);
+            }
             Ok(reply(data.to_string(), data))
         })())
     }
@@ -219,7 +262,10 @@ impl Panache {
         })())
     }
 
-    #[tool(description = "List local font filenames accepted by save_section.")]
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "List local font filenames accepted by save_section."
+    )]
     fn list_fonts(&self) -> CallToolResult {
         let names = self
             .0
@@ -238,6 +284,7 @@ impl Panache {
     }
 
     #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
         description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first."
     )]
     fn list_drafts(&self, Parameters(input): Parameters<List>) -> CallToolResult {
@@ -257,7 +304,8 @@ impl Panache {
     }
 
     #[tool(
-        description = "Read a bounded excerpt of original Markdown from any saved revision, without rendering. Offset counts Unicode characters."
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Read one section: summary, excerpt (default, image data omitted), or exact source. Offset counts Unicode characters in the selected view."
     )]
     fn read_section(&self, Parameters(input): Parameters<Read>) -> CallToolResult {
         tool_result((|| {
@@ -268,6 +316,7 @@ impl Panache {
                 input.section.unwrap_or(1),
                 input.offset.unwrap_or(0),
                 input.limit.unwrap_or(1000),
+                input.view.unwrap_or_default(),
             )?;
             result["style"] = serde_json::to_value(&draft.style)?;
             if !draft.controls.is_empty() {
@@ -275,6 +324,9 @@ impl Panache {
             }
             if let Some(layout) = &draft.paper {
                 result["paper"] = serde_json::to_value(layout)?;
+            }
+            if input.view == Some(ReadView::Summary) {
+                return Ok(reply(result.to_string(), result));
             }
             let message = format!(
                 "稿件 `{}` · 版本 {} · 第 {} 节 · 从第 {} 个字符起（共 {} 个）\n\n{}",
@@ -290,6 +342,7 @@ impl Panache {
     }
 
     #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
         description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs."
     )]
     async fn preview_handwriting(

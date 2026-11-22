@@ -265,26 +265,45 @@ impl Drafts {
         number: u32,
         offset: u32,
         limit: u32,
+        view: crate::ReadView,
     ) -> Result<Value> {
         ensure!(
             (1..=4000).contains(&limit),
             "limit must be 1..4000 characters"
         );
-        let (source, len, version): (String, u32, u32) = self
-            .connect()?
-            .query_row(
-                "SELECT substr(source,?4+1,?5), length(source), revision FROM sections
-             WHERE draft=?1 AND number=?2 AND revision<=?3 ORDER BY revision DESC LIMIT 1",
-                params![id, number, rev, offset, limit],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        let db = self.connect()?;
+        let (source_len,version):(u32,u32)=db.query_row(
+            "SELECT length(source),revision FROM sections WHERE draft=?1 AND number=?2 AND revision<=?3 ORDER BY revision DESC LIMIT 1",
+            params![id,number,rev],|r|Ok((r.get(0)?,r.get(1)?))).optional()?.context("Section does not exist at this revision")?;
+        let mut result = json!({"draft_id":id,"revision":rev,"section":number,"section_revision":version,"source_chars":source_len});
+        if view == crate::ReadView::Summary {
+            return Ok(result);
+        }
+        let (excerpt, len): (String, u32) = if view == crate::ReadView::Source {
+            let slice=db.query_row("SELECT substr(source,?4+1,?5) FROM sections WHERE draft=?1 AND number=?2 AND revision=?3",
+                params![id,number,version,offset,limit],|r|r.get(0))?;
+            (slice, source_len)
+        } else {
+            let raw: String = db.query_row(
+                "SELECT source FROM sections WHERE draft=?1 AND number=?2 AND revision=?3",
+                params![id, number, version],
+                |r| r.get(0),
+            )?;
+            let readable = handwriting_core::review_text(&raw);
+            (
+                readable
+                    .chars()
+                    .skip(offset as usize)
+                    .take(limit as usize)
+                    .collect(),
+                readable.chars().count() as u32,
             )
-            .optional()?
-            .context("Section does not exist at this revision")?;
-        Ok(
-            json!({"draft_id":id,"revision":rev,"section":number,"section_revision":version,
-            "markdown":source,"offset":offset,"total_chars":len,
-            "next_offset":offset.checked_add(limit).filter(|end| *end<len)}),
-        )
+        };
+        result["markdown"] = json!(excerpt);
+        result["offset"] = json!(offset);
+        result["total_chars"] = json!(len);
+        result["next_offset"] = json!(offset.checked_add(limit).filter(|n| *n < len));
+        Ok(result)
     }
     pub fn sections(&self, id: &str, rev: u32, number: Option<u32>) -> Result<Vec<Section>> {
         let db = self.connect()?;

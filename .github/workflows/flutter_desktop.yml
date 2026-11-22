@@ -38,9 +38,11 @@ jobs:
           python -m pip install "mcp>=1.12,<2"
           if [[ "$RUNNER_OS" == Windows ]]; then
             python crates/panache-mcp/tests/smoke.py target/desktop-package/windows/Panache/handwriting_app.exe --server-arg=--mcp
+            python crates/panache-mcp/tests/context_metrics.py target/desktop-package/windows/Panache/handwriting_app.exe --mcp
           else
             binary=$(find target/desktop-package -type f -name panache-mcp -print -quit)
             python crates/panache-mcp/tests/smoke.py "$binary"
+            python crates/panache-mcp/tests/context_metrics.py "$binary"
           fi
       - name: Flutter 检查
         working-directory: app
