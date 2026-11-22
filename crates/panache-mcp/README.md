@@ -49,9 +49,14 @@ cargo build --locked --release -p panache-mcp
 | `list_fonts` | 列出本地可选的字体文件名。 |
 | `save_section` | 用 `markdown` 新建稿件。首次可传标题、字体、字号、纸样、墨色、种子和作业排版模式。返回 `draft_id`、版本号和节号。 |
 | `list_drafts` | 找回本地稿件和最新版本。每批 20 条，可传 `offset`。 |
-| `read_section` | 复查指定版本某节的原始 Markdown。可按字符设置 `offset` 和 `limit`，默认 1000 字，单次最多 4000 字。 |
+| `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |
 | `preview_handwriting` | 默认返回首页 PNG。用 `section`、`page` 查看指定节中的一页，两者从 1 开始。 |
 | `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。 |
+| `describe_controls` | 先列参数组，再按 `group` 查看单位、范围和枚举值。附上 `draft_id` 和 `revision` 可读取该版的实际值。 |
+| `tune_handwriting` | 一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
+| `adjust_glyphs` | 先用 `preview_handwriting(view="layout")` 取编号和坐标，再按同一节、页和版本调整选中字形。 |
+
+面向 AI 客户端的调用示例、披露边界和测量口径见[工具设计](tool-design.md)。
 
 长作业可以按题组或章节分次传入，每节从新页开始。需要连续排版的段落放在同一节，公式、表格、代码块也应完整放在一节内。追加时带上 `draft_id` 和上次返回的 `expected_revision`；修改已有节时再给出 `section`。另一位客户端抢先保存后，用 `read_section` 复核最新内容再提交。
 
