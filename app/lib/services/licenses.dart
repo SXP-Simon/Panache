@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 void registerBundledLicenses() {
   LicenseRegistry.addLicense(() async* {
     const licenses = {
+      'Panache (AGPL-3.0-only)': 'Panache-AGPL-3.0.txt',
       'handwriting-web': 'project-MIT.txt',
       'handright / handwriting-core': 'handright-BSD-3-Clause.txt',
       '霞鹜文楷 / LXGW WenKai': 'lxgw-wenkai-OFL.txt',

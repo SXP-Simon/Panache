@@ -13,7 +13,7 @@ void main() {
 
   test('随包许可与原始声明一致，四款 OFL 字体包含完整许可', () async {
     const originals = {
-      'project-MIT.txt': '../LICENSE',
+      'Panache-AGPL-3.0.txt': '../LICENSE',
       'handright-BSD-3-Clause.txt':
           '../crates/handwriting-core/licenses/handright-LICENSE.txt',
       'handright-NOTICE.txt': '../crates/handwriting-core/NOTICE',
@@ -56,6 +56,7 @@ void main() {
         .expand((entry) => entry.paragraphs)
         .map((paragraph) => paragraph.text)
         .join('\n');
+    expect(text, contains('GNU AFFERO GENERAL PUBLIC LICENSE'));
     expect(text, contains('Copyright (c) 2025 Liuweiqing'));
     expect(text, contains('Chenghui LI'));
     expect(text, contains('SIL OPEN FONT LICENSE Version 1.1'));

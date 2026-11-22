@@ -3,6 +3,7 @@ name = "handwriting-bridge"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 handwriting-core.workspace = true
