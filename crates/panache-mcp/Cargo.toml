@@ -1,0 +1,22 @@
+[package]
+name = "panache-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+handwriting-core.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+rquickjs = "0.14"
+serde.workspace = true
+serde_json = "1"
+rmcp = { version = "3.11", features = ["transport-io"] }
+schemars = "1"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+base64 = "0.23.1"
+tempfile = "3"
+fontdue = "0.9.4"
+image = { version = "0.25", default-features = false }
+anyhow = "1"

@@ -5,6 +5,7 @@
 | `handwriting-core` | 字体、排版、扰动、图片与文档处理、PNG/PDF/ZIP 导出 | 已实现，独立于 Flutter、HTTP 和 SQLite |
 | `handwriting-bridge` | Flutter 原生桥接入口 | C ABI JSON 请求/响应、原生任务线程、进度、取消、离线导入和导出 |
 | `handwriting-server` | API、任务队列、WebSocket、SQLite、静态托管 | 已实现，桌面包作为内置 sidecar 自动运行 |
+| [panache-mcp](panache-mcp/README.md) | 本地 stdio MCP | Markdown 分节存稿、历史复查、按页预览和整稿导出 |
 
 核心实现流式/网格排版、数学节点、缺字回退、四邻域连通区域扰动、手动分页、右对齐、删除线模拟、插图滤镜和背景识别。使用 ChaCha8 与显式 seed，固定构建内结果可复现。源码移植的 BSD-3-Clause 说明见 [NOTICE](handwriting-core/NOTICE)。
 

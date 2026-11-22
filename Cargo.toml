@@ -3,6 +3,7 @@ members = [
     "crates/handwriting-core",
     "crates/handwriting-bridge",
     "crates/handwriting-server",
+    "crates/panache-mcp",
 ]
 resolver = "2"
 
