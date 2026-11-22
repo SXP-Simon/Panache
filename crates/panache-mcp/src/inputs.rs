@@ -58,12 +58,34 @@ impl Style {
         Ok([rgb[1], rgb[2], rgb[3], 255])
     }
 }
+#[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PaperMode {
+    #[default]
+    Photo,
+    Flatten,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Guide {
+    /// Zero-based writable ruling number, counted from the first supplied ruling.
+    pub row: u16,
+    /// Left and right endpoints [x,y] of this same baseline in original photo pixels.
+    pub left: [u32; 2],
+    pub right: [u32; 2],
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Save {
     /// Optional absolute local image path for a new draft. Imports and aligns the paper once.
     /// Use with the default plain preset. All revisions share the saved image.
     pub paper_path: Option<std::path::PathBuf>,
+    /// With paper_path: photo (default) preserves camera perspective; flatten aligns the background.
+    pub paper_mode: Option<PaperMode>,
+    /// Optional photo-space baselines overriding auto detection on import. Give 2..32 guides, first row 0, last row the last writable line; intermediate guides refine the fit.
+    pub paper_guides: Option<Vec<Guide>>,
     /// Original Markdown of just this section. A new section starts on a fresh page.
     pub markdown: String,
     /// Omit to create a draft. Supply the returned ID to append or edit.
@@ -129,8 +151,18 @@ pub struct Read {
 #[derive(Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PreviewView {
+    Paper,
     Image,
     Layout,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Shape {
+    /// Horizontal shear in degrees, -20..20. Positive displaces the bottom to the right.
+    pub shear_degrees: i8,
+    /// Top edge width relative to bottom, 80..120 percent. 100 makes parallel sides.
+    pub top_width_percent: u8,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -151,12 +183,14 @@ pub struct Nudge {
     pub angle: Option<i8>,
     /// Ink opacity in percent, 0..100.
     pub opacity: Option<u8>,
+    /// Optional residual glyph shape in paper space. Replaces prior shape; 0 degrees and 100 percent resets.
+    pub shape: Option<Shape>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
-    /// "image" (default) or "layout" for bounded base glyph boxes without pixels.
+    /// "image" (default), "paper" for the saved stationery alone, or "layout" for base glyph geometry.
     pub view: Option<PreviewView>,
     /// Layout mode: start index and number of glyphs (default 12, max 32).
     pub offset: Option<usize>,

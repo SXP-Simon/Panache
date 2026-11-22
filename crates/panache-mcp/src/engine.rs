@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use handwriting_core::{Cancellation, FontBook, Limits, RenderRequest, export, render};
+use handwriting_core::{Cancellation, FontBook, Limits, RenderRequest, export};
 use std::{
     collections::HashMap,
     fs,
@@ -108,6 +108,13 @@ impl Engine {
         })?;
         let mut params = crate::controls::parameters(draft, section.number, &draft.controls)?;
         params.fine_edit = edits.is_some();
+        if let Some(paper) = draft.paper.as_ref().filter(|p| p.projection.is_some()) {
+            params.width = Some(paper.width);
+            params.height = Some(paper.height);
+            params.underlined = false;
+            params.paper_pattern = None;
+            params.fine_edit = true;
+        }
         params.fine_edits = edits;
         Ok(RenderRequest {
             text: section.text,
@@ -138,19 +145,17 @@ impl Engine {
         }) {
             return Ok((hit.png.clone(), true));
         }
-        let request = self.request(draft, section, draft.background()?, edits)?;
+        let mut background = draft.background()?;
+        let photo = Self::photo(draft, &mut background)?;
+        let request = self.request(draft, section, background, edits)?;
         let mut image = None;
-        let pages = handwriting_core::render::render_until_page(
-            &request,
-            cancel,
-            page_number,
-            |i, page| {
+        let pages =
+            Self::render_pages(&request, photo.as_ref(), cancel, page_number, |i, page| {
                 if i + 1 == page_number {
                     image = Some(STANDARD.encode(export::png(&page)?));
                 }
                 Ok(())
-            },
-        )?;
+            })?;
         let png =
             image.with_context(|| format!("Section has {pages} pages; requested {page_number}"))?;
         if self.cache.len() == 4 {
@@ -167,9 +172,41 @@ impl Engine {
         });
         Ok((png, false))
     }
+    fn photo<'a>(
+        draft: &'a Snapshot<'_>,
+        background: &mut Option<Vec<u8>>,
+    ) -> Result<
+        Option<(
+            &'a handwriting_core::photo::PaperProjection,
+            image::RgbaImage,
+        )>,
+    > {
+        let Some(map) = draft.paper.as_ref().and_then(|p| p.projection.as_ref()) else {
+            return Ok(None);
+        };
+        let bytes = background.take().context("Missing original photograph")?;
+        let img = handwriting_core::imaging::decode(&bytes, &Limits::default())?.into_rgba8();
+        Ok(Some((map, img)))
+    }
+    fn render_pages(
+        request: &RenderRequest,
+        photo: Option<&(&handwriting_core::photo::PaperProjection, image::RgbaImage)>,
+        cancel: &Cancellation,
+        stop: usize,
+        emit: impl FnMut(usize, image::RgbaImage) -> handwriting_core::Result<()>,
+    ) -> handwriting_core::Result<usize> {
+        match photo {
+            Some((map, img)) => {
+                handwriting_core::render::render_on_photo(request, cancel, stop, map, img, emit)
+            }
+            None => handwriting_core::render::render_until_page(request, cancel, stop, emit),
+        }
+    }
     fn fine_request(&mut self, draft: &Snapshot<'_>, section: Section) -> Result<RenderRequest> {
         let (_, edits) = draft.edits(&section)?;
-        let mut req = self.request(draft, section, draft.background()?, edits)?;
+        let projected = draft.paper.as_ref().is_some_and(|p| p.projection.is_some());
+        let background = if projected { None } else { draft.background()? };
+        let mut req = self.request(draft, section, background, edits)?;
         req.params.fine_edit = true;
         Ok(req)
     }
@@ -194,6 +231,21 @@ impl Engine {
             .take(limit)
             .map(|g| {
                 let mut row = json!({"id":g.id,"bounds":g.bounds});
+                if let Some(map) = draft.paper.as_ref().and_then(|p| p.projection.as_ref()) {
+                    let [x, y, w, h] = g.bounds;
+                    let project = |x: i32, y: i32| {
+                        map.photo_point(x as f32, y as f32)
+                            .map(|n| n.round() as i32)
+                    };
+                    row["photo_quad"] = json!([
+                        project(x, y),
+                        project(x + w, y),
+                        project(x + w, y + h),
+                        project(x, y + h)
+                    ]);
+                    row["photo_baseline"] =
+                        json!([project(x, g.baseline), project(x + w, g.baseline)]);
+                }
                 if let Some([a, b]) = g.source_utf16
                     && let Some(chars) = utf16.get(a as usize..b as usize)
                 {
@@ -238,7 +290,8 @@ impl Engine {
                 || input.dy.is_some()
                 || input.scale.is_some()
                 || input.angle.is_some()
-                || input.opacity.is_some(),
+                || input.opacity.is_some()
+                || input.shape.is_some(),
             "Supply at least one adjustment"
         );
         ensure!(
@@ -246,7 +299,12 @@ impl Engine {
                 && input.dy.is_none_or(|v| (-65535..=65535).contains(&v))
                 && input.scale.is_none_or(|v| (50..=200).contains(&v))
                 && input.angle.is_none_or(|v| (-45..=45).contains(&v))
-                && input.opacity.is_none_or(|v| v <= 100),
+                && input.opacity.is_none_or(|v| v <= 100)
+                && input
+                    .shape
+                    .as_ref()
+                    .is_none_or(|s| (-20..=20).contains(&s.shear_degrees)
+                        && (80..=120).contains(&s.top_width_percent)),
             "Invalid glyph adjustment"
         );
         let version = section.version;
@@ -277,11 +335,40 @@ impl Engine {
                 softness: 0,
                 warp: None,
             });
+            let glyph = bounds
+                .iter()
+                .find(|g| g.id == id)
+                .context("Unknown glyph")?;
+            if let Some(shape) = &input.shape {
+                let height = f64::from(glyph.bounds[3].max(1));
+                let ratio = f64::from(shape.top_width_percent) / 100.;
+                let shear = f64::from(shape.shear_degrees).to_radians().tan();
+                let h = 2. * (ratio - 1.) / ((ratio + 1.) * height);
+                let f = h * height * height / 4.;
+                e.warp = if shape.shear_degrees == 0 && shape.top_width_percent == 100 {
+                    None
+                } else {
+                    Some([
+                        2. * ratio / (ratio + 1.),
+                        shear,
+                        shear * f,
+                        0.,
+                        1.,
+                        f,
+                        0.,
+                        h,
+                    ])
+                };
+            }
             e.dx = input.dx.unwrap_or(e.dx);
             e.dy = input.dy.unwrap_or(e.dy);
             e.angle = input.angle.unwrap_or(e.angle);
             e.scale = input.scale.unwrap_or(e.scale);
             e.opacity = input.opacity.unwrap_or(e.opacity);
+            ensure!(
+                fine_edit::usable_shape(e, glyph.bounds[2], glyph.bounds[3]),
+                "Shape exceeds safe bounds at the requested scale or rotation"
+            );
         }
         ensure!(edits.len() <= 10000, "Section glyph edit limit reached");
         cancel.check()?;
@@ -306,13 +393,14 @@ impl Engine {
         let mut temp = NamedTempFile::new_in(dir)?;
         let mut count = 0;
         let mut background = draft.background()?;
+        let photo = Self::photo(draft, &mut background)?;
         let render_sections = |emit: &mut PageSink<'_>| -> Result<()> {
             for section in sections {
                 cancel.check()?;
                 let (_, edits) = draft.edits(&section)?;
                 let mut request = self.request(draft, section, background.take(), edits)?;
                 request.limits.max_pages -= count;
-                render(&request, cancel, |_, page| {
+                Self::render_pages(&request, photo.as_ref(), cancel, usize::MAX, |_, page| {
                     emit(count, &page)?;
                     count += 1;
                     progress(count);

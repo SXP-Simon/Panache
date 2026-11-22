@@ -182,7 +182,7 @@ impl Drafts {
         tx.commit()?;
         let mut saved = json!({"draft_id":id,"revision":next,"section":number,"sections":number.max(count),"prepared_chars":total});
         if let Some(paper) = paper {
-            saved["paper"] = serde_json::to_value(&paper.layout)?;
+            saved["paper"] = paper.layout.summary();
         }
         Ok(saved)
     }

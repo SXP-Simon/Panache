@@ -83,6 +83,59 @@ async def smoke(command, arguments, out):
                 layout["height"],
                 layout["line_spacing"],
             ) == (True, 400, 500, 40)
+            # Supply two writable lines directly when the client knows the photo geometry.
+            guides = [
+                {"row": 0, "left": [75, 100], "right": [320, 84]},
+                {"row": 6, "left": [30, 395], "right": [377, 374]},
+            ]
+            guided = (
+                await call(
+                    client,
+                    "save_section",
+                    markdown="纸面透视",
+                    paper_path=str(paper_path),
+                    paper_guides=guides,
+                )
+            ).structuredContent
+            assert guided["paper"]["alignment"] == "manual_guides"
+            gkey = {"draft_id": guided["draft_id"]}
+            paper_only = png(
+                await call(client, "preview_handwriting", view="paper", **gkey)
+            )
+            base = png(await call(client, "preview_handwriting", **gkey))
+            assert paper_only != base
+            geom = (
+                await call(
+                    client, "preview_handwriting", view="layout", limit=1, **gkey
+                )
+            ).structuredContent["glyphs"][0]
+            assert len(geom["photo_quad"]) == 4 and len(geom["photo_baseline"]) == 2
+            patch = dict(**gkey, section=1, page=1, ids=[geom["id"]])
+            await call(
+                client,
+                "adjust_glyphs",
+                expected_revision=1,
+                **patch,
+                shape={"shear_degrees": 5, "top_width_percent": 88},
+            )
+            assert base != png(await call(client, "preview_handwriting", **gkey))
+            await call(
+                client,
+                "adjust_glyphs",
+                expected_revision=2,
+                **patch,
+                shape={"shear_degrees": 0, "top_width_percent": 100},
+            )
+            assert base == png(await call(client, "preview_handwriting", **gkey))
+            invalid = await client.call_tool(
+                "save_section",
+                {
+                    "markdown": "x",
+                    "paper_path": str(paper_path),
+                    "paper_guides": guides[::-1],
+                },
+            )
+            assert invalid.isError
             paper_path.unlink()
             paper_id = custom["draft_id"]
             paper_preview = png(

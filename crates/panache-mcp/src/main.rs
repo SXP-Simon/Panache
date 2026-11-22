@@ -93,6 +93,11 @@ impl Panache {
             input.markdown.chars().count() <= Limits::default().max_text_chars,
             "Section too long"
         );
+        ensure!(
+            input.paper_path.is_some()
+                || (input.paper_mode.is_none() && input.paper_guides.is_none()),
+            "paper_mode and paper_guides require paper_path at creation"
+        );
         let style = if input.draft_id.is_none() {
             ensure!(
                 input.expected_revision.unwrap_or(0) == 0 && input.section.unwrap_or(1) == 1,
@@ -144,7 +149,12 @@ impl Panache {
                             matches!(style.paper, Paper::Plain),
                             "Choose either paper_path or a paper preset"
                         );
-                        Some(paper::ImportedPaper::read(path, style.font_size)?)
+                        Some(paper::ImportedPaper::read(
+                            path,
+                            style.font_size,
+                            input.paper_mode.unwrap_or_default(),
+                            input.paper_guides.as_deref(),
+                        )?)
                     }
                     _ => None,
                 };
@@ -170,7 +180,7 @@ impl ServerHandler for Panache {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
-            .with_instructions("Save Markdown by section. Keep draft_id and revision. Read a summary first. Discover settings by group, tune a revision, inspect one page for glyph edits, then preview and export the same revision.")
+            .with_instructions("Drafts contain versioned Markdown sections. Images, the saved paper and per-glyph geometry are available on demand. Photo-space coordinates describe the preview; local adjustments use paper-space pixels.")
     }
 }
 
@@ -277,7 +287,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Save Markdown without rendering. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision."
+        description = "Save Markdown without rendering. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(self.save(input).await)
@@ -323,7 +333,7 @@ impl Panache {
                 result["controls"] = json!(draft.controls);
             }
             if let Some(layout) = &draft.paper {
-                result["paper"] = serde_json::to_value(layout)?;
+                result["paper"] = layout.summary();
             }
             if input.view == Some(ReadView::Summary) {
                 return Ok(reply(result.to_string(), result));
@@ -343,7 +353,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs."
+        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
     )]
     async fn preview_handwriting(
         &self,
@@ -353,6 +363,14 @@ impl Panache {
         let result = self
             .render(ctx, move |state, engine, cancel| {
                 let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
+                if input.view==Some(PreviewView::Paper){
+                    ensure!(input.offset.is_none() && input.limit.is_none() && input.section.is_none() && input.page.is_none(),"view=paper takes only draft_id and revision");
+                    let bytes=draft.background()?.context("No imported paper for this draft")?;
+                    let img=handwriting_core::imaging::decode(&bytes,&Limits::default())?.into_rgba8();
+                    use base64::{Engine as _,engine::general_purpose::STANDARD};
+                    let mut result=reply("稿件底纸".into(),json!({"width":img.width(),"height":img.height(),"revision":draft.revision}));
+                    result.content.push(ContentBlock::image(STANDARD.encode(handwriting_core::export::png(&img)?),"image/png"));return Ok(result);
+                }
                 let number = input.section.unwrap_or(1);
                 let section = state
                     .drafts
@@ -384,7 +402,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets are absolute relative to base bounds."
+        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Shape applies additional local shear or taper."
     )]
     async fn adjust_glyphs(
         &self,
