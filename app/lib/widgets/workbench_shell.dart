@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../services/mcp_connection_stub.dart'
+    if (dart.library.io) '../services/mcp_connection_native.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/nouveau_ornament.dart';
@@ -260,6 +264,7 @@ class WorkbenchShell extends StatelessWidget {
   Future<void> preferencesSheet(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     var motion = reduceMotion;
+    final mcpConfig = desktopMcpConfig();
     return showModalBottomSheet<void>(
       sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
           ? AnimationStyle.noAnimation
@@ -320,6 +325,32 @@ class WorkbenchShell extends StatelessWidget {
                           onConnection();
                         },
                 ),
+                if (mcpConfig != null)
+                  ListTile(
+                    key: const ValueKey('connect-ai-client'),
+                    leading: const Icon(Icons.hub_outlined),
+                    title: Text(l.connectAiClient),
+                    subtitle: Text(l.copyMcpConfig),
+                    trailing: const Icon(Icons.copy_outlined),
+                    onTap: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await Clipboard.setData(ClipboardData(text: mcpConfig));
+                      } on PlatformException {
+                        if (messenger.mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(content: Text(l.mcpCopyFailed)),
+                          );
+                        }
+                        return;
+                      }
+                      if (!sheetContext.mounted) return;
+                      Navigator.pop(sheetContext);
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(l.mcpConfigCopied)),
+                      );
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(Icons.translate),
                   title: Text(l.language),
