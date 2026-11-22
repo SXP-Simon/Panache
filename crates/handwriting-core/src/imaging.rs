@@ -166,6 +166,8 @@ pub struct Identification {
     pub confidence: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub corrected_background: Option<String>,
+    #[serde(skip)]
+    pub projection: Option<crate::photo::PaperProjection>,
 }
 
 // 2026-10-24：局部纵向亮度差可识别浅灰线，也不会把渐变阴影当成整片墨迹。
@@ -307,6 +309,7 @@ fn flatten_rulings(
     w: u32,
     h: u32,
     ratio: f32,
+    encode_corrected: bool,
 ) -> Result<Option<Identification>> {
     use base64::Engine;
     const STRIPS: usize = 9;
@@ -397,7 +400,7 @@ fn flatten_rulings(
             (y - (best[0] + spacing * i as f32 + slope * (x - columns[MID]))).abs() > 3.
         })
     });
-    if !nonlinear {
+    if !nonlinear && encode_corrected {
         return Ok(None);
     }
     let (ow, oh) = opaque.dimensions();
@@ -457,6 +460,25 @@ fn flatten_rulings(
         left_edges.push(continuous[trim]);
         right_edges.push(continuous[continuous.len() - 1 - trim]);
     }
+    if !nonlinear {
+        // Parallel rulings can still sit in a sheared box. Compare several row ends to
+        // avoid treating a short or interrupted individual ruling as a paper edge.
+        let quarter = (best.len() / 4).max(1);
+        let drift = |edges: &[usize]| {
+            let mean = |slice: &[usize]| slice.iter().sum::<usize>() as f32 / slice.len() as f32;
+            (mean(&edges[..quarter]) - mean(&edges[edges.len() - quarter..])).abs()
+        };
+        if drift(&left_edges).max(drift(&right_edges)) < w as f32 * 0.025 {
+            return Ok(None);
+        }
+    }
+    // The end points carry the horizontal foreshortening as well as the varying line pitch.
+    let measured_rows = (0..best.len())
+        .map(|i| crate::photo::Ruling {
+            edges: [left_edges[i] as f32 / ratio, right_edges[i] as f32 / ratio],
+            heights: std::array::from_fn(|j| tracks[j][i] / ratio),
+        })
+        .collect();
     left_edges.sort_unstable();
     right_edges.sort_unstable();
     let trim = best.len() / 10;
@@ -514,13 +536,31 @@ fn flatten_rulings(
         line_spacing: step,
         deskew_angle_degrees: 0.,
         confidence: best.len() as f32 / sequence.len() as f32,
-        corrected_background: Some(
-            base64::engine::general_purpose::STANDARD.encode(crate::export::png(&corrected)?),
-        ),
+        projection: Some(crate::photo::PaperProjection::Rulings {
+            first: top as f32,
+            step: step as f32,
+            layout_edges: [
+                (left as f32 / ratio).round(),
+                ow as f32 - ((w as usize - 1 - right) as f32 / ratio).round(),
+            ],
+            columns: columns.map(|x| x / ratio),
+            rows: measured_rows,
+        }),
+        corrected_background: encode_corrected
+            .then(|| crate::export::png(&corrected))
+            .transpose()?
+            .map(|png| base64::engine::general_purpose::STANDARD.encode(png)),
     }))
 }
 // 2026-10-24：分析坐标和返回的实际背景使用相同旋转，粗线按整条线带中心计距。
 pub fn identify(image: &DynamicImage) -> Result<Identification> {
+    identify_with_output(image, true)
+}
+/// Identify a paper-space layout while keeping the original photograph for compositing.
+pub fn identify_photo(image: &DynamicImage) -> Result<Identification> {
+    identify_with_output(image, false)
+}
+fn identify_with_output(image: &DynamicImage, encode_corrected: bool) -> Result<Identification> {
     use base64::Engine;
     use imageproc::geometric_transformations::{
         Border, Interpolation, rotate_about_center_no_crop,
@@ -544,7 +584,7 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
     );
     let (w, h) = gray.dimensions();
     let points = ruling_points(&gray);
-    if let Some(corrected) = flatten_rulings(&opaque, &points, w, h, ratio)? {
+    if let Some(corrected) = flatten_rulings(&opaque, &points, w, h, ratio, encode_corrected)? {
         return Ok(corrected);
     }
     let mut best = (0f64, 0f32, vec![0; h as usize]);
@@ -676,6 +716,7 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
     let margin_bottom = (oh as f32 - centers.last().unwrap() / ratio + offset_y).round() as u32;
     let corrected_background = corrected
         .as_ref()
+        .filter(|_| encode_corrected)
         .map(crate::export::png)
         .transpose()?
         .map(|png| base64::engine::general_purpose::STANDARD.encode(png));
@@ -692,6 +733,13 @@ pub fn identify(image: &DynamicImage) -> Result<Identification> {
         image_height,
         deskew_angle_degrees: angle,
         confidence: stable,
+        projection: corrected
+            .as_ref()
+            .map(|_| crate::photo::PaperProjection::Rotated {
+                angle: best.1,
+                photo_center: [ow as f32 / 2., oh as f32 / 2.],
+                layout_center: [image_width as f32 / 2., image_height as f32 / 2.],
+            }),
         corrected_background,
     })
 }

@@ -38,6 +38,7 @@ pub struct GlyphBounds {
     pub id: u32,
     pub bounds: [i32; 4],
     pub source_utf16: Option<[u32; 2]>,
+    pub baseline: i32,
 }
 
 /// Inspect a one-based page without encoding or exposing its glyph mask atlas.
@@ -61,6 +62,7 @@ pub fn inspect_page(
                         id: t.id,
                         bounds: [t.x, t.y, t.mask.width() as i32, t.mask.height() as i32],
                         source_utf16: t.source,
+                        baseline: t.baseline,
                     })
                     .collect(),
             );
@@ -247,6 +249,22 @@ fn projected_geometry(
     Some((bounds, inverse))
 }
 
+// Validate a local shape together with its existing scale and rotation.
+pub fn usable_shape(edit: &Adjustment, width: i32, height: i32) -> bool {
+    let (sin, cos) = f64::from(edit.angle).to_radians().sin_cos();
+    edit.warp.is_none_or(|warp| {
+        projected_geometry(
+            warp,
+            f64::from(width),
+            f64::from(height),
+            f64::from(edit.scale) / 100.,
+            cos,
+            sin,
+        )
+        .is_some()
+    })
+}
+
 pub(crate) fn paint(
     paper: &mut RgbaImage,
     tile: Tile,
@@ -301,7 +319,13 @@ pub(crate) fn paint(
                 + 12_750)
                 / 25_500;
             let alpha = (alpha * opacity + 50) / 100;
-            for (ch, value) in paper[(x, y)].0[..3].iter_mut().zip(color) {
+            let pixel = &mut paper[(x, y)];
+            if pixel[3] < 255 {
+                use image::Pixel;
+                pixel.blend(&Rgba([color[0], color[1], color[2], alpha as u8]));
+                continue;
+            }
+            for (ch, value) in pixel.0[..3].iter_mut().zip(color) {
                 *ch =
                     ((u32::from(*ch) * (255 - alpha) + u32::from(value) * alpha + 127) / 255) as u8;
             }

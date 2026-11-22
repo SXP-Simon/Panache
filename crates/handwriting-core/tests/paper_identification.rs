@@ -248,6 +248,22 @@ fn check_perspective(broken_lines: bool) {
     assert!(detected.margin_top.abs_diff(168) <= 4);
     assert!(detected.margin_bottom.abs_diff(165) <= 8);
     assert!(detected.margin_left.min(detected.margin_right) >= 130);
+    let map = detected.projection.as_ref().unwrap();
+    for row in [1, 8, 16] {
+        let r = row as f32;
+        for x in [280., 480., 680.] {
+            let [px, py] = map.photo_point(
+                x,
+                (detected.margin_top + row * detected.line_spacing) as f32,
+            );
+            let u = (px - 480.) / 480.;
+            let expected = 168. + 34. * r + r * r - (27. - r) * u + 9. * u * u;
+            assert!(
+                (py - expected).abs() < 4.,
+                "row {row}, pixel {px}: {py} vs {expected}"
+            );
+        }
+    }
     let png = base64::engine::general_purpose::STANDARD
         .decode(detected.corrected_background.unwrap())
         .unwrap();

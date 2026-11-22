@@ -325,6 +325,31 @@ pub fn render_until_page<F: FnMut(usize, RgbaImage) -> Result<()>>(
     r: &RenderRequest,
     cancel: &Cancellation,
     stop_after: usize,
+    emit: F,
+) -> Result<usize> {
+    render_output(r, cancel, stop_after, None, emit)
+}
+pub fn render_on_photo<F: FnMut(usize, RgbaImage) -> Result<()>>(
+    r: &RenderRequest,
+    cancel: &Cancellation,
+    stop_after: usize,
+    projection: &crate::photo::PaperProjection,
+    photo: &RgbaImage,
+    emit: F,
+) -> Result<usize> {
+    if !r.params.fine_edit || r.params.width.is_none() || r.params.height.is_none() {
+        return Err(Error::new(
+            "invalid_parameter",
+            "Photo projection requires a paper-space fine layout",
+        ));
+    }
+    render_output(r, cancel, stop_after, Some((projection, photo)), emit)
+}
+fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
+    r: &RenderRequest,
+    cancel: &Cancellation,
+    stop_after: usize,
+    photo: Option<(&crate::photo::PaperProjection, &RgbaImage)>,
     mut emit: F,
 ) -> Result<usize> {
     if stop_after == 0 {
@@ -338,7 +363,7 @@ pub fn render_until_page<F: FnMut(usize, RgbaImage) -> Result<()>>(
         .as_deref()
         .map(|key| fine_edit::overrides(key, &r.params))
         .unwrap_or_default();
-    render_pages(r, cancel, stop_after, |i, paper, ink| {
+    render_planes(r, cancel, stop_after, photo.is_some(), |i, paper, ink| {
         let image = match ink {
             Some(PageInk::Flat(ink)) => ink_effects::composite(paper, ink, &r.params, cancel)?,
             Some(PageInk::Fine(tiles)) => {
@@ -351,7 +376,11 @@ pub fn render_until_page<F: FnMut(usize, RgbaImage) -> Result<()>>(
             }
             None => paper,
         };
-        emit(i, image)
+        let output = match photo {
+            Some((projection, background)) => projection.composite(background, &image, cancel)?,
+            None => image,
+        };
+        emit(i, output)
     })
 }
 
@@ -399,6 +428,15 @@ pub(crate) fn render_pages(
     stop_after: usize,
     emit: impl FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>,
 ) -> Result<usize> {
+    render_planes(r, cancel, stop_after, false, emit)
+}
+fn render_planes(
+    r: &RenderRequest,
+    cancel: &Cancellation,
+    stop_after: usize,
+    transparent: bool,
+    emit: impl FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>,
+) -> Result<usize> {
     cancel.check()?;
     crate::validate_document(&r.text, &r.limits)?;
     let p = &r.params;
@@ -408,7 +446,11 @@ pub(crate) fn render_pages(
     let mut background = match (p.width, p.height) {
         (Some(w), Some(h)) => {
             p.validate(w, h, &r.limits)?;
-            blank_paper(w, h, p)
+            if transparent {
+                RgbaImage::new(w, h)
+            } else {
+                blank_paper(w, h, p)
+            }
         }
         (None, None) => imaging::decode(
             r.background
@@ -435,13 +477,15 @@ pub(crate) fn render_pages(
     if p.ink_layers || p.fine_edit {
         // The generated mask stores concentration, independent of the selected tint.
         layout.fill = [0, 0, 0, 255];
-        for pixel in background.pixels_mut() {
-            let opacity = u16::from(pixel[3]);
-            for channel in &mut pixel.0[..3] {
-                *channel =
-                    ((u16::from(*channel) * opacity + 255 * (255 - opacity) + 127) / 255) as u8;
+        if !transparent {
+            for pixel in background.pixels_mut() {
+                let opacity = u16::from(pixel[3]);
+                for channel in &mut pixel.0[..3] {
+                    *channel =
+                        ((u16::from(*channel) * opacity + 255 * (255 - opacity) + 127) / 255) as u8;
+                }
+                pixel[3] = 255;
             }
-            pixel[3] = 255;
         }
     }
     let p = &layout;
