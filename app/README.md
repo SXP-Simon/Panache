@@ -76,7 +76,7 @@ flutter build ios --release --no-codesign
 # 发布 IPA 需配置 Apple 签名后使用 flutter build ipa
 ```
 
-Android release 当前沿用脚手架的 debug 签名，正式发布前需配置自己的签名。iOS 的未签名 `.app` 不能直接安装到真机。Android 不支持 armv7；iOS 真机为 arm64，模拟器支持 arm64/x86_64。
+本地 Android release 构建在缺少密钥时会回退到 debug 签名。CI 使用发布密钥为正式 APK 签名，见[发布说明](../docs/release.md)。iOS 的未签名 `.app` 不能直接安装到真机。Android 不支持 armv7；iOS 真机为 arm64，模拟器支持 arm64/x86_64。
 
 阻塞 FFI 调用运行在 Dart background isolate，生成运行在 Rust worker thread；参数、状态和私有目录路径通过 JSON 传递，PNG/PDF/ZIP 从文件读取。字体由本地 `handwriting_assets` package 复用 `assets/font_assets/`，避免重复维护；首次启动将内置字体提取到应用缓存目录，草稿继续保存在 preferences；生成结果是可清理的缓存，需主动保存导出。单次只执行一个生成任务，最多保留 8 个任务结果。热重启会先取消原生任务并清理旧缓存；应用进入 paused 状态请求协作取消，恢复后可重新生成。
 
