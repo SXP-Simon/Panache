@@ -6,12 +6,15 @@ pub(in crate::render) fn paint_math_unit(
     mask: &GrayImage,
     origin: (i32, i32),
     p: &Parameters,
+    align_to_rulings: bool,
     rng: &mut ChaCha8Rng,
     cancel: &Cancellation,
 ) -> Result<()> {
     let cx = (mask.width() - 1) as f32 / 2.;
     let cy = (mask.height() - 1) as f32 / 2.;
-    let mut angle = normal(rng, p.perturb_theta_sigma);
+    let sampled_angle = normal(rng, p.perturb_theta_sigma);
+    // 2026-11-22：横线纸上的整表或整图先与纸面平行，随后随纸面投影；保留字迹自身的扰动。
+    let mut angle = if align_to_rulings { 0. } else { sampled_angle };
     let bounds = |angle: f32| {
         let mut bounds = (
             f32::INFINITY,
@@ -70,4 +73,47 @@ pub(in crate::render) fn paint_math_unit(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand_chacha::rand_core::SeedableRng;
+
+    #[test]
+    fn locked_table_rules_stay_on_the_paper_axis_across_seeds() {
+        let mut mask = GrayImage::new(201, 21);
+        for y in [0, 20] {
+            for x in 0..201 {
+                mask[(x, y)] = Luma([255]);
+            }
+        }
+        let p = Parameters {
+            left_margin: 0.,
+            right_margin: 0.,
+            top_margin: 0.,
+            bottom_margin: 0.,
+            word_spacing: 0.,
+            perturb_theta_sigma: 0.12,
+            perturb_x_sigma: 0.,
+            perturb_y_sigma: 0.,
+            ..Default::default()
+        };
+        for seed in 0..8 {
+            let mut canvas = RgbaImage::new(360, 180);
+            paint_math_unit(
+                &mut canvas,
+                &mask,
+                (60, 70),
+                &p,
+                true,
+                &mut ChaCha8Rng::seed_from_u64(seed),
+                &Cancellation::default(),
+            )
+            .unwrap();
+            for y in [70, 90] {
+                assert!((60..=260).all(|x| canvas[(x, y)][3] > 0));
+            }
+        }
+    }
 }

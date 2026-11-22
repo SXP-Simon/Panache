@@ -152,6 +152,7 @@ fn capture_one(
             &raw,
             (radius as i32, radius as i32),
             &tile_params,
+            unit.align_to_rulings,
             &mut rng,
             cancel,
         )?;

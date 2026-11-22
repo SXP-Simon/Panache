@@ -46,6 +46,7 @@ use units::{fixed_cell, keeps_grid_cell, layout_units};
 struct LineUnit {
     glyph: Glyph,
     rigid: bool,
+    align_to_rulings: bool,
     x: i32,
     dy: i32,
     break_after: bool,
@@ -263,6 +264,7 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
                     &u.glyph.mask,
                     origin,
                     self.p,
+                    u.align_to_rulings,
                     &mut self.rng,
                     self.cancel,
                 )?;
@@ -821,6 +823,8 @@ fn render_planes(
                 pages.line.push(LineUnit {
                     glyph: g,
                     rigid: compound || cell.is_some(),
+                    align_to_rulings: matches!(node, Node::Circuit(_) | Node::Table(_))
+                        && (p.background_ruled || p.underlined || p.paper_pattern.is_some()),
                     x: x.round() as i32,
                     dy,
                     break_after: homework_mode && homework::break_after(units[i]),
@@ -859,6 +863,7 @@ mod ruled_tests {
                 ink: true,
             },
             rigid: false,
+            align_to_rulings: false,
             x: 10,
             dy: 0,
             break_after: false,
