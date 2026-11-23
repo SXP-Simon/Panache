@@ -142,6 +142,22 @@ fn distribution_table_has_two_dimensional_handwritten_ink_and_continuous_rules()
     }
 }
 #[test]
+fn a_grid_at_the_raster_height_limit_keeps_its_plain_frame() {
+    use crate::text::{Table, TableKind, TableRule};
+    // 31 行 × 264 像素，加上笔宽后仍小于 8192；两端再延长就可能越界。
+    let table = Table {
+        kind: TableKind::Grid,
+        rows: vec![vec![Vec::new()]; 31],
+        vertical: vec![TableRule::Solid; 2],
+        horizontal: vec![TableRule::Solid; 32],
+    };
+    let book = &books()[0];
+    let plain = Glyphs::new(book).table(&table, 205., 0).unwrap();
+    assert_eq!(plain.mask.height(), 8189);
+    let mut natural = Glyphs::with_parameters(book, &Parameters::default()).unwrap();
+    assert_eq!(plain.mask, natural.table(&table, 205., 0).unwrap().mask);
+}
+#[test]
 fn grid_corner_overruns_are_local_bounded_and_repeatable() {
     let book = &books()[0];
     let mut quiet = Glyphs::new(book);

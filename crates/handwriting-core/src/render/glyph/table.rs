@@ -108,10 +108,10 @@ impl Glyphs<'_> {
                 (inset + width, offset + ys[index]),
             );
         }
-        if table.kind == TableKind::Grid && self.pen.naturalness > 0. {
+        let reach = (size * 0.105).min(5.) * self.pen.naturalness;
+        if table.kind == TableKind::Grid && corner_tails_fit(width, height, grid_thickness, reach) {
             // 横竖两笔都经过交点，只让其中一笔沿原方向多走一点。
             let mut rng = ChaCha8Rng::seed_from_u64(self.pen.seed);
-            let reach = (size * 0.105).min(5.) * self.pen.naturalness;
             for (row, dy) in [(0, -1), (ys.len() - 1, 1)] {
                 for (col, dx) in [(0, -1), (columns, 1)] {
                     if table.horizontal[row] == TableRule::Dashed
@@ -149,5 +149,26 @@ impl Glyphs<'_> {
             result.top += (axis.top + axis.bottom() - result.top - result.bottom()) / 2;
         }
         Ok(result)
+    }
+}
+
+// 与 compose 的圆笔边界一致；接近栅格上限时保留原有表框。
+fn corner_tails_fit(width: i32, height: i32, thickness: i32, reach: f32) -> bool {
+    let tail = reach.round() as i32;
+    let padding = 2 * (thickness / 2 + tail) + 1;
+    tail > 0 && Glyphs::check_size((width + padding) as u32, (height + padding) as u32).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn optional_tails_respect_dimension_and_area_budgets() {
+        for (w, h) in [(32760, 20), (20, 8184), (3995, 3995)] {
+            assert!(Glyphs::check_size(w as u32 + 4, h as u32 + 4).is_ok());
+            assert!(!corner_tails_fit(w, h, 3, 5.));
+        }
+        assert!(corner_tails_fit(500, 300, 3, 5.));
     }
 }
