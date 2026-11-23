@@ -52,7 +52,7 @@ cargo build --locked --release -p panache-mcp
 
 | 工具 | 用法 |
 | --- | --- |
-| `list_fonts` | 列出本地可选的字体文件名。 |
+| `list_fonts` | 列出本地字体。为作业、实验报告选笔迹时，指导模型展示中英数混排小样，按用户偏好定稿。 |
 | `save_section` | 用 `markdown` 新建稿件。首次可传标题、字体、字号、纸样、墨色、种子和作业排版模式。返回 `draft_id`、版本号和节号。 |
 | `list_drafts` | 找回本地稿件和最新版本。每批 20 条，可传 `offset`。 |
 | `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |

@@ -108,6 +108,21 @@ async def review_workflow(client, key, guides, font_path):
     return transparent, default, uploaded
 
 
+async def mixed_script_sample(client):
+    saved = (await call(client, "save_section", markdown="样品 A 的质量为 12.5 g。",
+                        style={"font": "李国夫手写体.ttf", "seed": 17})).structuredContent
+    key = {"draft_id": saved["draft_id"]}
+    primary = png(await call(client, "preview_handwriting", **key))
+    override = {"latin_font": "kalam", "latin_digits": True, "latin_font_scale": 120}
+    await call(client, "tune_handwriting", **key, expected_revision=1, changes=override)
+    assert png(await call(client, "preview_handwriting", **key)) != primary
+    reset = {"latin_font": None, "latin_digits": False, "latin_font_scale": 100}
+    await call(client, "tune_handwriting", **key, expected_revision=2, changes=reset)
+    spec = (await call(client, "describe_controls", **key, group="typography")).structuredContent
+    assert {name: spec["values"][name] for name in reset} == reset
+    assert png(await call(client, "preview_handwriting", **key)) == primary
+
+
 async def placement_pixels(client):
     saved = (await call(client, "save_section", markdown="字", style={"seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
@@ -176,8 +191,10 @@ async def smoke(command, arguments, out):
                 "preview_handwriting",
                 "export_handwriting",
             }
-            fonts = (await call(client, "list_fonts")).structuredContent["fonts"]
-            assert "志莽行书.ttf" in fonts
+            listed = await call(client, "list_fonts")
+            guidance = listed.structuredContent["sample_guidance"]
+            assert guidance in listed.content[0].text
+            assert "志莽行书.ttf" in listed.structuredContent["fonts"]
             paper_path = Path(temp) / "我的 横线纸.png"
             shutil.copyfile(
                 Path(__file__).parent / "fixtures" / "ruled.png", paper_path
@@ -264,6 +281,7 @@ async def smoke(command, arguments, out):
                 "save_section", {"markdown": "missing", "paper_path": str(paper_path)}
             )
             assert failed.isError
+            await mixed_script_sample(client)
             await placement_pixels(client)
             await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)

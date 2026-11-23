@@ -6,6 +6,8 @@ Panache 在 `tools/list` 中公布十三个任务入口。模型可以直接保�
 
 客户端负责启动 stdio 程序、把工具提供给模型，并决定将返回的文本、结构化数据和图片交给谁。首次可调用 `list_fonts` 验证连接，再用 `save_section` 创建一节短文，按返回版本预览。请区分用户能在聊天里看到图片与模型能读取工具图片这两种能力。模型实际收到图片时可以描述字迹和位置；只收到文字时，可以报告测量值，并请用户在预览或导出文件中确认字形、可读性和布局偏好。
 
+作业或实验报告混排时，先用主字体排一句真实内容，例如“样品 A 的质量为 12.5 g”。在目标纸面和字号下看笔画粗细、倾斜、英文字高与数字辨识度。风格还没定时，把混排预览给用户，说明推荐理由，再问“这种笔迹可以用在整份报告里吗？”用户已选定字体或委托选字时直接依约排版。已有稿件可用 `describe_controls(group="typography")` 查看当前设置；要恢复主字体原本的英数比例，可用 `tune_handwriting` 传 `changes: {"latin_font": null, "latin_digits": false, "latin_font_scale": 100}`。缺字可能触发字体回退，仍以实际预览为准。
+
 MCP 的工具列表支持分页。客户端可能取完所有页；分页能控制单次协议响应大小。Claude 的 Tool Search 支持宿主配置延迟加载，实际进入模型上下文的工具由宿主决定。Panache 的 stdio 客户端也可以完全不提供搜索，只用标准工具列表和调用接口。项目目前选择按需查询参数，避免为小型目录引入搜索索引和额外的调用步骤。设计依据见 [MCP 工具规范](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)、[MCP 路线图中的渐进发现](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) 和 [Claude Tool Search 文档](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)。
 
 ## 一次调整

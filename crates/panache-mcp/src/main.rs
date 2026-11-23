@@ -212,7 +212,7 @@ impl ServerHandler for Panache {
                 "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
                 "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
                 "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
-                "Use list_fonts for names and list_drafts to resume. A paper_path must be readable on the server computer. ",
+                "For mixed-script homework or lab reports, see list_fonts. Show a short mixed sample if the preferred hand is undecided. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
                 "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
                 "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
                 "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
@@ -310,7 +310,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "List local font filenames accepted by save_section."
+        description = "List local fonts accepted by save_section and how to preview a coherent Chinese, English and digit sample."
     )]
     fn list_fonts(&self) -> CallToolResult {
         let names = self
@@ -319,7 +319,17 @@ impl Panache {
             .iter()
             .map(|name| format!("- {name}"))
             .collect::<Vec<_>>();
-        reply(names.join("\n"), json!({"fonts": self.0.fonts}))
+        let guidance = concat!(
+            "For homework and lab reports, start with the primary font’s own letters and digits. ",
+            "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
+            "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
+            "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
+            "Honor an approved or delegated choice. For a mismatch, inspect describe_controls(group=typography) before trying a separate Latin font."
+        );
+        reply(
+            format!("{}\n\n{guidance}", names.join("\n")),
+            json!({"fonts": self.0.fonts, "sample_guidance": guidance}),
+        )
     }
 
     #[tool(
