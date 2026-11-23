@@ -137,54 +137,7 @@ class FineEdits {
     }
     final result = <int, FineAdjustment>{};
     for (final row in data) {
-      final value = row as Map<String, dynamic>;
-      final rgb = value['color'] as List?;
-      if (rgb != null &&
-          (rgb.length != 3 || rgb.any((c) => c is! int || c < 0 || c > 255))) {
-        throw const FormatException('Invalid fine edit color');
-      }
-      final rawWarp = value['warp'];
-      if (rawWarp != null &&
-          (rawWarp is! List ||
-              rawWarp.length != 8 ||
-              rawWarp.any(
-                (v) => v is! num || !v.isFinite || v.abs() > 65535,
-              ))) {
-        throw const FormatException('Invalid fine edit transform');
-      }
-      final edit = (
-        id: value['id'] as int,
-        dx: value['dx'] as int,
-        dy: value['dy'] as int,
-        scale: value['scale'] as int,
-        angle: value['angle'] as int,
-        opacity: value['opacity'] as int,
-        thickness: value['thickness'] as int? ?? 0,
-        softness: value['softness'] as int? ?? 0,
-        warp: rawWarp == null
-            ? null
-            : readWarp(
-                (rawWarp as List).map((v) => (v as num).toDouble()).toList(),
-              ),
-        color: rgb == null
-            ? null
-            : 0xff000000 +
-                  (rgb[0] as int) * 65536 +
-                  (rgb[1] as int) * 256 +
-                  (rgb[2] as int),
-      );
-      if (edit.id < 0 ||
-          edit.dx.abs() > 65535 ||
-          edit.dy.abs() > 65535 ||
-          edit.scale < 50 ||
-          edit.scale > 200 ||
-          edit.angle.abs() > 45 ||
-          edit.opacity < 0 ||
-          edit.opacity > 100 ||
-          edit.thickness.abs() > 20 ||
-          edit.softness.abs() > 20) {
-        throw const FormatException('Invalid fine adjustment');
-      }
+      final edit = _readAdjustment(row as Map<String, dynamic>);
       result[edit.id] = edit;
     }
     return FineEdits(key, result);
@@ -214,4 +167,55 @@ class FineEdits {
         },
     ],
   };
+}
+
+FineAdjustment _readAdjustment(Map<String, dynamic> value) {
+  final color = _readColor(value['color'] as List?);
+  final warp = _readWarp(value['warp']);
+  final edit = (
+    id: value['id'] as int,
+    dx: value['dx'] as int,
+    dy: value['dy'] as int,
+    scale: value['scale'] as int,
+    angle: value['angle'] as int,
+    opacity: value['opacity'] as int,
+    thickness: value['thickness'] as int? ?? 0,
+    softness: value['softness'] as int? ?? 0,
+    warp: warp,
+    color: color,
+  );
+  if (edit.id < 0 ||
+      edit.dx.abs() > 65535 ||
+      edit.dy.abs() > 65535 ||
+      edit.scale < 50 ||
+      edit.scale > 200 ||
+      edit.angle.abs() > 45 ||
+      edit.opacity < 0 ||
+      edit.opacity > 100 ||
+      edit.thickness.abs() > 20 ||
+      edit.softness.abs() > 20) {
+    throw const FormatException('Invalid fine adjustment');
+  }
+  return edit;
+}
+
+int? _readColor(List? rgb) {
+  if (rgb == null) return null;
+  if (rgb.length != 3 || rgb.any((c) => c is! int || c < 0 || c > 255)) {
+    throw const FormatException('Invalid fine edit color');
+  }
+  return 0xff000000 +
+      (rgb[0] as int) * 65536 +
+      (rgb[1] as int) * 256 +
+      (rgb[2] as int);
+}
+
+FineWarp? _readWarp(Object? value) {
+  if (value == null) return null;
+  if (value is! List ||
+      value.length != 8 ||
+      value.any((v) => v is! num || !v.isFinite || v.abs() > 65535)) {
+    throw const FormatException('Invalid fine edit transform');
+  }
+  return readWarp(value.map((v) => (v as num).toDouble()).toList());
 }
