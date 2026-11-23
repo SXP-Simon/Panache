@@ -202,7 +202,14 @@ impl ServerHandler for Panache {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
-            .with_instructions("Drafts contain versioned Markdown sections. Images, the saved paper and per-glyph geometry are available on demand. Photo-space coordinates describe the preview; local adjustments use paper-space pixels. For photo placement use preview_handwriting(view=review), compare the three labeled images, ask the user about ambiguous regions, and review the edited revision. Read view=trajectory to revisit actions and evidence.")
+            .with_instructions(concat!(
+                "Start with save_section(markdown). Use its draft_id and revision for preview_handwriting or export_handwriting. ",
+                "Use list_fonts for names and list_drafts to resume. A paper_path must be readable on the server computer. ",
+                "For photo placement use preview_handwriting(view=review). Inspect the returned images when available. ",
+                "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
+                "Ask for clarification on ambiguous regions. Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
+                "Review the edited revision. Use read_section(view=trajectory) to revisit actions and evidence."
+            ))
     }
 }
 
@@ -555,7 +562,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns path and page count. For visual acceptance, inspect view=review on the intended revision first, especially after moving glyphs or changing ink."
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns a local file path and page count. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Review the intended revision, especially after moving glyphs or changing ink."
     )]
     async fn export_handwriting(
         &self,

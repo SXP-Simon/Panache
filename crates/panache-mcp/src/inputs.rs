@@ -239,6 +239,7 @@ pub struct Preview {
 pub struct Export {
     pub draft_id: String,
     pub revision: Option<u32>,
+    /// PDF includes the paper. ZIP contains page PNGs and respects the transparent_background ink control.
     pub format: Option<Format>,
 }
 

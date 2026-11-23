@@ -28,7 +28,7 @@ The Windows, macOS, and Linux desktop packages include a local MCP server. Open 
 
 > Write my notes and the process diagram on this photo of my stationery. Show me the first page, then export the whole draft as a PDF.
 
-The client can list fonts, save Markdown in sections, revisit earlier revisions, preview individual pages, and adjust a diagram or table against the paper’s rulings. [MCP tools and configuration](crates/panache-mcp/README.md)
+For the photo, give the client a file path accessible on the computer running Panache. A client that passes images to its model can inspect the finished page and review a selected area. In a text-only client, ask for the measurements and open the exported PDF locally to judge the appearance. [MCP tools and configuration](crates/panache-mcp/README.md)
 
 | Process state diagram | Resource allocation table |
 | --- | --- |

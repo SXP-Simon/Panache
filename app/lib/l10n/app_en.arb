@@ -264,7 +264,7 @@
   "motionSaveFailed": "Motion preference applied but could not be saved.",
   "connectAiClient": "Connect AI client",
   "copyMcpConfig": "Copy MCP configuration (JSON)",
-  "mcpConfigCopied": "MCP configuration copied",
+  "mcpConfigCopied": "Configuration copied. Add Panache in your AI client’s MCP settings, then ask it to list Panache’s fonts.",
   "mcpCopyFailed": "Could not copy the configuration. Please try again.",
   "copyImage": "Copy image",
   "imageCopied": "Image copied to clipboard",
