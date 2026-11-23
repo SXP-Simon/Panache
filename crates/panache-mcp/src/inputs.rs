@@ -214,13 +214,15 @@ pub struct Nudge {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
-    /// With view=review, compare stored evidence on this section/page with an earlier draft revision. Returns data only. Offset/limit paginate intervening edit actions.
+    /// In review, compare with an earlier revision. Omit region for stored, data-only evidence (offset/limit paginate edits). With region, render paired crops.
     pub compare_revision: Option<u32>,
-    /// Layout only. Select glyph centers in this polygon (3..32 original image pixel pairs). Returned IDs can be adjusted together.
+    /// 3..32 vertices in native output image pixels, origin top left. Layout selects glyph centers. Review measures the polygon and shows its bounding crop.
     pub region: Option<Vec<[i32; 2]>>,
+    /// With review, region and compare_revision, mark the original position of moved content. The crop covers both polygons; differences outside their union cover the rest of the page.
+    pub previous_region: Option<Vec<[i32; 2]>>,
     /// In layout view, only return illustration outlines and isolated details.
     pub illustrations_only: Option<bool>,
-    /// "image" (default), "paper" for the saved stationery alone, or "layout" for base glyph geometry.
+    /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     pub view: Option<PreviewView>,
     /// Layout mode: start index and number of glyphs (default 12, max 32).
     pub offset: Option<usize>,

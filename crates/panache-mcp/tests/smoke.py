@@ -124,6 +124,14 @@ async def placement_pixels(client):
     assert right - left > 2 * (original[2] - original[0])
     await call(client, "adjust_glyphs", **edit, expected_revision=3, opacity=0)
     assert await ink_box() is None
+    local = await call(client, "preview_handwriting", **key, revision=4, view="review",
+                       compare_revision=3, region=[[130,160],[265,160],[265,265],[130,265]])
+    assert len([item for item in local.content if item.type == "image"]) == 3
+    measured = local.structuredContent
+    assert measured["crop_bounds"] == [130, 160, 135, 105]
+    assert measured["before"]["region"]["ink_pixels"] > 0
+    assert measured["after"]["region"]["ink_pixels"] == 0
+    assert measured["difference"]["outside_union_changed_pixels"] == 0
     exported = await call(client, "export_handwriting", **key)
     assert exported.structuredContent["review"]["pages_without_visibility_evidence"] == 1
     assert "局部墨迹" in exported.content[0].text

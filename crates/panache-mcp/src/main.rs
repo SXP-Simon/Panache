@@ -391,19 +391,28 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "With view=review and compare_revision, read a data-only same-page comparison with exact review IDs, intervening edits, feedback and limitations. Omit compare_revision to measure one page. view=review returns paper, finished image, reference overlay and visible ink evidence. Compare top/middle/bottom alignment and ink appearance. Use layout with region (photo pixel polygon) to select glyph IDs; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Set illustrations_only=true in layout for editable diagram outlines and details. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
+        description = "view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,
         Parameters(input): Parameters<Preview>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        if let Some(before) = input.compare_revision {
+        if input.previous_region.is_some()
+            && !(input.view == Some(PreviewView::Review)
+                && input.region.is_some()
+                && input.compare_revision.is_some())
+        {
+            return tool_result(Err(anyhow::anyhow!(
+                "previous_region requires view=review, region and compare_revision"
+            )));
+        }
+        if let Some(before) = input.compare_revision
+            && input.region.is_none()
+        {
             return tool_result((|| {
                 ensure!(
-                    input.view == Some(PreviewView::Review)
-                        && input.region.is_none()
-                        && input.illustrations_only.is_none(),
+                    input.view == Some(PreviewView::Review) && input.illustrations_only.is_none(),
                     "compare_revision requires an unfiltered review view"
                 );
                 let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
@@ -421,7 +430,8 @@ impl Panache {
             .render(ctx, move |state, engine, cancel| {
                 let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
                 ensure!(input.illustrations_only.is_none() || input.view==Some(PreviewView::Layout),"illustrations_only requires view=layout");
-                ensure!(input.region.is_none() || input.view==Some(PreviewView::Layout),"region requires layout view");
+                ensure!(input.region.is_none() || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review)),"region requires view=layout or review");
+                ensure!(input.compare_revision.is_none() || input.view==Some(PreviewView::Review),"compare_revision requires view=review");
                 if input.view==Some(PreviewView::Paper){
                     ensure!(input.offset.is_none() && input.limit.is_none() && input.section.is_none() && input.page.is_none(),"view=paper takes only draft_id and revision");
                     let bytes=draft.background()?.context("No imported paper for this draft")?;
@@ -439,6 +449,9 @@ impl Panache {
                 let page = input.page.unwrap_or(1);
                 if input.view == Some(PreviewView::Review) {
                     ensure!(input.limit.is_none() && input.offset.is_none(),"Review a single page without pagination");
+                    if let Some(region) = &input.region {
+                        return review::local::page(&state.drafts, engine, &draft, section, &input, region, cancel);
+                    }
                     let baselines=engine.review_baselines(&draft,section.clone(),page,cancel)?;
                     let (png,_)=engine.preview(&draft,section,page,cancel)?;
                     return review::page(&draft,number,page,&png,&baselines,cancel);

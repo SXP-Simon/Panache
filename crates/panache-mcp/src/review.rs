@@ -1,8 +1,10 @@
+pub mod local;
+
 use crate::{controls, drafts::Snapshot, reply};
 use anyhow::{Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use handwriting_core::{Cancellation, Limits, export, imaging};
-use image::{Pixel, Rgba, RgbaImage, imageops};
+use handwriting_core::{Cancellation, Limits, Parameters, export, imaging};
+use image::{GenericImageView, Pixel, Rgba, RgbaImage, imageops};
 use rmcp::model::{CallToolResult, ContentBlock};
 use serde_json::json;
 
@@ -28,7 +30,7 @@ pub fn contains(poly: &[[i32; 2]], [x, y]: [f32; 2]) -> bool {
         == 1
 }
 
-fn thumbnail(img: &RgbaImage) -> RgbaImage {
+fn thumbnail(img: &impl GenericImageView<Pixel = Rgba<u8>>) -> RgbaImage {
     let scale = (900. / img.width().max(img.height()) as f32).min(1.);
     imageops::thumbnail(
         img,
@@ -80,6 +82,41 @@ pub struct PageSample {
     pub content_sha256: String,
 }
 
+fn decode_page(png: &str) -> Result<RgbaImage> {
+    let bytes = STANDARD.decode(png)?;
+    let limits = Limits {
+        max_file_bytes: bytes.len(),
+        ..Default::default()
+    };
+    Ok(imaging::decode(&bytes, &limits)?.into_rgba8())
+}
+
+fn reference_paper(
+    draft: &Snapshot<'_>,
+    size: (u32, u32),
+    params: &Parameters,
+) -> Result<RgbaImage> {
+    let limits = Limits::default();
+    let paper = match draft.background()? {
+        Some(b) => imaging::decode(&b, &limits)?.into_rgba8(),
+        None => handwriting_core::render::preset_paper(size.0, size.1, params, &limits)?,
+    };
+    ensure!(
+        paper.dimensions() == size,
+        "Paper and output dimensions differ"
+    );
+    Ok(paper)
+}
+
+fn rgb_delta(a: Rgba<u8>, b: Rgba<u8>) -> u16 {
+    let white =
+        |p: Rgba<u8>, c: usize| 255 - ((255 - u16::from(p[c])) * u16::from(p[3])).div_ceil(255);
+    (0..3)
+        .map(|c| white(a, c).abs_diff(white(b, c)))
+        .max()
+        .unwrap()
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
@@ -89,13 +126,7 @@ pub fn page(
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
-    let bytes = STANDARD.decode(png)?;
-    let limits = Limits {
-        max_file_bytes: bytes.len(),
-        ..Default::default()
-    };
-    let mut finished = imaging::decode(&bytes, &limits)?.into_rgba8();
-    drop(bytes);
+    let mut finished = decode_page(png)?;
     use sha2::{Digest, Sha256};
     let mut hash = Sha256::new();
     hash.update(finished.width().to_le_bytes());
@@ -103,19 +134,7 @@ pub fn page(
     hash.update(finished.as_raw());
     let pixel_digest = format!("{:x}", hash.finalize());
     let baselines = &sample.baselines;
-    let paper = match draft.background()? {
-        Some(b) => imaging::decode(&b, &Limits::default())?.into_rgba8(),
-        None => handwriting_core::render::preset_paper(
-            finished.width(),
-            finished.height(),
-            &params,
-            &limits,
-        )?,
-    };
-    ensure!(
-        paper.dimensions() == finished.dimensions(),
-        "Paper and output dimensions differ"
-    );
+    let paper = reference_paper(draft, finished.dimensions(), &params)?;
     let (w, h) = paper.dimensions();
     // The reference is anchored to the imported stationery, independent of later margin adjustments.
     let (left, right, top, bottom, step) = draft.paper.as_ref().map_or(
@@ -178,13 +197,7 @@ pub fn page(
                 composite.blend(pixel);
                 *pixel = composite;
             }
-            let white = |p: Rgba<u8>, c: usize| {
-                255 - ((255 - u16::from(p[c])) * u16::from(p[3])).div_ceil(255)
-            };
-            let delta = (0..3)
-                .map(|c| white(*pixel, c).abs_diff(white(base, c)))
-                .max()
-                .unwrap();
+            let delta = rgb_delta(*pixel, base);
             peak = peak.max(delta);
             if delta >= 8 {
                 changed[(y as usize * 3 / h as usize).min(2)] += 1;

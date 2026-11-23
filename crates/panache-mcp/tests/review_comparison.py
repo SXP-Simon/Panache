@@ -163,4 +163,20 @@ async def exercise(client, directory, call):
         reflow["delta"] is None
         and "page_content_changed_or_repaginated" in reflow["limitations"]
     )
+
+    async def incompatible(draft_id, before, after, reason):
+        result = await client.call_tool("preview_handwriting", {
+            "draft_id": draft_id, "view": "review", "revision": after,
+            "compare_revision": before, "region": [[0, 0], [30, 0], [30, 30]],
+        })
+        assert result.isError and reason in result.content[0].text, result.content[0]
+        assert all(part.type != "image" for part in result.content)
+
+    await incompatible(key["draft_id"], 4, 6, "page_content_changed_or_repaginated")
+    preset = (await call(client, "save_section", markdown="字", style={"seed": 13})).structuredContent
+    preset_id = preset["draft_id"]
+    await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=1, changes={"paper": "grid"})
+    await incompatible(preset_id, 1, 2, "different_reference_paper")
+    await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=2, changes={"width": 800})
+    await incompatible(preset_id, 2, 3, "different_image_dimensions")
     return key, old["review_id"], quote
