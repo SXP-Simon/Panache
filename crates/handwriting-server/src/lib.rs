@@ -1,4 +1,6 @@
 //! 2026-10-12：兼容 Flutter HTTP API 的独立 Rust 服务。
+mod access;
+mod render_job;
 mod tasks;
 use axum::{
     Form, Json, Router,
@@ -8,23 +10,19 @@ use axum::{
         ws::{Message, WebSocket},
     },
     http::{HeaderMap, HeaderValue, Request, StatusCode},
-    middleware::{self, Next},
+    middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::Stream;
 #[cfg(test)]
 use handwriting_core::export;
 use handwriting_core::{
-    Cancellation, Error, FontBook, Limits, Parameters, RenderRequest, Result, document,
-    generation::{self, Event, Output},
-    imaging,
+    Error, Limits, Parameters, Result, document, imaging,
     local_fonts::{FontPage, FontSearch, LocalFonts},
 };
 use std::{
     collections::HashMap,
-    io::Write,
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -195,7 +193,10 @@ impl Server {
         app.layer(DefaultBodyLimit::max(
             self.0.config.limits.max_file_bytes.saturating_mul(3),
         ))
-        .layer(middleware::from_fn_with_state(self.clone(), boundary))
+        .layer(middleware::from_fn_with_state(
+            self.clone(),
+            access::boundary,
+        ))
         .with_state(self.clone())
     }
     pub fn cancel_active(&self) {
@@ -238,197 +239,8 @@ impl Server {
             }
         })
     }
-    fn font(&self, name: &str) -> Result<Arc<fontdue::Font>> {
-        if !self.0.fonts.iter().any(|s| s == name) {
-            return Err(Error::new("invalid_font", "字体不存在"));
-        }
-        let mut cache = self.0.font_cache.lock().unwrap();
-        if let Some(font) = cache.get(name) {
-            return Ok(font.clone());
-        }
-        let bytes = std::fs::read(self.0.config.font_dir.join(name)).map_err(storage_error)?;
-        let font = FontBook::load(&bytes)?;
-        if cache.len() >= 3 {
-            cache.clear();
-        }
-        cache.insert(name.into(), font.clone());
-        Ok(font)
-    }
     fn update(&self, id: &str, change: impl FnOnce(&mut tasks::Task)) -> Result<()> {
         self.0.store.lock().unwrap().update(id, change)
-    }
-    fn run(
-        &self,
-        id: &str,
-        fields: HashMap<String, String>,
-        files: HashMap<String, Upload>,
-        token: Cancellation,
-    ) -> Result<()> {
-        token.check()?;
-        let mut p = Parameters::from_form(&fields)?;
-        if !fields.contains_key("seed") && !p.fine_edit {
-            p.seed = u64::from_le_bytes(uuid::Uuid::new_v4().as_bytes()[..8].try_into().unwrap());
-        }
-        let primary = if let Some(file) = files.get("font_file") {
-            FontBook::load(&file.bytes)?
-        } else {
-            self.font(
-                fields
-                    .get("font_option")
-                    .map(String::as_str)
-                    .unwrap_or(&self.0.fonts[0]),
-            )?
-        };
-        let text = fields
-            .get("text")
-            .cloned()
-            .ok_or_else(|| Error::new("invalid_parameter", "缺少 text"))?;
-        let fonts = FontBook::with_text_fallbacks(primary, &text, |name| {
-            if self.0.fonts.iter().any(|available| available == name) {
-                self.font(name).map(Some)
-            } else {
-                Ok(None)
-            }
-        })?;
-        let request = RenderRequest {
-            text,
-            params: p.clone(),
-            background: files.get("background_image").map(|f| f.bytes.clone()),
-            fonts,
-            limits: self.0.config.limits.clone(),
-        };
-        self.update(id, |t| {
-            if t.task_status != "processing" {
-                return;
-            }
-            t.task_status = "processing".into();
-            t.task_stage = "rendering".into();
-            t.task_message = "正在生成手写图像".into();
-            t.task_progress = 5;
-        })?;
-        let extension = if p.pdf_save {
-            "pdf"
-        } else if !p.preview {
-            "zip"
-        } else if !p.full_preview && !p.ink_layers {
-            "png"
-        } else {
-            "json"
-        };
-        let content_type = match extension {
-            "pdf" => "application/pdf",
-            "zip" => "application/zip",
-            "png" => "image/png",
-            _ => "application/json",
-        };
-        let path = self
-            .0
-            .config
-            .data_dir
-            .join("results")
-            .join(format!("{id}.{extension}"));
-        let partial = path.with_extension("partial");
-        let outcome = (|| {
-            let mut output = std::fs::File::create(&partial).map_err(storage_error)?;
-            let progress = |event| self.generation_progress(id, event);
-            if extension == "zip" {
-                generation::generate(&request, &token, Output::Zip(&mut output), progress)?;
-            } else if extension == "pdf" {
-                generation::generate(&request, &token, Output::Pdf(&mut output), progress)?;
-            } else if p.ink_layers {
-                output
-                    .write_all(b"{\"status\":\"success\",\"layers\":[")
-                    .map_err(storage_error)?;
-                generation::generate(
-                    &request,
-                    &token,
-                    Output::InkLayers(&mut |index, page| {
-                        if index > 0 {
-                            output.write_all(b",").map_err(storage_error)?;
-                        }
-                        serde_json::to_writer(&mut output, &page).map_err(storage_error)
-                    }),
-                    progress,
-                )?;
-                output.write_all(b"]}").map_err(storage_error)?;
-            } else {
-                if extension == "json" {
-                    output
-                        .write_all(b"{\"status\":\"success\",\"images\":[")
-                        .map_err(storage_error)?;
-                }
-                generation::generate(
-                    &request,
-                    &token,
-                    Output::Preview(&mut |index, bytes| {
-                        if extension == "png" {
-                            output.write_all(&bytes).map_err(storage_error)?;
-                        } else {
-                            if index > 0 {
-                                output.write_all(b",").map_err(storage_error)?;
-                            }
-                            output.write_all(b"\"").map_err(storage_error)?;
-                            output
-                                .write_all(STANDARD.encode(bytes).as_bytes())
-                                .map_err(storage_error)?;
-                            output.write_all(b"\"").map_err(storage_error)?;
-                        }
-                        Ok(())
-                    }),
-                    progress,
-                )?;
-                if extension == "json" {
-                    output.write_all(b"]}").map_err(storage_error)?;
-                }
-            }
-            token.check()?;
-            output.sync_all().map_err(storage_error)?;
-            drop(output);
-            // 取消与完成提交使用同一锁，避免结果被取消状态覆盖或孤立。
-            let mut store = self.0.store.lock().unwrap();
-            token.check()?;
-            std::fs::rename(&partial, &path).map_err(storage_error)?;
-            store.update(id, |t| {
-                t.task_status = "completed".into();
-                t.task_stage = "completed".into();
-                t.task_message = "生成完成".into();
-                t.task_progress = 100;
-                t.result_file = Some(path.clone());
-                t.content_type = Some(content_type.into());
-                t.filename = if extension == "pdf" || extension == "zip" {
-                    Some(format!("images.{extension}"))
-                } else {
-                    None
-                };
-            })?;
-            Ok(())
-        })();
-        if outcome.is_err() {
-            let _ = std::fs::remove_file(&partial);
-            let _ = std::fs::remove_file(&path);
-        }
-        outcome
-    }
-    fn generation_progress(&self, id: &str, event: Event) -> Result<()> {
-        self.update(id, |t| {
-            if t.task_status != "processing" {
-                return;
-            }
-            match event {
-                Event::Rendering => {
-                    t.task_stage = "rendering".into();
-                }
-                Event::PageReady(pages) => {
-                    t.pages_completed = pages;
-                    t.task_progress = (10 + (pages - 1) * 3).min(90) as u8;
-                    t.task_message = format!("已生成 {pages} 页");
-                }
-                Event::Exporting => {
-                    t.task_stage = "exporting".into();
-                    t.task_message = "正在导出".into();
-                }
-            }
-        })
     }
 }
 async fn health() -> Json<serde_json::Value> {
@@ -851,132 +663,6 @@ async fn socket_updates(
 fn header<'a>(h: &'a HeaderMap, name: &str) -> Option<&'a str> {
     h.get(name).and_then(|v| v.to_str().ok())
 }
-fn origin(value: &str) -> Option<String> {
-    url::Url::parse(value)
-        .ok()
-        .map(|v| v.origin().ascii_serialization())
-}
-async fn boundary(State(s): State<Server>, request: Request<Body>, next: Next) -> Response {
-    let headers = request.headers();
-    let allowed = &s.0.config.allowed_origins;
-    let cors_origin = header(headers, "origin").map(str::to_owned);
-    let foreign = header(headers, "origin").is_some_and(|o| !allowed.iter().any(|a| a == o))
-        || header(headers, "referer")
-            .is_some_and(|r| origin(r).is_none_or(|o| !allowed.contains(&o)))
-        || (header(headers, "sec-fetch-site") == Some("cross-site") && cors_origin.is_none());
-    let host = header(headers, "host");
-    let invalid_host = host.is_some_and(|h| {
-        !allowed.iter().any(|a| {
-            url::Url::parse(a).ok().is_some_and(|u| {
-                let authority = match u.port() {
-                    Some(port) => format!("{}:{port}", u.host_str().unwrap_or("")),
-                    None => u.host_str().unwrap_or("").into(),
-                };
-                authority == h
-            })
-        })
-    });
-    if foreign || invalid_host {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(serde_json::json!({"error_code":"foreign_origin","message":"请求来源不允许"})),
-        )
-            .into_response();
-    }
-    if request.method() == axum::http::Method::OPTIONS && cors_origin.is_some() {
-        let mut response = StatusCode::NO_CONTENT.into_response();
-        cors_headers(&mut response, cors_origin.as_deref());
-        return response;
-    }
-    if let Some(token) = &s.0.config.access_token {
-        let auth = header(headers, "authorization").unwrap_or("");
-        let bearer = auth.strip_prefix("Bearer ");
-        let basic = auth
-            .strip_prefix("Basic ")
-            .and_then(|v| STANDARD.decode(v).ok())
-            .and_then(|v| String::from_utf8(v).ok())
-            .and_then(|v| v.split_once(':').map(|(_, p)| p.to_owned()));
-        if bearer != Some(token.as_str()) && basic.as_deref() != Some(token.as_str()) {
-            let mut r = (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error_code":"unauthorized","message":"需要访问令牌"})),
-            )
-                .into_response();
-            r.headers_mut().insert(
-                "www-authenticate",
-                HeaderValue::from_static("Basic realm=\"Handwriting\""),
-            );
-            cors_headers(&mut r, cors_origin.as_deref());
-            return r;
-        }
-    }
-    if request.uri().path().starts_with("/api/") {
-        let ip = request
-            .extensions()
-            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .map(|v| v.0.ip().to_string())
-            .unwrap_or_else(|| "local".into());
-        let path = request.uri().path();
-        let group = if path == "/api/generate_handwriting"
-            || path.ends_with("fileprocess")
-            || path == "/api/pdfpageprocess"
-        {
-            "upload"
-        } else {
-            "query"
-        };
-        let limit = if group == "upload" { 200 } else { 600 };
-        let mut rates = s.0.rates.lock().unwrap();
-        if rates.len() > 4096 {
-            rates.retain(|_, (time, _)| time.elapsed() < Duration::from_secs(300));
-        }
-        let entry = rates
-            .entry(format!("{ip}:{group}"))
-            .or_insert((Instant::now(), 0));
-        if entry.0.elapsed() >= Duration::from_secs(300) {
-            *entry = (Instant::now(), 0);
-        }
-        entry.1 += 1;
-        if entry.1 > limit {
-            let mut response = (
-                StatusCode::TOO_MANY_REQUESTS,
-                Json(serde_json::json!({"error_code":"rate_limited","message":"请求过于频繁"})),
-            )
-                .into_response();
-            cors_headers(&mut response, cors_origin.as_deref());
-            return response;
-        }
-    }
-    let mut response = next.run(request).await;
-    response.headers_mut().insert(
-        "x-content-type-options",
-        HeaderValue::from_static("nosniff"),
-    );
-    cors_headers(&mut response, cors_origin.as_deref());
-    response
-}
-fn cors_headers(response: &mut Response, origin: Option<&str>) {
-    if let Some(origin) = origin
-        && let Ok(value) = HeaderValue::from_str(origin)
-    {
-        let h = response.headers_mut();
-        h.insert("access-control-allow-origin", value);
-        h.insert("vary", HeaderValue::from_static("Origin"));
-        h.insert(
-            "access-control-allow-credentials",
-            HeaderValue::from_static("true"),
-        );
-        h.insert(
-            "access-control-allow-methods",
-            HeaderValue::from_static("GET, POST, OPTIONS"),
-        );
-        h.insert(
-            "access-control-allow-headers",
-            HeaderValue::from_static("Authorization, Content-Type, X-Panache-Task-Id"),
-        );
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1271,16 +957,36 @@ mod tests {
     #[tokio::test]
     async fn real_generation_preview_pdf_zip_and_idempotent_download() {
         let (_dir, s) = setup();
-        for extra in [
-            vec![("preview", "true"), ("full_preview", "false")],
-            vec![("preview", "true"), ("full_preview", "true")],
-            vec![
-                ("preview", "true"),
-                ("full_preview", "false"),
-                ("ink_layers", "true"),
-            ],
-            vec![("pdf_save", "true")],
-            vec![("preview", "false")],
+        for (extra, content_type, attachment) in [
+            (
+                vec![("preview", "true"), ("full_preview", "false")],
+                "image/png",
+                None,
+            ),
+            (
+                vec![("preview", "true"), ("full_preview", "true")],
+                "application/json",
+                None,
+            ),
+            (
+                vec![
+                    ("preview", "true"),
+                    ("full_preview", "false"),
+                    ("ink_layers", "true"),
+                ],
+                "application/json",
+                None,
+            ),
+            (
+                vec![("pdf_save", "true")],
+                "application/pdf",
+                Some("attachment; filename=images.pdf"),
+            ),
+            (
+                vec![("preview", "false")],
+                "application/zip",
+                Some("attachment; filename=images.zip"),
+            ),
         ] {
             let id = generate(&s, &extra).await;
             let (_, state) = call(&s, &format!("/api/generate_handwriting/task/{id}")).await;
@@ -1295,9 +1001,21 @@ mod tests {
                 }
             );
             let path = format!("/api/generate_handwriting/task/{id}/result");
-            let (status, bytes) = call(&s, &path).await;
-            assert_eq!(status, StatusCode::OK);
-            assert_eq!(bytes, call(&s, &path).await.1);
+            let response = s
+                .router()
+                .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()["content-type"], content_type);
+            assert_eq!(
+                header(response.headers(), "content-disposition"),
+                attachment
+            );
+            let bytes = axum::body::to_bytes(response.into_body(), 32 * 1024 * 1024)
+                .await
+                .unwrap();
+            assert_eq!(bytes.as_ref(), call(&s, &path).await.1.as_slice());
             if extra.contains(&("pdf_save", "true")) {
                 assert!(bytes.starts_with(b"%PDF-"));
             } else if extra.contains(&("preview", "false")) {
@@ -1446,18 +1164,20 @@ mod tests {
         config.access_token = Some("test-secret".into());
         let auth = Server::new(config).unwrap();
         assert_eq!(call(&auth, "/api/health").await.0, StatusCode::UNAUTHORIZED);
-        let response = auth
-            .router()
-            .oneshot(
-                Request::builder()
-                    .uri("/api/health")
-                    .header("authorization", "Bearer test-secret")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        for authorization in ["Bearer test-secret", "Basic dXNlcjp0ZXN0LXNlY3JldA=="] {
+            let response = auth
+                .router()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/health")
+                        .header("authorization", authorization)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+        }
     }
     #[tokio::test]
     async fn cancellation_tombstone_blocks_late_and_duplicate_submissions() {
