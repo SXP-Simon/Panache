@@ -18,6 +18,7 @@ from zipfile import ZipFile
 from PIL import Image
 
 import review_comparison
+from mcp_client import call
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -28,12 +29,6 @@ POEM = """# 钱塘湖春行
 几处早莺争暖树，谁家新燕啄春泥。
 乱花渐欲迷人眼，浅草才能没马蹄。
 最爱湖东行不足，绿杨阴里白沙堤。"""
-
-
-async def call(client, name, **args):
-    result = await client.call_tool(name, args)
-    assert not result.isError, (name, result.content[0])
-    return result
 
 
 def png(result):
