@@ -38,6 +38,12 @@ fn glyph_point(
     ]
 }
 
+#[derive(Clone)]
+pub struct RenderedPreview {
+    pub png: String,
+    pub fine_edit: bool,
+}
+
 struct CachedPage {
     draft: String,
     section: u32,
@@ -45,7 +51,7 @@ struct CachedPage {
     settings: u32,
     edits: u32,
     page: usize,
-    png: String,
+    preview: RenderedPreview,
 }
 
 type PageSink<'a> = dyn FnMut(usize, &image::RgbaImage) -> handwriting_core::Result<()> + 'a;
@@ -160,7 +166,7 @@ impl Engine {
         section: Section,
         page_number: usize,
         cancel: &Cancellation,
-    ) -> Result<(String, bool)> {
+    ) -> Result<(RenderedPreview, bool)> {
         let (n, v) = (section.number, section.version);
         ensure!(
             (1..=Limits::default().max_pages).contains(&page_number),
@@ -173,7 +179,7 @@ impl Engine {
                 && p.edits == edit_revision
                 && (p.section, p.version, p.page) == (n, v, page_number)
         }) {
-            return Ok((hit.png.clone(), true));
+            return Ok((hit.preview.clone(), true));
         }
         let mut background = draft.background()?;
         let camera = draft.camera(background.as_deref())?;
@@ -189,6 +195,10 @@ impl Engine {
             })?;
         let png =
             image.with_context(|| format!("Section has {pages} pages; requested {page_number}"))?;
+        let preview = RenderedPreview {
+            png,
+            fine_edit: request.params.fine_edit,
+        };
         if self.cache.len() == 4 {
             self.cache.pop_front();
         }
@@ -199,9 +209,9 @@ impl Engine {
             settings: draft.settings_revision,
             edits: edit_revision,
             page: page_number,
-            png: png.clone(),
+            preview: preview.clone(),
         });
-        Ok((png, false))
+        Ok((preview, false))
     }
     fn photo<'a>(
         draft: &'a Snapshot<'_>,

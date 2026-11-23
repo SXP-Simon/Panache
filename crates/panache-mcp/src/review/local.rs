@@ -128,6 +128,7 @@ struct Appearance {
     finished: RgbaImage,
     params: Parameters,
     content_sha256: String,
+    fine_edit: bool,
 }
 
 impl Appearance {
@@ -140,11 +141,12 @@ impl Appearance {
     ) -> Result<Self> {
         let params = controls::parameters(draft, section.number, &draft.controls)?;
         let sample = engine.review_baselines(draft, section.clone(), page, cancel)?;
-        let (png, _) = engine.preview(draft, section, page, cancel)?;
+        let (preview, _) = engine.preview(draft, section, page, cancel)?;
         Ok(Self {
-            finished: decode_page(&png)?,
+            finished: decode_page(&preview.png)?,
             params,
             content_sha256: sample.content_sha256,
+            fine_edit: preview.fine_edit,
         })
     }
 
@@ -289,7 +291,7 @@ pub fn page(
         thumbnail(&*img.view(x, y, w, h))
     };
     let paper_crop = crop(&paper);
-    let metadata = json!({
+    let mut metadata = json!({
         "draft_id":draft.id,"section":number,"page":page,"revision":draft.revision,"compare_revision":input.compare_revision,
         "photo_size":size,"region":region,"previous_region":input.previous_region,"crop_bounds":bounds,
         "crop_image_size":paper_crop.dimensions(),"channel_delta_threshold":THRESHOLD,
@@ -297,6 +299,15 @@ pub fn page(
         "after":after_metrics,"before":before.as_ref().map(|_|before_metrics),"difference":before.as_ref().map(|_|diff),
         "guidance":"Ink counts pixels whose largest visible RGB channel difference from the paper is at least 8. Revision differences apply the same threshold to before and after appearances; outside_union_changed_pixels covers the entire page outside both polygons. This local inspection leaves full-page review status unchanged. Inspect the crops against the request, including whether disappearance was intended. Overlapping text and diagrams contribute to the same pixels. Check protected areas with another region. Stop once the target and protected areas meet the request; ask if intent or attribution is unclear."
     });
+    if let Some(prior) = &before
+        && prior.fine_edit != after.fine_edit
+    {
+        let mode = |fine| if fine { "fine_edit" } else { "standard" };
+        metadata["render_mode_change"] = json!({
+            "before": mode(prior.fine_edit), "after": mode(after.fine_edit),
+            "guidance": "Fine edit applies ink variation to individual glyphs. Switching rendering modes can change unedited writing. All measured differences remain visible changes; inspect protected areas before judging the edit."
+        });
+    }
     let mut response = reply(metadata.to_string(), metadata);
     let mut append = |label: &str, img: RgbaImage| -> Result<()> {
         response.content.push(ContentBlock::text(label));

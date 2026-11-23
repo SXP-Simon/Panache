@@ -460,8 +460,8 @@ impl Panache {
                         return review::local::page(&state.drafts, engine, &draft, section, &input, region, cancel);
                     }
                     let baselines=engine.review_baselines(&draft,section.clone(),page,cancel)?;
-                    let (png,_)=engine.preview(&draft,section,page,cancel)?;
-                    return review::page(&draft,number,page,&png,&baselines,cancel);
+                    let (preview,_)=engine.preview(&draft,section,page,cancel)?;
+                    return review::page(&draft,number,page,&preview.png,&baselines,cancel);
                 }
                 if input.view == Some(PreviewView::Layout) {
                     let result = engine.layout(&draft, section, &input, cancel)?;
@@ -471,7 +471,7 @@ impl Panache {
                     input.offset.is_none() && input.limit.is_none(),
                     "offset and limit require view=layout"
                 );
-                let (png, cached) = engine.preview(&draft, section, page, cancel)?;
+                let (preview, cached) = engine.preview(&draft, section, page, cancel)?;
                 let mut result = reply(
                     format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision),
                     json!({
@@ -479,7 +479,7 @@ impl Panache {
                         "section": number, "page_in_section": page, "cached": cached
                     }),
                 );
-                result.content.push(ContentBlock::image(png, "image/png"));
+                result.content.push(ContentBlock::image(preview.png, "image/png"));
                 Ok(result)
             })
             .await;

@@ -122,12 +122,18 @@ async def placement_pixels(client):
     left, top, right, bottom = await ink_box()
     assert 139 <= left < right <= 256 and 169 <= top < bottom <= 256
     assert right - left > 2 * (original[2] - original[0])
+    region = [[130,160],[265,160],[265,265],[130,265]]
+    changed = await call(client, "preview_handwriting", **key, revision=3, view="review",
+                         compare_revision=2, region=region)
+    mode = changed.structuredContent["render_mode_change"]
+    assert (mode["before"], mode["after"]) == ("standard", "fine_edit")
     await call(client, "adjust_glyphs", **edit, expected_revision=3, opacity=0)
     assert await ink_box() is None
     local = await call(client, "preview_handwriting", **key, revision=4, view="review",
-                       compare_revision=3, region=[[130,160],[265,160],[265,265],[130,265]])
+                       compare_revision=3, region=region)
     assert len([item for item in local.content if item.type == "image"]) == 3
     measured = local.structuredContent
+    assert "render_mode_change" not in measured
     assert measured["crop_bounds"] == [130, 160, 135, 105]
     assert measured["before"]["region"]["ink_pixels"] > 0
     assert measured["after"]["region"]["ink_pixels"] == 0
