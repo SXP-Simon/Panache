@@ -82,15 +82,16 @@ def main():
     if args.build_number and (not args.build_number.isdecimal() or not 1 <= int(args.build_number) <= 2100000000):
         parser.error('Build number must be between 1 and 2100000000')
     os.environ['HANDWRITING_BUILD_VERSION'] = version
+    flutter = os.path.abspath(shutil.which(args.flutter) or args.flutter)
     target = {'Darwin': 'macos', 'Windows': 'windows', 'Linux': 'linux'}[platform.system()]
     packages = ['-p', 'panache-mcp']
     if target != 'macos':
         packages.extend(['-p', 'handwriting-server'])
     run('cargo', 'build', '--locked', '--release', *packages)
-    run(sys.executable, str(ROOT / 'scripts/build-text-worker.py'), '--flutter', args.flutter)
-    run(args.flutter, 'pub', 'get', cwd=ROOT / 'app')
+    run(sys.executable, str(ROOT / 'scripts/build-text-worker.py'), '--flutter', flutter)
+    run(flutter, 'pub', 'get', cwd=ROOT / 'app')
     build = int(args.build_number or 1)
-    run(args.flutter, 'build', target, '--release', f'--build-name={version}', f'--build-number={build}', cwd=ROOT / 'app')
+    run(flutter, 'build', target, '--release', f'--build-name={version}', f'--build-number={build}', cwd=ROOT / 'app')
     output = ROOT / 'target/desktop-package' / target
     if output.exists():
         shutil.rmtree(output)
@@ -127,7 +128,7 @@ def main():
     shutil.copytree(ROOT / 'crates/panache-mcp/licenses', backend / 'licenses', dirs_exist_ok=True)
     if target == 'macos':
         run('codesign', '--force', '--sign', '-', str(backend / mcp))
-    bundle_updater(bundle, backend, target, version, build, args.flutter)
+    bundle_updater(bundle, backend, target, version, build, flutter)
     if target == 'macos':
         run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))
         run('codesign', '--verify', '--deep', '--strict', str(bundle))

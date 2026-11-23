@@ -89,6 +89,11 @@ class DesktopReleaseVersionTest(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(value, encoding="utf-8")
             mcp_files(root, windows=True)
+            sdk_bin = root / "Flutter SDK/bin"
+            sdk_bin.mkdir(parents=True)
+            flutter = str(sdk_bin / "flutter.bat")
+            dart = sdk_bin / "dart.bat"
+            dart.touch()
             commands = []
 
             def fake_run(*arguments, **_kwargs):
@@ -100,14 +105,18 @@ class DesktopReleaseVersionTest(unittest.TestCase):
             with patch.object(MODULE, "ROOT", root), \
                  patch.object(MODULE.platform, "system", return_value="Windows"), \
                  patch.object(MODULE.platform, "machine", return_value="AMD64"), \
+                 patch.object(MODULE.shutil, "which", side_effect={"flutter": flutter}.get), \
                  patch.object(MODULE, "run", side_effect=fake_run), \
                  patch.object(MODULE, "brand_launcher") as brand, \
                  patch.dict(os.environ, {}, clear=True), \
                  patch("sys.argv", [str(SOURCE), "--version", "2.3.4", "--build-number", "2003004"]):
                 MODULE.main()
             self.assertEqual((root / "VERSION").read_text(), "1.34.0\n")
-            self.assertTrue(any("--build-name=2.3.4" in command and
-                                "--build-number=2003004" in command for command in commands))
+            self.assertIn((sys.executable, str(root / "scripts/build-text-worker.py"), "--flutter", flutter), commands)
+            self.assertIn((flutter, "pub", "get"), commands)
+            self.assertIn((flutter, "build", "windows", "--release", "--build-name=2.3.4",
+                           "--build-number=2003004"), commands)
+            self.assertIn((str(dart), "pub", "get"), commands)
             archive = root / "target/desktop-package/windows/Panache-2.3.4-AMD64.zip"
             with zipfile.ZipFile(archive) as package:
                 runtime = 'Panache/versions/2.3.4-2003004'
