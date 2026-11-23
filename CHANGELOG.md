@@ -1,20 +1,33 @@
 # Panache 更新记录
 
 ## 未发布
-[拍摄设备信息]: website/content/zh/guide/preview-export.md
 
-- 纸张设置支持透明 PNG。保存单页和导出图片 ZIP 时可保留墨迹并去除底纸与横线，PDF 继续使用原纸张。
-- 标准排版在自动换行时保留英文整词，并让句末标点跟随前文；超过整行宽度的英文词仍可逐字换行。
+## v1.20.0 (2026-11-23)
 
-- 图片和 PDF 导出保留底纸的相机与曝光信息，App 和 MCP 可补录缺少的机型、镜头和 ISO。[拍摄设备信息]
+### PDF 与字体
 
-- 修复 Windows 桌面打包时找不到 `flutter.bat` 的问题，更新器也会使用同一 Flutter SDK 的 Dart。
+- 导入 PDF 时，选「提取纯文字」可重新分页；选「按原页排手写」可保留分栏和表格，点按原行修改文字；选「在原页上填字」可在表单或扫描件上拖出矩形填写。难以可靠替换的文字会保留在底图。两种原页模式都需在关闭前导出，成品是按原打印尺寸生成的图片 PDF，文字无法搜索或复制。[界面与两页 PDF 样例](https://github.com/SXP-Simon/Panache/pull/15)
+- 使用桌面自带引擎时，在「字体排版 → 本机字体库」按名称搜索已安装字体。要批量添加，打开「我的字体」文件夹，复制字体后刷新。Web 和移动端可用「从文件导入字体」。
+- 本地 MCP 与桌面共享字体目录。用 `list_fonts(source="system", query="楷", limit=8)` 搜索，把 `entries[].id` 交给建稿的 `style.font` 或调稿的 `changes.font`。新稿的英文和数字默认跟随主字体。选用的个人或系统字体随稿保存，移走源文件后仍可预览旧版。
 
-- 小字号原生图中的细斜线仍能连续着墨，适用于流程图斜向分支和电路导线。无格纸上整图旋转时，也保留原本相接的对角笔画。
+### 用 MCP 校准、复查与回看手稿
 
-- 流程图的框线、箭头连线和电路导线随笔迹扰动轻微弯曲。同图中的平行线各有变化，分支、元件端子和箭尖仍落在连接点。
+- 整页写偏时，用 `tune_handwriting(paper_guides=…)` 在原稿上重设参考线。只有一栏或几个字偏移时，用 `preview_handwriting(view="layout", region=…)` 圈选，再用 `adjust_glyphs` 的 `place_center` 移动，或用 `target_quad` 把字块放进纸面上的四个目标角。
+- 导出前，用 `preview_handwriting(view="review")` 对照底纸、成品和参考线叠图，检查墨迹是否可见、指定区域以外是否有变化。传入 `region` 和 `compare_revision` 可放大同一区域对照两版。导出时会提示当前版本已复查的页面。
+- 用 `annotate_review` 分别记录用户原话和模型观察；下次用 `read_section(view="trajectory")` 找回各版的修改理由和逐页复查结果。需要腾出空间时，先用 `storage_usage` 查用量，再用 `plan_cleanup` 预览、`apply_cleanup` 清理选中的废弃临时文件。已交付的 PDF、ZIP 和稿件历史都会保留。[MCP 工具与用法](https://github.com/SXP-Simon/Panache/blob/v1.20.0/crates/panache-mcp/README.md)
 
-- 手写表格外框的实线在转角处会随笔迹扰动轻微出头；关闭扰动即可得到齐整的直角。
+### 纸张、排版与导出
+
+- 要把手写字叠在其他图片上，在「纸张」打开「透明 PNG（仅保留墨迹）」并刷新预览，再保存单页 PNG 或导出整稿图片 ZIP。MCP 可设置 `transparent_background`。半透明墨迹和精修会保留，PDF 仍带原底纸。
+- 底纸照片中的相机与曝光信息会写入单页 PNG、ZIP 内每页的 EXIF，以及 PDF 属性的「主题」。缺失的制造商、机型、镜头和 ISO 可在「纸张 → 底纸拍摄设备」或 MCP 的 `camera` 参数组补录，导出会标明补录项。GPS、拍摄时间、序列号和缩略图不会随文件导出。移动端快速切换底纸时，也会保留最后选定的图片。[拍摄设备与导出指南](https://github.com/SXP-Simon/Panache/blob/v1.20.0/website/content/zh/guide/preview-export.md)
+- 标准排版会把行末放不下的英文整词移到下一行，让常见闭合标点跟随前文。超过一行宽度的长词仍可逐字换行，原文中的显式换行会保留。
+- 手写表格的实线外角可轻微出头，流程框、箭头和电路导线可随笔迹扰动轻微弯曲。将水平、垂直和旋转扰动归零可恢复齐整线条。小字号和无格纸上旋转后的细斜线也能保持连通。[图表笔迹对照](https://github.com/SXP-Simon/Panache/pull/9)
+
+### 构建与升级
+
+- 修复 Windows 打包时找不到 `flutter.bat` 的问题，更新器使用同一 Flutter SDK 的 Dart。
+- Rust 调用方若使用完整结构体字面量，构造 `Parameters` 时需补上 `transparent_background: false` 和 `camera: Default::default()`，构造 `EncodedInkPage` 时需补上 `camera_exif: None`。已有序列化参数可按默认值读取。
+- 普通说明文档的 PR 可跳过应用构建；版本提交仍在同一 SHA 上验证 Flutter UI、Rust 后端和 Flutter Mobile 后再发布。
 
 ## v1.19.0 (2026-11-22)
 
