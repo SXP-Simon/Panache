@@ -42,6 +42,14 @@ async def exercise(client, directory):
     path = directory / "coursework.png"
     paper.save(path)
 
+    cropped_guides = [{"row": row, "left": [85, y], "right": [383, y]}
+                      for row, y in [(0, 12), (6, 252)]]
+    crowded = await client.call_tool("save_section", {
+        "markdown": "试填", "paper_path": str(path), "paper_guides": cropped_guides,
+    })
+    assert crowded.isError and "12.0px" in crowded.content[0].text
+    assert "40.0px" in crowded.content[0].text and "next visible ruling" in crowded.content[0].text
+
     body = ["观察云层", "记录风向"]
     course, name = "电磁学", "林舟"
     saved = (await call(

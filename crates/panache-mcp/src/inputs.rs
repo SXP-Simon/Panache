@@ -69,7 +69,7 @@ pub enum PaperMode {
 #[derive(serde::Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Guide {
-    /// Zero-based writable ruling number, counted from the first supplied ruling.
+    /// Count writable baselines from row 0. At the image center, leave one full row interval above row 0; on a tight crop start at the next visible ruling.
     pub row: u16,
     /// Left and right endpoints [x,y] of this same baseline in original photo pixels.
     pub left: [u32; 2],
