@@ -1,5 +1,7 @@
+mod camera;
 use crate::{Error, Result};
-use image::{DynamicImage, ImageFormat, RgbaImage};
+pub use camera::{CameraInput, CameraMetadata};
+use image::{DynamicImage, ImageEncoder, ImageFormat, RgbaImage};
 use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref};
 use std::io::{Cursor, Seek, Write};
 pub const PDF_JPEG_QUALITY: u8 = 75;
@@ -9,6 +11,27 @@ pub fn png(image: &RgbaImage) -> Result<Vec<u8>> {
         .write_to(&mut out, ImageFormat::Png)
         .map_err(|e| Error::new("encode_failed", e.to_string()))?;
     Ok(out.into_inner())
+}
+impl CameraMetadata {
+    pub fn png(&self, image: &RgbaImage) -> Result<Vec<u8>> {
+        if self.exif.is_empty() {
+            return png(image);
+        }
+        let mut out = Vec::new();
+        let mut encoder = image::codecs::png::PngEncoder::new(&mut out);
+        encoder
+            .set_exif_metadata(self.exif.clone())
+            .map_err(|e| Error::new("encode_failed", e.to_string()))?;
+        encoder
+            .write_image(
+                image,
+                image.width(),
+                image.height(),
+                image::ExtendedColorType::Rgba8,
+            )
+            .map_err(|e| Error::new("encode_failed", e.to_string()))?;
+        Ok(out)
+    }
 }
 pub struct PdfExport {
     pdf: Pdf,
@@ -82,7 +105,17 @@ impl PdfExport {
         self.pages.push(page_id);
         Ok(())
     }
-    pub fn finish(mut self) -> Vec<u8> {
+    pub fn finish(self) -> Vec<u8> {
+        self.finish_with_camera(&CameraMetadata::default())
+    }
+    pub fn finish_with_camera(mut self, camera: &CameraMetadata) -> Vec<u8> {
+        if !camera.summary.is_empty() {
+            let info = Ref::new(3 + self.pages.len() as i32 * 3);
+            self.pdf
+                .document_info(info)
+                .producer(pdf_writer::TextStr("Panache"))
+                .subject(pdf_writer::TextStr(&camera.summary));
+        }
         self.pdf.catalog(Ref::new(1)).pages(Ref::new(2));
         self.pdf
             .pages(Ref::new(2))
@@ -101,6 +134,15 @@ impl<W: Write + Seek> ZipExport<W> {
         }
     }
     pub fn add(&mut self, index: usize, image: &RgbaImage) -> Result<()> {
+        self.add_with_camera(index, image, &CameraMetadata::default())
+    }
+    pub fn add_with_camera(
+        &mut self,
+        index: usize,
+        image: &RgbaImage,
+        camera: &CameraMetadata,
+    ) -> Result<()> {
+        let bytes = camera.png(image)?;
         self.zip
             .start_file(
                 format!("{index}.png"),
@@ -109,7 +151,7 @@ impl<W: Write + Seek> ZipExport<W> {
             )
             .map_err(|e| Error::new("encode_failed", e.to_string()))?;
         self.zip
-            .write_all(&png(image)?)
+            .write_all(&bytes)
             .map_err(|e| Error::new("encode_failed", e.to_string()))
     }
     pub fn finish(self) -> Result<W> {

@@ -270,7 +270,7 @@ async def smoke(command, arguments, out):
             groups = (await call(client, "describe_controls")).structuredContent[
                 "groups"
             ]
-            assert len(groups) == 5
+            assert set(groups) == {"layout", "typography", "ink", "variation", "strike", "camera"}
             ink = (
                 await call(client, "describe_controls", group="ink")
             ).structuredContent["controls"]
@@ -362,6 +362,17 @@ async def smoke(command, arguments, out):
             ).structuredContent
             with ZipFile(exported_fine["path"]) as pages:
                 assert pages.read("0.png") == adjusted
+            camera_change = await call(client, "tune_handwriting", draft_id=paper_id,
+                                       expected_revision=3, changes={"camera_model": "Test Camera", "camera_iso": 200})
+            assert camera_change.structuredContent["fine_layout"] == "preserved"
+            tagged = png(await call(client, "preview_handwriting", draft_id=paper_id))
+            assert b"eXIf" in tagged and b"Test Camera" in tagged and tagged != adjusted
+            tagged_layout = (await call(client, "preview_handwriting", **probe)).structuredContent
+            assert tagged_layout["glyphs"][0]["adjustment"] == again["adjustment"]
+            cleared = await call(client, "tune_handwriting", draft_id=paper_id,
+                                 expected_revision=4, changes={"camera_model": None, "camera_iso": None})
+            assert cleared.structuredContent["revision"] == 5
+            assert png(await call(client, "preview_handwriting", draft_id=paper_id)) == adjusted
             # Exercise a long draft without ever exporting or rendering its tail.
             repeated = "逐题列出已知条件，检查解题步骤。\n" * 600
             large = (
@@ -415,7 +426,7 @@ async def smoke(command, arguments, out):
                 client,
                 "save_section",
                 draft_id=paper_id,
-                expected_revision=3,
+                expected_revision=5,
                 section=1,
                 markdown="重排后的版本",
             )

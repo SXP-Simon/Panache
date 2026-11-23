@@ -24,15 +24,20 @@ Color composeInkColor(InkLook look) {
 }
 
 class InkPage {
-  const InkPage(this.paper, this.ink, {this.fine});
+  const InkPage(this.paper, this.ink, {this.fine, this.cameraExif});
   final Uint8List paper;
   final Uint8List? ink;
   final FinePage? fine;
+  final Uint8List? cameraExif;
 
   factory InkPage.fromJson(Map<String, dynamic> json) => InkPage(
     base64Decode(json['paper'] as String),
     switch (json['ink']) {
       final String value => base64Decode(value),
+      _ => null,
+    },
+    cameraExif: switch (json['camera_exif']) {
+      final String value when value.length <= 4096 => base64Decode(value),
       _ => null,
     },
     fine: switch (json['fine']) {

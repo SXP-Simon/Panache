@@ -309,7 +309,7 @@ fn flatten_rulings(
     w: u32,
     h: u32,
     ratio: f32,
-    encode_corrected: bool,
+    camera: Option<&crate::export::CameraMetadata>,
 ) -> Result<Option<Identification>> {
     use base64::Engine;
     const STRIPS: usize = 9;
@@ -400,7 +400,7 @@ fn flatten_rulings(
             (y - (best[0] + spacing * i as f32 + slope * (x - columns[MID]))).abs() > 3.
         })
     });
-    if !nonlinear && encode_corrected {
+    if !nonlinear && camera.is_some() {
         return Ok(None);
     }
     let (ow, oh) = opaque.dimensions();
@@ -546,21 +546,29 @@ fn flatten_rulings(
             columns: columns.map(|x| x / ratio),
             rows: measured_rows,
         }),
-        corrected_background: encode_corrected
-            .then(|| crate::export::png(&corrected))
+        corrected_background: camera
+            .map(|camera| camera.png(&corrected))
             .transpose()?
             .map(|png| base64::engine::general_purpose::STANDARD.encode(png)),
     }))
 }
 // 2026-10-24：分析坐标和返回的实际背景使用相同旋转，粗线按整条线带中心计距。
 pub fn identify(image: &DynamicImage) -> Result<Identification> {
-    identify_with_output(image, true)
+    identify_with_output(image, Some(&Default::default()))
+}
+/// Keep the background camera tags when flattening a photograph into a new PNG.
+pub fn identify_paper(image: &DynamicImage, bytes: &[u8]) -> Result<Identification> {
+    let camera = crate::export::CameraMetadata::from_paper(Some(bytes), &Default::default())?;
+    identify_with_output(image, Some(&camera))
 }
 /// Identify a paper-space layout while keeping the original photograph for compositing.
 pub fn identify_photo(image: &DynamicImage) -> Result<Identification> {
-    identify_with_output(image, false)
+    identify_with_output(image, None)
 }
-fn identify_with_output(image: &DynamicImage, encode_corrected: bool) -> Result<Identification> {
+fn identify_with_output(
+    image: &DynamicImage,
+    camera: Option<&crate::export::CameraMetadata>,
+) -> Result<Identification> {
     use base64::Engine;
     use imageproc::geometric_transformations::{
         Border, Interpolation, rotate_about_center_no_crop,
@@ -584,7 +592,7 @@ fn identify_with_output(image: &DynamicImage, encode_corrected: bool) -> Result<
     );
     let (w, h) = gray.dimensions();
     let points = ruling_points(&gray);
-    if let Some(corrected) = flatten_rulings(&opaque, &points, w, h, ratio, encode_corrected)? {
+    if let Some(corrected) = flatten_rulings(&opaque, &points, w, h, ratio, camera)? {
         return Ok(corrected);
     }
     let mut best = (0f64, 0f32, vec![0; h as usize]);
@@ -716,8 +724,8 @@ fn identify_with_output(image: &DynamicImage, encode_corrected: bool) -> Result<
     let margin_bottom = (oh as f32 - centers.last().unwrap() / ratio + offset_y).round() as u32;
     let corrected_background = corrected
         .as_ref()
-        .filter(|_| encode_corrected)
-        .map(crate::export::png)
+        .zip(camera)
+        .map(|(image, camera)| camera.png(image))
         .transpose()?
         .map(|png| base64::engine::general_purpose::STANDARD.encode(png));
     Ok(Identification {

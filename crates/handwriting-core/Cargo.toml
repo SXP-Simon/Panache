@@ -11,6 +11,7 @@ flate2 = "1.1.10"
 fontdue = "0.9.4"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff"] }
 imageproc = { version = "0.27.0", default-features = false }
+kamadak-exif = "0.6.2"
 pdf-extract = "0.12.1"
 pdf-writer = "0.15.0"
 quick-xml = "0.42.0"

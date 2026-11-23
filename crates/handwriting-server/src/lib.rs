@@ -741,7 +741,7 @@ async fn imagefile(
             .try_acquire_owned()
             .map_err(|_| Error::new("queue_full", "工作线程繁忙，请稍后重试"))?;
     let identification = tokio::task::spawn_blocking(move || {
-        imaging::identify(&imaging::decode(&file.bytes, &limits)?)
+        imaging::identify_paper(&imaging::decode(&file.bytes, &limits)?, &file.bytes)
     })
     .await
     .map_err(|e| Error::new("worker_failed", e.to_string()))??;

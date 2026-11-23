@@ -261,13 +261,14 @@ impl Panache {
             )?;
             ensure!(changes != draft.controls, "No control values changed");
             controls::parameters(&draft, 1, &changes)?;
-            let next = self
-                .0
-                .drafts
-                .tune(draft.id, input.expected_revision, &changes)?;
+            let camera_only = changes.keys().chain(draft.controls.keys()).all(|key| {
+                controls::catalog()["camera"].get(key).is_some()
+                    || changes.get(key) == draft.controls.get(key)
+            });
+            let next = self.0.drafts.tune(&draft, &changes, camera_only)?;
             Ok(reply(
                 format!("Saved revision {next}."),
-                json!({"draft_id":draft.id,"revision":next,"controls":changes,"fine_layout":"inspect_again"}),
+                json!({"draft_id":draft.id,"revision":next,"controls":changes,"fine_layout":if camera_only { "preserved" } else { "inspect_again" }}),
             ))
         })())
     }
@@ -370,7 +371,7 @@ impl Panache {
                     let img=handwriting_core::imaging::decode(&bytes,&Limits::default())?.into_rgba8();
                     use base64::{Engine as _,engine::general_purpose::STANDARD};
                     let mut result=reply("稿件底纸".into(),json!({"width":img.width(),"height":img.height(),"revision":draft.revision}));
-                    result.content.push(ContentBlock::image(STANDARD.encode(handwriting_core::export::png(&img)?),"image/png"));return Ok(result);
+                    result.content.push(ContentBlock::image(STANDARD.encode(draft.camera(Some(&bytes))?.png(&img)?),"image/png"));return Ok(result);
                 }
                 let number = input.section.unwrap_or(1);
                 let section = state

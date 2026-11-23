@@ -40,8 +40,12 @@ fn default_latin_scale() -> u8 {
     100
 }
 
+/// For complete pre-camera struct literals, add `camera: Default::default()`.
+/// A struct update using `..Parameters::default()` picks up optional export fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameters {
+    #[serde(flatten)]
+    pub camera: crate::export::CameraInput,
     #[serde(default)]
     pub layout_style: LayoutStyle,
     #[serde(default)]
@@ -98,6 +102,7 @@ pub struct Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Self {
+            camera: Default::default(),
             layout_style: LayoutStyle::Standard,
             paper_pattern: None,
             latin_font: None,
@@ -182,6 +187,17 @@ impl Parameters {
                 _ => Err(Error::new("invalid_parameter", key)),
             }
         }
+        p.camera = crate::export::CameraInput {
+            camera_make: f.get("camera_make").cloned(),
+            camera_model: f.get("camera_model").cloned(),
+            camera_lens: f.get("camera_lens").cloned(),
+            camera_iso: f
+                .get("camera_iso")
+                .map(|s| s.parse())
+                .transpose()
+                .map_err(|_| Error::new("invalid_parameter", "camera_iso"))?,
+        };
+        p.camera.validate()?;
         p.layout_style = match f.get("layout_style").map(String::as_str) {
             None | Some("standard") => LayoutStyle::Standard,
             Some("homework") => LayoutStyle::Homework,

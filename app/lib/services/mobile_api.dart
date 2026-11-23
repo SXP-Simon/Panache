@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import '../utils/paper_exif.dart';
 import 'api.dart';
 import 'paper_background.dart';
 
@@ -53,6 +54,29 @@ class MobileHandwritingApi extends HandwritingApi {
   bool _closed = false;
   @override
   bool get usesMobilePaperLimits => true;
+
+  @override
+  Future<Uint8List?> readPaperExif(Upload file) async {
+    // This separate import reads metadata only. Rendering still uses the 16 MiB limit.
+    const sourceLimit = 64 * 1024 * 1024;
+    final source = paperExifSource(file.bytes);
+    if (source == null || source.isEmpty || source.length > sourceLimit) {
+      return null;
+    }
+    // Apply the limit to the metadata block, independently of the location of the pixels.
+    final paths = await stage({
+      'file': Upload('paper-metadata', source),
+    }, byteLimit: sourceLimit);
+    try {
+      final value = await call('paper_camera', files: paths) as String;
+      return value.isEmpty ? null : base64Decode(value);
+    } on ApiException catch (e) {
+      if (e.code == 'invalid_command') return null;
+      rethrow;
+    } finally {
+      await removeUploads(paths);
+    }
+  }
 
   static Future<MobileHandwritingApi> bundled() async {
     final root = await getTemporaryDirectory();
@@ -144,14 +168,17 @@ class MobileHandwritingApi extends HandwritingApi {
     return response['data'];
   }
 
-  Future<Map<String, dynamic>> stage(Map<String, Upload> uploads) async {
+  Future<Map<String, dynamic>> stage(
+    Map<String, Upload> uploads, {
+    int byteLimit = mobileImageBytes,
+  }) async {
     final parent = await Directory('$dataDirectory/uploads')
         .create(recursive: true);
     final directory = await parent.createTemp('request-');
     final paths = <String, dynamic>{};
     try {
       for (final entry in uploads.entries) {
-        if (entry.value.bytes.length > mobileImageBytes) {
+        if (entry.value.bytes.length > byteLimit) {
           throw ApiException('文件超过移动端限制 / File exceeds mobile limit');
         }
         final path = '${directory.path}/${paths.length}.bin';

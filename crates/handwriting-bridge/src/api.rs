@@ -134,6 +134,22 @@ pub fn execute(mut request: Request) -> Result<Value> {
             }
             Ok(json!({"status":"ready"}))
         }
+        "paper_camera" => {
+            use base64::{Engine, engine::general_purpose::STANDARD};
+            let file = request
+                .files
+                .get("file")
+                .ok_or_else(|| Error::new("invalid_upload", "缺少文件"))?;
+            let source = fs::File::open(&file.path).map_err(io_error)?;
+            if source.metadata().map_err(io_error)?.len() > 64 * 1024 * 1024 {
+                return Err(Error::new("upload_limit", "底纸照片过大"));
+            }
+            let camera = handwriting_core::export::CameraMetadata::from_reader(
+                Some(std::io::BufReader::new(source)),
+                &Default::default(),
+            )?;
+            Ok(json!(STANDARD.encode(camera.exif())))
+        }
         "fonts" => Ok(json!(fonts(&request.font_dir)?)),
         "license" => Ok(json!(concat!(
             include_str!("../../handwriting-core/NOTICE"),
@@ -163,7 +179,8 @@ pub fn execute(mut request: Request) -> Result<Value> {
             if request.command == "import" {
                 Ok(json!({"text":document::extract(&upload.name, &bytes, &limits())?}))
             } else {
-                let detected = imaging::identify(&imaging::decode(&bytes, &limits())?)?;
+                let detected =
+                    imaging::identify_paper(&imaging::decode(&bytes, &limits())?, &bytes)?;
                 serde_json::to_value(detected).map_err(io_error)
             }
         }
