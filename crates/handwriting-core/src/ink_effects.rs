@@ -133,6 +133,11 @@ pub fn composite(
                     + 12_750)
                     / 25_500;
             let pixel = &mut paper[(x, y)];
+            if pixel[3] < 255 {
+                use image::Pixel;
+                pixel.blend(&Rgba([p.fill[0], p.fill[1], p.fill[2], alpha as u8]));
+                continue;
+            }
             for (channel, ink) in pixel.0[..3].iter_mut().zip(p.fill) {
                 *channel = ((u32::from(*channel) * (255 - alpha) + u32::from(ink) * alpha + 127)
                     / 255) as u8;

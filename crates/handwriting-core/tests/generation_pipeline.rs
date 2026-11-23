@@ -49,6 +49,89 @@ fn request(text: &str) -> RenderRequest {
 }
 
 #[test]
+fn transparent_png_and_zip_keep_ink_alpha_and_pdf_keeps_the_paper() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let cancel = Cancellation::default();
+    for (uploaded, layered, fine) in [
+        (false, false, false),
+        (false, true, false),
+        (true, true, false),
+        (true, true, true),
+    ] {
+        let mut req = request("Ink\n---\nTwo");
+        req.params.preview = false;
+        req.params.underlined = true;
+        req.params.ink_layers = layered;
+        req.params.fine_edit = fine;
+        req.params.fill = [35, 90, 160, 160];
+        if uploaded {
+            req.params.width = None;
+            req.params.height = None;
+            req.background = Some(
+                export::png(&image::RgbaImage::from_pixel(
+                    240,
+                    180,
+                    image::Rgba([32, 40, 55, 255]),
+                ))
+                .unwrap(),
+            );
+        }
+        let pdf = |req: &RenderRequest| {
+            let mut bytes = Vec::new();
+            generation::generate(req, &cancel, Output::Pdf(&mut bytes), |_| Ok(())).unwrap();
+            bytes
+        };
+        let opaque_pdf = pdf(&req);
+        req.params.transparent_background = true;
+        assert_eq!(pdf(&req), opaque_pdf);
+        let mut pngs = Vec::new();
+        generation::generate(
+            &req,
+            &cancel,
+            Output::Preview(&mut |_, bytes| {
+                let im = image::load_from_memory(&bytes).unwrap().to_rgba8();
+                assert_eq!(im.dimensions(), (240, 180));
+                assert_eq!(im[(0, 0)][3], 0);
+                assert_eq!(im[(150, 46)][3], 0);
+                assert!(im.pixels().any(|p| p[3] > 0 && p[3] < 255 && p[2] > p[0]));
+                pngs.push(bytes);
+                Ok(())
+            }),
+            |_| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(pngs.len(), 2);
+        if layered {
+            generation::generate(
+                &req,
+                &cancel,
+                Output::InkLayers(&mut |_, page| {
+                    let paper = image::load_from_memory(&STANDARD.decode(page.paper).unwrap())
+                        .unwrap()
+                        .to_rgba8();
+                    assert!(paper.pixels().all(|p| p[3] == 0));
+                    Ok(())
+                }),
+                |_| Ok(()),
+            )
+            .unwrap();
+        }
+        let mut bytes = Cursor::new(vec![]);
+        generation::generate(&req, &cancel, Output::Zip(&mut bytes), |_| Ok(())).unwrap();
+        let mut zip = zip::ZipArchive::new(bytes).unwrap();
+        assert_eq!(zip.len(), pngs.len());
+        for (index, png) in pngs.iter().enumerate() {
+            let mut entry = Vec::new();
+            zip.by_index(index)
+                .unwrap()
+                .read_to_end(&mut entry)
+                .unwrap();
+            assert_eq!(&entry, png);
+        }
+    }
+}
+
+#[test]
 fn preview_prefix_stops_before_the_next_page_and_matches_export() {
     let mut request = request("第一页\n---\n第二页\n---\n第三页");
     request.params.preview = false;

@@ -334,7 +334,14 @@ pub fn render_until_page<F: FnMut(usize, RgbaImage) -> Result<()>>(
     stop_after: usize,
     emit: F,
 ) -> Result<usize> {
-    render_output(r, cancel, stop_after, None, emit)
+    render_output(
+        r,
+        cancel,
+        stop_after,
+        None,
+        r.params.transparent_background && !r.params.pdf_save,
+        emit,
+    )
 }
 pub fn render_on_photo<F: FnMut(usize, RgbaImage) -> Result<()>>(
     r: &RenderRequest,
@@ -350,13 +357,14 @@ pub fn render_on_photo<F: FnMut(usize, RgbaImage) -> Result<()>>(
             "Photo projection requires a paper-space fine layout",
         ));
     }
-    render_output(r, cancel, stop_after, Some((projection, photo)), emit)
+    render_output(r, cancel, stop_after, Some((projection, photo)), true, emit)
 }
-fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
+pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
     r: &RenderRequest,
     cancel: &Cancellation,
     stop_after: usize,
     photo: Option<(&crate::photo::PaperProjection, &RgbaImage)>,
+    transparent: bool,
     mut emit: F,
 ) -> Result<usize> {
     if stop_after == 0 {
@@ -370,7 +378,7 @@ fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
         .as_deref()
         .map(|key| fine_edit::overrides(key, &r.params))
         .unwrap_or_default();
-    render_planes(r, cancel, stop_after, photo.is_some(), |i, paper, ink| {
+    render_planes(r, cancel, stop_after, transparent, |i, paper, ink| {
         let image = match ink {
             Some(PageInk::Flat(ink)) => ink_effects::composite(paper, ink, &r.params, cancel)?,
             Some(PageInk::Fine(tiles)) => {
@@ -435,7 +443,13 @@ pub(crate) fn render_pages(
     stop_after: usize,
     emit: impl FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>,
 ) -> Result<usize> {
-    render_planes(r, cancel, stop_after, false, emit)
+    render_planes(
+        r,
+        cancel,
+        stop_after,
+        r.params.transparent_background && !r.params.pdf_save,
+        emit,
+    )
 }
 fn render_planes(
     r: &RenderRequest,
@@ -459,13 +473,19 @@ fn render_planes(
                 blank_paper(w, h, p)
             }
         }
-        (None, None) => imaging::decode(
-            r.background
-                .as_deref()
-                .ok_or_else(|| Error::new("missing_background", "缺少背景图"))?,
-            &r.limits,
-        )?
-        .to_rgba8(),
+        (None, None) => {
+            let mut paper = imaging::decode(
+                r.background
+                    .as_deref()
+                    .ok_or_else(|| Error::new("missing_background", "缺少背景图"))?,
+                &r.limits,
+            )?
+            .to_rgba8();
+            if transparent {
+                paper.as_mut().fill(0);
+            }
+            paper
+        }
         _ => {
             return Err(Error::new(
                 "invalid_parameter",

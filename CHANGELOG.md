@@ -3,6 +3,8 @@
 ## 未发布
 [拍摄设备信息]: website/content/zh/guide/preview-export.md
 
+- 纸张设置支持透明 PNG。保存单页和导出图片 ZIP 时可保留墨迹并去除底纸与横线，PDF 继续使用原纸张。
+
 - 图片和 PDF 导出保留底纸的相机与曝光信息，App 和 MCP 可补录缺少的机型、镜头和 ISO。[拍摄设备信息]
 
 - 修复 Windows 桌面打包时找不到 `flutter.bat` 的问题，更新器也会使用同一 Flutter SDK 的 Dart。

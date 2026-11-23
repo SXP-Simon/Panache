@@ -56,6 +56,37 @@ Future<InkPage> _page() async => InkPage(
 
 void main() {
   testWidgets(
+    'saving a fine page preserves transparent paper and translucent ink',
+    (tester) async {
+      await tester.runAsync(() async {
+        final source = await _page();
+        final page = InkPage(
+          await _png(Colors.transparent, [], Colors.transparent),
+          null,
+          fine: source.fine,
+        );
+        final bytes = await compositeFinePage(page, {}, const (
+          opacity: 50,
+          thickness: 0.0,
+          softness: 0.0,
+          color: 0xff0066cc,
+        ));
+        final image = await decodeInkImage(bytes);
+        try {
+          final rgba = (await image.toByteData(
+            format: ui.ImageByteFormat.rawStraightRgba,
+          ))!;
+          expect(rgba.getUint32(0), 0);
+          final i = (41 * image.width + 29) * 4;
+          expect(rgba.getUint8(i + 2), closeTo(204, 2));
+          expect(rgba.getUint8(i + 3), 128);
+        } finally {
+          image.dispose();
+        }
+      });
+    },
+  );
+  testWidgets(
     'diagram detail hit and whole illustration selection use the atlas groups',
     (tester) async {
       tester.view.physicalSize = const Size(1100, 850);

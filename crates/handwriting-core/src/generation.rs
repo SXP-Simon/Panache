@@ -105,7 +105,7 @@ pub fn generate(
             } else {
                 export::PdfExport::new()
             };
-            render::render(request, cancel, |index, image| {
+            render::render_output(request, cancel, usize::MAX, None, false, |index, image| {
                 cancel.check()?;
                 pdf.add(&image)?;
                 progress(Event::PageReady(index + 1))?;

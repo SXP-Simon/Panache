@@ -409,6 +409,11 @@ class WorkbenchSettings extends StatelessWidget {
                             ),
                           ],
                         ),
+                      settingSwitch(
+                        l.transparentPng,
+                        settings.transparentBackground,
+                        (value) => settings.transparentBackground = value,
+                      ),
                       _paperCamera(l),
                     ],
                     collapsible: false,
