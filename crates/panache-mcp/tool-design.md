@@ -59,7 +59,7 @@ MCP 的工具列表支持分页。客户端可能取完所有页；分页能控�
 
 反馈是调用方标注来源的本稿记录。`user_quote` 应逐字引用人的意见，`model_observation` 用于模型自己的观察。历史编辑备注的作者无法追溯时仍归为编辑上下文。若一轮同时改了墨迹与参考线，对比列出操作和观测结果，具体因果与偏好留给复核者判断。
 
-该设计借鉴了 Reflexion 将任务反馈留给下一次尝试的做法。关于模型仅靠自我判断纠错的研究使用的是推理任务，本项目将其作为设计动机。这里的效果由本项目的图像样本和回归用例单独验证。[Reflexion（NeurIPS 2023）](https://proceedings.neurips.cc/paper/2023/hash/1b44b878bb782e6954cd888628510e90-Abstract-Conference.html) · [外部反馈与自我纠错（ICLR 2024）](https://proceedings.iclr.cc/paper_files/paper/2024/hash/8b4add8b0aa8749d80a34ca5d941c355-Abstract-Conference.html)
+该设计借鉴了 Reflexion 将任务反馈留给下一次尝试的做法。关于模型仅靠自我判断纠错的研究使用的是推理任务，本项目将其作为设计动机。[Reflexion（NeurIPS 2023）](https://proceedings.neurips.cc/paper/2023/hash/1b44b878bb782e6954cd888628510e90-Abstract-Conference.html) · [外部反馈与自我纠错（ICLR 2024）](https://proceedings.iclr.cc/paper_files/paper/2024/hash/8b4add8b0aa8749d80a34ca5d941c355-Abstract-Conference.html)
 
 SICA 将历次尝试及其评估结果放入档案，供下一轮决策参考。本工具采用了可按版本取回结果的做法，作用域限于当前稿件，修改对象是稿件与排版参数。[SICA 作者实现](https://github.com/MaximeRobeyns/self_improving_coding_agent)
 
