@@ -21,7 +21,7 @@ import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
 import 'dialogs/text_tools_dialogs.dart';
 import 'dialogs/text_preview_dialog.dart';
-import '../services/api.dart';
+import '../models/upload.dart';
 import '../services/illustration_import.dart';
 import '../services/workspace.dart';
 import '../models/fine_edit.dart';
@@ -29,6 +29,7 @@ import '../services/desktop_exit.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
 import 'editor_preparation.dart';
+import 'live_preview_scheduler.dart';
 import '../widgets/workbench_controls.dart';
 import '../widgets/fine_preview.dart';
 import '../widgets/workbench_editor.dart';
@@ -89,9 +90,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   final undo = UndoHistoryController();
   int destination = 0, mobileTab = 0;
   SettingsSection settingsSection = SettingsSection.layout;
-  Timer? liveTimer;
-  int? liveSubmitted;
-  bool livePreview = false;
+  late final LivePreviewScheduler livePreview;
   bool fineFullscreen = false;
   bool composing = false;
   int navigationRevision = 0;
@@ -127,6 +126,23 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       applyText: (text) => replace(text, keepPreparation: true),
       onFailure: () => notify(l.prepareTextFailed),
     )..addListener(refreshPreparation);
+    livePreview = LivePreviewScheduler(
+      readDraft: () {
+        if (destination != 0 ||
+            locked ||
+            composing ||
+            !w.generation.available ||
+            editor.text.trim().isEmpty) {
+          return null;
+        }
+        return (
+          revision: w.editRevision,
+          previewRevision: w.generation.previewRevision,
+          full: w.settings.fullPreview,
+        );
+      },
+      submit: () => unawaited(w.generate(live: true)),
+    );
     editor.text = w.text;
     editor.addListener(rememberEditorSelection);
     w.addListener(refresh);
@@ -196,12 +212,14 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         selection: TextSelection.collapsed(offset: w.text.length),
       );
     }
-    if (livePreview && editor.text.trim().isEmpty && w.pages.isNotEmpty) {
+    if (livePreview.enabled &&
+        editor.text.trim().isEmpty &&
+        w.pages.isNotEmpty) {
       w.pages = [];
       w.page = 0;
     }
     setState(() {});
-    scheduleLivePreview();
+    livePreview.refresh();
     updatePrompts?.evaluate();
   }
 
@@ -213,7 +231,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    liveTimer?.cancel();
+    livePreview.dispose();
     preparation.dispose();
     WidgetsBinding.instance.removeObserver(this);
     w.removeListener(refresh);
@@ -248,7 +266,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     } finally {
       if (mounted) {
         setState(() => operation = false);
-        scheduleLivePreview();
+        livePreview.refresh();
       }
     }
   }
@@ -293,7 +311,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         value.composing.isValid && !value.composing.isCollapsed;
     if (composing != composingNow) {
       composing = composingNow;
-      scheduleLivePreview();
+      livePreview.refresh();
     }
     if (value.selection.isValid && value.selection.end <= value.text.length) {
       lastEditorSelection = value;
@@ -308,7 +326,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   Future<bool> enterFineEdit() async {
     w.text = editor.text;
     final result = await w.enterFineEdit();
-    if (mounted && result) liveSubmitted = w.editRevision;
+    if (mounted && result) livePreview.markSubmitted(w.editRevision);
     return result;
   }
 
@@ -420,37 +438,6 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     w.edit();
   });
 
-  void scheduleLivePreview() {
-    liveTimer?.cancel();
-    if (!livePreview ||
-        destination != 0 ||
-        locked ||
-        !w.generation.available ||
-        editor.text.trim().isEmpty ||
-        w.generation.previewRevision == w.editRevision ||
-        liveSubmitted == w.editRevision ||
-        composing) {
-      return;
-    }
-    liveTimer = Timer(
-      Duration(milliseconds: w.settings.fullPreview ? 750 : 350),
-      () {
-        if (!mounted || locked || destination != 0 || !livePreview) return;
-        if (composing) return;
-        liveSubmitted = w.editRevision;
-        unawaited(w.generate(live: true));
-      },
-    );
-  }
-
-  void setLivePreview(bool enabled) {
-    setState(() {
-      livePreview = enabled;
-      liveSubmitted = null;
-    });
-    scheduleLivePreview();
-  }
-
   Future<void> generate({bool preview = true, bool pdf = false}) async {
     if (!(form.currentState?.validate() ?? w.settings.valid)) {
       notify(l.validation);
@@ -458,11 +445,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     }
     w.text = editor.text;
     if (!preview && w.finePreviewNeedsRefresh) {
-      liveSubmitted = w.editRevision;
+      livePreview.markSubmitted(w.editRevision);
       final refreshed = await w.generate();
       if (!mounted || !refreshed || w.previewStale) return;
     }
-    if (preview) liveSubmitted = w.editRevision;
+    if (preview) livePreview.markSubmitted(w.editRevision);
     final navigation = navigationRevision;
     final succeeded = await w.generate(preview: preview, pdf: pdf);
     if (!mounted || !succeeded) return;
@@ -501,7 +488,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       navigationRevision++;
     });
     if (index == 1) widget.onGuideOpened?.call();
-    scheduleLivePreview();
+    livePreview.refresh();
   }
 
   void openGuideTarget(GuideTarget target) {
@@ -518,7 +505,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       }
       navigationRevision++;
     });
-    scheduleLivePreview();
+    livePreview.refresh();
   }
 
   void selectSettingsSection(SettingsSection section) {
@@ -604,8 +591,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     mobileTab: mobileTab,
     settingsSection: settingsSection,
     onSectionSelected: selectSettingsSection,
-    livePreview: livePreview,
-    onLivePreview: setLivePreview,
+    livePreview: livePreview.enabled,
+    onLivePreview: (value) => setState(() => livePreview.setEnabled(value)),
     fullPreview: w.settings.fullPreview,
     onFullPreview: (value) {
       w.settings.fullPreview = value;
