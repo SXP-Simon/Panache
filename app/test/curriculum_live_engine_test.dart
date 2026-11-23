@@ -7,6 +7,7 @@ import 'package:handwriting_app/services/desktop_backend.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/latex.dart';
 
+import 'support/desktop_backend_executable.dart';
 import 'support/latex_curriculum_cases.dart';
 
 void main() {
@@ -20,7 +21,7 @@ void main() {
       Workspace? workspace;
       try {
         final api = await backend.start(
-          executable: executable,
+          executable: await prepareBackendExecutable(executable, directory),
           dataDirectory: directory.path,
         );
         final w = workspace = Workspace(api: api, managedBackend: true);

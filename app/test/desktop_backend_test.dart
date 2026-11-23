@@ -6,6 +6,8 @@ import 'package:handwriting_app/services/workspace.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
+import 'support/desktop_backend_executable.dart';
+
 void main() {
   test('missing bundled executable fails without leaving a process', () async {
     final backend = DesktopBackend();
@@ -24,28 +26,8 @@ void main() {
         'handwriting-sidecar-',
       );
       final backend = DesktopBackend();
-      var binary = executable;
-      if (Platform.isMacOS) {
-        // flutter_tester is not sandboxed; verify inheritance in the real app smoke check.
-        binary = '${directory.path}/handwriting-server';
-        await File(executable).copy(binary);
-        final sign = await Process.run('codesign', [
-          '--force',
-          '--sign',
-          '-',
-          binary,
-        ]);
-        expect(sign.exitCode, 0);
-        await Directory('${directory.path}/font_assets').create();
-        for (final font in Directory(
-          '${File(executable).parent.path}/font_assets',
-        ).listSync().whereType<File>()) {
-          await font.copy(
-            '${directory.path}/font_assets/${font.uri.pathSegments.last}',
-          );
-        }
-      }
       try {
+        final binary = await prepareBackendExecutable(executable, directory);
         final api = await backend.start(
           executable: binary,
           dataDirectory: directory.path,
