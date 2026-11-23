@@ -53,7 +53,7 @@ cargo build --locked --release -p panache-mcp
 | `preview_handwriting` | 默认返回首页 PNG。用 `section`、`page` 查看指定节中的一页，两者从 1 开始。 |
 | `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。 |
 | `describe_controls` | 先列参数组，再按 `group` 查看单位、范围和枚举值。附上 `draft_id` 和 `revision` 可读取该版的实际值。 |
-| `tune_handwriting` | 一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
+| `tune_handwriting` | 可在原稿上更新参考线、导入本机字体，并一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
 | `adjust_glyphs` | 先用 `preview_handwriting(view="layout")` 取编号和坐标，再按同一节、页和版本调整选中字形。 |
 
 面向 AI 客户端的调用示例、披露边界和测量口径见[工具设计](tool-design.md)。
@@ -63,6 +63,16 @@ cargo build --locked --release -p panache-mcp
 每次保存只转换这一节，Markdown 原文和整理结果存入本地 SQLite。预览某节第 N 页时，引擎从该节开头排到第 N 页，只编码选中的一页。进程内保留最近生成的四张预览，修改其他节仍可复用。预览和导出传相同的 `revision` 可锁定稿件。种子和样式随稿保存，复现时需使用相同字体和引擎。
 
 整稿上限为整理后 10 万字、200 页。完整导出只在调用导出工具时执行；客户端可以取消，提供进度令牌时可看到已完成页数。ZIP 逐页写盘，PDF 在内存中组装压缩页面后写盘。结果成功后才移入 `exports/`。稿件及历史持续保存在 `PANACHE_MCP_HOME`；Windows 默认是 `%LOCALAPPDATA%/Panache/mcp`，其他系统默认是 `$XDG_DATA_HOME/Panache/mcp` 或 `~/.local/share/Panache/mcp`。
+
+## 照片排版与成品复盘
+
+1. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。图片最多长边 900 像素，像素坐标以返回的 `photo_size` 为准。需要看笔画细节时取原尺寸 `view="image"`。
+2. 上、中、下分别看字是否顺着实际横线、有没有盖住页眉，以及墨色和笔画锐度是否适合底纸。复盘附带像素对比和附近暗线的偏差。无横线或用户只说“放这边”时，把底纸或叠图展示给人，确认目标区域、首末行或四个角，再做修改。
+3. 调用 `tune_handwriting(draft_id, expected_revision, paper_guides, note)` 在原照片上重排全文。至少给两条参考线，每条提供行号与左右端点。无横线纸也可以指定想写入的区域。传空数组恢复建稿时的校准。旧版本仍可回看；改写书写区域会重置冲突的边距覆盖，重新排版后需重新选字。
+4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和相同版本交给 `adjust_glyphs`。`place_center` 将一组字移到指定照片位置；`target_quad` 按左上、右上、右下、左下四角放置所选字块，替换该组已有几何调整。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
+5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。可锁定版本，用 `offset/limit` 向前翻。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
+
+`tune_handwriting(font_path=…)` 会把本机 TTF/OTF 随稿保存。可用返回的字体标识在同一稿内切回该字体。墨迹组的 `transparent_background` 控制原尺寸 PNG 预览和 ZIP，PDF 保留纸张。透明稿复盘会把墨迹放回底纸，方便判断实际可读性。
 
 ## 验证
 
