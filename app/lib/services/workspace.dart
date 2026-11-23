@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/settings.dart';
 import '../models/ink_page.dart';
 import '../models/fine_edit.dart';
+import '../models/fine_edit_history.dart';
 import '../utils/ink_effects.dart';
 import '../utils/fine_raster.dart';
 import '../utils/text_tools.dart';
@@ -46,19 +47,13 @@ class Workspace extends ChangeNotifier {
   Settings settings;
   String text = '', version = '';
   bool fineEnabled = false;
-  String? _fineText;
-  FineEdits? _fineEdits;
-  final _fineUndo = <FineEdits?>[];
-  final _fineRedo = <FineEdits?>[];
-  bool get _currentFineHistory =>
-      _fineEdits != null &&
-      _fineText == text &&
-      _fineEdits!.key == inkPages.elementAtOrNull(page)?.fine?.key;
-  bool get canFineUndo => _fineUndo.isNotEmpty && _currentFineHistory;
-  bool get canFineRedo => _fineRedo.isNotEmpty && _currentFineHistory;
+  final _fineHistory = FineEditHistory();
+  String? get _finePageKey => inkPages.elementAtOrNull(page)?.fine?.key;
+  bool get canFineUndo => _fineHistory.canStep(text, _finePageKey, redo: false);
+  bool get canFineRedo => _fineHistory.canStep(text, _finePageKey, redo: true);
 
   Map<int, FineAdjustment> fineAdjustments(FinePage page) =>
-      _fineEdits?.key == page.key ? _fineEdits!.glyphs : const {};
+      _fineHistory.adjustmentsFor(page.key);
 
   Future<bool> enterFineEdit() async {
     if (!api.supportsFineEdit || !generation.available) return false;
@@ -73,42 +68,13 @@ class Workspace extends ChangeNotifier {
   }
 
   void applyFineEdits(FinePage page, List<FineAdjustment> values) {
-    if (busy ||
-        previewStale ||
-        inkPages.elementAtOrNull(this.page)?.fine?.key != page.key) {
-      return;
-    }
-    final previous = _fineEdits?.key == page.key && _fineText == text
-        ? _fineEdits
-        : null;
-    final next = <int, FineAdjustment>{...?previous?.glyphs};
-    var changed = false;
-    for (final value in values) {
-      if (value == defaultFineAdjustment(value.id)) {
-        changed = next.remove(value.id) != null || changed;
-      } else if (next[value.id] != value) {
-        next[value.id] = value;
-        changed = true;
-      }
-    }
-    if (!changed || next.length > 10000) return;
-    if (previous == null && _fineEdits != null) _fineUndo.clear();
-    if (_fineUndo.length >= 50) _fineUndo.removeAt(0);
-    _fineUndo.add(previous);
-    _fineRedo.clear();
-    _fineText = text;
-    _fineEdits = FineEdits(page.key, next);
-    edit(inkOnly: true);
+    if (busy || previewStale || _finePageKey != page.key) return;
+    if (_fineHistory.apply(text, page.key, values)) edit(inkOnly: true);
   }
 
   void stepFineHistory({required bool redo}) {
-    if (busy || previewStale || !_currentFineHistory) return;
-    final from = redo ? _fineRedo : _fineUndo;
-    final to = redo ? _fineUndo : _fineRedo;
-    if (from.isEmpty) return;
-    to.add(_fineEdits);
-    _fineEdits = from.removeLast() ?? FineEdits(_fineEdits!.key, const {});
-    edit(inkOnly: true);
+    if (busy || previewStale) return;
+    if (_fineHistory.step(text, _finePageKey, redo: redo)) edit(inkOnly: true);
   }
 
   final generation = GenerationViewModel();
@@ -226,15 +192,7 @@ class Workspace extends ChangeNotifier {
           };
         }
         if (data['fineEdits'] case final Map<String, dynamic> edits) {
-          try {
-            _fineEdits = FineEdits.fromJson(edits);
-            _fineText = text;
-            fineEnabled = true;
-          } on FormatException {
-            _fineEdits = null;
-          } on TypeError {
-            _fineEdits = null;
-          }
+          if (_fineHistory.restore(text, edits)) fineEnabled = true;
         }
       } catch (_) {
         /* Leave invalid drafts untouched until the next edit. */
@@ -345,13 +303,14 @@ class Workspace extends ChangeNotifier {
     if (disposed) return Future.value(false);
     saveTimer?.cancel();
     final font = fontFile;
+    final fineEdits = _fineHistory.forText(text);
     final snapshot = jsonEncode({
       'text': text,
       'settings': settings.toJson(),
       'images': images,
       'uploadedFont': font != null || _fontRestorePending,
-      if (_fineText == text && (_fineEdits?.glyphs.isNotEmpty ?? false))
-        'fineEdits': _fineEdits!.toJson(),
+      if (fineEdits != null && fineEdits.glyphs.isNotEmpty)
+        'fineEdits': fineEdits.toJson(),
     });
     return _write(
       'flutter.workspace',
@@ -434,8 +393,9 @@ class Workspace extends ChangeNotifier {
     if (fineEnabled && api.supportsFineEdit) {
       fields['fine_edit'] = 'true';
       fields['seed'] = '0';
-      if (!preview && _fineText == text && _fineEdits != null) {
-        fields['fine_edits'] = jsonEncode(_fineEdits!.toJson());
+      final fineEdits = _fineHistory.forText(text);
+      if (!preview && fineEdits != null) {
+        fields['fine_edits'] = jsonEncode(fineEdits.toJson());
       }
     }
     if (background != null) {

@@ -3,9 +3,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:handwriting_app/models/fine_edit.dart';
+import 'package:handwriting_app/models/ink_page.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/services/workspace_storage.dart';
+import 'package:http/http.dart' as http;
 
 class MemoryStorage implements WorkspaceStorage {
   final values = <String, String>{};
@@ -26,6 +29,7 @@ class MemoryStorage implements WorkspaceStorage {
 class ControlledApi extends HandwritingApi {
   ControlledApi() : super('http://example.invalid');
   final submission = Completer<String>();
+  Map<String, String>? submittedFields;
   final rendered = Completer<List<Uint8List>>();
   final cancelled = <String>[];
   final previewRequested = Completer<void>();
@@ -39,7 +43,11 @@ class ControlledApi extends HandwritingApi {
     Map<String, String> fields,
     Map<String, Upload> files, {
     String? taskId,
-  }) => submission.future;
+  }) {
+    submittedFields = fields;
+    return submission.future;
+  }
+
   @override
   Future<Map<String, dynamic>> status(String id) async => {
     'status': 'completed',
@@ -49,6 +57,10 @@ class ControlledApi extends HandwritingApi {
     previewRequested.complete();
     return rendered.future;
   }
+
+  @override
+  Future<http.Response> result(String id) async =>
+      http.Response.bytes([1], 200);
 
   @override
   Future<void> cancelTask(String id) async => cancelled.add(id);
@@ -220,6 +232,54 @@ void main() {
       expect(w.settings.valid, isTrue);
       w.dispose();
       await w.persist();
+    },
+  );
+
+  test(
+    'cleared edits are omitted from drafts and exported with their layout key',
+    () async {
+      final key = 'a' * 64;
+      final storage = MemoryStorage();
+      storage.values['flutter.workspace'] = jsonEncode({
+        'text': 'draft',
+        'fineEdits': {
+          'key': key,
+          'glyphs': [
+            {
+              'id': 1,
+              'dx': 4,
+              'dy': 0,
+              'scale': 100,
+              'angle': 0,
+              'opacity': 100,
+            },
+          ],
+        },
+      });
+      final api = ControlledApi();
+      final w = Workspace(api: api, storage: storage);
+      addTearDown(w.dispose);
+      await w.initialize();
+      final fine = FinePage(key, Uint8List(0), const []);
+      final page = InkPage(Uint8List(0), null, fine: fine);
+      w.generation
+        ..pages = [page.paper]
+        ..inkPages = [page]
+        ..previewRevision = w.editRevision;
+      expect(w.fineEnabled, isTrue);
+      expect(w.fineAdjustments(fine)[1]?.dx, 4);
+      w.applyFineEdits(fine, [defaultFineAdjustment(1)]);
+      await w.persist();
+      final saved = jsonDecode(storage.values['flutter.workspace']!) as Map;
+      expect(saved.containsKey('fineEdits'), isFalse);
+      api.supportsFineEdit = true;
+      final export = w.generate(preview: false);
+      expect(jsonDecode(api.submittedFields!['fine_edits']!), {
+        'key': key,
+        'glyphs': [],
+      });
+      api.submission.complete('export-task');
+      expect(await export, isTrue);
     },
   );
 

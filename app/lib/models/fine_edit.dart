@@ -125,13 +125,14 @@ bool _validKey(String key) => RegExp(r'^[0-9a-f]{64}$').hasMatch(key);
 class FineEdits {
   FineEdits(this.key, Map<int, FineAdjustment> glyphs)
     : glyphs = Map.unmodifiable(glyphs);
+  static const maxGlyphs = 10000;
   final String key;
   final Map<int, FineAdjustment> glyphs;
 
   factory FineEdits.fromJson(Map<String, dynamic> json) {
     final key = json['key'] as String;
     final data = json['glyphs'] as List;
-    if (!_validKey(key) || data.length > 10000) {
+    if (!_validKey(key) || data.length > maxGlyphs) {
       throw const FormatException('Invalid fine edits');
     }
     final result = <int, FineAdjustment>{};

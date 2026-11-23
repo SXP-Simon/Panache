@@ -4,6 +4,8 @@
 
 `app/lib/screens/` 负责页面、输入焦点、导航和文件选择交互；`app/lib/models/settings.dart` 管理渲染参数、校验与请求字段。`app/lib/services/workspace.dart` 是工作区业务协调器，对 UI 暴露草稿、设置与连接状态，通过 `ChangeNotifier` 通知变化。生成任务由 `view_models/generation_view_model.dart` 独立持有：提交、轮询、取消确认、任务身份、预览和导出结果均通过 `EngineGateway` 协调，不依赖页面、输入控制器或存储实现。工作区构造请求快照，并在提交后通过回调保存草稿；保留任务状态访问入口以供页面组合。
 
+`models/fine_edit_history.dart` 按草稿文本和渲染版面标识维护逐字微调与撤销重做。`Workspace` 检查当前预览能否编辑，通知页面并决定哪些微调记录进入草稿和导出请求。
+
 `EngineGateway` 是生成任务的类型化入口，提供提交、状态、取消、预览字节和导出字节；`EngineCatalog` 提供字体列表与引擎能力。`ApiEngineGateway` 适配现有 `HandwritingApi` 传输，工作区确认连接仍有效后才应用探测到的能力。`EngineFailure` 保留错误码、说明和可选的重试等待时间，任务状态层不解析 HTTP 响应或错误字符串。移动端传输使用 Rust C ABI / Dart FFI，桌面端连接受令牌保护的本地 sidecar，Web 连接 HTTP 服务。界面不直接调用 FFI、轮询任务或写入偏好设置。
 
 `GenerationRequest` 在通知界面进入忙碌状态前冻结请求字段并复制上传字节。生成操作持有提交时的引擎，取消始终作用于同一引擎。成功预览记录提交时的编辑版本与任务 ID；后续编辑使预览过期，失败和取消保留上次成功预览。HTTP 与移动端的任务错误均提供独立的错误码与说明，任务终态区别于取消请求的确认。
