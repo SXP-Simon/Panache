@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api.dart';
 import '../services/pdf_pages.dart';
+import '../services/pdf_writing_export.dart';
 import '../widgets/pdf_writing_surface.dart';
 
 class PdfWorkbench extends StatefulWidget {
@@ -167,50 +168,49 @@ class _PdfWorkbenchState extends State<PdfWorkbench> {
     });
   }
 
+  Future<bool?> _confirmExport(int issues) => showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l.pdfReview),
+      content: Text(l.pdfWarnings(issues)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l.exportPdf),
+        ),
+      ],
+    ),
+  );
+
   Future<void> export() async {
     final current = page;
     if (current == null || family == null || exporting != null) return;
     setState(() => exporting = 0);
     try {
-      final document = PdfPageExport();
-      var issues = 0;
-      for (var i = 0; i < count; i++) {
-        if (!mounted || leaving) return;
-        setState(() => exporting = i + 1);
-        final source = i == current.index ? current : await readPage(i);
-        if (!mounted || leaving) return;
-        if (relevantWarnings(source).isNotEmpty ||
-            (!fill && source.lines.isEmpty)) {
-          issues++;
-        }
-        final boxes = boxesFor(source);
-        final image = boxes.isEmpty
-            ? source.paper
-            : await renderPdfWritingPage(source, boxes, family!, widget.ink);
-        await document.add(source, image);
-      }
-      if (!mounted || leaving) return;
-      if (issues != 0) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(l.pdfReview),
-            content: Text(l.pdfWarnings(issues)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(l.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(l.exportPdf),
-              ),
-            ],
-          ),
-        );
+      final prepared = await assembleWritingPdf(
+        current: current,
+        readPage: readPage,
+        isActive: () => mounted && !leaving,
+        onPageStarted: (number) => setState(() => exporting = number),
+        writingFor: (source) => (
+          needsReview:
+              relevantWarnings(source).isNotEmpty ||
+              (!fill && source.lines.isEmpty),
+          boxes: boxesFor(source),
+          font: family!,
+          ink: widget.ink,
+        ),
+      );
+      if (!mounted || leaving || prepared == null) return;
+      if (prepared.reviewCount != 0) {
+        final confirmed = await _confirmExport(prepared.reviewCount);
         if (!mounted || confirmed != true) return;
       }
-      final bytes = await document.finish();
+      final bytes = await prepared.document.finish();
       if (!mounted || leaving) return;
       await widget.save(bytes);
     } catch (e) {
