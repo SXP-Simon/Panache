@@ -8,6 +8,14 @@
 
 <!-- 列出实际执行的检查、测试及平台。 -->
 
+## 界面截图
+
+<!-- 涉及 UI 变化时，请在此嵌入实际运行截图并标明平台。调整已有界面时展示改动前后，新增界面时展示新增状态。无界面变化可删除本节。
+仅供评审的截图请提交到独立的素材分支（如 pr-assets），该分支不参与 PR 合并。请在正文中使用素材提交的固定链接嵌图，确保本 PR 的文件差异不含这些截图。
+将下面的示例复制到注释外，并替换仓库、素材提交 SHA 和文件路径：
+![Windows：更新后的纸张设置](https://raw.githubusercontent.com/OWNER/REPO/ASSET_COMMIT_SHA/screenshots/paper-settings.png)
+-->
+
 ## 检查项
 
 - [ ] 用户可见文字已同时提供中英文翻译（`app/lib/l10n/app_zh.arb` / `app_en.arb`）
