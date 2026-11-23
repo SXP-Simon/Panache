@@ -51,6 +51,8 @@ async def review_workflow(client, key, guides, font_path):
         client, "tune_handwriting", **key, expected_revision=3,
         paper_guides=guides, font_path=str(font_path), note="Write inside the indicated area.",
     )).structuredContent
+    imported_font = revised["controls"]["font"]
+    assert imported_font.startswith("upload:")
     font_path.unlink()
     assert revised["revision"] == 4 and revised["paper"]["alignment"] == "manual_guides"
     assert (await client.call_tool("tune_handwriting", {**key, "expected_revision": 3, "paper_guides": guides})).isError
@@ -100,7 +102,14 @@ async def review_workflow(client, key, guides, font_path):
     original = (await call(client, "read_section", **key, revision=1, view="summary")).structuredContent["paper"]
     assert restored == original
     assert (await call(client,"read_section",**key,revision=4,view="summary")).structuredContent["paper"] != original
-    return transparent
+    # Change only the font between two otherwise identical historical revisions.
+    await call(client, "tune_handwriting", **key, expected_revision=9,
+               changes={"ink_opacity": 100, "font": "霞鹜文楷.ttf"})
+    default = png(await call(client, "preview_handwriting", **key, revision=10))
+    await call(client, "tune_handwriting", **key, expected_revision=10, changes={"font": imported_font})
+    uploaded = png(await call(client, "preview_handwriting", **key, revision=11))
+    assert default != uploaded
+    return transparent, default, uploaded
 
 
 async def placement_pixels(client):
@@ -227,7 +236,7 @@ async def smoke(command, arguments, out):
             paper_path.unlink()
             font_path = Path(temp) / "imported.ttf"
             shutil.copyfile(Path(__file__).resolve().parents[3] / "assets/font_assets/李国夫手写体.ttf", font_path)
-            imported_preview = await review_workflow(client, gkey, guides, font_path)
+            imported_preview, default_font_image, uploaded_font_image = await review_workflow(client, gkey, guides, font_path)
             paper_id = custom["draft_id"]
             paper_preview = png(
                 await call(client, "preview_handwriting", draft_id=paper_id)
@@ -335,6 +344,8 @@ async def smoke(command, arguments, out):
             assert {e["origin"] for e in events} >= {"draft_edit","measurement","user_quote","model_observation"}
             assert (await client.call_tool("read_section",{**gkey,"view":"review","review_id":reviewed_id})).isError
             assert png(await call(client, "preview_handwriting", **gkey, revision=6)) == imported_preview
+            assert png(await call(client, "preview_handwriting", **gkey, revision=10)) == default_font_image
+            assert png(await call(client, "preview_handwriting", **gkey, revision=11)) == uploaded_font_image
             assert (await call(client, "list_drafts")).structuredContent["drafts"][0][
                 "draft_id"
             ] == doc
