@@ -34,25 +34,16 @@ pub struct Circuit {
 
 pub const BEGIN: &str = "\\begin{circuitikz}";
 pub const END: &str = "\\end{circuitikz}";
-fn component_name(name: &str) -> Option<&str> {
-    Some(match name {
-        "R" | "resistor" => "R",
-        "C" | "capacitor" => "C",
-        "L" | "inductor" => "L",
-        "V" | "vsource" => "V",
-        "I" | "isource" => "I",
-        "sV" | "sinusoidal voltage source" => "sV",
-        "battery" | "battery1" => "battery1",
-        "D" | "diode" => "D",
-        "led" => "led",
-        "short" => "short",
-        "open" => "open",
-        "switch" => "switch",
-        "closing switch" => "closing switch",
-        "opening switch" => "opening switch",
-        _ => return None,
-    })
+mod labels;
+mod options;
+use options::{Component, split_options};
+
+enum Route {
+    Direct,
+    VerticalFirst,
+    HorizontalFirst,
 }
+
 struct Parser<'a> {
     source: &'a str,
     at: usize,
@@ -198,27 +189,21 @@ impl<'a> Parser<'a> {
             text: if text.is_empty() {
                 String::new()
             } else {
-                label_text(&text)?
+                labels::normalize(&text)?
             },
         });
         Some(())
     }
-    fn segment(
-        &mut self,
-        kind: String,
-        labels: Vec<Label>,
-        marks: (char, char),
-        end: Point,
-    ) -> Option<()> {
+    fn segment(&mut self, component: Component, end: Point) -> Option<()> {
         if self.circuit.segments.len() >= 128 || end == self.current {
             return None;
         }
         self.circuit.segments.push(Segment {
             start: self.current,
             end,
-            kind,
-            labels,
-            marks,
+            kind: component.kind.into(),
+            labels: component.labels,
+            marks: component.marks,
             end_arrow: false,
         });
         self.current = end;
@@ -255,16 +240,15 @@ impl<'a> Parser<'a> {
                 self.node()?;
                 continue;
             }
-            let (kind, labels, marks, route) = if self.eat("--") {
-                (String::from("short"), Vec::new(), (' ', ' '), 0)
+            let (component, route) = if self.eat("--") {
+                (Component::wire(), Route::Direct)
             } else if self.eat("|-") {
-                (String::from("short"), Vec::new(), (' ', ' '), 1)
+                (Component::wire(), Route::VerticalFirst)
             } else if self.eat("-|") {
-                (String::from("short"), Vec::new(), (' ', ' '), 2)
+                (Component::wire(), Route::HorizontalFirst)
             } else if self.eat("to") {
                 let options = self.group('[', ']')?;
-                let (k, l, m) = component(&options, self.rp)?;
-                (k, l, m, 0)
+                (Component::parse(&options, self.rp)?, Route::Direct)
             } else {
                 return None;
             };
@@ -273,154 +257,23 @@ impl<'a> Parser<'a> {
             } else {
                 self.point()?
             };
-            if route != 0 {
-                let middle = if route == 1 {
-                    Point(self.current.0, end.1)
-                } else {
-                    Point(end.0, self.current.1)
-                };
-                if middle != self.current {
-                    self.segment("short".into(), Vec::new(), (' ', ' '), middle)?;
-                }
+            let middle = match route {
+                Route::Direct => None,
+                Route::VerticalFirst => Some(Point(self.current.0, end.1)),
+                Route::HorizontalFirst => Some(Point(end.0, self.current.1)),
+            };
+            if let Some(point) = middle
+                && point != self.current
+            {
+                self.segment(Component::wire(), point)?;
             }
             if self.current != end {
-                self.segment(kind, labels, marks, end)?;
-            } else if route == 0 {
+                self.segment(component, end)?;
+            } else if middle.is_none() {
                 return None;
             }
         }
     }
-}
-fn split_options(source: &str) -> Option<Vec<&str>> {
-    let mut out = Vec::new();
-    let mut depth = 0i32;
-    let mut start = 0;
-    let mut escaped = false;
-    let mut math = false;
-    for (i, c) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if c == '\\' {
-            escaped = true;
-            continue;
-        }
-        if c == '$' {
-            math = !math;
-        }
-        if c == '{' {
-            depth += 1;
-        }
-        if c == '}' {
-            depth -= 1;
-        }
-        if !(0..=16).contains(&depth) {
-            return None;
-        }
-        if c == ',' && depth == 0 && !math {
-            out.push(source[start..i].trim());
-            start = i + 1;
-        }
-    }
-    if depth != 0 || math {
-        return None;
-    }
-    out.push(source[start..].trim());
-    Some(out)
-}
-fn component(source: &str, rp: bool) -> Option<(String, Vec<Label>, (char, char))> {
-    let mut kind = None;
-    let mut pending = Vec::new();
-    let mut marks = (' ', ' ');
-    for item in split_options(source)? {
-        if item.is_empty() || ["thin", "semithick", "thick"].contains(&item) {
-            continue;
-        }
-        if let Some(name) = component_name(item) {
-            if kind.is_some() {
-                return None;
-            }
-            kind = Some(name.to_owned());
-            continue;
-        }
-        if let Some((key, value)) = item.split_once('=') {
-            let key = key.trim();
-            if let Some(component) = component_name(key) {
-                if kind.is_some() || pending.len() >= 4 {
-                    return None;
-                }
-                kind = Some(component.to_owned());
-                pending.push(('l', String::new(), label_text(value.trim())?));
-                continue;
-            }
-            let base = key.chars().next()?;
-            if !matches!(base, 'l' | 'a' | 'i' | 'v') || pending.len() >= 4 {
-                return None;
-            }
-            let tail = &key[1..];
-            if ![
-                "", "_", "^", ">", "<", "^>", "^<", "_>", "_<", ">^", "<^", ">_", "<_",
-            ]
-            .contains(&tail)
-            {
-                return None;
-            }
-            if matches!(base, 'l' | 'a') && (tail.contains('<') || tail.contains('>')) {
-                return None;
-            }
-            if matches!(base, 'i' | 'v') && !rp && !tail.contains('<') && !tail.contains('>') {
-                return None;
-            }
-            pending.push((base, tail.to_owned(), label_text(value.trim())?));
-            continue;
-        }
-        let endpoints = match item {
-            "*-*" => ('*', '*'),
-            "o-o" => ('o', 'o'),
-            "*-" => ('*', ' '),
-            "-*" => (' ', '*'),
-            "o-" => ('o', ' '),
-            "-o" => (' ', 'o'),
-            "*-o" => ('*', 'o'),
-            "o-*" => ('o', '*'),
-            _ => return None,
-        };
-        if marks != (' ', ' ') {
-            return None;
-        }
-        marks = endpoints;
-    }
-    let kind = kind.unwrap_or_else(|| "short".into());
-    let mut labels = Vec::new();
-    for (base, tail, text) in pending {
-        let direction = if tail.contains('>') {
-            1.
-        } else if tail.contains('<') {
-            -1.
-        } else if base == 'i' {
-            if matches!(kind.as_str(), "V" | "sV" | "battery1") {
-                -1.
-            } else {
-                1.
-            }
-        } else if matches!(kind.as_str(), "V" | "sV" | "battery1") {
-            1.
-        } else {
-            -1.
-        };
-        labels.push(Label {
-            text,
-            side: if tail.contains('_') { -1. } else { 1. },
-            kind: base,
-            direction,
-        });
-    }
-    Some((kind, labels, marks))
-}
-mod labels;
-fn label_text(source: &str) -> Option<String> {
-    labels::normalize(source)
 }
 pub fn parse(source: &str) -> Option<Circuit> {
     if source.len() > 32768 {
