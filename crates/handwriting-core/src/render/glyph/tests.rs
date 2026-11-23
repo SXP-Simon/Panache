@@ -142,6 +142,45 @@ fn distribution_table_has_two_dimensional_handwritten_ink_and_continuous_rules()
     }
 }
 #[test]
+fn grid_corner_overruns_are_local_bounded_and_repeatable() {
+    let book = &books()[0];
+    let mut quiet = Glyphs::new(book);
+    let mut natural = Glyphs::with_parameters(book, &Parameters::default()).unwrap();
+    let grid = text::parse("⟦ A | 1 | 2; B | 3 | 4 ⟧");
+    let base = quiet.sequence(&grid, 40.).unwrap();
+    for seed in [0, 1, 7, 20261123] {
+        natural.pen.seed = seed;
+        let g = natural.sequence(&grid, 40.).unwrap();
+        assert_ne!(g.mask, base.mask);
+        assert_eq!(g.mask, natural.sequence(&grid, 40.).unwrap().mask);
+        let interior = image::imageops::crop_imm(
+            &g.mask,
+            (base.left - g.left) as u32,
+            (base.top - g.top) as u32,
+            base.mask.width(),
+            base.mask.height(),
+        );
+        assert_eq!(interior.to_image(), base.mask);
+        for (x, y, _) in g.mask.enumerate_pixels().filter(|(_, _, p)| p[0] > 0) {
+            let (x, y) = (g.left + x as i32, g.top + y as i32);
+            if !(base.left..base.right()).contains(&x) || !(base.top..base.bottom()).contains(&y) {
+                let dx = (x - base.left).abs().min((x - (base.right() - 1)).abs());
+                let dy = (y - base.top).abs().min((y - (base.bottom() - 1)).abs());
+                assert!(
+                    dx + dy <= 5 && (dx == 0 || dy == 0),
+                    "unexpected ink at ({x}, {y})"
+                );
+            }
+        }
+    }
+    let dashed = text::parse("⟦ ╌╌ ; A | 1 ; B | 2 ; ╌╌ ⟧");
+    assert!(matches!(&dashed[..], [Node::Table(_)]));
+    assert_eq!(
+        quiet.sequence(&dashed, 40.).unwrap().mask,
+        natural.sequence(&dashed, 40.).unwrap().mask
+    );
+}
+#[test]
 fn all_math_bounds_keep_actual_ink_and_native_baseline() {
     for book in books() {
         for size in [24., 40., 64.] {

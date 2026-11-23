@@ -1,6 +1,8 @@
 //! 2026-10-20：整表按真实手写墨迹测量列宽与基线，作为单个刚性结构缩放和分页。
 use super::*;
 use crate::text::{Table, TableKind, TableRule};
+use rand::{RngExt, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 pub(super) mod matrix;
 
 impl Glyphs<'_> {
@@ -76,7 +78,6 @@ impl Glyphs<'_> {
             let thickness = grid_thickness;
             let length = (end.0 - start.0).abs().max((end.1 - start.1).abs());
             if rule != TableRule::Dashed {
-                // 2026-10-20：各边共用精确端点和笔宽，不对格线添加人为抖动。
                 paths.push((vec![start, end], thickness));
             } else {
                 let dash = (size * 0.12).round().max(3.) as i32;
@@ -106,6 +107,30 @@ impl Glyphs<'_> {
                 (inset, offset + ys[index]),
                 (inset + width, offset + ys[index]),
             );
+        }
+        if table.kind == TableKind::Grid && self.pen.naturalness > 0. {
+            // 横竖两笔都经过交点，只让其中一笔沿原方向多走一点。
+            let mut rng = ChaCha8Rng::seed_from_u64(self.pen.seed);
+            let reach = (size * 0.105).min(5.) * self.pen.naturalness;
+            for (row, dy) in [(0, -1), (ys.len() - 1, 1)] {
+                for (col, dx) in [(0, -1), (columns, 1)] {
+                    if table.horizontal[row] == TableRule::Dashed
+                        || table.vertical[col] == TableRule::Dashed
+                    {
+                        continue;
+                    }
+                    let tail = (rng.random_range(-1.0f32..1.) * reach).round() as i32;
+                    if tail != 0 {
+                        let corner = (inset + xs[col], offset + ys[row]);
+                        let tip = if tail > 0 {
+                            (corner.0 + dx * tail, corner.1)
+                        } else {
+                            (corner.0, corner.1 + dy * tail.abs())
+                        };
+                        paths.push((vec![corner, tip], grid_thickness));
+                    }
+                }
+            }
         }
         paths.extend(delimiters.into_iter().map(|(points, thickness)| {
             (

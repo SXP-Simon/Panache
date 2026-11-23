@@ -32,7 +32,7 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 
 | 进程状态转换图 | 资源分配表 |
 | --- | --- |
-| [![进程状态转换图](assets/examples/process-states-6fcceb20526a.webp)](assets/examples/process-states-6fcceb20526a.webp) | [![资源分配表](assets/examples/bankers-algorithm-3d87bc66b1db.webp)](assets/examples/bankers-algorithm-3d87bc66b1db.webp) |
+| [![进程状态转换图](assets/examples/process-states-6fcceb20526a.webp)](assets/examples/process-states-6fcceb20526a.webp) | [![资源分配表](assets/examples/bankers-algorithm-40bcfd843ae0.webp)](assets/examples/bankers-algorithm-40bcfd843ae0.webp) |
 
 [《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 

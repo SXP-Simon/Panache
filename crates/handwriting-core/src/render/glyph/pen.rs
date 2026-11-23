@@ -516,7 +516,7 @@ mod tests {
         }
     }
     #[test]
-    fn long_fraction_paths_fit_the_existing_budget_and_non_math_frames_stay_rigid() {
+    fn long_fraction_paths_fit_the_existing_budget_and_matrix_frames_stay_rigid() {
         let font = FontBook::load(
             &std::fs::read(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -542,7 +542,7 @@ mod tests {
             },
         )
         .unwrap();
-        for source in ["⟦ A | 1 | 2; B | 3 | 4 ⟧", "⟦ matrix: 1  0 ; 0  1 ⟧"] {
+        for source in ["⟦ bmatrix: 1  0 ; 0  1 ⟧", "⟦ matrix: 1  0 ; 0  1 ⟧"] {
             let nodes = crate::text::parse(source);
             assert_eq!(
                 quiet.sequence(&nodes, 40.).unwrap().mask,
