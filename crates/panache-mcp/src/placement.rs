@@ -2,7 +2,6 @@
 use crate::drafts::Snapshot;
 use anyhow::{Result, ensure};
 use handwriting_core::fine_edit::{Adjustment, GlyphBounds};
-use std::collections::BTreeSet;
 
 pub struct Placement {
     // Paper-space homography normalized at the selection's top left.
@@ -14,7 +13,6 @@ impl Placement {
         draft: &Snapshot<'_>,
         size: [u32; 2],
         glyphs: &[GlyphBounds],
-        ids: &BTreeSet<u32>,
         quad: [[u32; 2]; 4],
     ) -> Result<Self> {
         let mut corners = [[0.; 2]; 4];
@@ -38,7 +36,7 @@ impl Placement {
         let mut top = f64::INFINITY;
         let mut right = f64::NEG_INFINITY;
         let mut bottom = f64::NEG_INFINITY;
-        for g in glyphs.iter().filter(|g| ids.contains(&g.id)) {
+        for g in glyphs {
             let [x, y, w, h] = g.bounds.map(f64::from);
             left = left.min(x);
             top = top.min(y);
