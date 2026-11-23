@@ -11,10 +11,13 @@ node scripts/prepare-release.cjs v1.18.1
 git show --stat HEAD
 ```
 
-脚本将未发布说明移到新版本标题下，更新根目录 `VERSION`，创建只含这两个文件的 `chore(release): v1.18.1` 提交。标题中的日期是北京时间的版本准备日期。推送版本提交后，GitHub Actions 会在该提交上运行 Flutter、Rust 和移动端检查。
+脚本将未发布说明移到新版本标题下，更新根目录 `VERSION`，创建只含这两个文件的 `chore(release): v1.18.1` 提交。标题中的日期是北京时间的版本准备日期。普通 PR 在合并前完成验证。准备发布时，推送版本提交，并趁它仍是 `main` 的最新提交启动三项检查。发布流程会核对每次运行的 SHA。
 
 ```bash
 git -c push.followTags=false push origin main
+gh workflow run flutter.yml --ref main
+gh workflow run rust.yml --ref main
+gh workflow run flutter_mobile.yml --ref main
 ```
 
 确定公开发布时，为刚才的版本提交创建同名标签，并只推送该标签。如果此时分支已有后续提交，用版本提交的 SHA 替换下例的 `HEAD`。

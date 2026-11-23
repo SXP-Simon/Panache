@@ -2,9 +2,6 @@ name: Flutter Mobile
 permissions:
   contents: read
 on:
-  push:
-    branches: ["main"]
-    paths: ["VERSION", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
   pull_request:
     paths: ["VERSION", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
   workflow_dispatch:
