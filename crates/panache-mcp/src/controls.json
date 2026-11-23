@@ -1,9 +1,9 @@
 {
   "camera": {
-    "camera_make": {"type":"string","maxLength":96,"description":"Optional paper camera maker in printable ASCII. Source EXIF takes precedence."},
-    "camera_model": {"type":"string","maxLength":96,"description":"Optional paper camera model in printable ASCII."},
-    "camera_lens": {"type":"string","maxLength":96,"description":"Optional lens model in printable ASCII."},
-    "camera_iso": {"type":"integer","min":1,"max":65535,"unit":"ISO"}
+    "camera_make": {"type":"string","maxLength":96,"description":"Camera make for export metadata. Used when the paper has no valid EXIF make."},
+    "camera_model": {"type":"string","maxLength":96,"description":"Camera model for export metadata when missing from the paper EXIF."},
+    "camera_lens": {"type":"string","maxLength":96,"description":"Lens model for export metadata when missing from the paper EXIF. Use ink_softness in the ink group to soften strokes."},
+    "camera_iso": {"type":"integer","min":1,"max":65535,"unit":"ISO","description":"ISO for export metadata when missing from the paper EXIF. Ink appearance is controlled by the ink group."}
   },
   "layout": {
     "font_size": {"type":"number","min":1,"max":2048,"unit":"px"},
@@ -13,6 +13,8 @@
     "right_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
     "top_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
     "bottom_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "paper": {"type":"choice","values":["plain","ruled","grid","dots"]},
+    "seed": {"type":"integer","min":0,"max":4294967295,"unit":"first section seed"},
     "width": {"type":"integer","min":1,"max":16000,"unit":"px (preset paper)"},
     "height": {"type":"integer","min":1,"max":16000,"unit":"px (preset paper)"},
     "layout_style": {"type":"choice","values":["standard","homework"]},
@@ -22,12 +24,14 @@
   },
   "typography": {
     "font": {"type":"font"},
-    "latin_font": {"type":"choice","values":["handlee","patrick_hand","indie_flower","kalam","shadows_into_light"]},
-    "latin_font_scale": {"type":"integer","min":50,"max":150,"unit":"%"},
-    "latin_digits": {"type":"boolean"}
+    "latin_font": {"type":"choice","default":null,"values":[null,"handlee","patrick_hand","indie_flower","kalam","shadows_into_light"],"description":"Default: follow the main font for ASCII letters, with fallback for missing glyphs. Leave unset unless the user asks for a separate English hand or dislikes the lettering. In an existing draft, omitting this key keeps its current value; null clears the override."},
+    "latin_font_scale": {"type":"integer","min":50,"max":150,"unit":"%","default":100,"description":"Size of ASCII letters relative to the main font, also applies to digits when latin_digits is true. Reset to 100 for an unscaled sample."},
+    "latin_digits": {"type":"boolean","default":false,"description":"Leave unset on new drafts. False keeps 0–9 at the main font and size. True applies the Latin size and any selected Latin font to digits."}
   },
   "ink": {
+    "transparent_background": {"type":"boolean","description":"Ink-only PNG preview and ZIP. PDF retains the paper."},
     "ink": {"type":"color"},
+    "ink_alpha": {"type":"integer","min":0,"max":255,"description":"Alpha channel of the selected RGBA pen color, before ink opacity."},
     "ink_opacity": {"type":"integer","min":0,"max":100,"unit":"%"},
     "ink_thickness": {"type":"number","min":-2,"max":2,"unit":"px","step":0.1},
     "ink_softness": {"type":"number","min":0,"max":2,"unit":"px","step":0.1}

@@ -49,6 +49,48 @@ fn request(text: &str) -> RenderRequest {
 }
 
 #[test]
+fn projected_ink_only_keeps_photo_coordinates_and_pdf_paper() {
+    use image::{Rgba, RgbaImage};
+    let mut req = request("坐标");
+    req.params.fine_edit = true;
+    req.params.transparent_background = true;
+    let paper = RgbaImage::from_pixel(300, 220, Rgba([170, 180, 190, 255]));
+    let map = photo::PaperProjection::Rotated {
+        angle: 0.,
+        layout_center: [0., 0.],
+        photo_center: [40., 25.],
+    };
+    let render = |req: &RenderRequest| {
+        let mut result = None;
+        handwriting_core::render::render_on_photo(
+            req,
+            &Cancellation::default(),
+            1,
+            &map,
+            &paper,
+            |_, img| {
+                result = Some(img);
+                Ok(())
+            },
+        )
+        .unwrap();
+        result.unwrap()
+    };
+    let ink = render(&req);
+    assert_eq!(ink.dimensions(), paper.dimensions());
+    assert_eq!(ink[(0, 0)][3], 0);
+    let (x, y, _) = ink
+        .enumerate_pixels()
+        .find(|(_, _, p)| p[3] == 255)
+        .unwrap();
+    assert!(x >= 40 && y >= 25);
+    req.params.pdf_save = true;
+    let on_paper = render(&req);
+    assert_eq!(on_paper[(0, 0)], paper[(0, 0)]);
+    assert_eq!(on_paper[(x, y)], ink[(x, y)]);
+}
+
+#[test]
 fn standard_wrap_keeps_words_and_closing_punctuation_with_their_neighbours() {
     fn lines(text: &str, width: u32) -> Vec<String> {
         let mut req = request(text);

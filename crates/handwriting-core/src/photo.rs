@@ -83,6 +83,39 @@ impl PaperProjection {
         }
     }
 
+    /// Convert a photo-space target to the layout coordinates used by glyph edits.
+    pub fn paper_point(&self, [x, y]: [f32; 2]) -> [f32; 2] {
+        match self {
+            Self::Rotated {
+                angle,
+                photo_center,
+                layout_center,
+            } => {
+                let (sin, cos) = (-angle).sin_cos();
+                rotate([x, y], *photo_center, *layout_center, sin, cos)
+            }
+            Self::Rulings {
+                first,
+                step,
+                layout_edges: [l, r],
+                columns,
+                rows,
+            } => {
+                let i = rows
+                    .partition_point(|row| height(row, columns, x) < y)
+                    .saturating_sub(1)
+                    .min(rows.len() - 2);
+                let ya = height(&rows[i], columns, x);
+                let t = (y - ya) / (height(&rows[i + 1], columns, x) - ya);
+                let [left, right] = edges(&rows[i], &rows[i + 1], t);
+                [
+                    lerp(*l, *r, (x - left) / (right - left)),
+                    first + (i as f32 + t) * step,
+                ]
+            }
+        }
+    }
+
     /// Inverse-sample just the transparent handwriting and illustration layer.
     pub fn composite(
         &self,
@@ -90,7 +123,15 @@ impl PaperProjection {
         ink: &RgbaImage,
         cancel: &Cancellation,
     ) -> Result<RgbaImage> {
-        let mut out = photo.clone();
+        self.composite_into(photo.clone(), ink, cancel)
+    }
+
+    pub(crate) fn composite_into(
+        &self,
+        mut out: RgbaImage,
+        ink: &RgbaImage,
+        cancel: &Cancellation,
+    ) -> Result<RgbaImage> {
         match self {
             Self::Rotated {
                 angle,
@@ -219,6 +260,10 @@ mod tests {
             .unwrap();
         for (px, py) in [(24, 21), (40, 19), (8, 47), (56, 41)] {
             assert_eq!(result[(px, py)], Rgba([255, 0, 0, 255]));
+        }
+        for [x, y] in [[16., 32.], [20., 20.], [43., 27.], [42., 12.]] {
+            let back = map.paper_point(map.photo_point(x, y));
+            assert!((back[0] - x).abs() < 1e-4 && (back[1] - y).abs() < 1e-4);
         }
         assert_eq!(map.photo_point(16., 32.), [8., 47.]);
         assert_eq!(map.photo_point(48., 32.), [56., 41.]);

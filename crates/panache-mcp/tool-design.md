@@ -1,61 +1,111 @@
-# AI 客户端如何调整手稿
+# 用 Panache MCP 排版和检查手稿
 
-## 工具发现
+假设用户发来一张斜拍的实验报告纸，希望把记录写在横线上，英文和数字也像同一个人写的。第一次接入 Panache 的客户端需要完成三件事：找到能写的位置，选好笔迹，确认导出的那一版确实符合要求。这份指南按这个顺序介绍该用哪个工具、该看返回结果中的什么内容。
 
-Panache 在 `tools/list` 中稳定公布九个任务入口。模型可以直接保存、预览、导出；只有需要调参时才调用 `describe_controls`。目录按排版、字体、墨迹、扰动和删除线五组组织，和服务端参数校验共用同一份定义。
+## 从一行字开始
 
-MCP 的工具列表支持分页。客户端可能取完所有页；分页能控制单次协议响应大小。Claude 的 Tool Search 支持宿主配置延迟加载，实际进入模型上下文的工具由宿主决定。Panache 的 stdio 客户端也可以完全不提供搜索，只用标准工具列表和调用接口。项目目前选择按需查询参数，避免为小型目录引入搜索索引和额外的调用步骤。设计依据见 [MCP 工具规范](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)、[MCP 路线图中的渐进发现](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) 和 [Claude Tool Search 文档](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)。
+在 AI 客户端登记 Panache 的 stdio 配置后，调用 `list_fonts`。能列出本机字体，就可以试写第一行。用 `save_section` 传入 Markdown，记下返回的 `draft_id` 和 `revision`，再用这两个值调用 `preview_handwriting`。**省略预览的 `view` 时，返回这版手稿的单页 PNG。** 指定节和页时从 1 开始计数。
 
-## 一次调整
+作业或实验报告适合直接拿一句正文试字，比如“样品 A 的质量为 12.5 g”。新稿只选主字体，英文和数字默认跟随它。如果用户想要整体再潦草一些，先换主字体。在目标纸张和字号下看看：中文和英文的笔画粗细是否协调？`12.5` 和单位能否一眼辨认？风格未定时，把小样给用户看，说清推荐理由，再问“这种笔迹可以用在整份报告里吗？”用户已经定好或委托选字时，就继续排版。
 
-假设要把墨色调淡，再把第二页的一处字迹右移。如果有稿件 ID，只需要保存 ID、当前版本和相关节号；省略 ID 时可以用 `list_drafts` 找回稿件。以下调用中的版本号用于示例，实际应使用工具返回的版本。
+只有用户对英文或数字单独提出要求，才需要查 `describe_controls(group="typography", draft_id=…)`。编辑旧稿时，省略参数会保留原设置。要撤销以前的西文字体和缩放，可以给 `tune_handwriting` 传这组 `changes`：
 
-| 调用 | 参数示例 | 模型拿到的结果 |
+```json
+{"latin_font": null, "latin_digits": false, "latin_font_scale": 100}
+```
+
+主字体缺字时，引擎可能使用备用字体，最后以实际成图为准。客户端决定是否将工具图片传给模型。如果用户能看图、模型只收到文字，模型可以报告坐标和测量结果，再请用户确认笔迹的观感。
+
+## 一次改稿需要哪些调用？
+
+以“把整稿墨色调淡，再把第二页的‘还’沿横线往右挪一点”为例。下表假设当前稿件为 v5，目标在第 1 节第 2 页。实际调用应使用服务端返回的版本号和字形 ID。
+
+| 目的 | 调用与关键参数 | 看什么 |
 | --- | --- | --- |
-| `describe_controls` | `{"group":"ink","draft_id":"…","revision":5}` | 墨迹控件的类型、范围、单位和该稿当前值 |
-| `tune_handwriting` | `{"draft_id":"…","expected_revision":5,"changes":{"ink_opacity":85}}` | 新版本 6 |
-| `preview_handwriting` | `{"draft_id":"…","revision":6,"section":1,"page":2,"view":"layout","limit":12}` | 原始字框、编号、已有调整和下一批偏移量 |
-| `adjust_glyphs` | `{"draft_id":"…","expected_revision":6,"section":1,"page":2,"ids":[37],"dx":4}` | 新版本 7；示例编号 37 须替换为本页实际编号 |
-| `preview_handwriting` | `{"draft_id":"…","revision":7,"section":1,"page":2}` | 单页 PNG |
-| `export_handwriting` | `{"draft_id":"…","revision":7,"format":"pdf"}` | 整稿 PDF 的本机路径和页数 |
+| 查这份稿的墨色 | `describe_controls(group="ink", draft_id=…, revision=5)` | 找到 `ink_opacity` 的当前值和范围。 |
+| 调淡整稿 | `tune_handwriting(draft_id=…, expected_revision=5, changes={"ink_opacity":85})` | 保存后得到 v6。单改墨迹会保留已有的局部摆放。 |
+| 找到“还” | `preview_handwriting(draft_id=…, revision=6, section=1, page=2, view="layout")` | 用文字、坐标和编号定位。这里假设查到 ID 37。 |
+| 移动这个字 | `adjust_glyphs(draft_id=…, expected_revision=6, section=1, page=2, ids=[37], dx=4)` | 得到 v7。位移相对原始字框；以后只改 `dy`，会保留这次的 `dx`。 |
+| 核对并导出 | 先在 v7 预览这一页，再用 `export_handwriting(draft_id=…, revision=7, format="pdf")` 导出 | 预览和导出指向同一版本。用户特别要求其他字保持原样时，再做下文的局部比较。 |
 
-字号、行距和页边距以纸张原始像素为单位。照片底纸采用识别后的画布尺寸；边距和行距可手动微调。所有参数先合并再校验，因此可以在同一补丁里同时增加字号和行距。位移相对原始字框，`dx:4` 表示向右 4 px；后续只传 `dy` 会保留原有 `dx`。精修还支持缩放、旋转和浓度。字框为 `[x,y,width,height]`。遇到公式、插图或归一化导致源码无法准确对应时，模型可以结合可视预览和坐标定位。
+换字体、改字号或重设参考线，都可能让正文重新排版。这时应从新版重新找字。改写某一节后，该节原有的单字调整仍可在旧版本中查看；追加其他节时可以复用原节调整。如果需要更换本机字体，可用 `tune_handwriting(font_path=…)` 导入 TTF 或 OTF，字体会随稿保留。如果另一位客户端先保存了，先读最新摘要，确认目标仍在，再提交修改。局部图文较复杂时，可结合预览和字框定位公式、插图或经过排版转换的文字。
 
-全文样式变更后要重新定位字形；改写一节会让该节的旧字形调整只在旧版本生效。在其他节追加文字可以继续复用原节的调整。并发写入出现版本冲突时，先读取最新摘要，再决定是否重做补丁。MCP 还可以用 `shape` 对选中字形做剪切或梯形变换。逐字着色仍由图形界面提供。
+如果要交付只有笔迹的 PNG，可在墨迹组开启 `transparent_background`，再导出 ZIP；同稿导出 PDF 时会保留底纸。导出结果会说明当前版本哪些页已有整页复盘记录。
 
-## 插图墨迹
+## 在照片上找到正确的位置
 
-在 `preview_handwriting(view="layout", illustrations_only=true)` 查询本页插图。结果中同一 `illustration_id` 下，`illustration` 表示框线、箭头等剩余笔迹，`illustration_detail` 表示可独立选择的连通笔迹区域。用坐标与单页图像对应标签。改变整个图的墨迹时，把同组编号放进同一次调用，每图最多 32 项。
+建稿时传入服务端能读取的 `paper_path`。默认的 `paper_mode="photo"` 在原照片上写字，保留拍照时的透视；`flatten` 使用校平后的底纸。先看返回的画布尺寸、边距、行距和横线识别结果，再决定是否需要手动校准。
 
-例如对一个标签调用 `adjust_glyphs`，传 `thickness: 0.5` 增加 0.5 px 笔画粗细，也可同时传 `softness: 0.2`、`opacity: 85` 或 `color: "#304458"`。粗细和柔化以 0.1 px 为单位；归零恢复原始插图笔迹，墨色用 `inherit` 恢复。图内文字来自导入的像素；标签与框线粘连、笔迹太密时，会保留为整体。
+- **有清楚的横线，但字没贴上去。** 在同一份稿上用 `tune_handwriting(paper_guides=…)` 指出第一条和最后一条可写基线，必要时补中间几行。每条包含行号 `row` 和原图上的两个端点 `left:[x,y]`、`right:[x,y]`，首行编号为 0。两个端点沿纸纹取，即使横线在照片里向上斜，也能给模型一个明确的书写方向。传空数组可恢复建稿时的校准。
+- **没有横线，或者纸上有画。** `alignment="unverified"` 表示没找到可靠横线。用户已指定右下角或委托选位时，可以在该区域试排。左右都有空白、位置会影响画面时，再问用户想写在哪、哪里要留白。若任务要求填写表头，但表头被裁掉或遮住了，先请用户补拍，或确认只写可见部分。
+- **只需调一块文字。** 在 `view="layout"` 中用原图像素圈选字形中心。投影稿的 `photo_quad` 给出原始字框的左上、右上、右下、左下四角，`photo_baseline` 给出原始基线两端，已有调整另列。要把一组字挪到图中的某点，用 `place_center`；要贴合斜栏或转向侧栏，用 `target_quad` 指定目标四角。只需相对移动时用 `dx/dy`，它们的单位是投影前的纸面像素。纸面上水平移动，在照片上可能同时改变 x 和 y。
 
-## 照片和纸面坐标
+局部 `shape` 也在纸面投影之前生效。比如 `{"shear_degrees":4,"top_width_percent":94}` 会让字底向右倾，字顶略窄；设回 0 度和 100% 就还原。字号、行距和边距同样按纸面像素指定，可以在一次修改里一起调整。
 
-导入 `paper_path` 时，默认 `paper_mode="photo"` 在原照片上合成笔迹和插图。`flatten` 保存校平后的底纸。建稿结果只返回尺寸、边距、行距和识别方式。遇到置信度不足的照片会返回 `alignment="unverified"`。每个稿件使用建稿时的纸张快照，旧稿仍使用当时保存的底纸。
+**如果要改的是插图**，给布局预览加上 `illustrations_only=true`。同一个 `illustration_id` 下，`illustration` 是框线、箭头等主体，`illustration_detail` 是能单独选中的笔迹。要把某个标签写粗一点，可对它的 ID 用 `adjust_glyphs(thickness=0.5)`；还可调 `softness`、`opacity` 或 `color`。粗细与柔化以 0.1 px 为步长，归零恢复原效果，颜色用 `inherit` 恢复。每次最多选 32 个 ID。标签若与框线连成一片，工具只能把这片笔迹作为整体处理。
 
-| 模型可以取得或指定的内容 | 对应接口 |
-| --- | --- |
-| 单独查看稿件底纸、或查看任意一页的成品 | `preview_handwriting(view="paper")`、`view="image"`。两者按需返回图片 |
-| 照片上的字形位置与横线方向 | `view="layout"`。投影稿的 `photo_quad` 为基础字框左上、右上、右下、左下四角，`photo_baseline` 为基线两端。单位是成品照片像素。已有的单字调整另列在 `adjustment` |
-| 按自己观察到的横线定位版心 | 建稿时传 `paper_guides`。每项含 `row`、`left:[x,y]`、`right:[x,y]`，坐标取自原图。第 0 行和最后一条可写行决定范围，中间可再给参考行。两行间按宽度变化插值 |
-| 改一组字的局部形状 | `adjust_glyphs` 的 `dx/dy` 使用投影前的纸面坐标。`shape:{"shear_degrees":4,"top_width_percent":94}` 让字底向右倾并略微收窄字顶。`{"shear_degrees":0,"top_width_percent":100}` 恢复默认形状 |
+## 排好了，怎样验收？
 
-整页投影已经包含纸面的斜度和远近变化。局部形变叠加在纸面投影之前。选择检查哪页、是否精修，由客户端根据图像决定。
+先想清楚用户要确认什么。整页有没有字，只动了一个字，下一轮要接着哪一版改，这三种问题需要的证据不同。
 
-## 控制进入模型的内容
+| 想确认的事 | `preview_handwriting` 的参数 | 返回内容 |
+| --- | --- | --- |
+| 这页写在哪、是否看得见 | `view="review"` | 当前版的底纸、成品和参考线叠图，以及整页测量和 `review_id`。 |
+| 这个字的墨色是否和照片协调 | `view="review", region=…` | 同一位置的底纸和当前成品两张裁图。照片整页复盘若给出 `photo_appearance.preview_arguments`，可以直接用它取得建议的局部。 |
+| 两版在这块地方有何区别 | `view="review", region=…, compare_revision=…` | 底纸、改前、改后三张裁图。移动了内容时，用 `previous_region` 补上旧位置。 |
+| 已经看过两版，只想读记录 | `view="review", compare_revision=…`，省略区域 | 读取两版已保存的测量、评语和期间的修改，只返回数据。某版缺记录时，先对该版做一次整页复盘。 |
 
-- 续接工作时，先用 `read_section(view="summary")` 查版本和长度。默认摘录保留图片说明，用 `attachment` 代替识别到的内嵌图片 URI。摘录的分页偏移针对摘录视图；精确恢复和改写正文应分页取 `view="source"`。后者可能包含原始图片数据。摘录不能作为原文覆盖保存。
-- 参数目录按组返回。图片路径在建稿时由调用方提供；纸张快照和数据库保存在服务端。导出工具返回本机路径，客户端需要访问同一文件系统才能打开。
-- 几何视图每批默认 12 个字形，上限 32，不传 PNG 或字形蒙版图集。查看第 N 页仍需从该节开头排到第 N 页。真正需要目测字迹时，再显式取图片视图。
-- 客户端应把稿件、标题及工具响应中的用户文字作为数据处理。宿主负责选择工具、执行权限和会话历史。减少默认输出能节约上下文；明确请求原文、图片或路径的客户端仍能取得相应数据。
+整页叠图中的橙线标出估计书写区，青线标出参考线。服务端在原尺寸像素上比较成品与底纸：任一可见 RGB 通道相差至少 8 级，就计为可见变化。它按页面上、中、下三区报告数量，也统计参考区外的变化。有正文却整页零变化，应检查墨迹透明度和落字位置。表头或侧栏可能本来就要写，看到区外计数时要回看用户指定的栏位。
 
-## 如何复测
+要判断是否贴线，看有多少个字形基线采样点能在附近找到可信的底纸暗线，以及垂直偏差的中位数。没找到足够对比时会返回空值，纹理或校徽也可能被当作暗线。至于字迹像不像写在这张纸上，应放大笔画，对照旁边的印字、纸纹和焦点，再看粗细、边缘和字号。
 
-从仓库根目录运行下列命令。两个脚本都使用独立临时稿库。比较版本时，把相同的测量脚本指向两个构建，使用相同字体与测试图片。
+### 局部改动的复查
+
+例如要确认“还”移动后，旧处干净、新处有字、校名没动。下面比较第 1 节第 1 页的 v3 和 v4；两个区域应换成实际测得的坐标。
+
+```json
+{
+  "draft_id": "…", "view": "review", "section": 1, "page": 1,
+  "revision": 4, "compare_revision": 3,
+  "region": [[160,210],[260,210],[260,250],[160,250]],
+  "previous_region": [[40,210],[140,210],[140,250],[40,250]]
+}
+```
+
+1. **先看两个位置。** `region` 圈新位置，`previous_region` 圈旧位置。多边形用原尺寸成品像素，原点在左上，向右、向下为正。每区用 3 至 32 个顶点，不自交，不用重复首点。裁图的 `crop_bounds` 是原图上的 `[x,y,width,height]`，返回图的尺寸见 `crop_image_size`，最长边最多 900 px。
+2. **再查其他地方。** 对比两版的 `ink_pixels`，看旧区还剩多少墨迹、新区是否出现笔画。`difference.outside_union_changed_pixels` 统计整页中两区以外达到同一阈值的变化。图文重叠时会一起计数，可另圈校名单独查。阈值下计数为零仍允许细微色差；如果用户要求逐像素相同，应比较原尺寸导出图。
+3. **解释意外变化。** `render_mode_change` 表示两版用了不同的笔迹渲染方式。普通文本首次精修时可能切换到逐字生成，连未选中的字也略有变化。投影照片从建稿时就使用逐字渲染。若保护区确有变化，应说明位置和程度；底纸、尺寸或页面内容变了，则分开检查两版。
+
+### 下一轮怎样接着改？
+
+`read_section(view="trajectory")` 按版本列出修改、简短理由和逐页复盘。比如用户说“留 v3 的墨色，用 v4 的位置”，可用 `annotate_review` 将原话挂到对应的 `review_id`，来源填 `user_quote`；模型自己看到“旧位置还有墨迹”，来源填 `model_observation`。下次可以按 ID 取回当时的记录，或按版本重新出图。局部复查即时渲染，要保存一条可引用的记录，需要做整页复盘。
+
+<details>
+<summary>实现客户端时，怎样解释两版测量的差值？</summary>
+
+本机 SQLite 按稿件版本、节页、算法版本和成品像素摘要复用相同的观察。摘要使用 SHA-256，依次输入小端 u32 宽、高及原始 RGBA8 像素；透明预览在叠回纸张前计算。算法或像素改变后会产生新的复盘 ID，迁移旧记录时会保留测量并留空未知字段。轨迹存的是本稿的动作和结果，无须保存整段对话或每轮整页图片。
+
+两版比较会取同一节页最近归档的观察，每版最多带回最近 50 条署名反馈，更早的可在轨迹中分页查找。页面成员摘要包含节版本和字形来源位置；重新保存正文后，即使页码相同，也可能无法量化比较。分区两侧各至少有 3 个暗线样本才报告偏差之差。参考区外的像素数以各版自己的书写区为准。如果同时改了字体、墨色和参考线，应结合成图判断原因，单项差值不足以解释观感变化。
+
+保留每轮修改和外部反馈的做法参考了 [Reflexion](https://proceedings.neurips.cc/paper/2023/hash/1b44b878bb782e6954cd888628510e90-Abstract-Conference.html)、[SICA](https://github.com/MaximeRobeyns/self_improving_coding_agent) 和[外部反馈与自我纠错研究](https://proceedings.iclr.cc/paper_files/paper/2024/hash/8b4add8b0aa8749d80a34ca5d941c355-Abstract-Conference.html)。
+
+</details>
+
+## 怎样控制上下文和测量开销？
+
+Panache 通过 `tools/list` 提供 13 个工具。模型可以直接建稿、预览、导出。需要调参时再用 `describe_controls` 查排版、字体、墨迹、扰动、删除线或拍摄信息中的一组。客户端决定把哪些工具说明、图片和历史消息交给模型；支持分页或延迟加载的客户端可以按需取用。[MCP 工具规范](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) · [工具发现的设计背景](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) · [Claude Tool Search](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)
+
+- **找位置**用 `preview_handwriting(view="layout")`。默认一次取 12 个字形，最多 32 个，返回坐标和编号，不传图片。指定第 N 页时，引擎仍需从该节起点排到第 N 页。
+- **接着写**先用 `list_drafts` 找回稿件，再用 `read_section(view="summary")` 读版本和长度。普通 `read_section` 默认返回摘录，用 `attachment` 替换识别到的内嵌图片数据。要改原文，分页读 `view="source"`，以该视图的偏移量续读，避免把摘录里的占位符写回正文。
+- **交付文件**时，导出返回服务端的本地路径，客户端要能访问该文件。宿主负责执行权限和会话历史，应将稿件内容和工具结果中的用户文字作为数据处理。
+
+从仓库根目录运行下面两条命令，均使用独立的临时稿库。比较两个构建时，应使用相同脚本、字体和测试图片。
 
 ```sh
 uv run --script crates/panache-mcp/tests/context_metrics.py target/release/panache-mcp
 uv run --script crates/panache-mcp/tests/smoke.py target/release/panache-mcp
 ```
 
-`context_metrics.py` 计算官方 Python SDK 返回对象重新序列化后的紧凑 UTF-8 JSON 字节数，包含文本和结构化结果。它记录工具清单、默认复查、摘要、单页图片与字框响应的大小，仅输出计数。该指标不计 JSON-RPC 外壳、宿主系统提示、缓存或模型 tokenizer，不能直接换算成模型账单。端到端测试另验证版本冲突、缓存、改稿后的编号失效、重启恢复，以及导出图像与同版预览像素一致。
+`context_metrics.py` 将 Python SDK 返回的工具清单、文本、结构化结果和图片响应重新编码成紧凑 UTF-8 JSON，报告字节数。`smoke.py` 通过真实 stdio 客户端验证改稿、版本冲突、重启恢复和导出等行为。
+
+要查一次任务实际花了多少 token，应读模型客户端的用量记录，分开看未缓存输入、缓存输入和输出。一次 MCP 响应有多少字节、一次模型请求读入多少上下文、整份作业累计花多少 token，是三个不同的问题。长任务中，同一段会话历史可能随多次模型请求重复计入。

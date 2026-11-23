@@ -264,7 +264,7 @@
   "motionSaveFailed": "动效设置已应用，但未能保存。",
   "connectAiClient": "连接 AI 客户端",
   "copyMcpConfig": "复制 MCP 配置（JSON）",
-  "mcpConfigCopied": "MCP 配置已复制",
+  "mcpConfigCopied": "配置已复制。请在 AI 客户端的 MCP 设置里添加 Panache，然后问它「Panache 有哪些字体？」",
   "mcpCopyFailed": "配置复制失败，请重试。",
   "copyImage": "复制图片",
   "imageCopied": "图片已复制到剪贴板",

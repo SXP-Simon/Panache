@@ -41,7 +41,7 @@ impl PaperLayout {
         }
         data
     }
-    fn from_guides(width: u32, height: u32, guides: &[Guide]) -> Result<Self> {
+    pub fn from_guides(width: u32, height: u32, guides: &[Guide]) -> Result<Self> {
         ensure!(
             (2..=32).contains(&guides.len()) && guides[0].row == 0,
             "Supply 2..32 guides starting at row 0"
@@ -68,8 +68,12 @@ impl PaperLayout {
         let last_y = line(last, center);
         let step = (last_y - first_y) / f32::from(last.row);
         ensure!(
-            step >= 1. && first_y >= step && last_y < height as f32,
-            "Guides leave no room for the first or last line"
+            step.is_finite() && step >= 1. && last_y < height as f32,
+            "Supply ordered baseline rows at least one pixel apart, ending within the image"
+        );
+        ensure!(
+            first_y >= step,
+            "Row 0 has {first_y:.1}px above it at image center; it needs one row interval ({step:.1}px). On a tight crop use the next visible ruling as row 0 and renumber the remaining guides."
         );
         let left = guides[0].left[0];
         let right = guides[0].right[0];

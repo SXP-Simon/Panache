@@ -13,7 +13,7 @@ pub enum Paper {
     Dots,
 }
 
-#[derive(Deserialize, JsonSchema, Default)]
+#[derive(Clone, Copy, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Format {
     #[default]
@@ -24,7 +24,7 @@ pub enum Format {
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Style {
-    /// Exact filename from list_fonts.
+    /// Main font filename from list_fonts. English letters and digits follow it by default.
     pub font: String,
     pub paper: Paper,
     /// RGB hex color, e.g. #302c30.
@@ -66,10 +66,10 @@ pub enum PaperMode {
     Flatten,
 }
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(serde::Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Guide {
-    /// Zero-based writable ruling number, counted from the first supplied ruling.
+    /// Count writable baselines from row 0. At the image center, leave one full row interval above row 0; on a tight crop start at the next visible ruling.
     pub row: u16,
     /// Left and right endpoints [x,y] of this same baseline in original photo pixels.
     pub left: [u32; 2],
@@ -112,10 +112,17 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
+    /// Replace the writing area on the saved paper, using 2..32 photo-space baselines. Pass [] to restore the original import calibration. Existing text is reflowed. Use the top and bottom writable lines even on unruled paper.
+    pub paper_guides: Option<Vec<Guide>>,
+    /// Import an absolute local TTF/OTF file into this draft. Its bytes are retained across restarts.
+    pub font_path: Option<std::path::PathBuf>,
+    /// Brief observable issue or user instruction that motivated this edit (max 320 characters).
+    pub note: Option<String>,
     pub draft_id: String,
     pub expected_revision: u32,
     /// Sparse name/value patch from describe_controls. Null restores the original setting.
-    pub changes: std::collections::BTreeMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub changes: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -127,6 +134,8 @@ pub struct List {
 #[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadView {
+    Review,
+    Trajectory,
     #[default]
     Excerpt,
     Summary,
@@ -136,6 +145,8 @@ pub enum ReadView {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Read {
+    /// With view=review, retrieve one immutable measurement and its attributed feedback.
+    pub review_id: Option<String>,
     /// Default excerpt omits inline image bytes; summary omits text; source reads exact Markdown.
     pub view: Option<ReadView>,
     pub draft_id: String,
@@ -151,12 +162,13 @@ pub struct Read {
 #[derive(Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PreviewView {
+    Review,
     Paper,
     Image,
     Layout,
 }
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(serde::Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Shape {
     /// Horizontal shear in degrees, -20..20. Positive displaces the bottom to the right.
@@ -168,12 +180,18 @@ pub struct Shape {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Nudge {
+    /// Optional short user feedback or observable reason to retain with this revision.
+    pub note: Option<String>,
     pub draft_id: String,
     pub expected_revision: u32,
     pub section: u32,
     pub page: usize,
     /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
     pub ids: Vec<u32>,
+    /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
+    pub place_center: Option<[u32; 2]>,
+    /// Image destinations of the original block's TL,TR,BR,BL corners, in that order (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Replaces prior geometry; use separately from other geometry changes.
+    pub target_quad: Option<[[u32; 2]; 4]>,
     /// Absolute offsets in pixels from the original glyph position. Omitted fields retain their values.
     pub dx: Option<i32>,
     pub dy: Option<i32>,
@@ -196,9 +214,15 @@ pub struct Nudge {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// In review, compare with an earlier revision. Omit region for stored, data-only evidence (offset/limit paginate edits). With region, render paired crops.
+    pub compare_revision: Option<u32>,
+    /// 3..32 vertices in native output image pixels, origin top left. Layout selects glyph centers. Review measures the polygon and shows its bounding crop.
+    pub region: Option<Vec<[i32; 2]>>,
+    /// With review, region and compare_revision, mark the original position of moved content. The crop covers both polygons; differences outside their union cover the rest of the page.
+    pub previous_region: Option<Vec<[i32; 2]>>,
     /// In layout view, only return illustration outlines and isolated details.
     pub illustrations_only: Option<bool>,
-    /// "image" (default), "paper" for the saved stationery alone, or "layout" for base glyph geometry.
+    /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     pub view: Option<PreviewView>,
     /// Layout mode: start index and number of glyphs (default 12, max 32).
     pub offset: Option<usize>,
@@ -215,5 +239,24 @@ pub struct Preview {
 pub struct Export {
     pub draft_id: String,
     pub revision: Option<u32>,
+    /// PDF includes the paper. ZIP contains page PNGs and respects the transparent_background ink control.
     pub format: Option<Format>,
+}
+
+#[derive(Deserialize, JsonSchema, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackOrigin {
+    UserQuote,
+    ModelObservation,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewFeedback {
+    pub draft_id: String,
+    pub review_id: String,
+    /// user_quote is reserved for the user's actual words; use model_observation for your interpretation.
+    pub origin: FeedbackOrigin,
+    /// Short, page-specific feedback, up to 320 characters.
+    pub text: String,
 }

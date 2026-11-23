@@ -1,13 +1,46 @@
+mod observations;
 use anyhow::{Context, Result, ensure};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 use crate::Style;
 use crate::paper::{ImportedPaper, PaperLayout};
 
 pub struct Drafts(PathBuf);
+
+#[cfg(test)]
+#[test]
+fn concurrent_first_opens_share_a_complete_schema() -> Result<()> {
+    let home = tempfile::tempdir()?;
+    let ready = std::sync::Barrier::new(8);
+    std::thread::scope(|s| -> Result<()> {
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                s.spawn(|| -> Result<()> {
+                    ready.wait();
+                    let drafts = Drafts::open(home.path())?;
+                    let db = drafts.connect()?;
+                    assert!(
+                        db.table_exists(None, "drafts")?
+                            && db.table_exists(None, "review_observations")?
+                    );
+                    assert_eq!(
+                        db.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0))?,
+                        "wal"
+                    );
+                    Ok(())
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().unwrap()?;
+        }
+        Ok(())
+    })
+}
 
 pub struct Snapshot<'a> {
     pub revision: u32,
@@ -21,6 +54,20 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
+    pub fn has_font(&self, handle: &str) -> Result<bool> {
+        Ok(self.drafts.connect()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM draft_fonts WHERE draft=? AND handle=?)",
+            params![self.id, handle],
+            |r| r.get(0),
+        )?)
+    }
+    pub fn font_bytes(&self, handle: &str) -> Result<Vec<u8>> {
+        Ok(self.drafts.connect()?.query_row(
+            "SELECT bytes FROM draft_fonts WHERE draft=? AND handle=?",
+            params![self.id, handle],
+            |r| r.get(0),
+        )?)
+    }
     pub fn camera(&self, paper: Option<&[u8]>) -> Result<handwriting_core::export::CameraMetadata> {
         let input = serde_json::from_value(Value::Object(self.controls.clone()))?;
         Ok(handwriting_core::export::CameraMetadata::from_paper(
@@ -47,6 +94,7 @@ impl Snapshot<'_> {
         section: u32,
         version: u32,
         edits: &handwriting_core::fine_edit::Adjustments,
+        details: &Value,
     ) -> Result<u32> {
         let mut db = self.drafts.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -61,6 +109,10 @@ impl Snapshot<'_> {
                 next,
                 serde_json::to_string(edits)?
             ],
+        )?;
+        tx.execute(
+            "INSERT INTO edit_notes VALUES(?,?,?)",
+            params![self.id, next, details.to_string()],
         )?;
         tx.commit()?;
         Ok(next)
@@ -78,6 +130,7 @@ impl Snapshot<'_> {
     }
 }
 
+#[derive(Clone)]
 pub struct Section {
     pub number: u32,
     pub version: u32,
@@ -87,9 +140,29 @@ pub struct Section {
 impl Drafts {
     pub fn open(dir: &Path) -> Result<Self> {
         let drafts = Self(dir.join("drafts.sqlite3"));
-        drafts.connect()?.execute_batch(
+        let mut db = drafts.connect()?;
+        // Concurrent first opens can both hold read locks when SQLite upgrades to WAL.
+        // SQLite may return BUSY immediately for this upgrade despite its busy timeout.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match db.pragma_update(None, "journal_mode", "WAL") {
+                Err(err)
+                    if matches!(
+                        err.sqlite_error_code(),
+                        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+                    ) && Instant::now() < deadline =>
+                {
+                    std::thread::sleep(Duration::from_millis(20))
+                }
+                result => {
+                    result.context("Enable WAL for the draft database")?;
+                    break;
+                }
+            }
+        }
+        let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute_batch(
             "
-            PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS drafts (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL, style TEXT NOT NULL,
                 revision INTEGER NOT NULL, chars INTEGER NOT NULL, sections INTEGER NOT NULL
@@ -113,16 +186,30 @@ impl Drafts {
                 revision INTEGER NOT NULL, source TEXT NOT NULL, prepared TEXT NOT NULL,
                 PRIMARY KEY(draft,number,revision)
             );
+            CREATE TABLE IF NOT EXISTS paper_layouts (
+                draft TEXT NOT NULL, revision INTEGER NOT NULL, layout TEXT NOT NULL,
+                PRIMARY KEY(draft,revision)
+            );
+            CREATE TABLE IF NOT EXISTS draft_fonts (
+                draft TEXT NOT NULL, handle TEXT NOT NULL, bytes BLOB NOT NULL,
+                PRIMARY KEY(draft,handle)
+            );
+            CREATE TABLE IF NOT EXISTS edit_notes (
+                draft TEXT NOT NULL, revision INTEGER NOT NULL, details TEXT NOT NULL,
+                PRIMARY KEY(draft,revision)
+            );
             CREATE TABLE IF NOT EXISTS papers (
                 draft TEXT PRIMARY KEY REFERENCES drafts(id), layout TEXT NOT NULL, image BLOB NOT NULL
             );
         ",
         )?;
+        tx.commit()?;
+        observations::initialize(&mut db)?;
         Ok(drafts)
     }
-    fn connect(&self) -> Result<Connection> {
+    pub(crate) fn connect(&self) -> Result<Connection> {
         let db = Connection::open(&self.0)?;
-        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.busy_timeout(Duration::from_secs(5))?;
         Ok(db)
     }
     pub fn save(
@@ -240,13 +327,20 @@ impl Drafts {
             Some((r, layout, s)) => (r, layout, serde_json::from_str(&s)?),
             None => (0, 0, crate::controls::Changes::new()),
         };
+        let updated_layout: Option<String> = self.connect()?.query_row(
+            "SELECT layout FROM paper_layouts WHERE draft=? AND revision<=? ORDER BY revision DESC LIMIT 1",
+            params![id,revision], |r| r.get(0)).optional()?;
         Ok(Snapshot {
             controls,
             settings_revision,
             layout_revision,
             id,
             drafts: self,
-            paper: layout.as_deref().map(serde_json::from_str).transpose()?,
+            paper: updated_layout
+                .or(layout)
+                .as_deref()
+                .map(serde_json::from_str)
+                .transpose()?,
             revision,
             style: serde_json::from_str(&style)?,
         })
@@ -255,7 +349,10 @@ impl Drafts {
         &self,
         draft: &Snapshot<'_>,
         controls: &crate::controls::Changes,
-        camera_only: bool,
+        preserve_layout: bool,
+        paper: Option<&PaperLayout>,
+        font: Option<(&str, &[u8])>,
+        details: &Value,
     ) -> Result<u32> {
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -264,7 +361,23 @@ impl Drafts {
             "INSERT INTO settings VALUES (?1,?2,?3)",
             params![draft.id, next, serde_json::to_string(controls)?],
         )?;
-        if camera_only {
+        if let Some(paper) = paper {
+            tx.execute(
+                "INSERT INTO paper_layouts VALUES(?,?,?)",
+                params![draft.id, next, serde_json::to_string(paper)?],
+            )?;
+        }
+        if let Some((handle, bytes)) = font {
+            tx.execute(
+                "INSERT INTO draft_fonts VALUES(?,?,?)",
+                params![draft.id, handle, bytes],
+            )?;
+        }
+        tx.execute(
+            "INSERT INTO edit_notes VALUES(?,?,?)",
+            params![draft.id, next, details.to_string()],
+        )?;
+        if preserve_layout {
             tx.execute(
                 "INSERT INTO camera_revisions VALUES (?1,?2,?3)",
                 params![draft.id, next, draft.layout_revision],
@@ -284,6 +397,46 @@ impl Drafts {
         );
         Ok(next)
     }
+    pub fn trajectory(&self, id: &str, rev: u32, offset: u32, limit: u32) -> Result<Value> {
+        ensure!((1..=50).contains(&limit), "Trajectory limit must be 1..50");
+        let db = self.connect()?;
+        let mut stmt=db.prepare(
+            "WITH events(revision,action,section,page,evidence,review_id,origin,seq) AS (
+              SELECT revision,'save_section',number,NULL,NULL,NULL,'draft_edit',0 FROM sections WHERE draft=?1
+              UNION ALL SELECT revision,'tune_handwriting',NULL,NULL,NULL,NULL,'draft_edit',0 FROM settings WHERE draft=?1
+              UNION ALL SELECT revision,'adjust_glyphs',section,NULL,NULL,NULL,'draft_edit',0 FROM glyph_edits WHERE draft=?1
+              UNION ALL SELECT revision,'page_review',section,page,evidence,review_id,'measurement',seq
+                FROM review_observations WHERE draft=?1
+              UNION ALL SELECT o.revision,'review_feedback',o.section,o.page,json_object('text',f.note),
+                       o.review_id,f.origin,f.rowid FROM review_feedback f JOIN review_observations o USING(review_id)
+                WHERE o.draft=?1
+            )
+            SELECT e.revision,e.action,e.section,COALESCE(e.page,json_extract(n.details,'$.page')),
+                   COALESCE(e.evidence,n.details,'{}'),e.review_id,e.origin
+            FROM events e LEFT JOIN edit_notes n ON n.draft=?1 AND n.revision=e.revision
+            WHERE e.revision<=?2
+            ORDER BY e.revision DESC,(e.action='review_feedback') DESC,(e.action='page_review') DESC,e.seq DESC,e.section,e.page
+            LIMIT ?3 OFFSET ?4")?;
+        let mut entries = Vec::new();
+        let mut rows = stmt.query(params![id, rev, limit + 1, offset])?;
+        while let Some(row) = rows.next()? {
+            let details: String = row.get(4)?;
+            entries.push(json!({
+                "revision":row.get::<_,u32>(0)?,
+                "action":row.get::<_,String>(1)?,
+                "review_id":row.get::<_,Option<String>>(5)?,"origin":row.get::<_,String>(6)?,
+                "section":row.get::<_,Option<u32>>(2)?,
+                "page":row.get::<_,Option<u32>>(3)?,
+                "details":serde_json::from_str::<Value>(&details)?,
+            }));
+        }
+        let more = entries.len() > limit as usize;
+        entries.truncate(limit as usize);
+        Ok(
+            json!({"draft_id":id,"revision":rev,"events":entries,"next_offset":if more {offset.checked_add(limit)} else {None}}),
+        )
+    }
+
     pub fn review(
         &self,
         id: &str,

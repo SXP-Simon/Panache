@@ -4,6 +4,10 @@ mod engine;
 mod inputs;
 mod markdown;
 mod paper;
+mod placement;
+mod review;
+mod storage;
+mod tuning;
 
 use anyhow::{Context, Result, ensure};
 use drafts::Drafts;
@@ -29,7 +33,7 @@ struct State {
     drafts: Drafts,
     engine: Mutex<Engine>,
     fonts: Vec<String>,
-    output: PathBuf,
+    storage: storage::Storage,
     worker: Arc<str>,
     render_slot: Arc<Semaphore>,
     prepare_slot: Arc<Semaphore>,
@@ -57,6 +61,20 @@ impl Drop for CancelOnDrop {
 }
 
 impl Panache {
+    async fn storage_task(
+        &self,
+        run: impl FnOnce(&storage::Storage, &Drafts) -> Result<serde_json::Value> + Send + 'static,
+    ) -> CallToolResult {
+        let state = self.0.clone();
+        tool_result(
+            async {
+                let value = tokio::task::spawn_blocking(move || run(&state.storage, &state.drafts))
+                    .await??;
+                Ok(reply(value.to_string(), value))
+            }
+            .await,
+        )
+    }
     async fn render(
         &self,
         ctx: RequestContext<RoleServer>,
@@ -133,7 +151,7 @@ impl Panache {
         };
         let permit = self.0.prepare_slot.clone().acquire_owned().await?;
         let worker = self.0.worker.clone();
-        let saved = tokio::task::spawn_blocking({
+        let mut saved = tokio::task::spawn_blocking({
             let state = self.0.clone();
             move || -> Result<serde_json::Value> {
                 let _permit = permit;
@@ -158,18 +176,28 @@ impl Panache {
                     }
                     _ => None,
                 };
+                let _budget = paper
+                    .as_ref()
+                    .map(|p| state.storage.import(p.bytes.len()))
+                    .transpose()?;
                 state
                     .drafts
                     .save(&input, &prepared, style.as_ref(), paper.as_ref())
             }
         })
         .await??;
-        let message = format!(
+        let mut message = format!(
             "已保存稿件 `{}` 的第 {} 节，当前版本 **{}**。",
             saved["draft_id"].as_str().unwrap_or_default(),
             saved["section"],
             saved["revision"]
         );
+        if saved["paper"]["alignment"] == "unverified" {
+            let hint = "未识别到可靠横线。无横线纸和画作均可继续使用。若落字位置不明确，先问用户想写在哪一侧、是否方便圈出区域，或哪些图案要留白。已有指定区域或用户已委托选位时，可直接按意图在本稿排版；用 tune_handwriting 的 paper_guides 定位，再用 preview_handwriting 的 review 视图复查。";
+            saved["placement_guidance"] = json!(hint);
+            message.push('\n');
+            message.push_str(hint);
+        }
         Ok(reply(message, saved))
     }
 }
@@ -180,7 +208,18 @@ impl ServerHandler for Panache {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
-            .with_instructions("Drafts contain versioned Markdown sections. Images, the saved paper and per-glyph geometry are available on demand. Photo-space coordinates describe the preview; local adjustments use paper-space pixels.")
+            .with_instructions(concat!(
+                "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
+                "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
+                "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
+                "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
+                "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+                "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
+                "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
+                "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
+                "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
+                "Review the edited revision. Use read_section(view=trajectory) to revisit actions and evidence."
+            ))
     }
 }
 
@@ -221,6 +260,12 @@ impl Panache {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or(&draft.style.font)
                         ),
+                        "paper" => draft
+                            .controls
+                            .get(k)
+                            .cloned()
+                            .unwrap_or(json!(draft.style.paper)),
+                        "ink_alpha" => json!(params.fill[3]),
                         "ink" => json!(
                             draft
                                 .controls
@@ -246,36 +291,26 @@ impl Panache {
     }
 
     #[tool(
-        description = "Tune a saved draft with a sparse control patch; returns a new revision. Preview that revision before export."
+        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. Map the intended area onto first/last writable baselines even on artwork or unruled paper. Ink-group changes preserve local glyph placement; after changing font, size or guides, inspect the new layout. Review the new revision before export."
     )]
-    fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
-        tool_result((|| {
-            let draft = self
-                .0
-                .drafts
-                .snapshot(&input.draft_id, Some(input.expected_revision))?;
-            let changes = controls::merge(
-                &draft.controls,
-                &input.changes.into_iter().collect(),
-                &self.0.fonts,
-            )?;
-            ensure!(changes != draft.controls, "No control values changed");
-            controls::parameters(&draft, 1, &changes)?;
-            let camera_only = changes.keys().chain(draft.controls.keys()).all(|key| {
-                controls::catalog()["camera"].get(key).is_some()
-                    || changes.get(key) == draft.controls.get(key)
-            });
-            let next = self.0.drafts.tune(&draft, &changes, camera_only)?;
-            Ok(reply(
-                format!("Saved revision {next}."),
-                json!({"draft_id":draft.id,"revision":next,"controls":changes,"fine_layout":if camera_only { "preserved" } else { "inspect_again" }}),
-            ))
-        })())
+    async fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
+        let state = self.0.clone();
+        tool_result(
+            async {
+                let permit = state.prepare_slot.clone().acquire_owned().await?;
+                tokio::task::spawn_blocking(move || {
+                    let _permit = permit;
+                    tuning::apply(&state, input)
+                })
+                .await?
+            }
+            .await,
+        )
     }
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "List local font filenames accepted by save_section."
+        description = "List local fonts accepted by save_section and how to preview a coherent Chinese, English and digit sample."
     )]
     fn list_fonts(&self) -> CallToolResult {
         let names = self
@@ -284,7 +319,17 @@ impl Panache {
             .iter()
             .map(|name| format!("- {name}"))
             .collect::<Vec<_>>();
-        reply(names.join("\n"), json!({"fonts": self.0.fonts}))
+        let guidance = concat!(
+            "Select only the main font for a new draft. Its letters and digits are the default, including for homework and lab reports. ",
+            "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
+            "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
+            "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
+            "Honor an approved or delegated main font. A request for generally messier handwriting applies to the main font. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
+        );
+        reply(
+            format!("{}\n\n{guidance}", names.join("\n")),
+            json!({"fonts": self.0.fonts, "sample_guidance": guidance}),
+        )
     }
 
     #[tool(
@@ -316,11 +361,30 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read one section: summary, excerpt (default, image data omitted), or exact source. Offset counts Unicode characters in the selected view."
+        description = "Read view=review with review_id for exact stored evidence and its user quotes or model observations. Read view=trajectory for recent draft edits, user-provided edit notes and page review evidence (offset/limit count events). Other views read one section: summary, excerpt (default, image data omitted), or exact source. Offset counts Unicode characters in the selected view."
     )]
     fn read_section(&self, Parameters(input): Parameters<Read>) -> CallToolResult {
         tool_result((|| {
             let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
+            if input.view == Some(ReadView::Review) {
+                ensure!(
+                    input.section.is_none() && input.offset.is_none() && input.limit.is_none(),
+                    "Exact review lookup uses draft_id and review_id"
+                );
+                let data =
+                    draft.observation(input.review_id.as_deref().context("Provide review_id")?)?;
+                return Ok(reply(data.to_string(), data));
+            }
+            ensure!(input.review_id.is_none(), "review_id requires view=review");
+            if input.view == Some(ReadView::Trajectory) {
+                let result = self.0.drafts.trajectory(
+                    draft.id,
+                    draft.revision,
+                    input.offset.unwrap_or(0),
+                    input.limit.unwrap_or(12),
+                )?;
+                return Ok(reply(result.to_string(), result));
+            }
             let mut result = self.0.drafts.review(
                 &input.draft_id,
                 draft.revision,
@@ -353,18 +417,48 @@ impl Panache {
     }
 
     #[tool(
-        annotations(read_only_hint = true, open_world_hint = false),
-        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Set illustrations_only=true in layout for editable diagram outlines and details. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
+        annotations(open_world_hint = false),
+        description = "view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,
         Parameters(input): Parameters<Preview>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
+        if input.previous_region.is_some()
+            && !(input.view == Some(PreviewView::Review)
+                && input.region.is_some()
+                && input.compare_revision.is_some())
+        {
+            return tool_result(Err(anyhow::anyhow!(
+                "previous_region requires view=review, region and compare_revision"
+            )));
+        }
+        if let Some(before) = input.compare_revision
+            && input.region.is_none()
+        {
+            return tool_result((|| {
+                ensure!(
+                    input.view == Some(PreviewView::Review) && input.illustrations_only.is_none(),
+                    "compare_revision requires an unfiltered review view"
+                );
+                let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
+                let data = draft.compare_reviews(
+                    before,
+                    input.section.unwrap_or(1),
+                    input.page.unwrap_or(1),
+                    u32::try_from(input.offset.unwrap_or(0))?,
+                    u32::try_from(input.limit.unwrap_or(20))?,
+                )?;
+                Ok(reply(data.to_string(), data))
+            })());
+        }
         let result = self
             .render(ctx, move |state, engine, cancel| {
                 let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
                 ensure!(input.illustrations_only.is_none() || input.view==Some(PreviewView::Layout),"illustrations_only requires view=layout");
+                ensure!(input.region.is_none() || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review)),"region requires view=layout or review");
+                ensure!(input.compare_revision.is_none() || input.view==Some(PreviewView::Review),"compare_revision requires view=review");
                 if input.view==Some(PreviewView::Paper){
                     ensure!(input.offset.is_none() && input.limit.is_none() && input.section.is_none() && input.page.is_none(),"view=paper takes only draft_id and revision");
                     let bytes=draft.background()?.context("No imported paper for this draft")?;
@@ -380,6 +474,15 @@ impl Panache {
                     .pop()
                     .context("Empty draft")?;
                 let page = input.page.unwrap_or(1);
+                if input.view == Some(PreviewView::Review) {
+                    ensure!(input.limit.is_none() && input.offset.is_none(),"Review a single page without pagination");
+                    if let Some(region) = &input.region {
+                        return review::local::page(&state.drafts, engine, &draft, section, &input, region, cancel);
+                    }
+                    let baselines=engine.review_baselines(&draft,section.clone(),page,cancel)?;
+                    let (preview,_)=engine.preview(&draft,section,page,cancel)?;
+                    return review::page(&draft,number,page,&preview.png,&baselines,cancel);
+                }
                 if input.view == Some(PreviewView::Layout) {
                     let result = engine.layout(&draft, section, &input, cancel)?;
                     return Ok(reply(result.to_string(), result));
@@ -388,7 +491,7 @@ impl Panache {
                     input.offset.is_none() && input.limit.is_none(),
                     "offset and limit require view=layout"
                 );
-                let (png, cached) = engine.preview(&draft, section, page, cancel)?;
+                let (preview, cached) = engine.preview(&draft, section, page, cancel)?;
                 let mut result = reply(
                     format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision),
                     json!({
@@ -396,7 +499,7 @@ impl Panache {
                         "section": number, "page_in_section": page, "cached": cached
                     }),
                 );
-                result.content.push(ContentBlock::image(png, "image/png"));
+                result.content.push(ContentBlock::image(preview.png, "image/png"));
                 Ok(result)
             })
             .await;
@@ -404,7 +507,19 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Shape applies additional local shear or taper."
+        description = "Attach a user's exact quote or your own model observation to a review_id. Does not advance the draft revision. Use read_section(view=review,review_id=...) to retrieve it."
+    )]
+    fn annotate_review(&self, Parameters(input): Parameters<ReviewFeedback>) -> CallToolResult {
+        tool_result(
+            self.0
+                .drafts
+                .annotate(&input)
+                .map(|data| reply(data.to_string(), data)),
+        )
+    }
+
+    #[tool(
+        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually."
     )]
     async fn adjust_glyphs(
         &self,
@@ -421,6 +536,10 @@ impl Panache {
                     .sections(draft.id, draft.revision, Some(input.section))?
                     .pop()
                     .context("Unknown section")?;
+                ensure!(
+                    input.note.as_ref().is_none_or(|s| s.chars().count() <= 320),
+                    "Note exceeds 320 characters"
+                );
                 let next = engine.adjust(&draft, section, &input, cancel)?;
                 Ok(reply(
                     format!("Saved revision {next}."),
@@ -432,7 +551,38 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns absolute path and actual page count."
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Inspect MCP home file sizes, available volume space, limits and protected payload. Optionally scope logical counts and registered exports to one draft. Use before considering cleanup."
+    )]
+    async fn storage_usage(&self, Parameters(input): Parameters<storage::Usage>) -> CallToolResult {
+        self.storage_task(move |store, drafts| store.usage(drafts, input))
+            .await
+    }
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Preview one draft's registered exports, eligible abandoned temporary files and byte estimates. Delivered files are report-only. No disk changes. Pass next_after_id to see more."
+    )]
+    async fn plan_cleanup(
+        &self,
+        Parameters(input): Parameters<storage::CleanupScope>,
+    ) -> CallToolResult {
+        self.storage_task(move |store, drafts| store.plan_cleanup(drafts, input))
+            .await
+    }
+    #[tool(
+        annotations(destructive_hint = true, open_world_hint = false),
+        description = "Remove selected abandoned temporary files from a fresh plan in this session. Intended only for reclaiming failed exports. A plan is not permission to delete user deliverables. No paths, completed exports, manuscript history, fonts, papers or reviews can be selected."
+    )]
+    async fn apply_cleanup(
+        &self,
+        Parameters(input): Parameters<storage::ApplyCleanup>,
+    ) -> CallToolResult {
+        self.storage_task(move |store, drafts| store.apply_cleanup(drafts, input))
+            .await
+    }
+
+    #[tool(
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns a local file path and page count. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Review the intended revision, especially after moving glyphs or changing ink."
     )]
     async fn export_handwriting(
         &self,
@@ -444,8 +594,12 @@ impl Panache {
         let result = self.render(ctx, move |state, engine, cancel| {
             let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
             let sections = state.drafts.sections(&input.draft_id, draft.revision, None)?;
-            let (path, pages) = engine.export(
-                &state.output, &draft, sections, input.format.unwrap_or_default(), cancel,
+            let (reviewed,visibility_flags)=draft.review_counts()?;
+            let params=controls::parameters(&draft,1,&draft.controls)?;
+            let zero_text_ink=params.ink_opacity==0 || params.fill[3]==0;
+            let format = input.format.unwrap_or_default();
+            let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
+                writer, &draft, sections, format, cancel,
                 |pages| {
                     if let Some(token) = &progress_token {
                         let update = rmcp::model::ProgressNotificationParam::new(token.clone(), pages as f64)
@@ -453,10 +607,11 @@ impl Panache {
                         let _ = tokio::runtime::Handle::current().block_on(peer.notify_progress(update));
                     }
                 },
-            )?;
-            let message = format!("已导出 **{pages} 页**（版本 {}）。\n\n`{}`", draft.revision, path.display());
+            ))?;
+            let warning=if zero_text_ink || visibility_flags>0 {"墨迹可见性需要复查。"}else if (reviewed as usize)<pages {"未复盘页的局部墨迹可见性尚未核验。"}else{""};
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。\n\n`{}`", draft.revision, path.display());
             Ok(reply(message, json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages
+                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review":{"pages_with_evidence":reviewed,"pages_with_visibility_flags":visibility_flags,"global_text_ink_zero":zero_text_ink,"pages_without_visibility_evidence":pages.saturating_sub(reviewed as usize)}
             })))
         }).await;
         tool_result(result)
@@ -500,11 +655,12 @@ async fn main() -> Result<()> {
         .context("Set PANACHE_MCP_HOME to a writable directory")?;
     let output = home.join("exports");
     fs::create_dir_all(&output)?;
+    let drafts = Drafts::open(&home)?;
     let state = State {
-        drafts: Drafts::open(&home)?,
+        storage: storage::Storage::open(&home, &drafts)?,
+        drafts,
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
-        output: std::path::absolute(output)?,
         worker: fs::read_to_string(worker)?.into(),
         render_slot: Arc::new(Semaphore::new(1)),
         prepare_slot: Arc::new(Semaphore::new(1)),

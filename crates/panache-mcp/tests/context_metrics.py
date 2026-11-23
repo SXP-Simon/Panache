@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from smoke import call
+from mcp_client import call
 
 
 def size(result):

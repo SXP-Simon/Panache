@@ -9,6 +9,7 @@ publish.workspace = true
 handwriting-core.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 rquickjs = "0.14"
+sha2 = "0.10.9"
 serde.workspace = true
 serde_json = "1"
 rmcp = { version = "3.11", features = ["transport-io"] }
@@ -20,3 +21,5 @@ tempfile = "3"
 fontdue = "0.9.4"
 image = { version = "0.25", default-features = false }
 anyhow = "1"
+fs2 = "0.4.3"
+file-id = "0.2.3"
