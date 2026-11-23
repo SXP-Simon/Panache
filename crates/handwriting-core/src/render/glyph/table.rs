@@ -4,8 +4,16 @@ use crate::text::{Table, TableKind, TableRule};
 use rand::RngExt;
 pub(super) mod matrix;
 
-impl Glyphs<'_> {
-    pub(super) fn table(&mut self, table: &Table, size: f32, depth: usize) -> Result<Glyph> {
+/// Every row has the same height, while columns follow the widest ink in each column.
+struct TableCells {
+    rows: Vec<Vec<Glyph>>,
+    column_edges: Vec<i32>,
+    row_height: i32,
+    pad: i32,
+}
+
+impl TableCells {
+    fn measure(glyphs: &mut Glyphs<'_>, table: &Table, size: f32, depth: usize) -> Result<Self> {
         let columns = table.vertical.len().saturating_sub(1);
         if !(1..=32).contains(&columns)
             || table.rows.is_empty()
@@ -16,7 +24,6 @@ impl Glyphs<'_> {
             return Err(Error::new("invalid_layout", "表格行列结构无效"));
         }
         let pad = (size * 0.26).round().max(3.) as i32;
-        let grid_thickness = (size * 0.025).round().max(1.) as i32;
 
         let mut widths = vec![(size * 0.35).round() as i32; columns];
         let mut row_height = (size * 0.77).round() as i32;
@@ -25,7 +32,7 @@ impl Glyphs<'_> {
         for row in &table.rows {
             let mut cells = Vec::new();
             for (column, cell) in row.iter().enumerate() {
-                let g = self.sequence_at(cell, size, depth + 1)?;
+                let g = glyphs.sequence_at(cell, size, depth + 1)?;
                 bytes = bytes.saturating_add(g.mask.len());
                 if bytes > 16_000_000 {
                     return Err(Error::new("invalid_layout", "表格子结构超过内存预算"));
@@ -34,19 +41,87 @@ impl Glyphs<'_> {
                 row_height = row_height.max(g.mask.height() as i32);
                 cells.push(g);
             }
-
             rendered.push(cells);
         }
-        let mut xs = vec![0];
+        let mut column_edges = vec![0];
         for width in widths {
-            xs.push(xs.last().unwrap() + width + pad * 2);
+            column_edges.push(column_edges.last().unwrap() + width + pad * 2);
         }
-        let mut ys = vec![0];
-        for _ in &table.rows {
-            ys.push(ys.last().unwrap() + row_height + pad * 2);
+        Ok(Self {
+            rows: rendered,
+            column_edges,
+            row_height: row_height + pad * 2,
+            pad,
+        })
+    }
+
+    fn width(&self) -> i32 {
+        *self.column_edges.last().unwrap()
+    }
+
+    fn height(&self) -> i32 {
+        self.rows.len() as i32 * self.row_height
+    }
+
+    fn positioned(self, kind: TableKind, inset: i32, offset: i32) -> Vec<PositionedGlyph> {
+        let mut children = Vec::new();
+        for (row, cells) in self.rows.into_iter().enumerate() {
+            for (g, edges) in cells.into_iter().zip(self.column_edges.windows(2)) {
+                let x = if kind == TableKind::Cases {
+                    edges[0] + self.pad
+                } else {
+                    (edges[0] + edges[1] - g.mask.width() as i32) / 2
+                };
+                let y =
+                    row as i32 * self.row_height + (self.row_height - g.mask.height() as i32) / 2;
+                let (left, top) = (inset + x - g.left, offset + y - g.top);
+                children.push((g, left, top));
+            }
         }
-        let width = *xs.last().unwrap();
-        let height = *ys.last().unwrap();
+        children
+    }
+
+    fn rules(
+        &self,
+        table: &Table,
+        inset: i32,
+        offset: i32,
+        size: f32,
+        thickness: i32,
+    ) -> Vec<Path> {
+        let dash = (size * 0.12).round().max(3.) as i32;
+        let mut paths = Vec::new();
+        let mut draw = |rule, start: (i32, i32), direction: (i32, i32), length| {
+            let point = |v| (start.0 + direction.0 * v, start.1 + direction.1 * v);
+            match rule {
+                TableRule::None if table.kind != TableKind::Grid => (),
+                TableRule::Dashed => {
+                    for at in (0..length).step_by((dash * 2) as usize) {
+                        paths.push((vec![point(at), point((at + dash).min(length))], thickness));
+                    }
+                }
+                _ => paths.push((vec![start, point(length)], thickness)),
+            }
+        };
+        for (&x, &rule) in self.column_edges.iter().zip(&table.vertical) {
+            draw(rule, (inset + x, offset), (0, 1), self.height());
+        }
+        for (row, &rule) in table.horizontal.iter().enumerate() {
+            draw(
+                rule,
+                (inset, offset + row as i32 * self.row_height),
+                (1, 0),
+                self.width(),
+            );
+        }
+        paths
+    }
+}
+
+impl Glyphs<'_> {
+    pub(super) fn table(&mut self, table: &Table, size: f32, depth: usize) -> Result<Glyph> {
+        let cells = TableCells::measure(self, table, size, depth)?;
+        let (width, height) = (cells.width(), cells.height());
         Self::check_size(width as u32 + 4, height as u32 + 4)?;
         let offset = if table.kind == TableKind::Grid {
             -height / 2
@@ -55,79 +130,36 @@ impl Glyphs<'_> {
             (x.top + x.bottom()) / 2 - height / 2
         };
         let (inset, delimiters) = matrix::delimiters(table.kind, width, height, size);
-        let mut children = Vec::new();
-        for (row, cells) in rendered.into_iter().enumerate() {
-            for (column, g) in cells.into_iter().enumerate() {
-                let x = inset
-                    + if table.kind == TableKind::Cases {
-                        xs[column] + pad - g.left
-                    } else {
-                        (xs[column] + xs[column + 1] - g.mask.width() as i32) / 2 - g.left
-                    };
-                // 2026-10-20：以实际墨迹居中，避免字体基线差异让数字和分数上下漂移。
-                let y = offset + (ys[row] + ys[row + 1] - g.mask.height() as i32) / 2 - g.top;
-                children.push((g, x, y));
-            }
-        }
-        let mut paths = Vec::new();
-        let mut draw = |rule, start: (i32, i32), end: (i32, i32)| {
-            if table.kind != TableKind::Grid && rule == TableRule::None {
-                return;
-            }
-            let thickness = grid_thickness;
-            let length = (end.0 - start.0).abs().max((end.1 - start.1).abs());
-            if rule != TableRule::Dashed {
-                paths.push((vec![start, end], thickness));
-            } else {
-                let dash = (size * 0.12).round().max(3.) as i32;
-                for at in (0..length).step_by((dash * 2) as usize) {
-                    let to = (at + dash).min(length);
-                    let p = |v| {
-                        if start.0 == end.0 {
-                            (start.0, start.1 + v)
-                        } else {
-                            (start.0 + v, start.1)
-                        }
-                    };
-                    paths.push((vec![p(at), p(to)], thickness));
-                }
-            }
-        };
-        for (index, rule) in table.vertical.iter().enumerate() {
-            draw(
-                *rule,
-                (inset + xs[index], offset),
-                (inset + xs[index], offset + height),
-            );
-        }
-        for (index, rule) in table.horizontal.iter().enumerate() {
-            draw(
-                *rule,
-                (inset, offset + ys[index]),
-                (inset + width, offset + ys[index]),
-            );
-        }
+        let thickness = (size * 0.025).round().max(1.) as i32;
+        let mut paths = cells.rules(table, inset, offset, size, thickness);
         let reach = (size * 0.105).min(5.) * self.pen.naturalness;
-        if table.kind == TableKind::Grid && corner_tails_fit(width, height, grid_thickness, reach) {
-            // 横竖两笔都经过交点，只让其中一笔沿原方向多走一点。
+        if table.kind == TableKind::Grid && corner_tails_fit(width, height, thickness, reach) {
+            // Draw corner extensions in row order so the pen consumes the same random sequence.
             let mut rng = self.next_drawing_rng();
-            for (row, dy) in [(0, -1), (ys.len() - 1, 1)] {
-                for (col, dx) in [(0, -1), (columns, 1)] {
-                    if table.horizontal[row] == TableRule::Dashed
-                        || table.vertical[col] == TableRule::Dashed
-                    {
+            let rows = [
+                (0, -1, table.horizontal[0]),
+                (height, 1, *table.horizontal.last().unwrap()),
+            ];
+            let columns = [
+                (0, -1, table.vertical[0]),
+                (width, 1, *table.vertical.last().unwrap()),
+            ];
+            for (y, dy, horizontal) in rows {
+                for (x, dx, vertical) in columns {
+                    if horizontal == TableRule::Dashed || vertical == TableRule::Dashed {
                         continue;
                     }
                     let tail = (rng.random_range(-1.0f32..1.) * reach).round() as i32;
-                    if tail != 0 {
-                        let corner = (inset + xs[col], offset + ys[row]);
-                        let tip = if tail > 0 {
-                            (corner.0 + dx * tail, corner.1)
-                        } else {
-                            (corner.0, corner.1 + dy * tail.abs())
-                        };
-                        paths.push((vec![corner, tip], grid_thickness));
+                    if tail == 0 {
+                        continue;
                     }
+                    let corner = (inset + x, offset + y);
+                    let tip = if tail > 0 {
+                        (corner.0 + dx * tail, corner.1)
+                    } else {
+                        (corner.0, corner.1 + dy * tail.abs())
+                    };
+                    paths.push((vec![corner, tip], thickness));
                 }
             }
         }
@@ -142,7 +174,9 @@ impl Glyphs<'_> {
         } else {
             inset
         };
-        let mut result = Self::compose((width + inset + right + pad) as f32, children, paths)?;
+        let advance = (width + inset + right + cells.pad) as f32;
+        let mut result =
+            Self::compose(advance, cells.positioned(table.kind, inset, offset), paths)?;
         if table.kind == TableKind::Matrix {
             let axis = self.glyph('x', size)?;
             result.top += (axis.top + axis.bottom() - result.top - result.bottom()) / 2;
