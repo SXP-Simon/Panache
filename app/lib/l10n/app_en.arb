@@ -20,7 +20,25 @@
   "redo": "Redo",
   "parameters": "Paper & handwriting",
   "font": "Handwriting font",
-  "uploadFont": "Upload font",
+  "importFontFile": "Import font from file",
+  "localFonts": "Local font library",
+  "systemFonts": "System fonts",
+  "personalFonts": "My fonts",
+  "searchFonts": "Search font names",
+  "openFontFolder": "Open font folder",
+  "refreshFonts": "Refresh font list",
+  "moreFonts": "Show more fonts",
+  "noMatchingFonts": "No matching fonts",
+  "personalFontsEmpty": "Add TTF or OTF files to this folder, then refresh the list.",
+  "openFontFolderFailed": "Open this folder manually: {path}",
+  "chooseBundledFont": "Choose a bundled font",
+  "@openFontFolderFailed": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "background": "Paper background",
   "uploadBackground": "Upload background",
   "detectBackground": "Detect margins & spacing",

@@ -11,6 +11,8 @@ import '../l10n/app_localizations.dart';
 import '../models/engine_failure.dart';
 import 'dialogs/connection_dialog.dart';
 import 'dialogs/illustration_dialog.dart';
+import 'dialogs/local_font_dialog.dart';
+import '../services/local_fonts.dart';
 import 'dialogs/paper_area_dialog.dart';
 import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
@@ -764,6 +766,19 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         color: value.toARGB32(),
       ));
     },
+    onBrowseLocalFonts: w.managedBackend && w.api.supportsLocalFonts
+        ? () => action(() async {
+            final font = await showDialog<LocalFont>(
+              context: context,
+              builder: (_) => LocalFontDialog(api: w.api),
+            );
+            if (font == null || !mounted) return;
+            final file = await w.api.readLocalFont(font);
+            if (!mounted) return;
+            w.fontFile = file;
+            w.edit();
+          })
+        : null,
     onUploadFont: () => action(() async {
       final file = await pick(['ttf', 'otf']);
       if (file != null) {

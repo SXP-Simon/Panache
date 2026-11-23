@@ -137,8 +137,13 @@ class HandwritingApi {
   }
 
   bool get supportsCancel => _supportsCancel;
+  bool supportsLocalFonts = false;
   bool supportsFineEdit = false;
   void configureCapabilities(dynamic info) {
+    supportsLocalFonts =
+        info is Map &&
+        info['capabilities'] is Map &&
+        info['capabilities']['local_fonts'] == true;
     supportsFineEdit =
         info is Map &&
         info['capabilities'] is Map &&
