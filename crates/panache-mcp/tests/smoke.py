@@ -557,6 +557,24 @@ async def smoke(command, arguments, out):
                 )
                 == adjusted
             )
+        limited = params.model_copy(update={"env": {**params.env, "PANACHE_MCP_MAX_HOME_BYTES": "1"}})
+        async with stdio_client(limited) as streams, ClientSession(*streams) as client:
+            await client.initialize()
+            usage = (await call(client, "storage_usage", **comparison_key)).structuredContent
+            assert usage["warning"] and usage["policy"]["max_home_bytes"] == 1
+            for name, args in [
+                ("save_section", {"markdown": "不可导入", "paper_path": str(Path(__file__).parent.resolve() / "fixtures/ruled.png")}),
+                ("tune_handwriting", {**comparison_key, "expected_revision": 6, "font_path": str(Path(__file__).resolve().parents[3] / "assets/font_assets/李国夫手写体.ttf")}),
+                ("export_handwriting", {**comparison_key, "format": "zip"}),
+            ]:
+                failure = await client.call_tool(name, args)
+                assert failure.isError and "Storage limit" in failure.content[0].text
+            after = (await call(client, "storage_usage", **comparison_key)).structuredContent
+            assert after["logical_payload"] == usage["logical_payload"]
+            assert after["export_directory_bytes"] == usage["export_directory_bytes"]
+            stored = (await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)).structuredContent
+            assert stored["feedback"][0]["text"] == user_quote
+            assert png(await call(client, "preview_handwriting", draft_id=paper_id, revision=3)) == adjusted
         print(
             f"Poem: 1 page. Extended draft: {archive['pages']} pages. Cache, selected page, old revision, restart and conflicts verified."
         )

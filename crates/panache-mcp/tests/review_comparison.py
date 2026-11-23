@@ -4,6 +4,7 @@ import sqlite3
 import struct
 import zlib
 from contextlib import closing
+from pathlib import Path
 
 
 def slanted_sheet(path):
@@ -118,8 +119,21 @@ async def exercise(client, directory, call):
     )
     inventory = assets()
     result = await compare(3, 4)
-    assert await compare(3, 4) == result
+    usage = (await call(client, "storage_usage", **key)).structuredContent
+    for _ in range(10):
+        assert await compare(3, 4) == result
+    repeated = (await call(client, "storage_usage", **key)).structuredContent
+    assert repeated["logical_payload"] == usage["logical_payload"]
+    assert repeated["export_directory_bytes"] == usage["export_directory_bytes"]
     assert assets() == inventory
+    exported = (await call(client, "export_handwriting", **key, format="zip")).structuredContent
+    size = Path(exported["path"]).stat().st_size
+    after = (await call(client, "storage_usage", **key)).structuredContent
+    assert after["export_directory_bytes"] == repeated["export_directory_bytes"] + size
+    assert after["delivered_bytes"] == size and after["eligible_temp_bytes"] == 0
+    planned = (await call(client, "plan_cleanup", **key)).structuredContent
+    assert planned["plan_id"] is None
+    assert [entry["class"] for entry in planned["entries"]] == ["delivered_report_only"]
     assert [a["revision"] for a in result["actions"]] == [4]
     assert result["actions"][0]["details"]["paper_guides"] == guides
     assert result["before"]["feedback"] == [{"origin": "user_quote", "text": quote}]
