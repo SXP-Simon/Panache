@@ -245,9 +245,7 @@ fn full_page_illustration_paginates_and_half_scale_leaves_room_for_text() {
     assert_eq!(pages(&full).len(), 2);
     assert_eq!(pages(&half).len(), 1);
 }
-#[test]
-fn document_order_math_entities_and_spans() {
-    let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p><w:r><w:t>正文 &amp; </w:t><w:tab/><w:t>结尾</w:t></w:r><m:oMath><m:r><m:t>x²</m:t></m:r></m:oMath></w:p><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>单元格</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#;
+fn docx_bytes(xml: &str) -> Vec<u8> {
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     zip.start_file(
         "word/document.xml",
@@ -255,10 +253,37 @@ fn document_order_math_entities_and_spans() {
     )
     .unwrap();
     zip.write_all(xml.as_bytes()).unwrap();
-    let bytes = zip.finish().unwrap().into_inner();
+    zip.finish().unwrap().into_inner()
+}
+
+#[test]
+fn document_order_math_entities_and_spans() {
+    let bytes = docx_bytes(
+        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                       xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+            <w:body>
+                <w:p><w:r><w:t>正文 &amp; </w:t><w:tab/><w:t>结尾</w:t></w:r>
+                    <m:oMath><m:r><m:t>x&#178;</m:t></m:r></m:oMath></w:p>
+                <w:tbl>
+                    <w:tr>
+                        <w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>
+                            <w:p><w:r><w:t>单元格</w:t></w:r></w:p></w:tc>
+                        <w:tc><w:tcPr><w:vMerge w:val="restart"/></w:tcPr>
+                            <w:p><w:r><w:t> 上 </w:t></w:r></w:p></w:tc>
+                    </w:tr>
+                    <w:tr>
+                        <w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>
+                            <w:p><w:r><w:t>下</w:t></w:r></w:p></w:tc>
+                        <w:tc><w:tcPr><w:vMerge/></w:tcPr></w:tc>
+                    </w:tr>
+                </w:tbl>
+                <w:p><w:r><w:t>尾段</w:t></w:r></w:p>
+            </w:body>
+        </w:document>"#,
+    );
     assert_eq!(
         document::extract("test.docx", &bytes, &Limits::default()).unwrap(),
-        "正文 & \t结尾x²\n单元格\t单元格"
+        "正文 & \t结尾x²\n尾段\n单元格\t单元格\t上\n下\t下\t上"
     );
     let limited = Limits {
         max_archive_bytes: 10,
@@ -277,6 +302,28 @@ fn document_order_math_entities_and_spans() {
         "unsupported_document"
     );
 }
+#[test]
+fn expanded_docx_cell_hits_budget_before_later_xml_error() {
+    let bytes = docx_bytes(
+        r#"<w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main">
+            <w:tbl><w:tr><w:tc><w:gridSpan w:val="5"/>
+                <w:p><w:t>x</w:t></w:p></w:tc></w:tr></w:tbl>
+            <w:p><w:t>&unknown;</w:t></w:p>
+        </w:document>"#,
+    );
+    for (max_text_chars, code, message) in [
+        (2, "text_limit", "表格文本过长"),
+        (10, "invalid_document", "不支持 XML 实体"),
+    ] {
+        let limits = Limits {
+            max_text_chars,
+            ..Limits::default()
+        };
+        let error = document::extract("test.docx", &bytes, &limits).unwrap_err();
+        assert_eq!((error.code, error.message.as_str()), (code, message));
+    }
+}
+
 #[test]
 fn form_validation_rejects_nan_and_conflicting_geometry() {
     let mut f = HashMap::from([("font_size".into(), "NaN".into())]);
