@@ -283,13 +283,12 @@ void main() {
 
   Future<void> openPaperSettings(WidgetTester tester, bool narrow) async {
     if (narrow) {
+      final l = labels(tester);
       await tester.tap(find.byKey(const ValueKey('open-paper')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('settings-section')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('settings-section-paper')).last,
-      );
+      await tester.tap(find.text(l.mobilePaper).last);
     } else {
       await tester.tap(find.byKey(const ValueKey('workspace-tool-paper')));
     }
@@ -310,11 +309,17 @@ void main() {
             matching: find.byType(Scrollable),
           )
           .first;
-      final lastMargin = find.byKey(
-        const PageStorageKey('parameter-right_margin'),
+      Future<void> scrollTo(Finder field, double delta) async {
+        await tester.scrollUntilVisible(field, delta, scrollable: scrollable);
+        await tester.pumpAndSettle();
+      }
+
+      final lastMargin = find.descendant(
+        of: find.byKey(const PageStorageKey('parameter-right_margin')),
+        matching: find.byType(TextFormField),
       );
       expect(camera, findsNothing);
-      await tester.scrollUntilVisible(lastMargin, 180, scrollable: scrollable);
+      await scrollTo(lastMargin, 180);
       expect(lastMargin.hitTestable(), findsOneWidget);
 
       workspace.background = Upload(
@@ -323,19 +328,19 @@ void main() {
       );
       workspace.emit();
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(camera, -180, scrollable: scrollable);
+      await scrollTo(camera, -180);
       await tester.tap(camera);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       final iso = find.widgetWithText(TextFormField, 'ISO');
-      await tester.scrollUntilVisible(iso, 180, scrollable: scrollable);
+      await scrollTo(iso, 180);
       await tester.enterText(iso, '400');
       expect(workspace.settings.camera['camera_iso'], '400');
-      await tester.scrollUntilVisible(lastMargin, 180, scrollable: scrollable);
+      await scrollTo(lastMargin, 180);
       expect(lastMargin.hitTestable(), findsOneWidget);
 
       final remove = find.text(l.remove);
-      await tester.scrollUntilVisible(remove, -180, scrollable: scrollable);
+      await scrollTo(remove, -180);
       await tester.tap(remove);
       await tester.pumpAndSettle();
       expect(workspace.background, isNull);
