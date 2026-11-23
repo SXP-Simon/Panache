@@ -3,7 +3,30 @@ permissions:
   contents: read
 on:
   pull_request:
-    paths: ["VERSION", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "crates/**", "Cargo.*", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/build-mobile-engine.py", ".github/workflows/flutter_mobile.yml"]
+    paths:
+      - "VERSION"
+      - "app/**"
+      - "!app/README.md"
+      - "!app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md"
+      - "scripts/*release*.*"
+      - "!scripts/*release*.md"
+      - "scripts/tests/test-flutter-release.cjs"
+      - ".github/workflows/publish_flutter.yml"
+      - "vendor/**"
+      - "!vendor/**/README.md"
+      - "!vendor/**/CHANGELOG.md"
+      - "!vendor/**/docs/**/*.md"
+      - "crates/**"
+      - "!crates/README.md"
+      - "!crates/*/README.md"
+      - "!crates/panache-mcp/tool-design.md"
+      - "Cargo.*"
+      - "assets/pubspec.yaml"
+      - "assets/licenses/**"
+      - "LICENSE"
+      - "assets/font_assets/**"
+      - "scripts/build-mobile-engine.py"
+      - ".github/workflows/flutter_mobile.yml"
   workflow_dispatch:
 jobs:
   android:

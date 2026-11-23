@@ -1,7 +1,34 @@
 name: Rust 后端
 on:
   pull_request:
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "crates/**", "Cargo.toml", "Cargo.lock", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "assets/font_assets/**", "assets/licenses/**", "LICENSE", "scripts/build-rust-service.sh", "deploy/rust/**", ".github/workflows/rust.yml"]
+    paths:
+      - "VERSION"
+      - "scripts/build-flutter-web.py"
+      - "scripts/build-text-worker.py"
+      - "scripts/tests/test_web_build_version.py"
+      - "crates/**"
+      - "!crates/README.md"
+      - "!crates/*/README.md"
+      - "!crates/panache-mcp/tool-design.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "app/**"
+      - "!app/README.md"
+      - "!app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md"
+      - "scripts/*release*.*"
+      - "!scripts/*release*.md"
+      - "scripts/tests/test-flutter-release.cjs"
+      - ".github/workflows/publish_flutter.yml"
+      - "vendor/**"
+      - "!vendor/**/README.md"
+      - "!vendor/**/CHANGELOG.md"
+      - "!vendor/**/docs/**/*.md"
+      - "assets/font_assets/**"
+      - "assets/licenses/**"
+      - "LICENSE"
+      - "scripts/build-rust-service.sh"
+      - "deploy/rust/**"
+      - ".github/workflows/rust.yml"
   workflow_dispatch:
 jobs:
   verify:
