@@ -22,77 +22,27 @@ Future<({Upload file, int width, int height})> preparePaperBackground(
     try {
       final width = descriptor.width;
       final height = descriptor.height;
-      final originalPixels = width * height;
-      if (correctedSize != null &&
-          (width != correctedSize.width ||
-              height != correctedSize.height ||
-              originalPixels > 32000000)) {
-        throw const FormatException('Invalid corrected background dimensions');
-      }
-      if (mobile && originalPixels > 64000000) {
-        throw ApiException(
-          'Paper source exceeds 64 megapixels',
-          code: 'image_limit',
-        );
-      }
-
-      final reserveForDeskew = correctedSize == null;
-      // The Rust detector searches angles up to about 12.5 degrees. Deskew can
-      // expand both sides of the image, so leave space for that bounding box.
-      final area = reserveForDeskew
-          ? originalPixels + ((width * width + height * height) * .22).ceil()
-          : originalPixels;
-      final resize =
-          mobile &&
-          (area > mobilePaperPixels || file.bytes.length > mobileImageBytes);
-      if (!resize && correctedSize == null) {
+      final plan = _decodePlan(
+        width,
+        height,
+        file.bytes.length,
+        mobile: mobile,
+        correctedSize: correctedSize,
+      );
+      if (!plan.resize && correctedSize == null) {
         return (file: file, width: width, height: height);
       }
-      final exif = resize ? await readPaperExif?.call(file) : null;
-      Future<({Upload file, int width, int height})?> decode(
-        double scale,
-      ) async {
-        final codec = await descriptor.instantiateCodec(
-          targetWidth: math.max(1, (width * scale).floor()),
-          targetHeight: math.max(1, (height * scale).floor()),
+      final exif = plan.resize ? await readPaperExif?.call(file) : null;
+      for (final scale in plan.scales) {
+        final prepared = await _decodePaper(
+          descriptor,
+          file,
+          scale: scale,
+          resize: plan.resize,
+          exif: exif,
         );
-        try {
-          final frame = await codec.getNextFrame();
-          final image = frame.image;
-          try {
-            if (!resize) return (file: file, width: width, height: height);
-            final png = await image.toByteData(format: ui.ImageByteFormat.png);
-            if (png == null ||
-                png.lengthInBytes +
-                        (exif == null || exif.isEmpty ? 0 : exif.length + 12) >
-                    mobileImageBytes) {
-              return null;
-            }
-            final stem = file.name.replaceFirst(RegExp(r'\.[^.]+$'), '');
-            return (
-              file: Upload(
-                '$stem.png',
-                withPaperExif(Uint8List.sublistView(png), exif),
-              ),
-              width: image.width,
-              height: image.height,
-            );
-          } finally {
-            image.dispose();
-          }
-        } finally {
-          codec.dispose();
-        }
+        if (prepared != null) return prepared;
       }
-
-      final scale = resize ? math.min(1.0, math.sqrt(11800000 / area)) : 1.0;
-      final prepared = await decode(scale);
-      if (prepared != null) return prepared;
-      // A 3.8 MP RGBA image leaves room for PNG overhead within 16 MiB.
-      final smaller = await decode(
-        math.min(scale, math.sqrt(3800000 / originalPixels)),
-      );
-      if (smaller != null) return smaller;
       throw ApiException(
         'Could not fit paper within mobile limits',
         code: 'image_limit',
@@ -102,5 +52,83 @@ Future<({Upload file, int width, int height})> preparePaperBackground(
     }
   } finally {
     buffer.dispose();
+  }
+}
+
+({bool resize, List<double> scales}) _decodePlan(
+  int width,
+  int height,
+  int byteLength, {
+  required bool mobile,
+  required ({int width, int height})? correctedSize,
+}) {
+  final originalPixels = width * height;
+  if (correctedSize != null &&
+      (width != correctedSize.width ||
+          height != correctedSize.height ||
+          originalPixels > 32000000)) {
+    throw const FormatException('Invalid corrected background dimensions');
+  }
+  if (mobile && originalPixels > 64000000) {
+    throw ApiException(
+      'Paper source exceeds 64 megapixels',
+      code: 'image_limit',
+    );
+  }
+
+  final reserveForDeskew = correctedSize == null;
+  // The Rust detector searches angles up to about 12.5 degrees. Deskew can
+  // expand both sides of the image, so leave space for that bounding box.
+  final area = reserveForDeskew
+      ? originalPixels + ((width * width + height * height) * .22).ceil()
+      : originalPixels;
+  final resize =
+      mobile && (area > mobilePaperPixels || byteLength > mobileImageBytes);
+  if (!resize) return (resize: false, scales: const [1.0]);
+  final initial = math.min(1.0, math.sqrt(11800000 / area));
+  // A 3.8 MP RGBA image leaves room for PNG overhead within 16 MiB.
+  final fallback = math.min(initial, math.sqrt(3800000 / originalPixels));
+  return (resize: true, scales: [initial, fallback]);
+}
+
+Future<({Upload file, int width, int height})?> _decodePaper(
+  ui.ImageDescriptor descriptor,
+  Upload file, {
+  required double scale,
+  required bool resize,
+  required Uint8List? exif,
+}) async {
+  final codec = await descriptor.instantiateCodec(
+    targetWidth: math.max(1, (descriptor.width * scale).floor()),
+    targetHeight: math.max(1, (descriptor.height * scale).floor()),
+  );
+  try {
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    try {
+      if (!resize) {
+        return (file: file, width: descriptor.width, height: descriptor.height);
+      }
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (png == null ||
+          png.lengthInBytes +
+                  (exif == null || exif.isEmpty ? 0 : exif.length + 12) >
+              mobileImageBytes) {
+        return null;
+      }
+      final stem = file.name.replaceFirst(RegExp(r'\.[^.]+$'), '');
+      return (
+        file: Upload(
+          '$stem.png',
+          withPaperExif(Uint8List.sublistView(png), exif),
+        ),
+        width: image.width,
+        height: image.height,
+      );
+    } finally {
+      image.dispose();
+    }
+  } finally {
+    codec.dispose();
   }
 }
