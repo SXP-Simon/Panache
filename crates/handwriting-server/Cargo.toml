@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
-handwriting-core.workspace = true
+handwriting-core = { workspace = true, features = ["local-fonts"] }
 axum = { workspace = true, features = ["multipart", "ws"] }
 serde.workspace = true
 tokio = { workspace = true, features = ["fs", "sync", "time"] }

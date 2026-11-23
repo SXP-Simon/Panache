@@ -8,21 +8,6 @@ pub fn apply(state: &State, input: Tune) -> Result<CallToolResult> {
     let mut draft = state
         .drafts
         .snapshot(&input.draft_id, Some(input.expected_revision))?;
-    let mut changes = if input.changes.is_empty() {
-        draft.controls.clone()
-    } else {
-        let mut fonts = state.fonts.clone();
-        if let Some(handle) = input
-            .changes
-            .get("font")
-            .and_then(|v| v.as_str())
-            .filter(|s| s.starts_with("upload:"))
-        {
-            ensure!(draft.has_font(handle)?, "Unknown font for this draft");
-            fonts.push(handle.to_owned());
-        }
-        controls::merge(&draft.controls, &input.changes, &fonts)?
-    };
     ensure!(
         input.note.as_ref().is_none_or(|s| s.chars().count() <= 320),
         "Note exceeds 320 characters"
@@ -57,10 +42,34 @@ pub fn apply(state: &State, input: Tune) -> Result<CallToolResult> {
             draft.revision + 1,
             path.file_name().unwrap_or_default().to_string_lossy()
         );
-        changes.insert("font".into(), json!(handle));
         Some((handle, bytes))
+    } else if let Some(id) = input
+        .changes
+        .get("font")
+        .and_then(|v| v.as_str())
+        .filter(|id| !id.starts_with("upload:"))
+    {
+        state.import_catalog_font(id, draft.revision + 1)?
     } else {
         None
+    };
+    let mut patch = input.changes.clone();
+    let mut fonts = state.fonts.clone();
+    if let Some((handle, _)) = &font {
+        patch.insert("font".into(), json!(handle));
+        fonts.push(handle.clone());
+    } else if let Some(handle) = patch
+        .get("font")
+        .and_then(|v| v.as_str())
+        .filter(|s| s.starts_with("upload:"))
+    {
+        ensure!(draft.has_font(handle)?, "Unknown font for this draft");
+        fonts.push(handle.to_owned());
+    }
+    let mut changes = if patch.is_empty() {
+        draft.controls.clone()
+    } else {
+        controls::merge(&draft.controls, &patch, &fonts)?
     };
     if let Some(guides) = &input.paper_guides {
         let paper = draft

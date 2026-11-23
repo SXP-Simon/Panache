@@ -218,6 +218,7 @@ impl Drafts {
         prepared: &str,
         new_style: Option<&Style>,
         paper: Option<&ImportedPaper>,
+        font: Option<&[u8]>,
     ) -> Result<Value> {
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -234,6 +235,12 @@ impl Drafts {
                     serde_json::to_string(style)?
                 ],
             )?;
+            if let Some(bytes) = font {
+                tx.execute(
+                    "INSERT INTO draft_fonts VALUES(?,?,?)",
+                    params![id, style.font, bytes],
+                )?;
+            }
             if let Some(paper) = paper {
                 tx.execute(
                     "INSERT INTO papers (draft,layout,image) VALUES (?1,?2,?3)",

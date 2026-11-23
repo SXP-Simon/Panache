@@ -7,6 +7,8 @@ pub mod generation;
 pub mod imaging;
 pub mod ink_effects;
 mod inline_document;
+#[cfg(feature = "local-fonts")]
+pub mod local_fonts;
 pub use inline_document::{review_text, validate as validate_document};
 mod parameters;
 pub mod photo;

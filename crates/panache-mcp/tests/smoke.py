@@ -169,11 +169,18 @@ async def placement_pixels(client):
 
 async def smoke(command, arguments, out):
     with TemporaryDirectory() as temp:
+        personal = Path(temp) / "my-fonts"
+        personal.mkdir()
+        custom_font = personal / "LocalSample.ttf"
+        latin = Path(__file__).resolve().parents[2] / "handwriting-core/assets/latin"
+        shutil.copyfile(latin / "Handlee-Regular.ttf", custom_font)
+        second_font = personal / "SecondSample.ttf"
+        shutil.copyfile(latin / "IndieFlower-Regular.ttf", second_font)
         params = StdioServerParameters(
             command=command,
             args=arguments,
             cwd=temp,
-            env={**os.environ, "PANACHE_MCP_HOME": temp, "PATH": ""},
+            env={**os.environ, "PANACHE_MCP_HOME": temp, "PANACHE_USER_FONT_DIR": str(personal), "PATH": ""},
         )
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
             info = await client.initialize()
@@ -203,6 +210,19 @@ async def smoke(command, arguments, out):
             guidance = listed.structuredContent["sample_guidance"]
             assert guidance in listed.content[0].text
             assert "志莽行书.ttf" in listed.structuredContent["fonts"]
+            results = (await call(client, "list_fonts", source="user", query="localsample", limit=1)).structuredContent
+            assert results["total"] == 1 and results["next_offset"] is None
+            entry = results["entries"][0]
+            assert entry["source"] == "user" and entry["filename"] == custom_font.name
+            saved_font = (await call(client, "save_section", markdown="ABC 123", style={"font": entry["id"]})).structuredContent
+            font_key = {"draft_id": saved_font["draft_id"]}
+            second = (await call(client, "list_fonts", source="user", query="secondsample")).structuredContent["entries"][0]
+            await call(client, "tune_handwriting", **font_key, expected_revision=1, changes={"font": second["id"]})
+            font_previews = [png(await call(client, "preview_handwriting", **font_key, revision=r)) for r in (1, 2)]
+            assert font_previews[0] != font_previews[1]
+            custom_font.unlink()
+            second_font.unlink()
+            assert (await call(client, "list_fonts", source="user", refresh=True)).structuredContent["total"] == 0
             paper_path = Path(temp) / "我的 横线纸.png"
             shutil.copyfile(
                 Path(__file__).parent / "fixtures" / "ruled.png", paper_path
@@ -589,6 +609,7 @@ async def smoke(command, arguments, out):
             )
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
             await client.initialize()
+            assert [png(await call(client, "preview_handwriting", **font_key, revision=r)) for r in (1, 2)] == font_previews
             assert (
                 png(
                     await call(

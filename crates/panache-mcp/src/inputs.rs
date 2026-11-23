@@ -24,7 +24,7 @@ pub enum Format {
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Style {
-    /// Main font filename from list_fonts. English letters and digits follow it by default.
+    /// Main font ID from list_fonts. Bundled filenames remain valid. English letters and digits follow it by default.
     pub font: String,
     pub paper: Paper,
     /// RGB hex color, e.g. #302c30.

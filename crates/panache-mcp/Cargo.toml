@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-handwriting-core.workspace = true
+handwriting-core = { workspace = true, features = ["local-fonts"] }
 tokio = { workspace = true, features = ["sync"] }
 rquickjs = "0.14"
 sha2 = "0.10.9"

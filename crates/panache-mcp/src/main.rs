@@ -12,7 +12,10 @@ mod tuning;
 use anyhow::{Context, Result, ensure};
 use drafts::Drafts;
 use engine::Engine;
-use handwriting_core::{Cancellation, Limits};
+use handwriting_core::{
+    Cancellation, Limits,
+    local_fonts::{FontSearch, LocalFonts},
+};
 use inputs::*;
 use rmcp::{
     RoleServer, ServerHandler, ServiceExt,
@@ -33,6 +36,7 @@ struct State {
     drafts: Drafts,
     engine: Mutex<Engine>,
     fonts: Vec<String>,
+    local_fonts: LocalFonts,
     storage: storage::Storage,
     worker: Arc<str>,
     render_slot: Arc<Semaphore>,
@@ -40,6 +44,19 @@ struct State {
 }
 #[derive(Clone)]
 struct Panache(Arc<State>);
+
+impl State {
+    fn import_catalog_font(&self, id: &str, revision: u32) -> Result<Option<(String, Vec<u8>)>> {
+        if self.fonts.iter().any(|f| f == id) {
+            return Ok(None);
+        }
+        let (entry, bytes) = self.local_fonts.read(id)?;
+        Ok(Some((
+            format!("upload:{revision}:{}", entry.filename),
+            bytes,
+        )))
+    }
+}
 
 fn reply(message: String, metadata: serde_json::Value) -> CallToolResult {
     let mut result = CallToolResult::success(vec![ContentBlock::text(message)]);
@@ -116,7 +133,7 @@ impl Panache {
                 || (input.paper_mode.is_none() && input.paper_guides.is_none()),
             "paper_mode and paper_guides require paper_path at creation"
         );
-        let style = if input.draft_id.is_none() {
+        let mut style = if input.draft_id.is_none() {
             ensure!(
                 input.expected_revision.unwrap_or(0) == 0 && input.section.unwrap_or(1) == 1,
                 "A new draft starts at section 1"
@@ -129,10 +146,6 @@ impl Panache {
                 "Title too long"
             );
             let style = input.style.clone().unwrap_or_default();
-            ensure!(
-                self.0.fonts.contains(&style.font),
-                "Unknown font. Use list_fonts to choose an installed font."
-            );
             style.ink_rgba()?;
             ensure!(
                 (16..=72).contains(&style.font_size),
@@ -176,13 +189,28 @@ impl Panache {
                     }
                     _ => None,
                 };
-                let _budget = paper
-                    .as_ref()
-                    .map(|p| state.storage.import(p.bytes.len()))
+                let font = match &mut style {
+                    Some(style) => {
+                        let font = state.import_catalog_font(&style.font, 1)?;
+                        if let Some((handle, _)) = &font {
+                            style.font.clone_from(handle);
+                        }
+                        font
+                    }
+                    None => None,
+                };
+                let bytes = paper.as_ref().map_or(0, |p| p.bytes.len())
+                    + font.as_ref().map_or(0, |(_, data)| data.len());
+                let _budget = (bytes > 0)
+                    .then(|| state.storage.import(bytes))
                     .transpose()?;
-                state
-                    .drafts
-                    .save(&input, &prepared, style.as_ref(), paper.as_ref())
+                state.drafts.save(
+                    &input,
+                    &prepared,
+                    style.as_ref(),
+                    paper.as_ref(),
+                    font.as_ref().map(|(_, bytes)| bytes.as_slice()),
+                )
             }
         })
         .await??;
@@ -310,26 +338,30 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "List local fonts accepted by save_section and how to preview a coherent Chinese, English and digit sample."
+        description = "Search bundled, personal and system fonts by name/source. Results are paged. Use an entry ID in save_section style.font or tune_handwriting changes.font; user and system faces are saved with the draft."
     )]
-    fn list_fonts(&self) -> CallToolResult {
-        let names = self
-            .0
-            .fonts
-            .iter()
-            .map(|name| format!("- {name}"))
-            .collect::<Vec<_>>();
-        let guidance = concat!(
-            "Select only the main font for a new draft. Its letters and digits are the default, including for homework and lab reports. ",
-            "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
-            "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
-            "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
-            "Honor an approved or delegated main font. A request for generally messier handwriting applies to the main font. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
-        );
-        reply(
-            format!("{}\n\n{guidance}", names.join("\n")),
-            json!({"fonts": self.0.fonts, "sample_guidance": guidance}),
-        )
+    async fn list_fonts(&self, Parameters(query): Parameters<FontSearch>) -> CallToolResult {
+        let state = self.0.clone();
+        let result = async {
+            let page = tokio::task::spawn_blocking(move || state.local_fonts.search(&query)).await??;
+            let names: Vec<_> = page.fonts.iter().map(|font| &font.id).collect();
+            let guidance = concat!(
+                "Select only the main font for a new draft. Its letters and digits are the default, including for homework and lab reports. ",
+                "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
+                "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
+                "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
+                "Honor an approved or delegated main font. A request for generally messier handwriting applies to the main font. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
+            );
+            let mut data = json!({
+                "entries": page.fonts, "total": page.total,
+                "next_offset": page.next_offset, "user_dir": page.user_dir
+            });
+            let message = format!("{data}\n\n{guidance}");
+            data["fonts"] = json!(names);
+            data["sample_guidance"] = json!(guidance);
+            Ok(reply(message, data))
+        }.await;
+        tool_result(result)
     }
 
     #[tool(
@@ -659,6 +691,7 @@ async fn main() -> Result<()> {
     let state = State {
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
+        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes),
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
         worker: fs::read_to_string(worker)?.into(),

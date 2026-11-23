@@ -19,6 +19,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !address.ip().is_loopback() && access_token.as_ref().is_none_or(|v| v.len() < 32) {
         return Err("非 loopback 监听必须配置至少 32 字节的 HANDWRITING_ACCESS_TOKEN".into());
     }
+    let desktop = env::var("HANDWRITING_DESKTOP_SIDECAR").as_deref() == Ok("1");
+    if desktop
+        && (!address.ip().is_loopback() || access_token.as_ref().is_none_or(|v| v.len() < 32))
+    {
+        return Err("桌面 sidecar 需要 loopback 地址和至少 32 字节的访问令牌".into());
+    }
     let listener = tokio::net::TcpListener::bind(address).await?;
     let bound = listener.local_addr()?;
     let root = env::current_exe()?
@@ -26,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("无法定位服务程序目录")?
         .to_path_buf();
     let mut config = Config {
+        desktop,
         access_token,
         ..Config::default()
     };
@@ -103,7 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("服务地址：http://{bound}；Rust 手写引擎已启用");
     // 2026-10-12：桌面 sidecar 通过 stdin 管道跟随父进程生命周期。
     // 专用线程避免 Tokio 的阻塞 stdin 在运行时退出时无法回收。
-    let desktop = env::var("HANDWRITING_DESKTOP_SIDECAR").as_deref() == Ok("1");
     let (parent_closed, parent_gone) = tokio::sync::oneshot::channel();
     if desktop {
         std::thread::spawn(move || {
