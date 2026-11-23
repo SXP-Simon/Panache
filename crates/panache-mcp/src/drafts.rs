@@ -1,14 +1,46 @@
 mod observations;
 use anyhow::{Context, Result, ensure};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 use crate::Style;
 use crate::paper::{ImportedPaper, PaperLayout};
 
 pub struct Drafts(PathBuf);
+
+#[cfg(test)]
+#[test]
+fn concurrent_first_opens_share_a_complete_schema() -> Result<()> {
+    let home = tempfile::tempdir()?;
+    let ready = std::sync::Barrier::new(8);
+    std::thread::scope(|s| -> Result<()> {
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                s.spawn(|| -> Result<()> {
+                    ready.wait();
+                    let drafts = Drafts::open(home.path())?;
+                    let db = drafts.connect()?;
+                    assert!(
+                        db.table_exists(None, "drafts")?
+                            && db.table_exists(None, "review_observations")?
+                    );
+                    assert_eq!(
+                        db.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0))?,
+                        "wal"
+                    );
+                    Ok(())
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().unwrap()?;
+        }
+        Ok(())
+    })
+}
 
 pub struct Snapshot<'a> {
     pub revision: u32,
@@ -108,9 +140,29 @@ pub struct Section {
 impl Drafts {
     pub fn open(dir: &Path) -> Result<Self> {
         let drafts = Self(dir.join("drafts.sqlite3"));
-        drafts.connect()?.execute_batch(
+        let mut db = drafts.connect()?;
+        // Concurrent first opens can both hold read locks when SQLite upgrades to WAL.
+        // SQLite may return BUSY immediately for this upgrade despite its busy timeout.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match db.pragma_update(None, "journal_mode", "WAL") {
+                Err(err)
+                    if matches!(
+                        err.sqlite_error_code(),
+                        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+                    ) && Instant::now() < deadline =>
+                {
+                    std::thread::sleep(Duration::from_millis(20))
+                }
+                result => {
+                    result.context("Enable WAL for the draft database")?;
+                    break;
+                }
+            }
+        }
+        let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute_batch(
             "
-            PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS drafts (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL, style TEXT NOT NULL,
                 revision INTEGER NOT NULL, chars INTEGER NOT NULL, sections INTEGER NOT NULL
@@ -151,12 +203,13 @@ impl Drafts {
             );
         ",
         )?;
-        observations::initialize(&mut drafts.connect()?)?;
+        tx.commit()?;
+        observations::initialize(&mut db)?;
         Ok(drafts)
     }
     pub(crate) fn connect(&self) -> Result<Connection> {
         let db = Connection::open(&self.0)?;
-        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.busy_timeout(Duration::from_secs(5))?;
         Ok(db)
     }
     pub fn save(
