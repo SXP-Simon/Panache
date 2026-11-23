@@ -147,6 +147,8 @@ pub enum ReadView {
 pub struct Read {
     /// With view=review, retrieve one immutable measurement and its attributed feedback.
     pub review_id: Option<String>,
+    /// With trajectory, pass next_cursor to continue the same snapshot, including its filters. Omit offset.
+    pub cursor: Option<String>,
     /// With trajectory, return only annotations from this source.
     pub feedback_origin: Option<FeedbackOrigin>,
     /// Default excerpt omits inline image bytes; summary omits text; source reads exact Markdown.
@@ -245,7 +247,7 @@ pub struct Export {
     pub format: Option<Format>,
 }
 
-#[derive(Deserialize, JsonSchema, serde::Serialize)]
+#[derive(Clone, Copy, Deserialize, JsonSchema, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FeedbackOrigin {
     UserQuote,

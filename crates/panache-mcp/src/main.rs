@@ -401,6 +401,12 @@ impl Panache {
                 input.feedback_origin.is_none() || input.view == Some(ReadView::Trajectory),
                 "feedback_origin requires view=trajectory"
             );
+            if input.view == Some(ReadView::Trajectory) {
+                ensure!(input.review_id.is_none(), "review_id requires view=review");
+                let result = self.0.drafts.trajectory(&input)?;
+                return Ok(reply(result.to_string(), result));
+            }
+            ensure!(input.cursor.is_none(), "cursor requires view=trajectory");
             let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
             if input.view == Some(ReadView::Review) {
                 ensure!(
@@ -412,17 +418,6 @@ impl Panache {
                 return Ok(reply(data.to_string(), data));
             }
             ensure!(input.review_id.is_none(), "review_id requires view=review");
-            if input.view == Some(ReadView::Trajectory) {
-                let result = self.0.drafts.trajectory(
-                    draft.id,
-                    draft.revision,
-                    input.section,
-                    input.feedback_origin.as_ref(),
-                    input.offset.unwrap_or(0),
-                    input.limit.unwrap_or(12),
-                )?;
-                return Ok(reply(result.to_string(), result));
-            }
             let mut result = self.0.drafts.review(
                 &input.draft_id,
                 draft.revision,

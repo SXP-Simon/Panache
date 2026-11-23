@@ -134,7 +134,34 @@ async def check_filtered_history(client, call, draft_id):
     assert empty["events"] == [] and empty["next_offset"] is None
     models = (await history(feedback_origin="model_observation"))["events"]
     assert [e["details"]["text"] for e in models] == ["我觉得第一节也可以调淡。"]
-    for invalid in [dict(view="summary", feedback_origin="user_quote"),
+    # Continue both snapshots after a newer edit, a backfilled review and two
+    # annotations on old reviews (including one that sorts before page one).
+    full_first = await history(limit=1)
+    await call(client, "save_section", **key, expected_revision=4, markdown="第三节")
+    await call(client, "preview_handwriting", **key, revision=2, section=1, view="review")
+    for quote in quotes:
+        await call(client, "annotate_review", **key, review_id=quote["review_id"],
+                   origin="user_quote", text="翻页期间补录。")
+    for start, expected in [(first, quotes), (full_first, all_events)]:
+        result = start
+        actual = list(start["events"])
+        while cursor := result.get("next_cursor"):
+            result = await history(cursor=cursor, limit=2)
+            assert result["revision"] == 4
+            actual.extend(result["events"])
+            assert len(actual) <= len(expected)
+        assert actual == expected
+    assert (await history(limit=50))["revision"] == 5
+    fresh = (await history(section=1, feedback_origin="user_quote"))["events"]
+    assert sum(event["details"]["text"] == "翻页期间补录。" for event in fresh) == 2
+
+    token = first["next_cursor"]
+    for invalid in [dict(view="summary", cursor=token), dict(view="trajectory", cursor="???"),
+                    dict(view="trajectory", cursor=token, section=2),
+                    dict(view="trajectory", cursor=token, offset=1),
+                    dict(view="trajectory", cursor=token, revision=5),
+                    dict(view="trajectory", cursor=token, feedback_origin="model_observation"),
+                    dict(view="summary", feedback_origin="user_quote"),
                     dict(view="trajectory", section=0)]:
         assert (await client.call_tool("read_section", {**key, **invalid})).isError
 

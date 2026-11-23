@@ -240,7 +240,9 @@ mod tests {
             [serde_json::to_string(&crate::Style::default())?],
         )?;
         let old = drafts.snapshot("d", Some(1))?;
-        let legacy_id = drafts.trajectory("d", 1, None, None, 0, 5)?["events"][0]["review_id"]
+        let legacy_id = drafts.trajectory(&serde_json::from_value(
+            json!({"draft_id":"d","revision":1,"limit":5}),
+        )?)?["events"][0]["review_id"]
             .as_str()
             .unwrap()
             .to_owned();

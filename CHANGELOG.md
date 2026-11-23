@@ -2,7 +2,7 @@
 
 ## 未发布
 
-- MCP 续稿时可按节和评语来源筛选历史。用 `read_section(view="trajectory", section=2, feedback_origin="user_quote")` 可直接找回第 2 节记录的用户原话、关联版本和复盘 ID。
+- MCP 续稿时可按节和评语来源筛选历史。用 `read_section(view="trajectory", section=2, feedback_origin="user_quote")` 可直接找回第 2 节记录的用户原话、关联版本和复盘 ID。轨迹支持用游标续读，翻页时补录的评语会在下一轮查询中出现。
 
 ## v1.20.0 (2026-11-23)
 
