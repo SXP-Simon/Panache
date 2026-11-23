@@ -2,7 +2,31 @@ name: Flutter 独立桌面客户端
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["VERSION", "app/**", "vendor/**", "crates/**", "Cargo.toml", "Cargo.lock", "assets/font_assets/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "scripts/embed-macos-backend.sh", ".github/workflows/flutter_desktop.yml"]
+    paths:
+      - "VERSION"
+      - "app/**"
+      - "!app/README.md"
+      - "!app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md"
+      - "vendor/**"
+      - "!vendor/**/README.md"
+      - "!vendor/**/CHANGELOG.md"
+      - "!vendor/**/docs/**/*.md"
+      - "crates/**"
+      - "!crates/README.md"
+      - "!crates/*/README.md"
+      - "!crates/panache-mcp/tool-design.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "assets/font_assets/**"
+      - "assets/pubspec.yaml"
+      - "assets/licenses/**"
+      - "LICENSE"
+      - "scripts/build-flutter-desktop.py"
+      - "scripts/windows_launcher.py"
+      - "scripts/tests/test_desktop_release_version.py"
+      - "scripts/tests/test_windows_launcher.py"
+      - "scripts/embed-macos-backend.sh"
+      - ".github/workflows/flutter_desktop.yml"
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"

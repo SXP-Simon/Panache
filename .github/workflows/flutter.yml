@@ -5,7 +5,34 @@ permissions:
 
 on:
   pull_request:
-    paths: ["VERSION", "scripts/build-flutter-web.py", "scripts/build-text-worker.py", "scripts/tests/test_web_build_version.py", "scripts/build-flutter-desktop.py", "scripts/windows_launcher.py", "scripts/test-desktop-updater.ps1", "scripts/tests/test_desktop_release_version.py", "scripts/tests/test_windows_launcher.py", "app/**", "scripts/*release*.*", "scripts/tests/test-flutter-release.cjs", ".github/workflows/publish_flutter.yml", "vendor/**", "assets/pubspec.yaml", "assets/licenses/**", "LICENSE", "assets/font_assets/**", "scripts/test-flutter-web.py", "scripts/tests/test_flutter_web_runner.py", ".github/workflows/flutter.yml"]
+    paths:
+      - "VERSION"
+      - "scripts/build-flutter-web.py"
+      - "scripts/build-text-worker.py"
+      - "scripts/tests/test_web_build_version.py"
+      - "scripts/build-flutter-desktop.py"
+      - "scripts/windows_launcher.py"
+      - "scripts/test-desktop-updater.ps1"
+      - "scripts/tests/test_desktop_release_version.py"
+      - "scripts/tests/test_windows_launcher.py"
+      - "app/**"
+      - "!app/README.md"
+      - "!app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md"
+      - "scripts/*release*.*"
+      - "!scripts/*release*.md"
+      - "scripts/tests/test-flutter-release.cjs"
+      - ".github/workflows/publish_flutter.yml"
+      - "vendor/**"
+      - "!vendor/**/README.md"
+      - "!vendor/**/CHANGELOG.md"
+      - "!vendor/**/docs/**/*.md"
+      - "assets/pubspec.yaml"
+      - "assets/licenses/**"
+      - "LICENSE"
+      - "assets/font_assets/**"
+      - "scripts/test-flutter-web.py"
+      - "scripts/tests/test_flutter_web_runner.py"
+      - ".github/workflows/flutter.yml"
   workflow_dispatch:
 
 jobs:
