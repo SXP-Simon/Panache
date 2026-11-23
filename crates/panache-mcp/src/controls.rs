@@ -91,13 +91,25 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
         layout.apply(&mut params);
     }
 
-    if changes.is_empty() {
-        return Ok(params);
-    }
     let mut fields = serde_json::to_value(&params)?;
     for (k, v) in changes {
         match k.as_str() {
-            "font" => continue,
+            "font" | "ink_alpha" => continue,
+            "seed" => {
+                fields["seed"] = json!(v.as_u64().context("Invalid seed")? + u64::from(section) - 1)
+            }
+            "paper" => {
+                ensure!(
+                    draft.paper.is_none(),
+                    "Preset paper requires a draft without imported stationery"
+                );
+                fields["underlined"] = json!(v == "ruled");
+                fields["paper_pattern"] = if v == "grid" || v == "dots" {
+                    v.clone()
+                } else {
+                    Value::Null
+                };
+            }
             "ink" => {
                 let mut tinted = style.clone();
                 tinted.ink = v.as_str().context("Invalid ink")?.to_owned();
@@ -108,6 +120,9 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
             }
             _ => fields[k] = v.clone(),
         }
+    }
+    if let Some(alpha) = changes.get("ink_alpha") {
+        fields["fill"][3] = alpha.clone();
     }
     params = serde_json::from_value(fields)?;
     params.ink_layers =

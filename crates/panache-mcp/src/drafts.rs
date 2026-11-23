@@ -21,6 +21,30 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
+    pub fn record_review(&self, section: u32, page: usize, evidence: &Value) -> Result<()> {
+        self.drafts
+            .record_review(self.id, self.revision, section, page, evidence)
+    }
+
+    pub fn review_counts(&self) -> Result<(u32, u32)> {
+        Ok(self.drafts.connect()?.query_row(
+            "SELECT count(*),count(CASE WHEN json_extract(evidence,'$.visibility') IN ('no_visible_change','very_low_contrast') THEN 1 END) FROM page_reviews WHERE draft=? AND revision=?",
+            params![self.id,self.revision], |r|Ok((r.get(0)?,r.get(1)?)))?)
+    }
+    pub fn has_font(&self, handle: &str) -> Result<bool> {
+        Ok(self.drafts.connect()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM draft_fonts WHERE draft=? AND handle=?)",
+            params![self.id, handle],
+            |r| r.get(0),
+        )?)
+    }
+    pub fn font_bytes(&self, handle: &str) -> Result<Vec<u8>> {
+        Ok(self.drafts.connect()?.query_row(
+            "SELECT bytes FROM draft_fonts WHERE draft=? AND handle=?",
+            params![self.id, handle],
+            |r| r.get(0),
+        )?)
+    }
     pub fn camera(&self, paper: Option<&[u8]>) -> Result<handwriting_core::export::CameraMetadata> {
         let input = serde_json::from_value(Value::Object(self.controls.clone()))?;
         Ok(handwriting_core::export::CameraMetadata::from_paper(
@@ -47,6 +71,7 @@ impl Snapshot<'_> {
         section: u32,
         version: u32,
         edits: &handwriting_core::fine_edit::Adjustments,
+        details: &Value,
     ) -> Result<u32> {
         let mut db = self.drafts.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -61,6 +86,10 @@ impl Snapshot<'_> {
                 next,
                 serde_json::to_string(edits)?
             ],
+        )?;
+        tx.execute(
+            "INSERT INTO edit_notes VALUES(?,?,?)",
+            params![self.id, next, details.to_string()],
         )?;
         tx.commit()?;
         Ok(next)
@@ -78,6 +107,7 @@ impl Snapshot<'_> {
     }
 }
 
+#[derive(Clone)]
 pub struct Section {
     pub number: u32,
     pub version: u32,
@@ -112,6 +142,22 @@ impl Drafts {
                 draft TEXT NOT NULL REFERENCES drafts(id), number INTEGER NOT NULL,
                 revision INTEGER NOT NULL, source TEXT NOT NULL, prepared TEXT NOT NULL,
                 PRIMARY KEY(draft,number,revision)
+            );
+            CREATE TABLE IF NOT EXISTS paper_layouts (
+                draft TEXT NOT NULL, revision INTEGER NOT NULL, layout TEXT NOT NULL,
+                PRIMARY KEY(draft,revision)
+            );
+            CREATE TABLE IF NOT EXISTS draft_fonts (
+                draft TEXT NOT NULL, handle TEXT NOT NULL, bytes BLOB NOT NULL,
+                PRIMARY KEY(draft,handle)
+            );
+            CREATE TABLE IF NOT EXISTS edit_notes (
+                draft TEXT NOT NULL, revision INTEGER NOT NULL, details TEXT NOT NULL,
+                PRIMARY KEY(draft,revision)
+            );
+            CREATE TABLE IF NOT EXISTS page_reviews (
+                draft TEXT NOT NULL, revision INTEGER NOT NULL, section INTEGER NOT NULL,
+                page INTEGER NOT NULL, evidence TEXT NOT NULL, PRIMARY KEY(draft,revision,section,page)
             );
             CREATE TABLE IF NOT EXISTS papers (
                 draft TEXT PRIMARY KEY REFERENCES drafts(id), layout TEXT NOT NULL, image BLOB NOT NULL
@@ -240,13 +286,20 @@ impl Drafts {
             Some((r, layout, s)) => (r, layout, serde_json::from_str(&s)?),
             None => (0, 0, crate::controls::Changes::new()),
         };
+        let updated_layout: Option<String> = self.connect()?.query_row(
+            "SELECT layout FROM paper_layouts WHERE draft=? AND revision<=? ORDER BY revision DESC LIMIT 1",
+            params![id,revision], |r| r.get(0)).optional()?;
         Ok(Snapshot {
             controls,
             settings_revision,
             layout_revision,
             id,
             drafts: self,
-            paper: layout.as_deref().map(serde_json::from_str).transpose()?,
+            paper: updated_layout
+                .or(layout)
+                .as_deref()
+                .map(serde_json::from_str)
+                .transpose()?,
             revision,
             style: serde_json::from_str(&style)?,
         })
@@ -255,7 +308,10 @@ impl Drafts {
         &self,
         draft: &Snapshot<'_>,
         controls: &crate::controls::Changes,
-        camera_only: bool,
+        preserve_layout: bool,
+        paper: Option<&PaperLayout>,
+        font: Option<(&str, &[u8])>,
+        details: &Value,
     ) -> Result<u32> {
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -264,7 +320,23 @@ impl Drafts {
             "INSERT INTO settings VALUES (?1,?2,?3)",
             params![draft.id, next, serde_json::to_string(controls)?],
         )?;
-        if camera_only {
+        if let Some(paper) = paper {
+            tx.execute(
+                "INSERT INTO paper_layouts VALUES(?,?,?)",
+                params![draft.id, next, serde_json::to_string(paper)?],
+            )?;
+        }
+        if let Some((handle, bytes)) = font {
+            tx.execute(
+                "INSERT INTO draft_fonts VALUES(?,?,?)",
+                params![draft.id, handle, bytes],
+            )?;
+        }
+        tx.execute(
+            "INSERT INTO edit_notes VALUES(?,?,?)",
+            params![draft.id, next, details.to_string()],
+        )?;
+        if preserve_layout {
             tx.execute(
                 "INSERT INTO camera_revisions VALUES (?1,?2,?3)",
                 params![draft.id, next, draft.layout_revision],
@@ -284,6 +356,56 @@ impl Drafts {
         );
         Ok(next)
     }
+    pub fn record_review(
+        &self,
+        id: &str,
+        rev: u32,
+        section: u32,
+        page: usize,
+        evidence: &Value,
+    ) -> Result<()> {
+        self.connect()?.execute(
+            "INSERT OR REPLACE INTO page_reviews VALUES(?,?,?,?,?)",
+            params![id, rev, section, u32::try_from(page)?, evidence.to_string()],
+        )?;
+        Ok(())
+    }
+
+    pub fn trajectory(&self, id: &str, rev: u32, offset: u32, limit: u32) -> Result<Value> {
+        ensure!((1..=50).contains(&limit), "Trajectory limit must be 1..50");
+        let db = self.connect()?;
+        let mut stmt=db.prepare(
+            "WITH events(revision,action,section,page,evidence) AS (
+              SELECT revision,'save_section',number,NULL,NULL FROM sections WHERE draft=?1
+              UNION ALL SELECT revision,'tune_handwriting',NULL,NULL,NULL FROM settings WHERE draft=?1
+              UNION ALL SELECT revision,'adjust_glyphs',section,NULL,NULL FROM glyph_edits WHERE draft=?1
+              UNION ALL SELECT revision,'page_review',section,page,evidence FROM page_reviews WHERE draft=?1
+            )
+            SELECT e.revision,e.action,e.section,COALESCE(e.page,json_extract(n.details,'$.page')),
+                   COALESCE(e.evidence,n.details,'{}')
+            FROM events e LEFT JOIN edit_notes n ON n.draft=?1 AND n.revision=e.revision
+            WHERE e.revision<=?2
+            ORDER BY e.revision DESC,(e.action='page_review') DESC,e.section,e.page
+            LIMIT ?3 OFFSET ?4")?;
+        let mut entries = Vec::new();
+        let mut rows = stmt.query(params![id, rev, limit + 1, offset])?;
+        while let Some(row) = rows.next()? {
+            let details: String = row.get(4)?;
+            entries.push(json!({
+                "revision":row.get::<_,u32>(0)?,
+                "action":row.get::<_,String>(1)?,
+                "section":row.get::<_,Option<u32>>(2)?,
+                "page":row.get::<_,Option<u32>>(3)?,
+                "details":serde_json::from_str::<Value>(&details)?,
+            }));
+        }
+        let more = entries.len() > limit as usize;
+        entries.truncate(limit as usize);
+        Ok(
+            json!({"draft_id":id,"revision":rev,"events":entries,"next_offset":if more {offset.checked_add(limit)} else {None}}),
+        )
+    }
+
     pub fn review(
         &self,
         id: &str,

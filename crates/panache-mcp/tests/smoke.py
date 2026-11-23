@@ -38,6 +38,66 @@ def png(result):
     )
 
 
+async def review_workflow(client, key, guides, font_path):
+    # Revise the same sheet after its source image has moved away.
+    guides = [{**g, "left": [g["left"][0]+12, g["left"][1]+9],
+               "right": [g["right"][0]+12, g["right"][1]+9]} for g in guides]
+    revised = (await call(
+        client, "tune_handwriting", **key, expected_revision=3,
+        paper_guides=guides, font_path=str(font_path), note="Write inside the indicated area.",
+    )).structuredContent
+    font_path.unlink()
+    assert revised["revision"] == 4 and revised["paper"]["alignment"] == "manual_guides"
+    assert (await client.call_tool("tune_handwriting", {**key, "expected_revision": 3, "paper_guides": guides})).isError
+    review = await call(client, "preview_handwriting", **key, view="review")
+    assert sum(c.type == "image" for c in review.content) == 3
+    assert review.structuredContent["evidence"]["visibility"] == "inspect_visually"
+    glyph = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent["glyphs"][0]
+    selected = (await call(client, "preview_handwriting", **key, view="layout", region=glyph["photo_quad"])).structuredContent
+    assert glyph["id"] in [g["id"] for g in selected["glyphs"]]
+    await call(client, "adjust_glyphs", **key, expected_revision=4, section=1, page=1,
+               ids=[glyph["id"]], place_center=[170, 260], note="Move the chosen word.")
+    moved = (await call(client, "preview_handwriting", **key, view="layout",
+                        region=[[166,256],[174,256],[174,264],[166,264]])).structuredContent
+    assert glyph["id"] in [g["id"] for g in moved["glyphs"]]
+    pdf = (await call(client, "export_handwriting", **key, format="pdf")).structuredContent
+    await call(client, "tune_handwriting", **key, expected_revision=5, changes={"transparent_background": True})
+    transparent = png(await call(client, "preview_handwriting", **key))
+    archive = (await call(client, "export_handwriting", **key, format="zip")).structuredContent
+    with ZipFile(archive["path"]) as z:
+        assert z.read("0.png") == transparent
+    same_pdf = (await call(client, "export_handwriting", **key, format="pdf")).structuredContent
+    assert Path(same_pdf["path"]).read_bytes() == Path(pdf["path"]).read_bytes()
+    await call(client, "tune_handwriting", **key, expected_revision=6, changes={"ink_opacity": 0})
+    unreviewed = (await call(client, "export_handwriting", **key, format="zip")).structuredContent["review"]
+    assert unreviewed["pages_with_evidence"] == 0 and unreviewed["global_text_ink_zero"]
+    invisible = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
+    assert invisible["evidence"]["visibility"] == "no_visible_change"
+    assert invisible["evidence"]["max_rgb_delta"] == 0
+    flagged = (await call(client, "export_handwriting", **key, format="zip")).structuredContent["review"]
+    assert flagged["pages_with_evidence"] == 1 and flagged["pages_with_visibility_flags"] == 1
+    recent = (await call(client, "read_section", **key, view="trajectory", limit=1)).structuredContent
+    assert recent["next_offset"] == 1 and recent["events"][0]["details"]["visibility"] == "no_visible_change"
+    previous = (await call(client, "read_section", **key, revision=5, view="trajectory")).structuredContent
+    assert previous["events"][0]["details"]["note"] == "Move the chosen word."
+    assert all(e["revision"] <= 5 for e in previous["events"])
+    # Fit the full four-corner mask of a single glyph and check the reported final geometry.
+    ids = [glyph["id"]]
+    quad = [[130, 200], [166, 195], [171, 232], [126, 235]]
+    edit = dict(**key, expected_revision=7, section=1, page=1, ids=ids)
+    assert (await client.call_tool("adjust_glyphs", {**edit, "target_quad": [quad[i] for i in (0,2,1,3)]})).isError
+    await call(client, "adjust_glyphs", **edit, target_quad=quad)
+    geometry = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
+    for actual, target in zip(geometry["glyphs"][0]["current_photo_quad"], quad, strict=True):
+        assert max(abs(a-b) for a,b in zip(actual,target,strict=True)) < 1.1
+    await call(client, "tune_handwriting", **key, expected_revision=8, paper_guides=[])
+    restored = (await call(client, "read_section", **key, view="summary")).structuredContent["paper"]
+    original = (await call(client, "read_section", **key, revision=1, view="summary")).structuredContent["paper"]
+    assert restored == original
+    assert (await call(client,"read_section",**key,revision=4,view="summary")).structuredContent["paper"] != original
+    return transparent
+
+
 async def smoke(command, arguments, out):
     with TemporaryDirectory() as temp:
         params = StdioServerParameters(
@@ -137,6 +197,9 @@ async def smoke(command, arguments, out):
             )
             assert invalid.isError
             paper_path.unlink()
+            font_path = Path(temp) / "imported.ttf"
+            shutil.copyfile(Path(__file__).resolve().parents[3] / "assets/font_assets/李国夫手写体.ttf", font_path)
+            imported_preview = await review_workflow(client, gkey, guides, font_path)
             paper_id = custom["draft_id"]
             paper_preview = png(
                 await call(client, "preview_handwriting", draft_id=paper_id)
@@ -234,6 +297,7 @@ async def smoke(command, arguments, out):
             )
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
             await client.initialize()
+            assert png(await call(client, "preview_handwriting", **gkey, revision=6)) == imported_preview
             assert (await call(client, "list_drafts")).structuredContent["drafts"][0][
                 "draft_id"
             ] == doc

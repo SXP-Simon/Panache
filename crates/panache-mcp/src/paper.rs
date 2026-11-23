@@ -41,7 +41,7 @@ impl PaperLayout {
         }
         data
     }
-    fn from_guides(width: u32, height: u32, guides: &[Guide]) -> Result<Self> {
+    pub fn from_guides(width: u32, height: u32, guides: &[Guide]) -> Result<Self> {
         ensure!(
             (2..=32).contains(&guides.len()) && guides[0].row == 0,
             "Supply 2..32 guides starting at row 0"

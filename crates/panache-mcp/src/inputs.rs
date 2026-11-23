@@ -66,7 +66,7 @@ pub enum PaperMode {
     Flatten,
 }
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(serde::Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Guide {
     /// Zero-based writable ruling number, counted from the first supplied ruling.
@@ -112,10 +112,17 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
+    /// Replace the writing area on the saved paper, using 2..32 photo-space baselines. Pass [] to restore the original import calibration. Existing text is reflowed. Use the top and bottom writable lines even on unruled paper.
+    pub paper_guides: Option<Vec<Guide>>,
+    /// Import an absolute local TTF/OTF file into this draft. Its bytes are retained across restarts.
+    pub font_path: Option<std::path::PathBuf>,
+    /// Brief observable issue or user instruction that motivated this edit (max 320 characters).
+    pub note: Option<String>,
     pub draft_id: String,
     pub expected_revision: u32,
     /// Sparse name/value patch from describe_controls. Null restores the original setting.
-    pub changes: std::collections::BTreeMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub changes: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -127,6 +134,7 @@ pub struct List {
 #[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadView {
+    Trajectory,
     #[default]
     Excerpt,
     Summary,
@@ -151,12 +159,13 @@ pub struct Read {
 #[derive(Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PreviewView {
+    Review,
     Paper,
     Image,
     Layout,
 }
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(serde::Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Shape {
     /// Horizontal shear in degrees, -20..20. Positive displaces the bottom to the right.
@@ -168,12 +177,18 @@ pub struct Shape {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Nudge {
+    /// Optional short user feedback or observable reason to retain with this revision.
+    pub note: Option<String>,
     pub draft_id: String,
     pub expected_revision: u32,
     pub section: u32,
     pub page: usize,
     /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
     pub ids: Vec<u32>,
+    /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
+    pub place_center: Option<[u32; 2]>,
+    /// Absolute placement of the original selected block into four image pixels (TL,TR,BR,BL). Replaces prior geometric edits for these IDs. Exclusive with other geometry changes.
+    pub target_quad: Option<[[u32; 2]; 4]>,
     /// Absolute offsets in pixels from the original glyph position. Omitted fields retain their values.
     pub dx: Option<i32>,
     pub dy: Option<i32>,
@@ -196,6 +211,8 @@ pub struct Nudge {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// Layout only. Select glyph centers in this polygon (3..32 original image pixel pairs). Returned IDs can be adjusted together.
+    pub region: Option<Vec<[i32; 2]>>,
     /// In layout view, only return illustration outlines and isolated details.
     pub illustrations_only: Option<bool>,
     /// "image" (default), "paper" for the saved stationery alone, or "layout" for base glyph geometry.

@@ -4,6 +4,9 @@ mod engine;
 mod inputs;
 mod markdown;
 mod paper;
+mod placement;
+mod review;
+mod tuning;
 
 use anyhow::{Context, Result, ensure};
 use drafts::Drafts;
@@ -180,7 +183,7 @@ impl ServerHandler for Panache {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
-            .with_instructions("Drafts contain versioned Markdown sections. Images, the saved paper and per-glyph geometry are available on demand. Photo-space coordinates describe the preview; local adjustments use paper-space pixels.")
+            .with_instructions("Drafts contain versioned Markdown sections. Images, the saved paper and per-glyph geometry are available on demand. Photo-space coordinates describe the preview; local adjustments use paper-space pixels. For photo placement use preview_handwriting(view=review), compare the three labeled images, ask the user about ambiguous regions, and review the edited revision. Read view=trajectory to revisit actions and evidence.")
     }
 }
 
@@ -221,6 +224,12 @@ impl Panache {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or(&draft.style.font)
                         ),
+                        "paper" => draft
+                            .controls
+                            .get(k)
+                            .cloned()
+                            .unwrap_or(json!(draft.style.paper)),
+                        "ink_alpha" => json!(params.fill[3]),
                         "ink" => json!(
                             draft
                                 .controls
@@ -246,31 +255,21 @@ impl Panache {
     }
 
     #[tool(
-        description = "Tune a saved draft with a sparse control patch; returns a new revision. Preview that revision before export."
+        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. For a special writing area ask the user for first/last writable baselines. Review the new revision before export."
     )]
-    fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
-        tool_result((|| {
-            let draft = self
-                .0
-                .drafts
-                .snapshot(&input.draft_id, Some(input.expected_revision))?;
-            let changes = controls::merge(
-                &draft.controls,
-                &input.changes.into_iter().collect(),
-                &self.0.fonts,
-            )?;
-            ensure!(changes != draft.controls, "No control values changed");
-            controls::parameters(&draft, 1, &changes)?;
-            let camera_only = changes.keys().chain(draft.controls.keys()).all(|key| {
-                controls::catalog()["camera"].get(key).is_some()
-                    || changes.get(key) == draft.controls.get(key)
-            });
-            let next = self.0.drafts.tune(&draft, &changes, camera_only)?;
-            Ok(reply(
-                format!("Saved revision {next}."),
-                json!({"draft_id":draft.id,"revision":next,"controls":changes,"fine_layout":if camera_only { "preserved" } else { "inspect_again" }}),
-            ))
-        })())
+    async fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
+        let state = self.0.clone();
+        tool_result(
+            async {
+                let permit = state.prepare_slot.clone().acquire_owned().await?;
+                tokio::task::spawn_blocking(move || {
+                    let _permit = permit;
+                    tuning::apply(&state, input)
+                })
+                .await?
+            }
+            .await,
+        )
     }
 
     #[tool(
@@ -316,11 +315,20 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read one section: summary, excerpt (default, image data omitted), or exact source. Offset counts Unicode characters in the selected view."
+        description = "Read view=trajectory for recent draft edits, user-provided edit notes and page review evidence (offset/limit count events). Other views read one section: summary, excerpt (default, image data omitted), or exact source. Offset counts Unicode characters in the selected view."
     )]
     fn read_section(&self, Parameters(input): Parameters<Read>) -> CallToolResult {
         tool_result((|| {
             let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
+            if input.view == Some(ReadView::Trajectory) {
+                let result = self.0.drafts.trajectory(
+                    draft.id,
+                    draft.revision,
+                    input.offset.unwrap_or(0),
+                    input.limit.unwrap_or(12),
+                )?;
+                return Ok(reply(result.to_string(), result));
+            }
             let mut result = self.0.drafts.review(
                 &input.draft_id,
                 draft.revision,
@@ -353,8 +361,8 @@ impl Panache {
     }
 
     #[tool(
-        annotations(read_only_hint = true, open_world_hint = false),
-        description = "Preview one page. Default image; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Set illustrations_only=true in layout for editable diagram outlines and details. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
+        annotations(open_world_hint = false),
+        description = "Preview one page. view=review returns paper, finished image, reference overlay and visible ink evidence. Compare top/middle/bottom alignment and ink appearance. Use layout with region (photo pixel polygon) to select glyph IDs; view=layout returns base glyph boxes [x,y,width,height] in pixels, paginated with offset/limit, for adjust_glyphs. view=paper gives the saved background alone. Set illustrations_only=true in layout for editable diagram outlines and details. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline in image pixels."
     )]
     async fn preview_handwriting(
         &self,
@@ -365,6 +373,7 @@ impl Panache {
             .render(ctx, move |state, engine, cancel| {
                 let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
                 ensure!(input.illustrations_only.is_none() || input.view==Some(PreviewView::Layout),"illustrations_only requires view=layout");
+                ensure!(input.region.is_none() || input.view==Some(PreviewView::Layout),"region requires layout view");
                 if input.view==Some(PreviewView::Paper){
                     ensure!(input.offset.is_none() && input.limit.is_none() && input.section.is_none() && input.page.is_none(),"view=paper takes only draft_id and revision");
                     let bytes=draft.background()?.context("No imported paper for this draft")?;
@@ -380,6 +389,12 @@ impl Panache {
                     .pop()
                     .context("Empty draft")?;
                 let page = input.page.unwrap_or(1);
+                if input.view == Some(PreviewView::Review) {
+                    ensure!(input.limit.is_none() && input.offset.is_none(),"Review a single page without pagination");
+                    let baselines=engine.review_baselines(&draft,section.clone(),page,cancel)?;
+                    let (png,_)=engine.preview(&draft,section,page,cancel)?;
+                    return review::page(&draft,number,page,&png,&baselines,cancel);
+                }
                 if input.view == Some(PreviewView::Layout) {
                     let result = engine.layout(&draft, section, &input, cancel)?;
                     return Ok(reply(result.to_string(), result));
@@ -404,7 +419,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Shape applies additional local shear or taper."
+        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually."
     )]
     async fn adjust_glyphs(
         &self,
@@ -421,6 +436,10 @@ impl Panache {
                     .sections(draft.id, draft.revision, Some(input.section))?
                     .pop()
                     .context("Unknown section")?;
+                ensure!(
+                    input.note.as_ref().is_none_or(|s| s.chars().count() <= 320),
+                    "Note exceeds 320 characters"
+                );
                 let next = engine.adjust(&draft, section, &input, cancel)?;
                 Ok(reply(
                     format!("Saved revision {next}."),
@@ -432,7 +451,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns absolute path and actual page count."
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns path and page count. For visual acceptance, inspect view=review on the intended revision first, especially after moving glyphs or changing ink."
     )]
     async fn export_handwriting(
         &self,
@@ -444,6 +463,9 @@ impl Panache {
         let result = self.render(ctx, move |state, engine, cancel| {
             let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
             let sections = state.drafts.sections(&input.draft_id, draft.revision, None)?;
+            let (reviewed,visibility_flags)=draft.review_counts()?;
+            let params=controls::parameters(&draft,1,&draft.controls)?;
+            let zero_text_ink=params.ink_opacity==0 || params.fill[3]==0;
             let (path, pages) = engine.export(
                 &state.output, &draft, sections, input.format.unwrap_or_default(), cancel,
                 |pages| {
@@ -454,9 +476,10 @@ impl Panache {
                     }
                 },
             )?;
-            let message = format!("已导出 **{pages} 页**（版本 {}）。\n\n`{}`", draft.revision, path.display());
+            let warning=if zero_text_ink || visibility_flags>0 {"墨迹可见性需要复查。"}else{""};
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。\n\n`{}`", draft.revision, path.display());
             Ok(reply(message, json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages
+                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review":{"pages_with_evidence":reviewed,"pages_with_visibility_flags":visibility_flags,"global_text_ink_zero":zero_text_ink}
             })))
         }).await;
         tool_result(result)

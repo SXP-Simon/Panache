@@ -19,6 +19,33 @@ use crate::{
 use handwriting_core::fine_edit::{self, Adjustment, Adjustments};
 use serde_json::{Value, json};
 
+// Coordinates relative to the original tile center, transformed in paint order.
+fn glyph_point(
+    g: &fine_edit::GlyphBounds,
+    edit: Option<&Adjustment>,
+    mut offset: [f64; 2],
+) -> [f32; 2] {
+    let [x, y, w, h] = g.bounds;
+    let mut center = [x as f64 + w as f64 / 2., y as f64 + h as f64 / 2.];
+    if let Some(e) = edit {
+        center[0] += f64::from(e.dx);
+        center[1] += f64::from(e.dy);
+        let (sin, cos) = f64::from(e.angle).to_radians().sin_cos();
+        let scale = f64::from(e.scale) / 100.;
+        let [u, v] = offset;
+        offset = [scale * (cos * u - sin * v), scale * (sin * u + cos * v)];
+        if let Some([a, b, c, d, f, k, g, h]) = e.warp {
+            let [u, v] = offset;
+            let z = g * u + h * v + 1.;
+            offset = [(a * u + b * v + c) / z, (d * u + f * v + k) / z];
+        }
+    }
+    [
+        (center[0] + offset[0]) as f32,
+        (center[1] + offset[1]) as f32,
+    ]
+}
+
 struct CachedPage {
     draft: String,
     section: u32,
@@ -94,11 +121,22 @@ impl Engine {
             .and_then(serde_json::Value::as_str)
             .unwrap_or(&draft.style.font);
         ensure!(
-            self.names.iter().any(|f| f == font_name),
+            font_name.starts_with("upload:") || self.names.iter().any(|f| f == font_name),
             "Font no longer available: {}",
             font_name
         );
-        let primary = self.font(font_name)?;
+        let primary = if font_name.starts_with("upload:") {
+            let key = format!("{}:{}", draft.id, font_name);
+            if let Some(font) = self.fonts.get(&key) {
+                font.clone()
+            } else {
+                let font = FontBook::load(&draft.font_bytes(font_name)?)?;
+                self.fonts.insert(key, font.clone());
+                font
+            }
+        } else {
+            self.font(font_name)?
+        };
         let fonts = FontBook::with_text_fallbacks(primary, &section.text, |name| {
             if self.names.iter().any(|n| n == name) {
                 self.font(name).map(Some)
@@ -211,6 +249,41 @@ impl Engine {
         req.params.fine_edit = true;
         Ok(req)
     }
+    pub fn review_baselines(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        page: usize,
+        cancel: &Cancellation,
+    ) -> Result<Vec<[f32; 2]>> {
+        let req = self.fine_request(draft, section)?;
+        let (_, glyphs) = fine_edit::inspect_page(&req, page, cancel)?;
+        let edits = req
+            .params
+            .fine_edits
+            .as_ref()
+            .map(|v| {
+                v.glyphs
+                    .iter()
+                    .map(|e| (e.id, e))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let stride = glyphs.len().div_ceil(384).max(1);
+        Ok(glyphs
+            .iter()
+            .filter(|g| g.illustration.is_none())
+            .step_by(stride)
+            .map(|g| {
+                let dy = f64::from(g.baseline - g.bounds[1]) - f64::from(g.bounds[3]) / 2.;
+                crate::review::photo_point(
+                    draft,
+                    glyph_point(g, edits.get(&g.id).copied(), [0., dy]),
+                )
+            })
+            .collect())
+    }
+
     pub fn layout(
         &mut self,
         draft: &Snapshot<'_>,
@@ -228,6 +301,27 @@ impl Engine {
         if input.illustrations_only == Some(true) {
             bounds.retain(|g| g.illustration.is_some());
         }
+        let edits = req
+            .params
+            .fine_edits
+            .as_ref()
+            .map(|v| {
+                v.glyphs
+                    .iter()
+                    .map(|e| (e.id, e))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let center = |g: &fine_edit::GlyphBounds| {
+            crate::review::photo_point(draft, glyph_point(g, edits.get(&g.id).copied(), [0., 0.]))
+        };
+        if let Some(poly) = &input.region {
+            ensure!(
+                (3..=32).contains(&poly.len()),
+                "Use 3..32 vertices in image pixels"
+            );
+            bounds.retain(|g| crate::review::contains(poly, center(g)));
+        }
         let utf16: Vec<_> = req.text.encode_utf16().collect();
         let rows: Vec<_> = bounds
             .iter()
@@ -235,6 +329,9 @@ impl Engine {
             .take(limit)
             .map(|g| {
                 let mut row = json!({"id":g.id,"bounds":g.bounds});
+                if input.region.is_some() {
+                    row["selected_center"] = json!(center(g));
+                }
                 if let Some(parent) = g.illustration {
                     row["kind"] = json!(if parent == g.id {
                         "illustration"
@@ -277,6 +374,12 @@ impl Engine {
                     .and_then(|v| v.glyphs.iter().find(|e| e.id == g.id))
                 {
                     row["adjustment"] = json!(edit);
+                    let w = f64::from(g.bounds[2]) / 2.;
+                    let h = f64::from(g.bounds[3]) / 2.;
+                    row["current_photo_quad"] =
+                        json!([[-w, -h], [w, -h], [w, h], [-w, h]].map(|uv| {
+                            crate::review::photo_point(draft, glyph_point(g, Some(edit), uv))
+                        }));
                 }
                 row
             })
@@ -300,7 +403,9 @@ impl Engine {
             "Choose 1..32 distinct glyph IDs"
         );
         ensure!(
-            input.dx.is_some()
+            input.target_quad.is_some()
+                || input.place_center.is_some()
+                || input.dx.is_some()
                 || input.dy.is_some()
                 || input.scale.is_some()
                 || input.angle.is_some()
@@ -363,6 +468,55 @@ impl Engine {
             .flat_map(|v| v.glyphs)
             .map(|e| (e.id, e))
             .collect();
+        let params = &req.params;
+        let [w, h] = draft
+            .paper
+            .as_ref()
+            .map(|p| p.photo_size.unwrap_or([p.width, p.height]))
+            .unwrap_or([params.width.unwrap_or(0), params.height.unwrap_or(0)]);
+        let placement = if let Some(quad) = input.target_quad {
+            ensure!(
+                input.place_center.is_none()
+                    && input.dx.is_none()
+                    && input.dy.is_none()
+                    && input.angle.is_none()
+                    && input.scale.is_none()
+                    && input.shape.is_none(),
+                "Use target_quad separately from other geometry fields"
+            );
+            Some(crate::placement::Placement::new(
+                draft,
+                [w, h],
+                &bounds,
+                &ids,
+                quad,
+            )?)
+        } else {
+            None
+        };
+        let translation = if let Some(target) = input.place_center {
+            ensure!(
+                input.dx.is_none() && input.dy.is_none() && input.shape.is_none(),
+                "Use place_center separately from dx/dy/shape"
+            );
+            ensure!(target[0] < w && target[1] < h, "Target outside the page");
+            let projection = draft.paper.as_ref().and_then(|p| p.projection.as_ref());
+            let dest = target.map(|v| v as f32);
+            let dest = projection.map_or(dest, |p| p.paper_point(dest));
+            let mut mean = [0., 0.];
+            for g in bounds.iter().filter(|g| ids.contains(&g.id)) {
+                let pos = glyph_point(g, edits.get(&g.id), [0., 0.]);
+                for axis in 0..2 {
+                    mean[axis] += pos[axis] / ids.len() as f32;
+                }
+            }
+            Some([
+                (dest[0] - mean[0]).round() as i32,
+                (dest[1] - mean[1]).round() as i32,
+            ])
+        } else {
+            None
+        };
         for id in ids {
             let e = edits.entry(id).or_insert(Adjustment {
                 id,
@@ -380,6 +534,9 @@ impl Engine {
                 .iter()
                 .find(|g| g.id == id)
                 .context("Unknown glyph")?;
+            if let Some(map) = &placement {
+                map.apply(e, glyph.bounds)?;
+            }
             if let Some(shape) = &input.shape {
                 let height = f64::from(glyph.bounds[3].max(1));
                 let ratio = f64::from(shape.top_width_percent) / 100.;
@@ -400,6 +557,14 @@ impl Engine {
                         h,
                     ])
                 };
+            }
+            if let Some([dx, dy]) = translation {
+                e.dx = e.dx.checked_add(dx).context("Position overflow")?;
+                e.dy = e.dy.checked_add(dy).context("Position overflow")?;
+                ensure!(
+                    (-65535..=65535).contains(&e.dx) && (-65535..=65535).contains(&e.dy),
+                    "Move exceeds the supported layout range"
+                );
             }
             e.dx = input.dx.unwrap_or(e.dx);
             e.dy = input.dy.unwrap_or(e.dy);
@@ -425,6 +590,7 @@ impl Engine {
                 key,
                 glyphs: edits.into_values().collect(),
             },
+            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"target_quad":input.target_quad,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
         )
     }
     pub fn export(
@@ -446,6 +612,7 @@ impl Engine {
                 cancel.check()?;
                 let (_, edits) = draft.edits(&section)?;
                 let mut request = self.request(draft, section, background.take(), edits)?;
+                request.params.pdf_save = matches!(format, Format::Pdf);
                 request.limits.max_pages -= count;
                 Self::render_pages(&request, photo.as_ref(), cancel, usize::MAX, |_, page| {
                     emit(count, &page)?;

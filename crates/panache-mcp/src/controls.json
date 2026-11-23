@@ -13,6 +13,8 @@
     "right_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
     "top_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
     "bottom_margin": {"type":"number","min":0,"max":10000,"unit":"px"},
+    "paper": {"type":"choice","values":["plain","ruled","grid","dots"]},
+    "seed": {"type":"integer","min":0,"max":4294967295,"unit":"first section seed"},
     "width": {"type":"integer","min":1,"max":16000,"unit":"px (preset paper)"},
     "height": {"type":"integer","min":1,"max":16000,"unit":"px (preset paper)"},
     "layout_style": {"type":"choice","values":["standard","homework"]},
@@ -27,7 +29,9 @@
     "latin_digits": {"type":"boolean"}
   },
   "ink": {
+    "transparent_background": {"type":"boolean","description":"Ink-only PNG preview and ZIP. PDF retains the paper."},
     "ink": {"type":"color"},
+    "ink_alpha": {"type":"integer","min":0,"max":255,"description":"Alpha channel of the selected RGBA pen color, before ink opacity."},
     "ink_opacity": {"type":"integer","min":0,"max":100,"unit":"%"},
     "ink_thickness": {"type":"number","min":-2,"max":2,"unit":"px","step":0.1},
     "ink_softness": {"type":"number","min":0,"max":2,"unit":"px","step":0.1}
