@@ -127,3 +127,9 @@ cargo build --locked --release -p panache-mcp
 ```sh
 uv run --script crates/panache-mcp/tests/smoke.py target/release/panache-mcp --out output/pdf
 ```
+
+局部复查盲评使用合成页面。构建后运行以下命令，在新的输出目录中生成两组顺序配平的图片与任务，以及单独保存的答案和逐例统计。给评审者各发一组，待其回答后再打开 `private/key.json`。脚本另外核对源图像素。调用数和字节数只统计取复盘结果的开销，选区已提供。
+
+```sh
+uv run --script crates/panache-mcp/tests/local_review_experiment.py target/release/panache-mcp --out output/local-review-pilot
+```
