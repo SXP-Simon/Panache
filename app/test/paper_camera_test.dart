@@ -22,6 +22,27 @@ void main() {
     );
   });
 
+  test(
+    'large WebP can carry individual camera metadata beyond the image data',
+    () {
+      const imageSize = 65 * 1024 * 1024;
+      const tiff = [73, 73, 42, 0, 8, 0, 0, 0];
+      final bytes = Uint8List(12 + 8 + imageSize + 8 + tiff.length);
+      final data = ByteData.sublistView(bytes);
+      data.setUint32(0, 0x52494646);
+      data.setUint32(4, bytes.length - 8, Endian.little);
+      data.setUint32(8, 0x57454250);
+      data.setUint32(12, 0x56503820);
+      data.setUint32(16, imageSize, Endian.little);
+      data.setUint32(20 + imageSize, 0x45584946);
+      data.setUint32(24 + imageSize, tiff.length, Endian.little);
+      bytes.setAll(28 + imageSize, tiff);
+      expect(paperExifSource(bytes), tiff);
+      data.setUint32(24 + imageSize, tiff.length + 1, Endian.little);
+      expect(paperExifSource(bytes), isNull);
+    },
+  );
+
   testWidgets(
     'saving an ink page inserts one EXIF chunk without changing pixels',
     (tester) async {

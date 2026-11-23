@@ -12,4 +12,6 @@ When a photograph supplies the background, each PNG, including each page in a ZI
 
 Under **Paper → Paper camera**, enter any missing manufacturer, model, lens model or ISO. Use printable ASCII for the names and 1–65535 for ISO. Values in the photograph take precedence. The EXIF description and PDF subject identify fields supplied by the user. With neither source nor manual values, the export has no camera record.
 
+During mobile resizing, JPEG, PNG and WebP supply their EXIF block separately from the pixels. For other containers larger than 64 MiB, the app checks the first 16 MiB for camera information.
+
 In MCP, inspect the `camera` group with `describe_controls`, then send the desired fields through `tune_handwriting`, for example `changes={"camera_model":"Pixel 8","camera_iso":200}`. Set a field to `null` to clear it. Camera-only changes preserve glyph adjustments.

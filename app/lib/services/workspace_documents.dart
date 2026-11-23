@@ -10,6 +10,7 @@ import 'workspace.dart';
 class WorkspaceDocuments {
   const WorkspaceDocuments(this.workspace);
   final Workspace workspace;
+  static final _selections = Expando<Object>();
   static final _detections = Expando<Object>();
 
   Future<void> importText(Upload file) async {
@@ -55,6 +56,10 @@ class WorkspaceDocuments {
 
   Future<bool> setPaperBackground(Upload file) async {
     final api = workspace.api;
+    final token = Object();
+    _selections[workspace] = token;
+    _detections[workspace] = Object();
+    final revision = workspace.backgroundRevision;
     final paper = api.usesMobilePaperLimits
         ? (await preparePaperBackground(
             file,
@@ -62,7 +67,12 @@ class WorkspaceDocuments {
             readPaperExif: api.readPaperExif,
           )).file
         : file;
-    if (workspace.disposed || !identical(workspace.api, api)) return false;
+    if (workspace.disposed ||
+        !identical(workspace.api, api) ||
+        _selections[workspace] != token ||
+        workspace.backgroundRevision != revision) {
+      return false;
+    }
     workspace.background = paper;
     workspace.pages = [];
     workspace.page = 0;

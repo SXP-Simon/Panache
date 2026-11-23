@@ -12,4 +12,6 @@
 
 打开「纸张 → 底纸拍摄设备」可补录制造商、设备型号、镜头型号和 ISO。名称使用设备标注的 ASCII 拼写，ISO 范围为 1–65535。原图有值的字段优先；补录项会在图片的 EXIF 描述和 PDF 主题中列出。没有原始信息和补录值时，导出文件不添加相机记录。
 
+移动端缩图时，JPEG、PNG 和 WebP 会从图片中单独提取 EXIF 块。其他封装超过 64 MiB 时，在文件前 16 MiB 查找设备信息。
+
 MCP 可用 `describe_controls` 查询 `camera` 组，再用 `tune_handwriting` 提交变动字段。例如 `changes={"camera_model":"Pixel 8","camera_iso":200}`。将字段设为 `null` 可清除补录。仅修改相机信息会保留当前笔迹精修。

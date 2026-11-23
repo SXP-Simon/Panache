@@ -91,6 +91,7 @@ impl CameraMetadata {
             (Tag::FNumber, "FNumber", None),
             (Tag::ExposureTime, "ExposureTime", None),
         ] {
+            // PRIMARY selects the main image. Tag context selects TIFF IFD0 or the Exif sub-IFD.
             let from_file = source
                 .as_ref()
                 .and_then(|exif| exif.get_field(tag, In::PRIMARY))

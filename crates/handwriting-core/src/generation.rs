@@ -16,6 +16,7 @@ pub enum Output<'a> {
     Zip(&'a mut dyn WriteSeek),
 }
 
+/// Rust callers constructing legacy page packets can set `camera_exif: None`.
 #[derive(serde::Serialize)]
 pub struct EncodedInkPage {
     pub paper: String,

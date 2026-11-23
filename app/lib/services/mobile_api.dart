@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import '../utils/paper_exif.dart';
 import 'api.dart';
 import 'paper_background.dart';
 
@@ -58,13 +59,14 @@ class MobileHandwritingApi extends HandwritingApi {
   Future<Uint8List?> readPaperExif(Upload file) async {
     // This separate import reads metadata only. Rendering still uses the 16 MiB limit.
     const sourceLimit = 64 * 1024 * 1024;
-    final source = file.bytes.length <= sourceLimit
-        ? file
-        : Upload(
-            'paper-header',
-            Uint8List.sublistView(file.bytes, 0, 512 * 1024),
-          );
-    final paths = await stage({'file': source}, byteLimit: sourceLimit);
+    final source = paperExifSource(file.bytes);
+    if (source == null || source.isEmpty || source.length > sourceLimit) {
+      return null;
+    }
+    // Apply the limit to the metadata block, independently of the location of the pixels.
+    final paths = await stage({
+      'file': Upload('paper-metadata', source),
+    }, byteLimit: sourceLimit);
     try {
       final value = await call('paper_camera', files: paths) as String;
       return value.isEmpty ? null : base64Decode(value);

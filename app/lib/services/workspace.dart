@@ -115,9 +115,12 @@ class Workspace extends ChangeNotifier {
   List<String> fonts = [];
   Map<String, String> images = {};
   Upload? _background;
+  int _backgroundRevision = 0;
+  int get backgroundRevision => _backgroundRevision;
   bool backgroundRuled = false;
   Upload? get background => _background;
   set background(Upload? value) {
+    ++_backgroundRevision;
     if (!identical(value, _background)) backgroundRuled = false;
     _background = value;
   }

@@ -367,12 +367,11 @@ fn photo_camera_tags_and_manual_fallback_survive_page_exports() {
     }
     let mut pdf = vec![];
     generation::generate(&req, &cancel, Output::Pdf(&mut pdf), |_| Ok(())).unwrap();
-    let pdf = String::from_utf8_lossy(&pdf);
-    assert!(
-        pdf.contains("/Subject")
-            && pdf.contains("Source phone")
-            && pdf.contains("User supplied: ISO.")
-    );
+    let doc = pdf_extract::Document::load_mem(&pdf).unwrap();
+    let info_id = doc.trailer.get(b"Info").unwrap().as_reference().unwrap();
+    let info = doc.get_dictionary(info_id).unwrap();
+    let subject = pdf_extract::decode_text_string(info.get(b"Subject").unwrap()).unwrap();
+    assert!(subject.contains("Source phone") && subject.contains("User supplied: ISO."));
     req.params.ink_layers = true;
     generation::generate(
         &req,

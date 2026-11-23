@@ -13,6 +13,16 @@ class PaperApi extends HandwritingApi {
   PaperApi() : super('local://test');
   final requests = <Completer<Map<String, dynamic>>>[];
   final files = <Upload>[];
+  bool delayExif = false;
+  final readingExif = Completer<void>();
+  final exifResult = Completer<Uint8List?>();
+  @override
+  Future<Uint8List?> readPaperExif(Upload file) {
+    if (!delayExif) return Future.value(null);
+    if (!readingExif.isCompleted) readingExif.complete();
+    return exifResult.future;
+  }
+
   @override
   bool usesMobilePaperLimits = false;
   @override
@@ -59,6 +69,27 @@ void main() {
       ..background = Upload('paper.png', Uint8List(0));
   });
   tearDown(() => workspace.dispose());
+  test(
+    'a slower mobile resize cannot replace a newer paper selection',
+    () async {
+      api.usesMobilePaperLimits = true;
+      api.delayExif = true;
+      final png = await paperPng(32, 32);
+      final padded = Uint8List(mobileImageBytes + 1)
+        ..setRange(0, png.length, png);
+      final docs = WorkspaceDocuments(workspace);
+      final first = docs.setPaperBackground(Upload('first.png', padded));
+      await api.readingExif.future;
+      final second = Upload('second.png', png);
+      expect(
+        await WorkspaceDocuments(workspace).setPaperBackground(second),
+        isTrue,
+      );
+      api.exifResult.complete(null);
+      expect(await first, isFalse);
+      expect(workspace.background, same(second));
+    },
+  );
   test(
     'legacy measurements subtract detected spacing, not previous spacing',
     () async {
