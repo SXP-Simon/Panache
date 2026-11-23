@@ -105,6 +105,40 @@ void _preflightTar(String path) {
   }
 }
 
+void _validateZipHeaders(InputFileStream input) {
+  final names = <String>{};
+  final directory = ZipDirectory()..read(input);
+  for (final header in directory.fileHeaders) {
+    final local = header.file!;
+    if (header.filename != local.filename ||
+        header.uncompressedSize > maxEntryBytes ||
+        (header.uncompressedSize > 1024 * 1024 &&
+            header.uncompressedSize > (header.compressedSize + 1) * 300)) {
+      reject('invalid_zip');
+    }
+    final type = header.externalFileAttributes >> 16 & 0xf000;
+    if (!_supportedEntryMode(type)) {
+      reject('archive_link_or_special');
+    }
+    if (type == 0xa000 && header.versionMadeBy >> 8 != 3) {
+      reject('archive_link_or_special');
+    }
+    if (type == 0xa000 && header.uncompressedSize > 4096) {
+      reject('archive_too_large');
+    }
+    final name = archivePath(header.filename);
+    if (!names.add(name.toLowerCase())) {
+      reject('duplicate_archive_entry');
+    }
+  }
+}
+
+bool _macMetadata(String name) =>
+    name == '__MACOSX' || name.startsWith('__MACOSX/');
+
+bool _supportedEntryMode(int mode) =>
+    mode == 0 || mode == 0x8000 || mode == 0x4000 || mode == 0xa000;
+
 class _Entries {
   _Entries(this.platform);
   final String platform;
@@ -117,7 +151,7 @@ class _Entries {
       reject('duplicate_archive_entry');
     }
     final mode = entry.mode & 0xf000;
-    if (mode != 0 && mode != 0x8000 && mode != 0x4000 && mode != 0xa000) {
+    if (!_supportedEntryMode(mode)) {
       reject('archive_link_or_special');
     }
     if (entry.size < 0 ||
@@ -134,10 +168,37 @@ class _Entries {
     files[name] = entry;
   }
 
+  void writeTo(String destination) {
+    final regular = Archive();
+    for (final MapEntry(key: name, value: entry) in files.entries) {
+      if (!entry.isSymbolicLink && !_macMetadata(name)) {
+        regular.add(entry);
+      }
+    }
+    extractArchiveToDiskSync(regular, destination, maxSize: maxExtractedBytes);
+    for (final MapEntry(key: name, value: entry) in files.entries) {
+      if (_macMetadata(name)) continue;
+      final target = p.joinAll([destination, ...name.split('/')]);
+      if (entry.isSymbolicLink) {
+        Link(target).createSync(entry.symbolicLink!, recursive: true);
+      } else {
+        if (entry.isFile && File(target).lengthSync() != entry.size) {
+          reject('truncated_archive');
+        }
+        setMode(
+          target,
+          entry.isDirectory
+              ? 0x1ed
+              : (entry.unixPermissions == 0 ? 0x1a4 : entry.unixPermissions),
+        );
+      }
+    }
+  }
+
   void validate() {
     final root = platform == 'macos-arm64' ? 'Panache.app' : 'Panache';
     for (final MapEntry(key: name, value: entry) in files.entries) {
-      if (name == '__MACOSX' || name.startsWith('__MACOSX/')) {
+      if (_macMetadata(name)) {
         if (platform != 'macos-arm64') reject('unexpected_archive_root');
         continue;
       }
@@ -209,31 +270,7 @@ Future<String> extractPackage(
     if (source.endsWith('.zip')) {
       _preflightZip(source);
       input = InputFileStream(source);
-      final directory = ZipDirectory()..read(input);
-      for (final header in directory.fileHeaders) {
-        final local = header.file!;
-        if (header.filename != local.filename ||
-            header.uncompressedSize > maxEntryBytes ||
-            (header.uncompressedSize > 1024 * 1024 &&
-                header.uncompressedSize > (header.compressedSize + 1) * 300)) {
-          reject('invalid_zip');
-        }
-        final type = header.externalFileAttributes >> 16 & 0xf000;
-        if (type != 0 && type != 0x8000 && type != 0x4000 && type != 0xa000) {
-          reject('archive_link_or_special');
-        }
-        if (type == 0xa000 && header.versionMadeBy >> 8 != 3) {
-          reject('archive_link_or_special');
-        }
-        if (type == 0xa000 && header.uncompressedSize > 4096) {
-          reject('archive_too_large');
-        }
-        final name = archivePath(header.filename);
-        if (!entries.folded.add(name.toLowerCase())) {
-          reject('duplicate_archive_entry');
-        }
-      }
-      entries.folded.clear();
+      _validateZipHeaders(input);
       input.closeSync();
       input = InputFileStream(source);
       archive = ZipDecoder().decodeStream(
@@ -267,32 +304,7 @@ Future<String> extractPackage(
       reject('unsupported_archive');
     }
     entries.validate();
-    final regular = Archive();
-    for (final MapEntry(key: name, value: entry) in entries.files.entries) {
-      if (!entry.isSymbolicLink &&
-          name != '__MACOSX' &&
-          !name.startsWith('__MACOSX/')) {
-        regular.add(entry);
-      }
-    }
-    extractArchiveToDiskSync(regular, destination, maxSize: maxExtractedBytes);
-    for (final MapEntry(key: name, value: entry) in entries.files.entries) {
-      if (name == '__MACOSX' || name.startsWith('__MACOSX/')) continue;
-      final target = p.joinAll([destination, ...name.split('/')]);
-      if (entry.isSymbolicLink) {
-        Link(target).createSync(entry.symbolicLink!, recursive: true);
-      } else {
-        if (entry.isFile && File(target).lengthSync() != entry.size) {
-          reject('truncated_archive');
-        }
-        setMode(
-          target,
-          entry.isDirectory
-              ? 0x1ed
-              : (entry.unixPermissions == 0 ? 0x1a4 : entry.unixPermissions),
-        );
-      }
-    }
+    entries.writeTo(destination);
     return p.join(
       destination,
       platform == 'macos-arm64' ? 'Panache.app' : 'Panache',
