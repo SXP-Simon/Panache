@@ -23,6 +23,26 @@ class DefaultApi extends HandwritingApi {
 
 void main() {
   test(
+    'transparent PNG is opt-in, survives presets and leaves PDF on paper',
+    () {
+      final settings = Settings()..restore({'transparentBackground': true});
+      final restored = Settings()..restore(settings.toJson());
+      expect(restored.transparentBackground, isTrue);
+      restored.smallPreset();
+      expect(restored.transparentBackground, isTrue);
+      expect(
+        restored.form('x', preview: true, pdf: false)['transparent_background'],
+        'true',
+      );
+      expect(
+        restored.form('x', preview: false, pdf: true)['transparent_background'],
+        'false',
+      );
+      restored.restore({});
+      expect(restored.transparentBackground, isFalse);
+    },
+  );
+  test(
     'notebook defaults target portrait mobile writing without touching fonts',
     () {
       final settings = Settings.notebook();

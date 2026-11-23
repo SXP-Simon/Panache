@@ -409,6 +409,12 @@ class WorkbenchSettings extends StatelessWidget {
                             ),
                           ],
                         ),
+                      settingSwitch(
+                        l.transparentPng,
+                        settings.transparentBackground,
+                        (value) => settings.transparentBackground = value,
+                        icon: Icons.texture,
+                      ),
                       _paperCamera(l),
                     ],
                     collapsible: false,
@@ -516,10 +522,16 @@ class WorkbenchSettings extends StatelessWidget {
     );
   }
 
-  Widget settingSwitch(String title, bool value, ValueChanged<bool> change) =>
+  Widget settingSwitch(
+    String title,
+    bool value,
+    ValueChanged<bool> change, {
+    IconData? icon,
+  }) =>
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(title),
+        secondary: icon == null ? null : Icon(icon),
         value: value,
         onChanged: locked
             ? null

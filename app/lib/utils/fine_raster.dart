@@ -276,6 +276,9 @@ class FineRaster {
           final alpha = (mask[sy * glyph.width + sx] * opacity + 50) ~/ 100;
           if (alpha == 0) continue;
           final base = (y * width + x) * 4;
+          // rawRgba stores premultiplied RGB; source-over also updates alpha.
+          pixels[base + 3] =
+              alpha + (pixels[base + 3] * (255 - alpha) + 127) ~/ 255;
           for (var c = 0; c < 3; c++) {
             final value = color >> ((2 - c) * 8) & 255;
             pixels[base + c] =

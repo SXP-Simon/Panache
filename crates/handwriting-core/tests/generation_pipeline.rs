@@ -49,6 +49,166 @@ fn request(text: &str) -> RenderRequest {
 }
 
 #[test]
+fn standard_wrap_keeps_words_and_closing_punctuation_with_their_neighbours() {
+    fn lines(text: &str, width: u32) -> Vec<String> {
+        let mut req = request(text);
+        req.params.width = Some(width);
+        req.params.monospaced = true;
+        req.params.fine_edit = true;
+        req.params.full_preview = true;
+        let source: Vec<_> = text.encode_utf16().collect();
+        let (_, glyphs) = fine_edit::inspect_page(&req, 1, &Cancellation::default()).unwrap();
+        let mut lines = Vec::<String>::new();
+        let mut previous = None;
+        for glyph in glyphs {
+            if previous != Some(glyph.baseline) {
+                lines.push(String::new());
+                previous = Some(glyph.baseline);
+            }
+            let [start, end] = glyph.source_utf16.unwrap();
+            let letters = String::from_utf16(&source[start as usize..end as usize]).unwrap();
+            lines.last_mut().unwrap().push_str(&letters);
+        }
+        lines
+    }
+    assert_eq!(lines("12345 planet,", 140), ["12345", "planet,"]);
+    assert_eq!(lines("中文混排好，", 140), ["中文混排", "好，"]);
+    assert_eq!(lines("中文 planet!", 140), ["中文", "planet!"]);
+    assert_eq!(lines("12345 nice ,", 140), ["12345", "nice,"]);
+    assert_eq!(lines("a              ,", 140), ["a,"]);
+    assert_eq!(lines("12345 café", 130), ["12345", "café"]);
+    assert_eq!(lines("12345 résumé", 140), ["12345", "résumé"]);
+    assert_eq!(lines("prefix don't", 140), ["prefix", "don't"]);
+    assert_eq!(lines("1234567890123456", 140), ["1234567890", "123456"]);
+    assert_eq!(lines("end\n，start", 140), ["end", "，start"]);
+}
+
+#[test]
+fn first_word_reclaims_indent_only_if_needed_and_wrapped_words_start_at_the_margin() {
+    let layout = |text: &str, indent| {
+        let mut req = request(text);
+        req.params.width = Some(140);
+        req.params.monospaced = true;
+        req.params.first_line_indent = indent;
+        req.params.fine_edit = true;
+        fine_edit::inspect_page(&req, 1, &Cancellation::default())
+            .unwrap()
+            .1
+    };
+    let reference = layout("notebook", false);
+    let indented = layout("notebook", true);
+    assert_eq!(reference.len(), 8);
+    assert_eq!(indented.len(), reference.len());
+    for (a, b) in indented.iter().zip(reference) {
+        assert_eq!((a.baseline, a.bounds), (b.baseline, b.bounds));
+    }
+    assert!(layout("note", true)[0].bounds[0] > layout("note", false)[0].bounds[0]);
+    let wrapped = layout("12345 planet,", false);
+    let alone = layout("planet,", false);
+    assert!(wrapped[5].baseline > wrapped[0].baseline);
+    assert_eq!(wrapped[5].bounds[0], alone[0].bounds[0]);
+}
+
+#[test]
+fn transparent_png_and_zip_keep_ink_alpha_and_pdf_keeps_the_paper() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let cancel = Cancellation::default();
+    for (uploaded, layered, fine) in [
+        (false, false, false),
+        (false, true, false),
+        (true, true, false),
+        (true, true, true),
+    ] {
+        let mut req = request("Ink\n---\nTwo");
+        req.params.preview = false;
+        req.params.underlined = true;
+        req.params.ink_layers = layered;
+        req.params.fine_edit = fine;
+        req.params.fill = [35, 90, 160, 160];
+        if uploaded {
+            req.params.width = None;
+            req.params.height = None;
+            req.background = Some(
+                export::png(&image::RgbaImage::from_pixel(
+                    240,
+                    180,
+                    image::Rgba([32, 40, 55, 255]),
+                ))
+                .unwrap(),
+            );
+        }
+        let pdf = |req: &RenderRequest| {
+            let mut bytes = Vec::new();
+            generation::generate(req, &cancel, Output::Pdf(&mut bytes), |_| Ok(())).unwrap();
+            bytes
+        };
+        let opaque_pdf = pdf(&req);
+        req.params.transparent_background = true;
+        assert_eq!(pdf(&req), opaque_pdf);
+        // Locate solid ink independently of the alpha under test, once per page.
+        let alpha = req.params.fill[3];
+        req.params.fill[3] = 255;
+        let mut solid_points = Vec::new();
+        render(&req, &cancel, |_, page| {
+            let (x, y, _) = page
+                .enumerate_pixels()
+                .find(|(_, _, p)| p[3] == 255)
+                .unwrap();
+            solid_points.push((x, y));
+            Ok(())
+        })
+        .unwrap();
+        req.params.fill[3] = alpha;
+        let mut pngs = Vec::new();
+        generation::generate(
+            &req,
+            &cancel,
+            Output::Preview(&mut |index, bytes| {
+                let im = image::load_from_memory(&bytes).unwrap().to_rgba8();
+                assert_eq!(im.dimensions(), (240, 180));
+                assert_eq!(im[(0, 0)][3], 0);
+                assert_eq!(im[(150, 46)][3], 0);
+                let solid = im[solid_points[index]];
+                assert_eq!(solid[3], alpha, "fully covered stroke");
+                assert!(solid[2] > solid[0]);
+                pngs.push(bytes);
+                Ok(())
+            }),
+            |_| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(pngs.len(), 2);
+        if layered {
+            generation::generate(
+                &req,
+                &cancel,
+                Output::InkLayers(&mut |_, page| {
+                    let paper = image::load_from_memory(&STANDARD.decode(page.paper).unwrap())
+                        .unwrap()
+                        .to_rgba8();
+                    assert!(paper.pixels().all(|p| p[3] == 0));
+                    Ok(())
+                }),
+                |_| Ok(()),
+            )
+            .unwrap();
+        }
+        let mut bytes = Cursor::new(vec![]);
+        generation::generate(&req, &cancel, Output::Zip(&mut bytes), |_| Ok(())).unwrap();
+        let mut zip = zip::ZipArchive::new(bytes).unwrap();
+        assert_eq!(zip.len(), pngs.len());
+        for (index, png) in pngs.iter().enumerate() {
+            let mut entry = Vec::new();
+            zip.by_index(index)
+                .unwrap()
+                .read_to_end(&mut entry)
+                .unwrap();
+            assert_eq!(&entry, png);
+        }
+    }
+}
+
+#[test]
 fn preview_prefix_stops_before_the_next_page_and_matches_export() {
     let mut request = request("第一页\n---\n第二页\n---\n第三页");
     request.params.preview = false;

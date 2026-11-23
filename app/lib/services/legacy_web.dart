@@ -12,6 +12,7 @@ Map<String, dynamic> readLegacyDraft() {
       'fill',
       'selectedOption',
       'isUnderlined',
+      'transparentBackground',
       'enableEnglishSpacing',
       'enableFullPreview',
       ...legacyFields.keys,

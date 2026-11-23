@@ -195,6 +195,7 @@ class Settings {
   int latinScale = 100;
   bool latinDigits = false, firstLineIndent = false, monospaced = false;
   String? _paperPattern;
+  bool transparentBackground = false;
   bool underlined = true, englishSpacing = false, fullPreview = false;
 
   PaperStyle get paperStyle => switch (_paperPattern) {
@@ -243,6 +244,7 @@ class Settings {
     'monospaced': monospaced,
     'paper_pattern': _paperPattern,
     'isUnderlined': underlined,
+    'transparent_background': transparentBackground,
     'enableEnglishSpacing': englishSpacing,
     'full_preview': fullPreview,
     'strikethroughEnabled': strikethroughEnabled,
@@ -292,6 +294,9 @@ class Settings {
       'dots' => 'dots',
       _ => null,
     };
+    transparentBackground =
+        (json['transparent_background'] ?? json['transparentBackground']) ==
+        true;
     if (json.containsKey('isUnderlined')) {
       underlined = json['isUnderlined'] == true;
     }
@@ -331,6 +336,7 @@ class Settings {
     'paper_pattern': ?_paperPattern,
     'preview': '$preview',
     'pdf_save': '$pdf',
+    'transparent_background': '${transparentBackground && !pdf}',
     'full_preview': '$fullPreview',
     'ink_layers': 'true',
     'layout_style': layoutStyle,

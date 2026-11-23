@@ -6,6 +6,8 @@ In the fine editor, select a character or lasso a group to move it, adjust its i
 
 Save the current image to share a single page. Export a PDF for a multi-page document, or an image ZIP for a PNG of each page.
 
+Under **Paper**, turn on **Transparent PNG (ink only)** and refresh the preview. Save the current page as a transparent PNG or export all pages in an image ZIP. PDF exports retain the paper.
+
 ### Paper camera information
 
 When a photograph supplies the background, each PNG, including each page in a ZIP, retains available EXIF values for the manufacturer, camera and lens models, ISO, focal length, aperture and exposure time. PDF exports list the same details in the document subject. Location, capture time, serial numbers and thumbnails are excluded.
