@@ -4,7 +4,7 @@ use crate::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use image::{GrayImage, RgbaImage};
-use rand::{RngExt, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::sync::{
     Arc,
@@ -33,6 +33,7 @@ pub struct RenderRequest {
     pub fonts: FontBook,
     pub limits: Limits,
 }
+mod composition;
 mod fine;
 mod glyph;
 mod homework;
@@ -520,6 +521,7 @@ fn render_planes(
     } else {
         layout_units(&nodes)
     };
+    let mut composer = composition::UnitComposer::new(p, &r.text, source.as_deref(), (w, h));
     let mut glyphs = Glyphs::with_parameters(&r.fonts, p)?;
     let mut pages = Pages {
         canvas: background.clone(),
@@ -646,76 +648,11 @@ fn render_planes(
                 pages.y = pages.previous_bottom + p.line_spacing;
             }
             node => {
-                let size =
-                    (p.font_size + normal(&mut pages.rng, p.font_size_sigma)).clamp(1., 2048.);
-                let mut fine_parts = None;
-                let mut g = if p.fine_edit
-                    && unit.len() > 1
-                    && unit.iter().all(|node| matches!(node, Node::Char(_)))
-                {
-                    let (advance, children) = glyphs.sequence_parts(unit, size, 0)?;
-                    let composed = Glyphs::compose(advance, children.clone(), vec![])?;
-                    fine_parts = Some(fine::Parts::new(
-                        &composed,
-                        children,
-                        node_index,
-                        source.as_deref(),
-                    ));
-                    composed
-                } else {
-                    glyphs.unit(unit, size, i)?
-                };
-                let mut compound = unit.len() > 1
-                    || !matches!(node, Node::Char(_))
-                    || matches!(node,Node::Char(c) if glyph::is_circled(*c));
-                if !p.monospaced
-                    && pages.rng.random::<f32>() < p.strikethrough_probability
-                    && !matches!(node,Node::Char(c) if c.is_whitespace())
-                {
-                    let candidates: Vec<_> = r
-                        .text
-                        .chars()
-                        .filter(|c| !c.is_whitespace() && !"，。！？,.!?".contains(*c))
-                        .take(1024)
-                        .collect();
-                    if !candidates.is_empty() {
-                        let wrong = glyphs.glyph(
-                            candidates[pages.rng.random_range(0..candidates.len())],
-                            size,
-                        )?;
-                        let length = (p.font_size * 2f32.sqrt()
-                            + normal(&mut pages.rng, p.strikethrough_length_sigma))
-                        .clamp(0., (w as f32 + h as f32).min(16384.));
-                        let angle = (45. + normal(&mut pages.rng, p.strikethrough_angle_sigma))
-                            .to_radians();
-                        let width = (p.strikethrough_width
-                            + normal(&mut pages.rng, p.strikethrough_width_sigma))
-                        .clamp(1., (w.min(h) as f32).clamp(1., 256.))
-                            as i32;
-                        let sy = wrong.top as f32 + length / 7.;
-                        let path = vec![
-                            ((length / 7.).round() as i32, sy.round() as i32),
-                            (
-                                (length / 7. + length * angle.cos() * 5. / 7.).round() as i32,
-                                (sy + length * angle.sin() * 5. / 7.).round() as i32,
-                            ),
-                        ];
-                        // 2026-10-15：正确字写在错字和完整删除线之后，不能让较长删除线划到正确内容。
-                        let stroke_right =
-                            path.iter().map(|p| p.0).max().unwrap_or(0) + width / 2 + 2;
-                        let shift = (wrong.advance + p.word_spacing)
-                            .max(wrong.right() as f32)
-                            .max(stroke_right as f32)
-                            .round() as i32;
-                        g = Glyphs::compose(
-                            g.advance + shift as f32,
-                            vec![(wrong, 0, 0), (g, shift, 0)],
-                            vec![(path, width)],
-                        )?;
-                        compound = true;
-                        fine_parts = None;
-                    }
-                }
+                let composition::PreparedGlyph {
+                    glyph,
+                    compound,
+                    fine_parts,
+                } = composer.prepare(&mut glyphs, &mut pages.rng, unit, i, node_index)?;
                 if homework_mode
                     && homework::break_before(unit)
                     && let Some(previous) = pages.line.last_mut()
@@ -724,7 +661,7 @@ fn render_planes(
                 }
                 let usable_height = h as f32 - p.top_margin - p.bottom_margin;
                 let cell = fixed_cell(unit, p);
-                g = g.fit(paragraph.usable_width(), usable_height);
+                let mut g = glyph.fit(paragraph.usable_width(), usable_height);
                 if let Some(cell) = cell {
                     g = g.place_in_cell(cell);
                 }
