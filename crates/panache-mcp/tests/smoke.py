@@ -112,14 +112,22 @@ async def mixed_script_sample(client):
     saved = (await call(client, "save_section", markdown="样品 A 的质量为 12.5 g。",
                         style={"font": "李国夫手写体.ttf", "seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
+    inherited = {"latin_font": None, "latin_digits": False, "latin_font_scale": 100}
+    initial = (await call(client, "describe_controls", **key, group="typography")).structuredContent
+    assert {k: initial["controls"][k]["default"] for k in inherited} == inherited
+    assert {k: initial["values"][k] for k in inherited} == inherited
+    assert None in initial["controls"]["latin_font"]["values"]
     primary = png(await call(client, "preview_handwriting", **key))
     override = {"latin_font": "kalam", "latin_digits": True, "latin_font_scale": 120}
     await call(client, "tune_handwriting", **key, expected_revision=1, changes=override)
     assert png(await call(client, "preview_handwriting", **key)) != primary
-    reset = {"latin_font": None, "latin_digits": False, "latin_font_scale": 100}
-    await call(client, "tune_handwriting", **key, expected_revision=2, changes=reset)
+    await call(client, "tune_handwriting", **key, expected_revision=2, changes={"ink_opacity": 90})
+    current = (await call(client, "describe_controls", **key, group="typography")).structuredContent
+    assert {k: current["values"][k] for k in override} == override
+    await call(client, "tune_handwriting", **key, expected_revision=3,
+               changes={**inherited, "ink_opacity": None})
     spec = (await call(client, "describe_controls", **key, group="typography")).structuredContent
-    assert {name: spec["values"][name] for name in reset} == reset
+    assert {name: spec["values"][name] for name in inherited} == inherited
     assert png(await call(client, "preview_handwriting", **key)) == primary
 
 

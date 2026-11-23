@@ -24,9 +24,9 @@
   },
   "typography": {
     "font": {"type":"font"},
-    "latin_font": {"type":"choice","values":["handlee","patrick_hand","indie_flower","kalam","shadows_into_light"],"description":"Optional override for ASCII letters. Omit on a new draft or set to null in tune_handwriting to follow the main font, with fallback for missing glyphs."},
-    "latin_font_scale": {"type":"integer","min":50,"max":150,"unit":"%","description":"Size of ASCII letters relative to the main font, also applies to digits when latin_digits is true. Reset to 100 for an unscaled sample."},
-    "latin_digits": {"type":"boolean","description":"False keeps 0–9 at the main font and size. True applies the Latin size and any selected Latin font to digits."}
+    "latin_font": {"type":"choice","default":null,"values":[null,"handlee","patrick_hand","indie_flower","kalam","shadows_into_light"],"description":"Default: follow the main font for ASCII letters, with fallback for missing glyphs. Leave unset unless the user asks for a separate English hand or dislikes the lettering. In an existing draft, omitting this key keeps its current value; null clears the override."},
+    "latin_font_scale": {"type":"integer","min":50,"max":150,"unit":"%","default":100,"description":"Size of ASCII letters relative to the main font, also applies to digits when latin_digits is true. Reset to 100 for an unscaled sample."},
+    "latin_digits": {"type":"boolean","default":false,"description":"Leave unset on new drafts. False keeps 0–9 at the main font and size. True applies the Latin size and any selected Latin font to digits."}
   },
   "ink": {
     "transparent_background": {"type":"boolean","description":"Ink-only PNG preview and ZIP. PDF retains the paper."},

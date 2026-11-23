@@ -212,7 +212,7 @@ impl ServerHandler for Panache {
                 "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
                 "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
                 "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
-                "For mixed-script homework or lab reports, see list_fonts. Show a short mixed sample if the preferred hand is undecided. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
+                "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
                 "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
                 "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
                 "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
@@ -320,11 +320,11 @@ impl Panache {
             .map(|name| format!("- {name}"))
             .collect::<Vec<_>>();
         let guidance = concat!(
-            "For homework and lab reports, start with the primary font’s own letters and digits. ",
+            "Select only the main font for a new draft. Its letters and digits are the default, including for homework and lab reports. ",
             "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
             "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
             "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
-            "Honor an approved or delegated choice. For a mismatch, inspect describe_controls(group=typography) before trying a separate Latin font."
+            "Honor an approved or delegated main font. A request for generally messier handwriting applies to the main font. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
         );
         reply(
             format!("{}\n\n{guidance}", names.join("\n")),
