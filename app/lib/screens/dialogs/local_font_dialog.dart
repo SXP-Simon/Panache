@@ -193,7 +193,11 @@ class _LocalFontDialogState extends State<LocalFontDialog> {
                     return Column(
                       children: [
                         SelectableText('${l.errorTitle}: $error'),
-                        TextButton(onPressed: load, child: Text(l.retry)),
+                        TextButton(
+                          onPressed: () =>
+                              fonts.isEmpty ? reload(refresh: true) : load(),
+                          child: Text(l.retry),
+                        ),
                       ],
                     );
                   }

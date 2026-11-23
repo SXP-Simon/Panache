@@ -33,6 +33,33 @@ void main() {
       }
     },
   );
+  test(
+    'system fonts stay selectable when the personal folder is unavailable',
+    () async {
+      final api = HandwritingApi(
+        'http://localhost',
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'fonts': [
+                {'id': 'sys', 'name': 'Kai', 'filename': 'kai.ttf'},
+              ],
+              'next_offset': null,
+              'user_dir': null,
+            }),
+            200,
+          ),
+        ),
+      );
+      final page = await api.listLocalFonts(
+        source: LocalFontSource.system,
+        query: 'Kai',
+      );
+      expect(page.fonts.single.name, 'Kai');
+      expect(page.directory, isNull);
+    },
+  );
+
   testWidgets(
     'changing libraries discards outstanding searches and reads the selected font by ID',
     (tester) async {

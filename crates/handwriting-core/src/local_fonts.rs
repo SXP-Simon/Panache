@@ -4,12 +4,7 @@ use fontdb::{Database, Source};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::HashSet,
-    env, fs,
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
+use std::{collections::HashSet, env, fs, path::PathBuf, sync::Mutex};
 use write_fonts::{FontBuilder, read::FontRef, types::Tag};
 
 #[derive(
@@ -48,7 +43,7 @@ pub struct FontPage {
     pub fonts: Vec<FontEntry>,
     pub total: usize,
     pub next_offset: Option<usize>,
-    pub user_dir: PathBuf,
+    pub user_dir: Option<PathBuf>,
 }
 
 struct Entry {
@@ -59,6 +54,7 @@ struct Entry {
 
 struct Index {
     db: Database,
+    user_dir: std::result::Result<PathBuf, String>,
     entries: Vec<Entry>,
 }
 
@@ -151,15 +147,26 @@ impl LocalFonts {
         }
     }
 
-    fn scan(&self, user_dir: &Path, system: impl FnOnce(&mut Database)) -> Result<Index> {
-        if !user_dir.is_absolute() {
-            return Err(invalid(
-                "PANACHE_USER_FONT_DIR must be an absolute directory",
-            ));
+    fn open_user_dir(&self) -> std::result::Result<PathBuf, String> {
+        let dir = self
+            .user_dir
+            .as_deref()
+            .ok_or("Set PANACHE_USER_FONT_DIR to a writable directory")?;
+        if !dir.is_absolute() {
+            return Err("PANACHE_USER_FONT_DIR must be an absolute directory".into());
         }
-        fs::create_dir_all(user_dir).map_err(|e| invalid(e.to_string()))?;
+        fs::create_dir_all(dir)
+            .and_then(|()| fs::read_dir(dir))
+            .map_err(|e| format!("Cannot open personal font directory {}: {e}", dir.display()))?;
+        Ok(dir.into())
+    }
+
+    fn scan(&self, system: impl FnOnce(&mut Database)) -> Index {
         let mut db = Database::new();
-        db.load_fonts_dir(user_dir);
+        let user_dir = self.open_user_dir();
+        if let Ok(dir) = &user_dir {
+            db.load_fonts_dir(dir);
+        }
         let user_ids: HashSet<_> = db.faces().map(|f| f.id).collect();
         system(&mut db);
         let mut entries = self
@@ -248,26 +255,22 @@ impl LocalFonts {
                 &b.info.id,
             ))
         });
-        Ok(Index { db, entries })
+        Index {
+            db,
+            user_dir,
+            entries,
+        }
     }
 
-    fn with_index<T>(
-        &self,
-        refresh: bool,
-        visit: impl FnOnce(&Index, &Path) -> Result<T>,
-    ) -> Result<T> {
-        let dir = self
-            .user_dir
-            .as_deref()
-            .ok_or_else(|| invalid("Set PANACHE_USER_FONT_DIR to a writable directory"))?;
+    fn with_index<T>(&self, refresh: bool, visit: impl FnOnce(&Index) -> Result<T>) -> Result<T> {
         let mut cache = self
             .index
             .lock()
             .map_err(|_| invalid("Font catalog unavailable"))?;
         if cache.is_none() || refresh {
-            *cache = Some(self.scan(dir, Database::load_system_fonts)?);
+            *cache = Some(self.scan(Database::load_system_fonts));
         }
-        visit(cache.as_ref().unwrap(), dir)
+        visit(cache.as_ref().unwrap())
     }
 
     pub fn search(&self, search: &FontSearch) -> Result<FontPage> {
@@ -276,7 +279,12 @@ impl LocalFonts {
             return Err(invalid("Font search limit must be 1..100"));
         }
         let keyword = search.query.trim().to_lowercase();
-        self.with_index(search.refresh, |index, dir| {
+        self.with_index(search.refresh, |index| {
+            if search.source == Some(FontSource::User)
+                && let Err(message) = &index.user_dir
+            {
+                return Err(invalid(message));
+            }
             let mut fonts = Vec::new();
             let mut total = 0;
             for entry in &index.entries {
@@ -295,13 +303,18 @@ impl LocalFonts {
                 fonts,
                 total,
                 next_offset: (end < total).then_some(end),
-                user_dir: dir.into(),
+                user_dir: index.user_dir.as_ref().ok().cloned(),
             })
         })
     }
 
     pub fn read(&self, id: &str) -> Result<(FontEntry, Vec<u8>)> {
-        self.with_index(false, |index, _| {
+        self.with_index(false, |index| {
+            if id.starts_with("user:")
+                && let Err(message) = &index.user_dir
+            {
+                return Err(invalid(message));
+            }
             let entry = index
                 .entries
                 .iter()

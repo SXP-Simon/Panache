@@ -9,7 +9,7 @@ typedef LocalFont = ({String id, String name, String filename});
 typedef LocalFontPage = ({
   List<LocalFont> fonts,
   int? nextOffset,
-  String directory,
+  String? directory,
 });
 
 extension LocalFonts on HandwritingApi {
@@ -43,7 +43,7 @@ extension LocalFonts on HandwritingApi {
           ),
       ],
       nextOffset: data['next_offset'] as int?,
-      directory: data['user_dir'] as String,
+      directory: data['user_dir'] as String?,
     );
   }
 

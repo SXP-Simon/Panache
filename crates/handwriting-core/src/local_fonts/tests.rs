@@ -38,9 +38,7 @@ fn search_pages_sources_and_collection_face_bytes() {
         user_dir: Some(user.clone()),
         ..LocalFonts::new(vec!["sample.ttf".to_owned()], 110_000)
     };
-    let index = catalog
-        .scan(&user, |db| db.load_fonts_dir(&system))
-        .unwrap();
+    let index = catalog.scan(|db| db.load_fonts_dir(&system));
     *catalog.index.lock().unwrap() = Some(index);
 
     let first = catalog
@@ -99,4 +97,41 @@ fn search_pages_sources_and_collection_face_bytes() {
     );
     fs::remove_file(user.join("sample.ttf")).unwrap();
     assert!(catalog.read(&personal[0].id).is_err());
+}
+
+#[test]
+fn unavailable_personal_directory_keeps_other_sources_usable() {
+    let home = tempdir().unwrap();
+    let system_font = home.path().join("system.ttf");
+    fs::write(&system_font, HANDLEE).unwrap();
+    // An existing regular file prevents the personal directory from being created.
+    for path in [None, Some(system_font.join("fonts"))] {
+        let catalog = LocalFonts {
+            user_dir: path,
+            ..LocalFonts::new(vec!["bundled.ttf".into()], 50_000)
+        };
+        let index = catalog.scan(|db| db.load_font_file(&system_font).unwrap());
+        *catalog.index.lock().unwrap() = Some(index);
+        let results = catalog.search(&FontSearch::default()).unwrap();
+        assert_eq!(results.total, 2);
+        assert!(results.user_dir.is_none());
+        assert_eq!(results.fonts[0].id, "bundled.ttf");
+        let system = catalog
+            .search(&FontSearch {
+                source: Some(FontSource::System),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(catalog.read(&system.fonts[0].id).unwrap().1, HANDLEE);
+        let personal = catalog.search(&FontSearch {
+            source: Some(FontSource::User),
+            ..Default::default()
+        });
+        let error = personal.err().unwrap();
+        assert!(error.message.contains("directory"));
+        assert_eq!(
+            catalog.read("user:missing").err().unwrap().message,
+            error.message
+        );
+    }
 }
