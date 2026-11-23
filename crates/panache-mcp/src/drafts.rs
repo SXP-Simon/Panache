@@ -154,7 +154,7 @@ impl Drafts {
         observations::initialize(&mut drafts.connect()?)?;
         Ok(drafts)
     }
-    fn connect(&self) -> Result<Connection> {
+    pub(crate) fn connect(&self) -> Result<Connection> {
         let db = Connection::open(&self.0)?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(db)

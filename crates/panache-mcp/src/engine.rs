@@ -1,15 +1,7 @@
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, FontBook, Limits, RenderRequest, export};
-use std::{
-    collections::HashMap,
-    fs,
-    io::Write,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-use tempfile::NamedTempFile;
-use uuid::Uuid;
+use std::{collections::HashMap, fs, io::Write, path::PathBuf, sync::Arc};
 
 use crate::{
     Format,
@@ -614,14 +606,13 @@ impl Engine {
     }
     pub fn export(
         &mut self,
-        dir: &Path,
+        writer: &mut crate::storage::BudgetWriter<'_>,
         draft: &Snapshot<'_>,
         sections: Vec<Section>,
         format: Format,
         cancel: &Cancellation,
         mut progress: impl FnMut(usize),
-    ) -> Result<(PathBuf, usize)> {
-        let mut temp = NamedTempFile::new_in(dir)?;
+    ) -> Result<usize> {
         let mut count = 0;
         let mut background = draft.background()?;
         let camera = draft.camera(background.as_deref())?;
@@ -644,24 +635,19 @@ impl Engine {
             cancel.check()?;
             Ok(())
         };
-        let extension = match format {
+        match format {
             Format::Pdf => {
                 let mut pdf = export::PdfExport::lossless();
                 render_sections(&mut |_, page| pdf.add(page))?;
-                temp.write_all(&pdf.finish_with_camera(&camera))?;
-                "pdf"
+                writer.write_all(&pdf.finish_with_camera(&camera))?;
             }
             Format::Zip => {
-                let mut zip = export::ZipExport::new(temp.as_file_mut());
+                let mut zip = export::ZipExport::new(writer);
                 render_sections(&mut |i, page| zip.add_with_camera(i, page, &camera))?;
                 zip.finish()?;
-                "zip"
             }
         };
-        temp.as_file_mut().flush()?;
         cancel.check()?;
-        let path = dir.join(format!("panache-{}.{}", Uuid::new_v4(), extension));
-        temp.persist_noclobber(&path)?;
-        Ok((path, count))
+        Ok(count)
     }
 }

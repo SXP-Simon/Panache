@@ -98,6 +98,10 @@ pub fn apply(state: &State, input: Tune) -> Result<CallToolResult> {
     let paper = input.paper_guides.as_ref().and(draft.paper.as_ref());
     let details = json!({"changes":input.changes,"font":font.as_ref().map(|(name,_)|name),"paper_guides":input.paper_guides,"note":input.note});
     let preserve_layout = preserve_layout && paper.is_none();
+    let _budget = font
+        .as_ref()
+        .map(|(_, bytes)| state.storage.import(bytes.len()))
+        .transpose()?;
     let next = state.drafts.tune(
         &draft,
         &changes,

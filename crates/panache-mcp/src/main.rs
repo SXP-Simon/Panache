@@ -6,6 +6,7 @@ mod markdown;
 mod paper;
 mod placement;
 mod review;
+mod storage;
 mod tuning;
 
 use anyhow::{Context, Result, ensure};
@@ -32,7 +33,7 @@ struct State {
     drafts: Drafts,
     engine: Mutex<Engine>,
     fonts: Vec<String>,
-    output: PathBuf,
+    storage: storage::Storage,
     worker: Arc<str>,
     render_slot: Arc<Semaphore>,
     prepare_slot: Arc<Semaphore>,
@@ -60,6 +61,20 @@ impl Drop for CancelOnDrop {
 }
 
 impl Panache {
+    async fn storage_task(
+        &self,
+        run: impl FnOnce(&storage::Storage, &Drafts) -> Result<serde_json::Value> + Send + 'static,
+    ) -> CallToolResult {
+        let state = self.0.clone();
+        tool_result(
+            async {
+                let value = tokio::task::spawn_blocking(move || run(&state.storage, &state.drafts))
+                    .await??;
+                Ok(reply(value.to_string(), value))
+            }
+            .await,
+        )
+    }
     async fn render(
         &self,
         ctx: RequestContext<RoleServer>,
@@ -161,6 +176,10 @@ impl Panache {
                     }
                     _ => None,
                 };
+                let _budget = paper
+                    .as_ref()
+                    .map(|p| state.storage.import(p.bytes.len()))
+                    .transpose()?;
                 state
                     .drafts
                     .save(&input, &prepared, style.as_ref(), paper.as_ref())
@@ -492,6 +511,37 @@ impl Panache {
     }
 
     #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Inspect MCP home file sizes, available volume space, limits and protected payload. Optionally scope logical counts and registered exports to one draft. Use before considering cleanup."
+    )]
+    async fn storage_usage(&self, Parameters(input): Parameters<storage::Usage>) -> CallToolResult {
+        self.storage_task(move |store, drafts| store.usage(drafts, input))
+            .await
+    }
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Preview one draft's registered exports, eligible abandoned temporary files and byte estimates. Delivered files are report-only. No disk changes. Pass next_after_id to see more."
+    )]
+    async fn plan_cleanup(
+        &self,
+        Parameters(input): Parameters<storage::CleanupScope>,
+    ) -> CallToolResult {
+        self.storage_task(move |store, drafts| store.plan_cleanup(drafts, input))
+            .await
+    }
+    #[tool(
+        annotations(destructive_hint = true, open_world_hint = false),
+        description = "Remove selected abandoned temporary files from a fresh plan in this session. Intended only for reclaiming failed exports. A plan is not permission to delete user deliverables. No paths, completed exports, manuscript history, fonts, papers or reviews can be selected."
+    )]
+    async fn apply_cleanup(
+        &self,
+        Parameters(input): Parameters<storage::ApplyCleanup>,
+    ) -> CallToolResult {
+        self.storage_task(move |store, drafts| store.apply_cleanup(drafts, input))
+            .await
+    }
+
+    #[tool(
         description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns path and page count. For visual acceptance, inspect view=review on the intended revision first, especially after moving glyphs or changing ink."
     )]
     async fn export_handwriting(
@@ -507,8 +557,9 @@ impl Panache {
             let (reviewed,visibility_flags)=draft.review_counts()?;
             let params=controls::parameters(&draft,1,&draft.controls)?;
             let zero_text_ink=params.ink_opacity==0 || params.fill[3]==0;
-            let (path, pages) = engine.export(
-                &state.output, &draft, sections, input.format.unwrap_or_default(), cancel,
+            let format = input.format.unwrap_or_default();
+            let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
+                writer, &draft, sections, format, cancel,
                 |pages| {
                     if let Some(token) = &progress_token {
                         let update = rmcp::model::ProgressNotificationParam::new(token.clone(), pages as f64)
@@ -516,7 +567,7 @@ impl Panache {
                         let _ = tokio::runtime::Handle::current().block_on(peer.notify_progress(update));
                     }
                 },
-            )?;
+            ))?;
             let warning=if zero_text_ink || visibility_flags>0 {"墨迹可见性需要复查。"}else if (reviewed as usize)<pages {"未复盘页的局部墨迹可见性尚未核验。"}else{""};
             let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。\n\n`{}`", draft.revision, path.display());
             Ok(reply(message, json!({
@@ -564,11 +615,12 @@ async fn main() -> Result<()> {
         .context("Set PANACHE_MCP_HOME to a writable directory")?;
     let output = home.join("exports");
     fs::create_dir_all(&output)?;
+    let drafts = Drafts::open(&home)?;
     let state = State {
-        drafts: Drafts::open(&home)?,
+        storage: storage::Storage::open(&home, &drafts)?,
+        drafts,
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
-        output: std::path::absolute(output)?,
         worker: fs::read_to_string(worker)?.into(),
         render_slot: Arc::new(Semaphore::new(1)),
         prepare_slot: Arc::new(Semaphore::new(1)),

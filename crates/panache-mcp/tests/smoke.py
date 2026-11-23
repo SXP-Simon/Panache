@@ -148,6 +148,9 @@ async def smoke(command, arguments, out):
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
                 "annotate_review",
+                "storage_usage",
+                "plan_cleanup",
+                "apply_cleanup",
                 "list_fonts",
                 "describe_controls",
                 "tune_handwriting",

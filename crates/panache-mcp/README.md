@@ -54,6 +54,9 @@ cargo build --locked --release -p panache-mcp
 | `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。 |
 | `describe_controls` | 先列参数组，再按 `group` 查看单位、范围和枚举值。附上 `draft_id` 和 `revision` 可读取该版的实际值。 |
 | `tune_handwriting` | 可在原稿上更新参考线、导入本机字体，并一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
+| `storage_usage` | 查询目录和逐稿用量，以及当前预算。 |
+| `plan_cleanup` | 按稿列出废弃临时文件和受保护的已交付导出。 |
+| `apply_cleanup` | 复核计划，仅清理选中的废弃临时文件。 |
 | `annotate_review` | 将用户原话或模型观察挂到指定复盘 ID，保持稿件版本号。 |
 | `adjust_glyphs` | 先用 `preview_handwriting(view="layout")` 取编号和坐标，再按同一节、页和版本调整选中字形。 |
 
@@ -64,6 +67,24 @@ cargo build --locked --release -p panache-mcp
 每次保存只转换这一节，Markdown 原文和整理结果存入本地 SQLite。预览某节第 N 页时，引擎从该节开头排到第 N 页，只编码选中的一页。进程内保留最近生成的四张预览，修改其他节仍可复用。预览和导出传相同的 `revision` 可锁定稿件。种子和样式随稿保存，复现时需使用相同字体和引擎。
 
 整稿上限为整理后 10 万字、200 页。完整导出只在调用导出工具时执行；客户端可以取消，提供进度令牌时可看到已完成页数。ZIP 逐页写盘，PDF 在内存中组装压缩页面后写盘。结果成功后才移入 `exports/`。稿件及历史持续保存在 `PANACHE_MCP_HOME`；Windows 默认是 `%LOCALAPPDATA%/Panache/mcp`，其他系统默认是 `$XDG_DATA_HOME/Panache/mcp` 或 `~/.local/share/Panache/mcp`。
+
+## 容量与清理
+
+用 `storage_usage` 查询数据目录内常规文件的长度、数据库及其 WAL/SHM 大小、导出目录和所在卷剩余字节。可传 `draft_id` 查看一稿的正文历史、底纸、字体、逐页证据、评语等内容字节数。文件长度、SQLite 内容长度和磁盘分配量口径不同。跨稿复用同一字体的文件目前仍按稿保存。
+
+管理员可在 MCP 启动环境设置以下无符号整数字节值，默认均未设置。多个 MCP 进程共用一个本地目录时应使用相同配置。
+
+| 环境变量 | 触发行为 |
+| --- | --- |
+| `PANACHE_MCP_WARN_BYTES` | 目录文件总长度达到阈值时，用量查询返回 `warning=true`。 |
+| `PANACHE_MCP_MAX_HOME_BYTES` | 用目录剩余预算控制新的字体、底纸和导出内容。正文、复盘与 SQLite 页、索引、日志仍可增长，这是大文件写入预算。 |
+| `PANACHE_MCP_MIN_FREE_BYTES` | 为该磁盘卷保留空间。导入时检查内容长度；导出时按文件增长量检查，包括 ZIP 写入和结尾索引。 |
+
+容量不足时可继续读取稿件、比较历史和查询用量。查询不会改变稿件。导出、导入大文件和执行清理共用同一数据目录的跨进程锁；遇到 busy 可在当前操作结束后重试。
+
+1. 用 `plan_cleanup(draft_id=…)` 只读预览。每页最多 50 条登记，可用 `next_after_id` 继续。成功交付的 PDF/ZIP 列出版本、文件名与字节数，交付路径可能仍有人引用。旧版未登记文件计入目录用量。
+2. 只有 `abandoned_temp` 可以交给 `apply_cleanup(plan_id=…, candidate_ids=[…])`。计划限当前服务进程，五分钟有效。工具在执行时复核登记、文件身份、修改时间、大小和任务锁，返回实际移除的文件长度及跳过原因。
+3. 若用户要求的释放量大于可安全清理的字节数，报告差额。成功交付的导出、来源不明的文件、正文、历史、纸张、字体和复盘评语均受保护。低磁盘空间不会触发自动淘汰。需要删除已交付成品时，由用户按报告中的具体文件自行处理。
 
 ## 照片排版与成品复盘
 

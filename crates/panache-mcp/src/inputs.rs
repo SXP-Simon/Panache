@@ -13,7 +13,7 @@ pub enum Paper {
     Dots,
 }
 
-#[derive(Deserialize, JsonSchema, Default)]
+#[derive(Clone, Copy, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Format {
     #[default]

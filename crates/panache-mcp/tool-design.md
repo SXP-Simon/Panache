@@ -2,7 +2,7 @@
 
 ## 工具发现
 
-Panache 在 `tools/list` 中公布十个任务入口。模型可以直接保存、预览、导出；只有需要调参时才调用 `describe_controls`。目录按排版、字体、墨迹、扰动、删除线和拍摄信息六组组织，和服务端参数校验共用同一份定义。
+Panache 在 `tools/list` 中公布十三个任务入口。模型可以直接保存、预览、导出；只有需要调参时才调用 `describe_controls`。目录按排版、字体、墨迹、扰动、删除线和拍摄信息六组组织，和服务端参数校验共用同一份定义。
 
 MCP 的工具列表支持分页。客户端可能取完所有页；分页能控制单次协议响应大小。Claude 的 Tool Search 支持宿主配置延迟加载，实际进入模型上下文的工具由宿主决定。Panache 的 stdio 客户端也可以完全不提供搜索，只用标准工具列表和调用接口。项目目前选择按需查询参数，避免为小型目录引入搜索索引和额外的调用步骤。设计依据见 [MCP 工具规范](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)、[MCP 路线图中的渐进发现](https://blog.modelcontextprotocol.io/posts/mcp-roadmap/) 和 [Claude Tool Search 文档](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool)。
 
