@@ -223,6 +223,26 @@ class MobileHandwritingApi extends HandwritingApi {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>> pdfPage(
+    Upload file,
+    int pageIndex,
+    String mode,
+  ) async {
+    final paths = await stage({'file': file});
+    try {
+      return Map<String, dynamic>.from(
+        await call(
+          'pdf_page',
+          fields: {'pageIndex': '$pageIndex', 'mode': mode},
+          files: paths,
+        ) as Map,
+      );
+    } finally {
+      await removeUploads(paths);
+    }
+  }
+
   final Map<String, Map<String, dynamic>> _uploads = {};
   @override
   Future<String> submit(
