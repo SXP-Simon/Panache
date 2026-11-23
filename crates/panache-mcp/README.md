@@ -102,7 +102,7 @@ cargo build --locked --release -p panache-mcp
 2. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。整页复查图长边最多 900 像素，像素坐标以返回的 `photo_size` 为准。检查有字区域的横线、页眉、页边和需要保留的图案。
 3. 调用 `tune_handwriting(draft_id, expected_revision, paper_guides, note)` 在原照片上重排全文。至少给两条参考线，每条提供行号与左右端点。无横线纸也可以指定想写入的区域。传空数组恢复建稿时的校准。旧版本仍可回看；改写书写区域会重置冲突的边距覆盖，重新排版后需重新选字。
 4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和相同版本交给 `adjust_glyphs`。`place_center` 将一组字移到指定照片位置；`target_quad` 按左上、右上、右下、左下四角放置所选字块，替换该组已有几何调整。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
-5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。可锁定版本，用 `offset/limit` 向前翻。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
+5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。有下一页时，把 `next_cursor` 作为下一次调用的 `cursor`。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
 
 要核对局部改动，用 `preview_handwriting(view="review", region=…, revision=新版本, compare_revision=旧版本)` 查看同一区域的底纸、改前和改后图。移动字块时还可用 `previous_region` 圈出旧位置。需要保护的文字或页眉可单独圈选复查。区域使用原尺寸成品像素。[局部坐标与测量示例](tool-design.md#局部改动的复查)
 
@@ -115,6 +115,8 @@ cargo build --locked --release -p panache-mcp
 ### 比较两版，找回当时的依据
 
 先对要看的两个版本分别调用 `preview_handwriting(view="review", revision=…)`，记下返回的 `review_id`。用户明确表达偏好后，用 `annotate_review(draft_id, review_id, origin="user_quote", text=…)` 保存原话。模型自己的观察使用 `model_observation`。
+
+续稿时，`read_section(draft_id=…, view="trajectory", section=2, feedback_origin="user_quote")` 只返回归在第 2 节的用户原话，每条带有关联版本和 `review_id`。结果按关联稿件版本从高到低排列；事后补在旧版上的评语仍归旧版。省略 `section` 可查全稿，省略 `feedback_origin` 可查所有来源。按节筛选时只含明确归在该节的事件，全稿调参记录需在全稿轨迹中查看。每页默认 12 条、最多 50 条匹配事件，有下一页时，用 `read_section(draft_id=…, view="trajectory", cursor=next_cursor)` 续读。游标沿用首页的版本、筛选条件和当时已有的复盘、评语；遍历期间新增的记录可在新查询中查看。旧客户端仍可按 `next_offset` 跳页，并发补评时偏移可能变化。
 
 例如，比较第 1 节第 1 页的 v3 与 v4：
 

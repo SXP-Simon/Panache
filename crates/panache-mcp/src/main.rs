@@ -393,10 +393,20 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read view=review with review_id for exact stored evidence and its user quotes or model observations. Read view=trajectory for recent draft edits, user-provided edit notes and page review evidence (offset/limit count events). Other views read one section: summary, excerpt (default, image data omitted), or exact source. Offset counts Unicode characters in the selected view."
+        description = "Read view=trajectory for draft history, highest associated revision first. Filter by feedback_origin=user_quote and optionally section for verbatim quotes in events[].details.text with their revision and review_id. Use view=review with review_id for full measurements or other feedback on that review. Text views: summary, excerpt (default, image data omitted), or exact source."
     )]
     fn read_section(&self, Parameters(input): Parameters<Read>) -> CallToolResult {
         tool_result((|| {
+            ensure!(
+                input.feedback_origin.is_none() || input.view == Some(ReadView::Trajectory),
+                "feedback_origin requires view=trajectory"
+            );
+            if input.view == Some(ReadView::Trajectory) {
+                ensure!(input.review_id.is_none(), "review_id requires view=review");
+                let result = self.0.drafts.trajectory(&input)?;
+                return Ok(reply(result.to_string(), result));
+            }
+            ensure!(input.cursor.is_none(), "cursor requires view=trajectory");
             let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
             if input.view == Some(ReadView::Review) {
                 ensure!(
@@ -408,15 +418,6 @@ impl Panache {
                 return Ok(reply(data.to_string(), data));
             }
             ensure!(input.review_id.is_none(), "review_id requires view=review");
-            if input.view == Some(ReadView::Trajectory) {
-                let result = self.0.drafts.trajectory(
-                    draft.id,
-                    draft.revision,
-                    input.offset.unwrap_or(0),
-                    input.limit.unwrap_or(12),
-                )?;
-                return Ok(reply(result.to_string(), result));
-            }
             let mut result = self.0.drafts.review(
                 &input.draft_id,
                 draft.revision,

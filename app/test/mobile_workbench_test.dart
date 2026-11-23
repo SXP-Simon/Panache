@@ -281,7 +281,74 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  Future<void> openPaperSettings(WidgetTester tester, bool narrow) async {
+    if (narrow) {
+      final l = labels(tester);
+      await tester.tap(find.byKey(const ValueKey('open-paper')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('settings-section')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l.mobilePaper).last);
+    } else {
+      await tester.tap(find.byKey(const ValueKey('workspace-tool-paper')));
+    }
+    await tester.pumpAndSettle();
+  }
+
   for (final width in [375.0, 1440.0]) {
+    testWidgets('paper camera follows the background and scrolls at $width px', (
+      tester,
+    ) async {
+      final workspace = await openWorkbench(tester, size: Size(width, 740));
+      final l = labels(tester);
+      await openPaperSettings(tester, width < 900);
+      final camera = find.text(l.paperCamera);
+      final scrollable = find
+          .descendant(
+            of: find.byType(WorkbenchSettings),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      Future<void> scrollTo(Finder field, double delta) async {
+        await tester.scrollUntilVisible(field, delta, scrollable: scrollable);
+        await tester.pumpAndSettle();
+      }
+
+      final lastMargin = find.descendant(
+        of: find.byKey(const PageStorageKey('parameter-right_margin')),
+        matching: find.byType(TextFormField),
+      );
+      expect(camera, findsNothing);
+      await scrollTo(lastMargin, 180);
+      expect(lastMargin.hitTestable(), findsOneWidget);
+
+      workspace.background = Upload(
+        'paper.png',
+        (await workspace.api.preview('paper')).first,
+      );
+      workspace.emit();
+      await tester.pumpAndSettle();
+      await scrollTo(camera, -180);
+      await tester.tap(camera);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final iso = find.widgetWithText(TextFormField, 'ISO');
+      await scrollTo(iso, 180);
+      await tester.enterText(iso, '400');
+      expect(workspace.settings.camera['camera_iso'], '400');
+      await scrollTo(lastMargin, 180);
+      expect(lastMargin.hitTestable(), findsOneWidget);
+
+      final remove = find.text(l.remove);
+      await scrollTo(remove, -180);
+      await tester.tap(remove);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(workspace.background, isNull);
+      expect(camera, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets(
       'live workbench keeps the latest draft and selected paper at $width px',
       (tester) async {
@@ -290,18 +357,8 @@ void main() {
         final narrow = width < 900;
         Finder keyed(String key) => find.byKey(ValueKey(key));
         final editor = keyed('text-editor');
-        final l = labels(tester);
 
-        if (narrow) {
-          await tester.tap(keyed('open-paper'));
-          await tester.pumpAndSettle();
-          await tester.tap(keyed('settings-section'));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text(l.mobilePaper).last);
-        } else {
-          await tester.tap(keyed('workspace-tool-paper'));
-        }
-        await tester.pumpAndSettle();
+        await openPaperSettings(tester, narrow);
         await tester.tap(keyed('paper-style-dots'));
         await tester.pumpAndSettle();
         expect(workspace.settings.paperStyle, PaperStyle.dots);

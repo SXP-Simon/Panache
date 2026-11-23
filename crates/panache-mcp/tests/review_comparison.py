@@ -101,6 +101,71 @@ async def unruled_artwork(client, directory, call):
         finished = after
 
 
+async def check_filtered_history(client, call, draft_id):
+    key = {"draft_id": draft_id}
+    await call(client, "save_section", **key, expected_revision=3, markdown="第二节")
+    for revision, section, origin, note in [
+        (3, 1, "user_quote", "第一节的墨色保留。"),
+        (4, 2, "user_quote", "第二节用淡墨。"),
+        (4, 1, "model_observation", "我觉得第一节也可以调淡。"),
+        (4, 1, "user_quote", "第一节维持原样。"),
+    ]:
+        review = await call(client, "preview_handwriting", **key, revision=revision,
+                            section=section, view="review")
+        await call(client, "annotate_review", **key, review_id=review.structuredContent["review_id"],
+                   origin=origin, text=note)
+
+    async def history(**args):
+        result = await call(client, "read_section", **key, view="trajectory", **args)
+        return result.structuredContent
+
+    all_events = (await history(limit=50))["events"]
+    section_events = [e for e in all_events if e["section"] == 1]
+    assert (await history(section=1))["events"] == section_events
+    quotes = [e for e in section_events if e["origin"] == "user_quote"]
+    assert [e["details"]["text"] for e in quotes] == ["第一节维持原样。", "第一节的墨色保留。"]
+    query = dict(section=1, feedback_origin="user_quote", limit=1)
+    first = await history(**query)
+    assert first["events"] == quotes[:1] and first["next_offset"] == 1
+    second = await history(**query, offset=first["next_offset"])
+    assert second["events"] == quotes[1:] and second["next_offset"] is None
+    assert (await history(**query, revision=3))["events"] == quotes[1:]
+    empty = await history(section=2, feedback_origin="model_observation")
+    assert empty["events"] == [] and empty["next_offset"] is None
+    models = (await history(feedback_origin="model_observation"))["events"]
+    assert [e["details"]["text"] for e in models] == ["我觉得第一节也可以调淡。"]
+    # Continue both snapshots after a newer edit, a backfilled review and two
+    # annotations on old reviews (including one that sorts before page one).
+    full_first = await history(limit=1)
+    await call(client, "save_section", **key, expected_revision=4, markdown="第三节")
+    await call(client, "preview_handwriting", **key, revision=2, section=1, view="review")
+    for quote in quotes:
+        await call(client, "annotate_review", **key, review_id=quote["review_id"],
+                   origin="user_quote", text="翻页期间补录。")
+    for start, expected in [(first, quotes), (full_first, all_events)]:
+        result = start
+        actual = list(start["events"])
+        while cursor := result.get("next_cursor"):
+            result = await history(cursor=cursor, limit=2)
+            assert result["revision"] == 4
+            actual.extend(result["events"])
+            assert len(actual) <= len(expected)
+        assert actual == expected
+    assert (await history(limit=50))["revision"] == 5
+    fresh = (await history(section=1, feedback_origin="user_quote"))["events"]
+    assert sum(event["details"]["text"] == "翻页期间补录。" for event in fresh) == 2
+
+    token = first["next_cursor"]
+    for invalid in [dict(view="summary", cursor=token), dict(view="trajectory", cursor="???"),
+                    dict(view="trajectory", cursor=token, section=2),
+                    dict(view="trajectory", cursor=token, offset=1),
+                    dict(view="trajectory", cursor=token, revision=5),
+                    dict(view="trajectory", cursor=token, feedback_origin="model_observation"),
+                    dict(view="summary", feedback_origin="user_quote"),
+                    dict(view="trajectory", section=0)]:
+        assert (await client.call_tool("read_section", {**key, **invalid})).isError
+
+
 async def exercise(client, directory, call):
     await unruled_artwork(client, directory, call)
     path = directory / "slanted.png"
@@ -245,4 +310,5 @@ async def exercise(client, directory, call):
     await incompatible(preset_id, 1, 2, "different_reference_paper")
     await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=2, changes={"width": 800})
     await incompatible(preset_id, 2, 3, "different_image_dimensions")
+    await check_filtered_history(client, call, preset_id)
     return key, old["review_id"], quote

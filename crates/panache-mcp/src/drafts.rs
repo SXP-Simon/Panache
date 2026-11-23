@@ -1,4 +1,5 @@
 mod observations;
+mod trajectory;
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
@@ -404,46 +405,6 @@ impl Drafts {
         );
         Ok(next)
     }
-    pub fn trajectory(&self, id: &str, rev: u32, offset: u32, limit: u32) -> Result<Value> {
-        ensure!((1..=50).contains(&limit), "Trajectory limit must be 1..50");
-        let db = self.connect()?;
-        let mut stmt=db.prepare(
-            "WITH events(revision,action,section,page,evidence,review_id,origin,seq) AS (
-              SELECT revision,'save_section',number,NULL,NULL,NULL,'draft_edit',0 FROM sections WHERE draft=?1
-              UNION ALL SELECT revision,'tune_handwriting',NULL,NULL,NULL,NULL,'draft_edit',0 FROM settings WHERE draft=?1
-              UNION ALL SELECT revision,'adjust_glyphs',section,NULL,NULL,NULL,'draft_edit',0 FROM glyph_edits WHERE draft=?1
-              UNION ALL SELECT revision,'page_review',section,page,evidence,review_id,'measurement',seq
-                FROM review_observations WHERE draft=?1
-              UNION ALL SELECT o.revision,'review_feedback',o.section,o.page,json_object('text',f.note),
-                       o.review_id,f.origin,f.rowid FROM review_feedback f JOIN review_observations o USING(review_id)
-                WHERE o.draft=?1
-            )
-            SELECT e.revision,e.action,e.section,COALESCE(e.page,json_extract(n.details,'$.page')),
-                   COALESCE(e.evidence,n.details,'{}'),e.review_id,e.origin
-            FROM events e LEFT JOIN edit_notes n ON n.draft=?1 AND n.revision=e.revision
-            WHERE e.revision<=?2
-            ORDER BY e.revision DESC,(e.action='review_feedback') DESC,(e.action='page_review') DESC,e.seq DESC,e.section,e.page
-            LIMIT ?3 OFFSET ?4")?;
-        let mut entries = Vec::new();
-        let mut rows = stmt.query(params![id, rev, limit + 1, offset])?;
-        while let Some(row) = rows.next()? {
-            let details: String = row.get(4)?;
-            entries.push(json!({
-                "revision":row.get::<_,u32>(0)?,
-                "action":row.get::<_,String>(1)?,
-                "review_id":row.get::<_,Option<String>>(5)?,"origin":row.get::<_,String>(6)?,
-                "section":row.get::<_,Option<u32>>(2)?,
-                "page":row.get::<_,Option<u32>>(3)?,
-                "details":serde_json::from_str::<Value>(&details)?,
-            }));
-        }
-        let more = entries.len() > limit as usize;
-        entries.truncate(limit as usize);
-        Ok(
-            json!({"draft_id":id,"revision":rev,"events":entries,"next_offset":if more {offset.checked_add(limit)} else {None}}),
-        )
-    }
-
     pub fn review(
         &self,
         id: &str,
