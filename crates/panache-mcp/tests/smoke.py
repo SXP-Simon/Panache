@@ -1,18 +1,21 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["mcp>=1.12,<2"]
+# dependencies = ["mcp>=1.12,<2", "Pillow"]
 # ///
 """Exercise a real MCP client over stdio. Optionally keep the poem's PNG and PDF."""
 
 import argparse
 import asyncio
 import base64
+import io
 import json
 import os
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
+
+from PIL import Image
 
 import review_comparison
 
@@ -98,6 +101,28 @@ async def review_workflow(client, key, guides, font_path):
     assert restored == original
     assert (await call(client,"read_section",**key,revision=4,view="summary")).structuredContent["paper"] != original
     return transparent
+
+
+async def placement_pixels(client):
+    saved = (await call(client, "save_section", markdown="字", style={"seed": 17})).structuredContent
+    key = {"draft_id": saved["draft_id"]}
+    await call(client, "tune_handwriting", **key, expected_revision=1, changes={"transparent_background": True})
+    glyph = (await call(client, "preview_handwriting", **key, view="layout")).structuredContent["glyphs"][0]
+    async def ink_box():
+        with Image.open(io.BytesIO(png(await call(client, "preview_handwriting", **key)))) as im:
+            return im.getchannel("A").getbbox()
+    original = await ink_box()
+    quad = [[140, 180], [255, 170], [250, 254], [145, 255]]
+    edit = dict(**key, section=1, page=1, ids=[glyph["id"]])
+    await call(client, "adjust_glyphs", **edit, expected_revision=2, target_quad=quad)
+    left, top, right, bottom = await ink_box()
+    assert 139 <= left < right <= 256 and 169 <= top < bottom <= 256
+    assert right - left > 2 * (original[2] - original[0])
+    await call(client, "adjust_glyphs", **edit, expected_revision=3, opacity=0)
+    assert await ink_box() is None
+    exported = await call(client, "export_handwriting", **key)
+    assert exported.structuredContent["review"]["pages_without_visibility_evidence"] == 1
+    assert "局部墨迹" in exported.content[0].text
 
 
 async def smoke(command, arguments, out):
@@ -212,6 +237,7 @@ async def smoke(command, arguments, out):
                 "save_section", {"markdown": "missing", "paper_path": str(paper_path)}
             )
             assert failed.isError
+            await placement_pixels(client)
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
             poem = POEM.replace("，", "，\n")

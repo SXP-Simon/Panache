@@ -517,10 +517,10 @@ impl Panache {
                     }
                 },
             )?;
-            let warning=if zero_text_ink || visibility_flags>0 {"墨迹可见性需要复查。"}else{""};
+            let warning=if zero_text_ink || visibility_flags>0 {"墨迹可见性需要复查。"}else if (reviewed as usize)<pages {"未复盘页的局部墨迹可见性尚未核验。"}else{""};
             let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。\n\n`{}`", draft.revision, path.display());
             Ok(reply(message, json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review":{"pages_with_evidence":reviewed,"pages_with_visibility_flags":visibility_flags,"global_text_ink_zero":zero_text_ink}
+                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review":{"pages_with_evidence":reviewed,"pages_with_visibility_flags":visibility_flags,"global_text_ink_zero":zero_text_ink,"pages_without_visibility_evidence":pages.saturating_sub(reviewed as usize)}
             })))
         }).await;
         tool_result(result)

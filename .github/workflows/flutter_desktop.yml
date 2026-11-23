@@ -59,7 +59,7 @@ jobs:
       - name: 验证随包 MCP 的预览、导出和历史恢复
         shell: bash
         run: |
-          python -m pip install "mcp>=1.12,<2"
+          python -m pip install "mcp>=1.12,<2" Pillow
           if [[ "$RUNNER_OS" == Windows ]]; then
             python crates/panache-mcp/tests/smoke.py target/desktop-package/windows/Panache/handwriting_app.exe --server-arg=--mcp
             python crates/panache-mcp/tests/context_metrics.py target/desktop-package/windows/Panache/handwriting_app.exe --mcp
