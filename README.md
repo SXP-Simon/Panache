@@ -32,7 +32,11 @@ The client can list fonts, save Markdown in sections, revisit earlier revisions,
 
 | Process state diagram | Resource allocation table |
 | --- | --- |
-| [![Process state diagram](assets/examples/process-states-6fcceb20526a.webp)](assets/examples/process-states-6fcceb20526a.webp) | [![Resource allocation table](assets/examples/bankers-algorithm-3d87bc66b1db.webp)](assets/examples/bankers-algorithm-3d87bc66b1db.webp) |
+| [![Process state diagram](assets/examples/process-states-60b3a1d31f00.webp)](assets/examples/process-states-60b3a1d31f00.webp) | [![Resource allocation table](assets/examples/bankers-algorithm-40bcfd843ae0.webp)](assets/examples/bankers-algorithm-40bcfd843ae0.webp) |
+
+| Flowchart strokes | RC circuit connections |
+| --- | --- |
+| [![Flowchart strokes](assets/examples/process-states-detail-31f9bf0ddada.webp)](assets/examples/process-states-detail-31f9bf0ddada.webp) | [![RC circuit connections](assets/examples/rc-ladder-09c7d9dac754.webp)](assets/examples/rc-ladder-09c7d9dac754.webp) |
 
 [Handwritten poem](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 

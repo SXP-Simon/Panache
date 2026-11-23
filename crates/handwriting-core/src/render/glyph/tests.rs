@@ -142,6 +142,70 @@ fn distribution_table_has_two_dimensional_handwritten_ink_and_continuous_rules()
     }
 }
 #[test]
+fn a_grid_at_the_raster_height_limit_keeps_its_plain_frame() {
+    use crate::text::{Table, TableKind, TableRule};
+    // 31 行 × 264 像素，加上笔宽后仍小于 8192；两端再延长就可能越界。
+    let table = Table {
+        kind: TableKind::Grid,
+        rows: vec![vec![Vec::new()]; 31],
+        vertical: vec![TableRule::Solid; 2],
+        horizontal: vec![TableRule::Solid; 32],
+    };
+    let book = &books()[0];
+    let plain = Glyphs::new(book).table(&table, 205., 0).unwrap();
+    assert_eq!(plain.mask.height(), 8189);
+    let mut natural = Glyphs::with_parameters(book, &Parameters::default()).unwrap();
+    assert_eq!(plain.mask, natural.table(&table, 205., 0).unwrap().mask);
+}
+#[test]
+fn grid_corner_overruns_are_local_bounded_and_repeatable() {
+    let book = &books()[0];
+    let mut quiet = Glyphs::new(book);
+    let mut natural = Glyphs::with_parameters(book, &Parameters::default()).unwrap();
+    let grid = text::parse("⟦ A | 1 | 2; B | 3 | 4 ⟧");
+    let base = quiet.sequence(&grid, 40.).unwrap();
+    for seed in [0, 1, 7, 20261123] {
+        natural.pen.seed = seed;
+        let g = natural.unit(&grid, 40., 0).unwrap();
+        assert_ne!(g.mask, base.mask);
+        assert_eq!(g.mask, natural.unit(&grid, 40., 0).unwrap().mask);
+        let interior = image::imageops::crop_imm(
+            &g.mask,
+            (base.left - g.left) as u32,
+            (base.top - g.top) as u32,
+            base.mask.width(),
+            base.mask.height(),
+        );
+        assert_eq!(interior.to_image(), base.mask);
+        let mut axes = [[false; 2]; 4];
+        for (x, y, _) in g.mask.enumerate_pixels().filter(|(_, _, p)| p[0] > 0) {
+            let (x, y) = (g.left + x as i32, g.top + y as i32);
+            if !(base.left..base.right()).contains(&x) || !(base.top..base.bottom()).contains(&y) {
+                let col = usize::from(x >= base.right() - 1);
+                let row = usize::from(y >= base.bottom() - 1);
+                axes[row * 2 + col][usize::from(y < base.top || y >= base.bottom())] = true;
+                let dx = (x - base.left).abs().min((x - (base.right() - 1)).abs());
+                let dy = (y - base.top).abs().min((y - (base.bottom() - 1)).abs());
+                assert!(
+                    dx + dy <= 5 && (dx == 0 || dy == 0),
+                    "unexpected ink at ({x}, {y})"
+                );
+            }
+        }
+        assert!(axes.iter().all(|axes| *axes != [true, true]));
+    }
+    let first = natural.unit(&grid, 40., 0).unwrap();
+    let second = natural.unit(&grid, 40., 1).unwrap();
+    assert_ne!(first.mask, second.mask);
+    assert_eq!(first.mask, natural.unit(&grid, 40., 0).unwrap().mask);
+    let dashed = text::parse("⟦ ╌╌ ; A | 1 ; B | 2 ; ╌╌ ⟧");
+    assert!(matches!(&dashed[..], [Node::Table(_)]));
+    assert_eq!(
+        quiet.sequence(&dashed, 40.).unwrap().mask,
+        natural.sequence(&dashed, 40.).unwrap().mask
+    );
+}
+#[test]
 fn all_math_bounds_keep_actual_ink_and_native_baseline() {
     for book in books() {
         for size in [24., 40., 64.] {
@@ -463,7 +527,7 @@ fn scripts_follow_actual_base_height_and_natural_ink_width() {
         for size in [24., 40., 70.] {
             let mut glyphs = Glyphs::new(book);
             for letter in ['x', 'H', 'g'] {
-                let base = glyphs.unit(&[Node::Char(letter)], size).unwrap();
+                let base = glyphs.unit(&[Node::Char(letter)], size, 0).unwrap();
                 let upper = glyphs
                     .scripts(&[Node::Char('2')], &[], size, &base, 0)
                     .unwrap();
@@ -485,7 +549,7 @@ fn scripts_follow_actual_base_height_and_natural_ink_width() {
                     combined.advance < base.mask.width() as f32 + size,
                     "{letter}/{size}: excessive trailing bearing"
                 );
-                let chinese = glyphs.unit(&[Node::Char('中')], size).unwrap();
+                let chinese = glyphs.unit(&[Node::Char('中')], size, 0).unwrap();
                 assert_eq!(chinese.advance, glyphs.glyph('中', size).unwrap().advance);
             }
         }

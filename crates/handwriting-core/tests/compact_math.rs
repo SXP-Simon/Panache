@@ -53,7 +53,7 @@ fn page(request: &RenderRequest) -> RgbaImage {
     assert_eq!(pages.len(), 1);
     pages.remove(0)
 }
-fn ink_crop(image: &RgbaImage) -> RgbaImage {
+fn ink_crop(image: &RgbaImage, grid: bool) -> RgbaImage {
     let ink: Vec<_> = image
         .enumerate_pixels()
         .filter(|(_, _, p)| p[0] < 128)
@@ -63,7 +63,26 @@ fn ink_crop(image: &RgbaImage) -> RgbaImage {
     let maxx = ink.iter().map(|p| p.0).max().unwrap();
     let miny = ink.iter().map(|p| p.1).min().unwrap();
     let maxy = ink.iter().map(|p| p.1).max().unwrap();
-    image::imageops::crop_imm(image, minx, miny, maxx - minx + 1, maxy - miny + 1).to_image()
+    let crop =
+        image::imageops::crop_imm(image, minx, miny, maxx - minx + 1, maxy - miny + 1).to_image();
+    if !grid {
+        return crop;
+    }
+    // 用贯穿表身的外框对齐两次渲染，四角收笔在框外可长短不同。
+    let mut vertical = (0..crop.width()).filter(|&x| {
+        (0..crop.height())
+            .filter(|&y| crop[(x, y)][0] < 128)
+            .count() as u32
+            > crop.height() * 9 / 10
+    });
+    let mut horizontal = (0..crop.height()).filter(|&y| {
+        (0..crop.width()).filter(|&x| crop[(x, y)][0] < 128).count() as u32 > crop.width() * 9 / 10
+    });
+    let left = vertical.next().unwrap();
+    let right = vertical.next_back().unwrap();
+    let top = horizontal.next().unwrap();
+    let bottom = horizontal.next_back().unwrap();
+    image::imageops::crop_imm(&crop, left, top, right - left + 1, bottom - top + 1).to_image()
 }
 #[test]
 fn grid_keeps_formulas_natural_and_chinese_cell_rhythm() {
@@ -109,13 +128,14 @@ fn nonzero_translation_moves_whole_formula_without_detaching_ink_components() {
         "⟦ X | 0  1 ; ── ; P | (8)/(15)  (7)/(15) ⟧",
         "⟦ a ┆ b ; ╌╌ ; c ┆ d ⟧",
     ] {
-        let baseline = ink_crop(&page(&request(source)));
+        let grid = source.starts_with('⟦');
+        let baseline = ink_crop(&page(&request(source)), grid);
         for seed in 1..=8 {
             let mut shifted = request(source);
             shifted.params.perturb_x_sigma = 2.;
             shifted.params.perturb_y_sigma = 3.;
             shifted.params.seed = seed;
-            let actual = ink_crop(&page(&shifted));
+            let actual = ink_crop(&page(&shifted), grid);
             if source.contains('√') || source.contains(")/(") {
                 // 2026-10-24：分数线与根顶允许两像素内的自然曲线，不能让结构或字形独立漂移。
                 assert!(actual.width().abs_diff(baseline.width()) <= 2);
@@ -138,7 +158,7 @@ fn nonzero_translation_moves_whole_formula_without_detaching_ink_components() {
             } else {
                 assert!(
                     actual == baseline,
-                    "{source}/{seed}: non-math frames must remain rigid"
+                    "{source}/{seed}: compound ink must translate as one unit"
                 );
             }
         }

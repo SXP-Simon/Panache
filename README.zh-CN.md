@@ -32,7 +32,11 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 
 | 进程状态转换图 | 资源分配表 |
 | --- | --- |
-| [![进程状态转换图](assets/examples/process-states-6fcceb20526a.webp)](assets/examples/process-states-6fcceb20526a.webp) | [![资源分配表](assets/examples/bankers-algorithm-3d87bc66b1db.webp)](assets/examples/bankers-algorithm-3d87bc66b1db.webp) |
+| [![进程状态转换图](assets/examples/process-states-60b3a1d31f00.webp)](assets/examples/process-states-60b3a1d31f00.webp) | [![资源分配表](assets/examples/bankers-algorithm-40bcfd843ae0.webp)](assets/examples/bankers-algorithm-40bcfd843ae0.webp) |
+
+| 流程图线条近景 | RC 电路接线近景 |
+| --- | --- |
+| [![流程图线条近景](assets/examples/process-states-detail-31f9bf0ddada.webp)](assets/examples/process-states-detail-31f9bf0ddada.webp) | [![RC 电路接线近景](assets/examples/rc-ladder-09c7d9dac754.webp)](assets/examples/rc-ladder-09c7d9dac754.webp) |
 
 [《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 

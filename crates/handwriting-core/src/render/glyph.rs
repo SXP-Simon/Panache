@@ -96,6 +96,7 @@ pub(super) struct Glyphs<'a> {
     cache: HashMap<(char, u32), Glyph>,
     cache_bytes: usize,
     pen: pen::MathPen,
+    drawing_stream: u64,
 }
 type Path = (Vec<(i32, i32)>, i32);
 pub(super) type PositionedGlyph = (Glyph, i32, i32);
@@ -109,6 +110,7 @@ impl<'a> Glyphs<'a> {
             cache: HashMap::new(),
             cache_bytes: 0,
             pen: pen::MathPen::sample(book.primary()),
+            drawing_stream: 0,
         }
     }
     pub fn with_parameters(book: &'a FontBook, p: &Parameters) -> Result<Self> {
@@ -287,7 +289,17 @@ impl<'a> Glyphs<'a> {
             previous = point;
         }
     }
-    pub fn unit(&mut self, nodes: &[Node], size: f32) -> Result<Glyph> {
+    fn next_drawing_rng(&mut self) -> rand_chacha::ChaCha8Rng {
+        use rand::SeedableRng;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(self.pen.seed);
+        rng.set_stream(self.drawing_stream);
+        self.drawing_stream += 1;
+        rng
+    }
+
+    pub fn unit(&mut self, nodes: &[Node], size: f32, index: usize) -> Result<Glyph> {
+        // 高位定位排版单元，低位区分其内嵌图表。预量宽和实际绘制从同一位置开始。
+        self.drawing_stream = (index as u64) << 32;
         if nodes.len() == 1 {
             let mut glyph = self.node(&nodes[0], size)?;
             if matches!(nodes[0], Node::Char(_)) && !super::units::keeps_grid_cell(nodes) {
