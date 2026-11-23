@@ -116,7 +116,8 @@ class DesktopReleaseVersionTest(unittest.TestCase):
             self.assertIn((flutter, "pub", "get"), commands)
             self.assertIn((flutter, "build", "windows", "--release", "--build-name=2.3.4",
                            "--build-number=2003004"), commands)
-            self.assertIn((str(dart), "pub", "get"), commands)
+            pub_get_tools = [Path(command[0]).resolve() for command in commands if command[1:] == ("pub", "get")]
+            self.assertIn(dart.resolve(), pub_get_tools)
             archive = root / "target/desktop-package/windows/Panache-2.3.4-AMD64.zip"
             with zipfile.ZipFile(archive) as package:
                 runtime = 'Panache/versions/2.3.4-2003004'
