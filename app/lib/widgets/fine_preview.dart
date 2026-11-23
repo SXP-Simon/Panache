@@ -13,6 +13,8 @@ import '../utils/fine_raster.dart';
 import '../view_models/fine_selection.dart';
 import '../view_models/fine_selection_drag.dart';
 import 'color_picker_dialog.dart';
+import 'fine_adjustment_sliders.dart';
+import 'fine_preview_painter.dart';
 import 'preview_image_actions.dart';
 import 'preview_zoom.dart';
 import 'workbench_controls.dart';
@@ -453,9 +455,6 @@ class _FinePreviewState extends State<FinePreview> {
     });
   }
 
-  int _transformValue(String field) =>
-      _transformDraft?.field == field ? _transformDraft!.value : 0;
-
   void _commitDraft() {
     final wasShaping = _shapeDraft;
     _finish(_draft);
@@ -586,6 +585,35 @@ class _FinePreviewState extends State<FinePreview> {
     });
   }
 
+  void _scheduleDefaultZoom() {
+    if (!widget.toolbar) return;
+    final wide = widget.inspector != null;
+    if (_zoomLayout != wide) {
+      _zoomLayout = wide;
+      _manualZoom = false;
+      _defaultZoomViewport = null;
+    }
+    if (!_manualZoom &&
+        (_defaultZoomViewport == null ||
+            wide && _defaultZoomViewport != _viewport)) {
+      _defaultZoomViewport = _viewport;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _zoomLayout != wide || _manualZoom) return;
+        final top = model.glyphs.fold<double>(
+          _size.height,
+          (top, glyph) => math.min(top, glyph.y.toDouble()),
+        );
+        _zoom.value = wide
+            ? initialPreviewZoom(
+                _viewport,
+                _size,
+                contentTop: model.glyphs.isEmpty ? 0 : top,
+              )
+            : Matrix4.identity();
+      });
+    }
+  }
+
   Widget _paper(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final raster = _raster;
@@ -603,33 +631,7 @@ class _FinePreviewState extends State<FinePreview> {
         );
         if (fit <= 0 || !fit.isFinite) return const SizedBox.shrink();
         _updateViewport(bounds.biggest, fit);
-        if (widget.toolbar) {
-          final wide = widget.inspector != null;
-          if (_zoomLayout != wide) {
-            _zoomLayout = wide;
-            _manualZoom = false;
-            _defaultZoomViewport = null;
-          }
-          if (!_manualZoom &&
-              (_defaultZoomViewport == null ||
-                  wide && _defaultZoomViewport != _viewport)) {
-            _defaultZoomViewport = _viewport;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || _zoomLayout != wide || _manualZoom) return;
-              final top = model.glyphs.fold<double>(
-                _size.height,
-                (top, glyph) => math.min(top, glyph.y.toDouble()),
-              );
-              _zoom.value = wide
-                  ? initialPreviewZoom(
-                      _viewport,
-                      _size,
-                      contentTop: model.glyphs.isEmpty ? 0 : top,
-                    )
-                  : Matrix4.identity();
-            });
-          }
-        }
+        _scheduleDefaultZoom();
         final surface = SizedBox.fromSize(
           size: _size * fit,
           child: PreviewImageActions(
@@ -646,7 +648,7 @@ class _FinePreviewState extends State<FinePreview> {
               onPointerUp: (event) => _up(event, fit),
               onPointerCancel: (_) => _cancelGesture(),
               child: CustomPaint(
-                painter: _FinePainter(
+                painter: FinePreviewPainter(
                   raster,
                   image,
                   widget.look,
@@ -1005,104 +1007,14 @@ class _FinePreviewState extends State<FinePreview> {
                       maintainState: true,
                       maintainAnimation: true,
                       maintainSize: true,
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          _slider(
-                            'fine-scale',
-                            l.fineScale,
-                            current.scale,
-                            50,
-                            200,
-                            '%',
-                            (v) => _adjust(scale: v),
-                          ),
-                          if (selection.length == 1)
-                            _slider(
-                              'fine-angle',
-                              l.fineAngle,
-                              current.angle,
-                              -45,
-                              45,
-                              '°',
-                              (v) => _adjust(angle: v),
-                            ),
-                          if (selection.length > 1)
-                            _slider(
-                              'fine-transform-angle',
-                              l.fineGroupAngle,
-                              _transformValue('angle'),
-                              -45,
-                              45,
-                              '°',
-                              (value) => _transform('angle', value),
-                            ),
-                          _slider(
-                            'fine-transform-horizontal',
-                            l.finePerspectiveX,
-                            _transformValue('horizontal'),
-                            -35,
-                            35,
-                            '%',
-                            (value) => _transform('horizontal', value),
-                          ),
-                          _slider(
-                            'fine-transform-vertical',
-                            l.finePerspectiveY,
-                            _transformValue('vertical'),
-                            -35,
-                            35,
-                            '%',
-                            (value) => _transform('vertical', value),
-                          ),
-                          _slider(
-                            'fine-opacity',
-                            l.fineOpacity,
-                            current.opacity,
-                            0,
-                            100,
-                            '%',
-                            (v) => _adjust(opacity: v),
-                          ),
-                          _slider(
-                            'fine-thickness',
-                            l.fineThickness,
-                            current.thickness,
-                            math
-                                .min(
-                                  current.thickness,
-                                  -20 - (baseLook.thickness * 10).round(),
-                                )
-                                .clamp(-20, 0),
-                            math
-                                .max(
-                                  current.thickness,
-                                  20 - (baseLook.thickness * 10).round(),
-                                )
-                                .clamp(0, 20),
-                            ' px',
-                            (v) => _adjust(thickness: v),
-                            delta: true,
-                          ),
-                          _slider(
-                            'fine-softness',
-                            l.fineSoftness,
-                            current.softness,
-                            math.min(
-                              current.softness,
-                              -(baseLook.softness * 10).round(),
-                            ),
-                            math.max(
-                              current.softness,
-                              20 - (baseLook.softness * 10).round(),
-                            ),
-                            ' px',
-                            (v) => _adjust(softness: v),
-                            delta: true,
-                          ),
-                        ],
+                      child: FineAdjustmentSliders(
+                        current: current,
+                        selectionCount: selection.length,
+                        baseLook: baseLook,
+                        transformDraft: _transformDraft,
+                        onAdjust: _adjust,
+                        onTransform: _transform,
+                        onCommit: _commitDraft,
                       ),
                     ),
                     if (scrollActions && first != null) parameterActions,
@@ -1120,41 +1032,6 @@ class _FinePreviewState extends State<FinePreview> {
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _slider(
-    String key,
-    String label,
-    int value,
-    int min,
-    int max,
-    String unit,
-    ValueChanged<int> change, {
-    bool delta = false,
-  }) {
-    final display = delta
-        ? '${value > 0 ? '+' : ''}${(value / 10).toStringAsFixed(1)}$unit'
-        : '$value$unit';
-    return SizedBox(
-      width: 107,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, textAlign: TextAlign.center),
-          Text(display, softWrap: false),
-          Slider(
-            key: ValueKey(key),
-            value: value.toDouble(),
-            min: min.toDouble(),
-            max: max.toDouble(),
-            divisions: max - min,
-            label: display,
-            onChanged: (v) => change(v.round()),
-            onChangeEnd: (_) => _commitDraft(),
-          ),
-        ],
       ),
     );
   }
@@ -1196,79 +1073,3 @@ bool mapEqualsFine(Map<int, FineAdjustment> a, Map<int, FineAdjustment> b) =>
     identical(a, b) ||
     a.length == b.length &&
         a.entries.every((entry) => entry.value == b[entry.key]);
-
-class _FinePainter extends CustomPainter {
-  _FinePainter(
-    this.raster,
-    this.image,
-    this.look,
-    this.edits, {
-    required this.draft,
-    required this.outlines,
-    required this.corners,
-    required this.handleScale,
-    required this.box,
-    required this.lasso,
-    required this.color,
-  });
-  final FineRaster raster;
-  final ui.Image image;
-  final InkLook look;
-  final Map<int, FineAdjustment> edits;
-  final bool draft;
-  final Set<Rect> outlines;
-  final List<Offset>? corners;
-  final double handleScale;
-  final Rect? box;
-  final List<Offset> lasso;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    final fit = size.width / image.width;
-    canvas.scale(fit);
-    if (draft) {
-      raster.paint(canvas, edits, look);
-    } else {
-      canvas.drawImage(
-        image,
-        Offset.zero,
-        Paint()..filterQuality = FilterQuality.low,
-      );
-    }
-    final fill = Paint()..color = color.withValues(alpha: .14);
-    final line = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1 / fit;
-    for (final rect in [...outlines, ?box]) {
-      canvas.drawRect(rect, fill);
-      canvas.drawRect(rect, line);
-    }
-    if (lasso.length > 1) {
-      final path = Path()
-        ..fillType = PathFillType.evenOdd
-        ..addPolygon(lasso, true);
-      canvas.drawPath(path, fill);
-      canvas.drawPath(path, line);
-    }
-    if (corners case final points?) {
-      final scale = fit * handleScale;
-      canvas.drawPath(
-        Path()..addPolygon(points, true),
-        line..strokeWidth = 2 / scale,
-      );
-      final handle = Paint()..color = color;
-      final edge = Paint()..color = Colors.white;
-      for (final point in points) {
-        canvas.drawCircle(point, 7 / scale, edge);
-        canvas.drawCircle(point, 5 / scale, handle);
-      }
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _FinePainter oldDelegate) => true;
-}

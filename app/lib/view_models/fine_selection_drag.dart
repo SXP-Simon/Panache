@@ -65,8 +65,9 @@ class FineSelectionDrag {
         action != FineDragAction.move ||
         !mouse ||
         hit == null ||
-        selection.selected.contains(hit.id))
+        selection.selected.contains(hit.id)) {
       return false;
+    }
     selection.select([hit.id]);
     return true;
   }
