@@ -1,5 +1,61 @@
 {
   "@@locale": "zh",
+  "pdfImport": "导入 PDF",
+  "pdfText": "提取纯文字",
+  "pdfTextHint": "把可复制的文字放入工作台编辑器，使用当前纸张重新排版。",
+  "pdfLayout": "按原页排手写",
+  "pdfLayoutHint": "按原页文字行的位置换成手写，保留分页、分栏和底图。扫描页保留原貌。",
+  "pdfFill": "在原页上填字",
+  "pdfFillHint": "完整保留页面图像，框选空白处填写。可用于扫描件。",
+  "pdfLocal": "文件由本机引擎处理。原页模式导出平面图像 PDF，关闭后清除本次编辑。",
+  "pdfRemote": "此文件将发送到当前引擎 {engine}。原页模式导出平面图像 PDF，关闭后清除本次编辑。",
+  "@pdfRemote": {
+    "placeholders": {
+      "engine": {
+        "type": "String"
+      }
+    }
+  },
+  "pdfLayoutHelp": "点按手写行可以修改。导出时保留各页尺寸。",
+  "pdfFillHelp": "拖出矩形，输入内容。点按已填文字可以修改或移除。",
+  "pdfFontError": "无法载入所选字体。请返回工作台选择内置字体或本机字体文件后重试。",
+  "pdfEncrypted": "此 PDF 受密码保护。请在有权访问的 PDF 阅读器中导出未加密副本，再重新导入。",
+  "pdfLimit": "文件超过引擎或导出的大小、页数或复杂度上限。请拆分成较小的 PDF 后重试。",
+  "pdfInvalid": "无法读取该 PDF。请检查文件，或在 PDF 阅读器中重新另存一份。",
+  "pdfEngineOld": "当前引擎不支持 PDF 原页处理。请更新 Panache 引擎或选择提取纯文字。",
+  "pdfFailed": "PDF 处理失败。{detail}",
+  "@pdfFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "pdfCloseTitle": "关闭这份 PDF？",
+  "pdfCloseHint": "关闭后会清除本次编辑。如需保留成品，请先导出 PDF。",
+  "pdfReview": "检查导出页面",
+  "pdfWarnings": "有 {pages} 页含无法替换的文字、扫描内容或可能无法完整绘制的元素。请确认已查看这些页面。",
+  "@pdfWarnings": {
+    "placeholders": {
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
+  "pdfNoText": "该页没有可替换的文字。导出会保留原页图像。如需写字，请使用「在原页上填字」。",
+  "pdfPartial": "该页含部分无法替换的文字或无法完整绘制的元素，请核对预览。",
+  "pdfProgress": "正在导出第 {current} / {total} 页",
+  "@pdfProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pdfBoxText": "区域文字",
   "appTitle": "Panache",
   "workspace": "工作台",
   "guide": "使用指南",
@@ -20,7 +76,19 @@
   "redo": "重做",
   "parameters": "纸张与笔迹",
   "font": "手写字体",
-  "uploadFont": "上传字体",
+  "importFontFile": "从文件导入字体",
+  "localFonts": "本机字体库",
+  "systemFonts": "系统字体",
+  "personalFonts": "我的字体",
+  "searchFonts": "搜索字体名称",
+  "openFontFolder": "打开字体文件夹",
+  "refreshFonts": "刷新字体列表",
+  "moreFonts": "显示更多字体",
+  "noMatchingFonts": "未找到匹配的字体",
+  "personalFontsEmpty": "将 TTF 或 OTF 字体放入此文件夹，然后刷新列表。",
+  "openFontFolderFailed": "请手动打开字体文件夹：{path}",
+  "@openFontFolderFailed": {"placeholders": {"path": {"type": "String"}}},
+  "chooseBundledFont": "选择内置字体",
   "background": "纸张背景",
   "uploadBackground": "上传背景",
   "detectBackground": "识别边距和行距",

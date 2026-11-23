@@ -5,11 +5,19 @@ edition.workspace = true
 publish.workspace = true
 license.workspace = true
 
+[features]
+local-fonts = ["dep:fontdb", "dep:schemars", "dep:write-fonts"]
+
 [dependencies]
+schemars = { version = "1", optional = true }
+fontdb = { version = "0.24", optional = true }
+write-fonts = { version = "0.56", default-features = false, features = ["read"], optional = true }
 base64 = "0.23.1"
 flate2 = "1.1.10"
 fontdue = "0.9.4"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff"] }
+hayro = "0.9.0"
+lopdf = { version = "0.42.0", default-features = false }
 icu_properties = "2.3.0"
 imageproc = { version = "0.27.0", default-features = false }
 kamadak-exif = "0.6.2"

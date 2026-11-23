@@ -71,10 +71,11 @@ class EngineInfo {
     required this.canCancel,
     required this.canChooseTaskId,
     this.canFineEdit = false,
+    this.canListLocalFonts = false,
   });
   final String version;
   final bool canCancel, canChooseTaskId;
-  final bool canFineEdit;
+  final bool canFineEdit, canListLocalFonts;
   factory EngineInfo.fromJson(Map<String, dynamic> value) {
     final capabilities = value['capabilities'];
     return EngineInfo(
@@ -83,6 +84,8 @@ class EngineInfo {
           capabilities is Map && capabilities['task_cancellation'] == true,
       canChooseTaskId:
           capabilities is Map && capabilities['task_submission_id'] == true,
+      canListLocalFonts:
+          capabilities is Map && capabilities['local_fonts'] == true,
       canFineEdit: capabilities is Map && capabilities['fine_edit'] == true,
     );
   }
@@ -126,6 +129,7 @@ class ApiEngineGateway implements EngineGateway, EngineCatalog {
       'task_cancellation': info.canCancel,
       'task_submission_id': info.canChooseTaskId,
       'fine_edit': info.canFineEdit,
+      'local_fonts': info.canListLocalFonts,
     },
   });
 

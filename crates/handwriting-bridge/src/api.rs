@@ -159,7 +159,7 @@ pub fn execute(mut request: Request) -> Result<Value> {
         "version" => Ok(
             json!({"version": handwriting_core::app_version(), "capabilities": {"fine_edit": true}}),
         ),
-        "import" | "identify" => {
+        "import" | "identify" | "pdf_page" => {
             let _operation = OPERATIONS
                 .try_lock()
                 .map_err(|_| Error::new("queue_full", "本地引擎正在处理任务"))?;
@@ -176,7 +176,14 @@ pub fn execute(mut request: Request) -> Result<Value> {
                 .get("file")
                 .ok_or_else(|| Error::new("invalid_upload", "缺少文件"))?;
             let bytes = read(&upload.path)?;
-            if request.command == "import" {
+            if request.command == "pdf_page" {
+                serde_json::to_value(handwriting_core::pdf_page::import(
+                    bytes,
+                    &request.fields,
+                    &limits(),
+                )?)
+                .map_err(io_error)
+            } else if request.command == "import" {
                 Ok(json!({"text":document::extract(&upload.name, &bytes, &limits())?}))
             } else {
                 let detected =

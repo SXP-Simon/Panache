@@ -11,6 +11,11 @@ import '../l10n/app_localizations.dart';
 import '../models/engine_failure.dart';
 import 'dialogs/connection_dialog.dart';
 import 'dialogs/illustration_dialog.dart';
+import 'dialogs/pdf_import_dialog.dart';
+import 'pdf_workbench.dart';
+import '../services/pdf_pages.dart';
+import 'dialogs/local_font_dialog.dart';
+import '../services/local_fonts.dart';
 import 'dialogs/paper_area_dialog.dart';
 import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
@@ -326,7 +331,35 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Future<void> importText() => action(() async {
     final file = await pick(['txt', 'docx', 'pdf', 'rtf']);
-    if (file == null) return;
+    if (file == null || !mounted) return;
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      final api = w.api;
+      final mode = await choosePdfImport(context, api.base);
+      if (!mounted || mode == null) return;
+      if (mode != PdfImportMode.text) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => PdfWorkbench(
+              file: file,
+              mode: mode,
+              ink: Color(w.settings.inkLook.color),
+              fetch: (index) async => PdfSourcePage.fromJson(
+                await api.pdfPage(file, index, mode.name),
+                index,
+              ),
+              loadFont: () =>
+                  loadPdfHandwritingFont(w.fontFile, w.settings.font),
+              save: (bytes) => saveBytes(
+                bytes,
+                'pdf',
+                name: '${file.name.substring(0, file.name.length - 4)}-Panache',
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+    }
     await documents.importText(file);
   });
   Future<void> insertImage() => action(() async {
@@ -764,6 +797,19 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         color: value.toARGB32(),
       ));
     },
+    onBrowseLocalFonts: w.managedBackend && w.api.supportsLocalFonts
+        ? () => action(() async {
+            final font = await showDialog<LocalFont>(
+              context: context,
+              builder: (_) => LocalFontDialog(api: w.api),
+            );
+            if (font == null || !mounted) return;
+            final file = await w.api.readLocalFont(font);
+            if (!mounted) return;
+            w.fontFile = file;
+            w.edit();
+          })
+        : null,
     onUploadFont: () => action(() async {
       final file = await pick(['ttf', 'otf']);
       if (file != null) {

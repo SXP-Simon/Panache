@@ -20,6 +20,7 @@ use handwriting_core::{
     Cancellation, Error, FontBook, Limits, Parameters, RenderRequest, Result, document,
     generation::{self, Event, Output},
     imaging,
+    local_fonts::{FontPage, FontSearch, LocalFonts},
 };
 use std::{
     collections::HashMap,
@@ -40,6 +41,7 @@ use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Clone)]
 pub struct Config {
+    pub desktop: bool,
     pub data_dir: PathBuf,
     pub font_dir: PathBuf,
     pub web_dir: Option<PathBuf>,
@@ -54,6 +56,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            desktop: false,
             data_dir: PathBuf::from(".handwriting-rust"),
             font_dir: PathBuf::from("assets/font_assets"),
             web_dir: None,
@@ -73,6 +76,7 @@ struct App {
     semaphore: Arc<Semaphore>,
     fonts: Vec<String>,
     font_cache: Mutex<HashMap<String, Arc<fontdue::Font>>>,
+    local_fonts: Option<LocalFonts>,
     rates: Mutex<HashMap<String, (Instant, u32)>>,
 }
 #[derive(Clone)]
@@ -109,7 +113,8 @@ impl IntoResponse for ApiError {
 type ApiResult<T> = std::result::Result<T, ApiError>;
 impl Server {
     pub fn new(mut config: Config) -> Result<Self> {
-        if config.concurrency == 0
+        if (config.desktop && config.access_token.as_ref().is_none_or(|t| t.len() < 32))
+            || config.concurrency == 0
             || config.max_active < config.concurrency
             || config.allowed_origins.is_empty()
             || config.allowed_origins.iter().any(|o| {
@@ -149,7 +154,11 @@ impl Server {
         }
         let store = Store::open(&config.data_dir, config.ttl_seconds)?;
         let concurrency = config.concurrency;
+        let local_fonts = config
+            .desktop
+            .then(|| LocalFonts::new(Vec::new(), config.limits.max_file_bytes));
         Ok(Self(Arc::new(App {
+            local_fonts,
             config,
             store: Mutex::new(store),
             semaphore: Arc::new(Semaphore::new(concurrency)),
@@ -159,18 +168,24 @@ impl Server {
         })))
     }
     pub fn router(&self) -> Router {
-        let api = Router::new()
+        let mut api = Router::new()
             .route("/health", get(health))
             .route("/fonts_info", get(fonts))
             .route("/version", get(version))
             .route("/textfileprocess", post(textfile))
             .route("/imagefileprocess", post(imagefile))
+            .route("/pdfpageprocess", post(pdfpage))
             .route("/generate_handwriting", post(submit))
             .route("/generate_handwriting/task/{id}", get(status))
             .route("/generate_handwriting/task/{id}/result", get(result))
             .route("/generate_handwriting/task/{id}/cancel", post(cancel))
             .route("/generate_handwriting/ws/{id}", get(websocket))
             .fallback(|| async { StatusCode::NOT_FOUND });
+        if self.0.local_fonts.is_some() {
+            api = api
+                .route("/local_fonts", post(local_fonts))
+                .route("/local_fonts/read", post(read_local_font));
+        }
         let mut app = Router::new().nest("/api", api);
         if let Some(dir) = &self.0.config.web_dir {
             app = app.fallback_service(
@@ -424,9 +439,34 @@ async fn health() -> Json<serde_json::Value> {
 async fn fonts(State(s): State<Server>) -> Json<Vec<String>> {
     Json(s.0.fonts.clone())
 }
+async fn local_fonts(
+    State(s): State<Server>,
+    Json(query): Json<FontSearch>,
+) -> ApiResult<Json<FontPage>> {
+    let page =
+        tokio::task::spawn_blocking(move || s.0.local_fonts.as_ref().unwrap().search(&query))
+            .await
+            .map_err(storage_error)??;
+    Ok(Json(page))
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FontId {
+    id: String,
+}
+async fn read_local_font(
+    State(s): State<Server>,
+    Json(request): Json<FontId>,
+) -> ApiResult<Vec<u8>> {
+    let (_, bytes) =
+        tokio::task::spawn_blocking(move || s.0.local_fonts.as_ref().unwrap().read(&request.id))
+            .await
+            .map_err(storage_error)??;
+    Ok(bytes)
+}
 async fn version(State(s): State<Server>) -> Json<serde_json::Value> {
     Json(
-        serde_json::json!({"version":s.0.config.version,"capabilities":{"task_cancellation":true,"task_submission_id":true,"fine_edit":true}}),
+        serde_json::json!({"version":s.0.config.version,"capabilities":{"local_fonts":s.0.local_fonts.is_some(),"task_cancellation":true,"task_submission_id":true,"fine_edit":true}}),
     )
 }
 struct Upload {
@@ -727,6 +767,27 @@ async fn textfile(
             .map_err(|e| Error::new("worker_failed", e.to_string()))??;
     Ok(Json(serde_json::json!({"text":text})))
 }
+async fn pdfpage(
+    State(s): State<Server>,
+    Input(fields, mut files): Input,
+) -> ApiResult<Json<handwriting_core::pdf_page::PdfPage>> {
+    let file = files
+        .remove("file")
+        .ok_or_else(|| Error::new("invalid_upload", "缺少 file"))?;
+    let limits = s.0.config.limits.clone();
+    let permit =
+        s.0.semaphore
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::new("queue_full", "工作线程繁忙，请稍后重试"))?;
+    let page = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        handwriting_core::pdf_page::import(file.bytes, &fields, &limits)
+    })
+    .await
+    .map_err(|e| Error::new("worker_failed", e.to_string()))??;
+    Ok(Json(page))
+}
 async fn imagefile(
     State(s): State<Server>,
     Input(_, mut files): Input,
@@ -856,7 +917,10 @@ async fn boundary(State(s): State<Server>, request: Request<Body>, next: Next) -
             .map(|v| v.0.ip().to_string())
             .unwrap_or_else(|| "local".into());
         let path = request.uri().path();
-        let group = if path == "/api/generate_handwriting" || path.ends_with("fileprocess") {
+        let group = if path == "/api/generate_handwriting"
+            || path.ends_with("fileprocess")
+            || path == "/api/pdfpageprocess"
+        {
             "upload"
         } else {
             "query"
@@ -1146,6 +1210,44 @@ mod tests {
         service.abort();
     }
     #[tokio::test]
+    async fn local_fonts_require_authenticated_desktop_sidecar() {
+        let (_dir, hosted) = setup();
+        let uri = "/api/local_fonts";
+        let post = || {
+            Request::builder()
+                .method("POST")
+                .uri(uri)
+                .header("content-type", "application/json")
+                .body(Body::from("{}"))
+                .unwrap()
+        };
+        let hosted_version: serde_json::Value =
+            serde_json::from_slice(&call(&hosted, "/api/version").await.1).unwrap();
+        assert_eq!(hosted_version["capabilities"]["local_fonts"], false);
+        assert_eq!(
+            hosted.router().oneshot(post()).await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+        let mut config = hosted.0.config.clone();
+        config.desktop = true;
+        assert!(Server::new(config.clone()).is_err());
+        config.access_token = Some("x".repeat(32));
+        let desktop = Server::new(config).unwrap();
+        assert_eq!(
+            desktop.router().oneshot(post()).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+        let mut foreign = post();
+        foreign.headers_mut().insert(
+            "origin",
+            HeaderValue::from_static("https://elsewhere.example"),
+        );
+        assert_eq!(
+            desktop.router().oneshot(foreign).await.unwrap().status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    #[tokio::test]
     async fn static_health_fonts_version_and_unknown_api() {
         let (dir, s) = setup();
         let (status, health) = call(&s, "/api/health").await;
@@ -1214,6 +1316,33 @@ mod tests {
                 assert_eq!(data["images"].as_array().unwrap().len(), 2);
             }
         }
+    }
+    #[tokio::test]
+    async fn imports_selected_pdf_page() {
+        let (_dir, s) = setup();
+        let mut pdf = export::PdfExport::new();
+        pdf.add(&image_for_test()).unwrap();
+        let bytes = pdf.finish();
+        let (status, data) = send(
+            &s,
+            "/api/pdfpageprocess",
+            &[("pageIndex", "0"), ("mode", "fill")],
+            Some(("file", "paper.pdf", &bytes)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{data}");
+        assert_eq!(data["pageCount"], 1);
+        assert_eq!(data["pageIndex"], 0);
+        assert!(data["backgroundPng"].as_str().unwrap().starts_with("iVBOR"));
+        let (status, data) = send(
+            &s,
+            "/api/pdfpageprocess",
+            &[("pageIndex", "1")],
+            Some(("file", "paper.pdf", &bytes)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(data["error_code"], "invalid_parameter");
     }
     #[tokio::test]
     async fn uploads_text_and_background_identification() {

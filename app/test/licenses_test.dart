@@ -59,6 +59,7 @@ void main() {
     expect(text, contains('GNU AFFERO GENERAL PUBLIC LICENSE'));
     expect(text, contains('Copyright (c) 2025 Liuweiqing'));
     expect(text, contains('Chenghui LI'));
+    expect(text, contains('Copyright 2014 PDFium Authors'));
     expect(text, contains('SIL OPEN FONT LICENSE Version 1.1'));
 
     final workspace = Workspace();

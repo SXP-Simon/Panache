@@ -96,6 +96,19 @@ class HandwritingApi {
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> pdfPage(
+    Upload file,
+    int pageIndex,
+    String mode,
+  ) async {
+    final response = await multipart(
+      '/api/pdfpageprocess',
+      {'pageIndex': '$pageIndex', 'mode': mode},
+      {'file': file},
+    );
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+  }
+
   Future<String> submit(
     Map<String, String> fields,
     Map<String, Upload> files, {
@@ -137,8 +150,13 @@ class HandwritingApi {
   }
 
   bool get supportsCancel => _supportsCancel;
+  bool supportsLocalFonts = false;
   bool supportsFineEdit = false;
   void configureCapabilities(dynamic info) {
+    supportsLocalFonts =
+        info is Map &&
+        info['capabilities'] is Map &&
+        info['capabilities']['local_fonts'] == true;
     supportsFineEdit =
         info is Map &&
         info['capabilities'] is Map &&

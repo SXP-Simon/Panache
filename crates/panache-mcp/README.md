@@ -52,7 +52,7 @@ cargo build --locked --release -p panache-mcp
 
 | 工具 | 用法 |
 | --- | --- |
-| `list_fonts` | 列出本地字体。为作业、实验报告选笔迹时，指导模型展示中英数混排小样，按用户偏好定稿。 |
+| `list_fonts` | 按名称、文件名或来源（`bundled`、`user`、`system`）检索字体。默认 20 项，使用 `next_offset` 翻页。为作业、实验报告选笔迹时，指导模型展示中英数混排小样，按用户偏好定稿。 |
 | `save_section` | 用 `markdown` 新建稿件。首次可传标题、字体、字号、纸样、墨色、种子和作业排版模式。返回 `draft_id`、版本号和节号。 |
 | `list_drafts` | 找回本地稿件和最新版本。每批 20 条，可传 `offset`。 |
 | `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |
@@ -65,6 +65,10 @@ cargo build --locked --release -p panache-mcp
 | `apply_cleanup` | 复核计划，仅清理选中的废弃临时文件。 |
 | `annotate_review` | 将用户原话或模型观察挂到指定复盘 ID，保持稿件版本号。 |
 | `adjust_glyphs` | 先用 `preview_handwriting(view="layout")` 取编号和坐标，再按同一节、页和版本调整选中字形。 |
+
+例如用 `list_fonts(query="楷", source="system", limit=8)` 检索系统字体。把 `entries[].id` 用于建稿的 `style.font` 或调稿的 `changes.font`。随包字体继续接受原文件名。个人和系统字体会随稿保存，删除源文件后仍可预览历史版本。TTF、OTF 和 TTC/OTC 中带轮廓、单个字面大小不超过 32 MiB 的字体可供选择。
+
+桌面与 MCP 共享“我的字体”目录，`list_fonts` 的 `user_dir` 给出绝对路径。Windows 使用 `%LOCALAPPDATA%/Panache/fonts`，macOS 使用 `~/Library/Application Support/Panache/fonts`，Linux 使用 `$XDG_DATA_HOME/Panache/fonts`（默认 `~/.local/share/Panache/fonts`）。可通过 `PANACHE_USER_FONT_DIR` 指定绝对路径。把字体放入后调用 `list_fonts(source="user", refresh=true)`。
 
 面向 AI 客户端的调用示例、披露边界和测量口径见[工具设计](tool-design.md)。
 

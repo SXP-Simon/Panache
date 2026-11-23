@@ -35,6 +35,8 @@ dependencies:
   panache_updater:
     path: updater
   super_clipboard: 0.9.1
+  pdf: ^3.13.1
+  image: ^4.13.1
 
 dev_dependencies:
   flutter_test:

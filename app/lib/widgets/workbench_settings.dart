@@ -44,6 +44,7 @@ class WorkbenchSettings extends StatelessWidget {
     required this.onSelectFont,
     required this.onColorSelected,
     required this.onUploadFont,
+    this.onBrowseLocalFonts,
     required this.onRemoveFont,
     required this.onDefaultPreset,
     required this.onSmallPreset,
@@ -78,7 +79,7 @@ class WorkbenchSettings extends StatelessWidget {
       onRemoveBackground;
   final ValueChanged<String?> onSelectFont;
   final ValueChanged<Color> onColorSelected;
-  final VoidCallback? onAdjustBackground;
+  final VoidCallback? onAdjustBackground, onBrowseLocalFonts;
   final SettingsSection? activeSection;
   final ValueChanged<SettingsSection>? onSectionChanged;
   final Widget? inkControls;
@@ -166,117 +167,124 @@ class WorkbenchSettings extends StatelessWidget {
               key: PageStorageKey(activeSection),
               children: [
                 if (show(SettingsSection.layout)) ...[
-                  section(
-                    'font',
-                    l.fontChoices,
-                    Icons.font_download_outlined,
-                    [
-                      Semantics(
-                        identifier: 'font-select',
-                        child: SettingsFieldLabel(
-                          label: l.font,
-                          child: DropdownButtonFormField<String>(
-                            key: ValueKey(
-                              'font-${settings.font}-${fontFile?.name}',
-                            ),
-                            initialValue: fonts.contains(settings.font)
-                                ? settings.font
-                                : null,
-                            isExpanded: true,
-                            items: fonts
-                                .map(
-                                  (f) => DropdownMenuItem(
-                                    value: f,
-                                    child: Text(
-                                      f,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: locked
-                                ? null
-                                : (value) {
-                                    onSelectFont(value);
-                                  },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      FilledButton.tonalIcon(
-                        onPressed: locked ? null : onUploadFont,
-                        icon: const Icon(Icons.upload),
-                        label: Text(
-                          fontFile?.name ?? l.uploadFont,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (fontFile != null)
-                        TextButton(
-                          onPressed: locked ? null : onRemoveFont,
-                          child: Text(l.remove),
-                        ),
-                      const SizedBox(height: 10),
-                      SettingsFieldLabel(
-                        label: l.latinFont,
+                  section('font', l.fontChoices, Icons.font_download_outlined, [
+                    Semantics(
+                      identifier: 'font-select',
+                      child: SettingsFieldLabel(
+                        label: l.font,
                         child: DropdownButtonFormField<String>(
-                          key: ValueKey('latin-font-$settingsRevision'),
+                          key: ValueKey(
+                            'font-${settings.font}-${fontFile?.name}',
+                          ),
+                          hint: Text(l.chooseBundledFont),
+                          initialValue:
+                              fontFile == null && fonts.contains(settings.font)
+                              ? settings.font
+                              : null,
                           isExpanded: true,
-                          initialValue: settings.latinFont ?? '',
-                          items: [
-                            DropdownMenuItem(
-                              value: '',
-                              child: Text(l.inheritLatinFont),
-                            ),
-                            for (final entry in latinFonts.entries)
-                              DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(
-                                  entry.value,
-                                  overflow: TextOverflow.ellipsis,
+                          items: fonts
+                              .map(
+                                (f) => DropdownMenuItem(
+                                  value: f,
+                                  child: Text(
+                                    f,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                          ],
+                              )
+                              .toList(),
                           onChanged: locked
                               ? null
                               : (value) {
-                                  settings.latinFont = value == ''
-                                      ? null
-                                      : value;
-                                  onEdited();
+                                  onSelectFont(value);
                                 },
                         ),
                       ),
-                      NumericSlider(
-                        label: l.latinFontScale,
-                        id: 'latin-font-scale',
-                        value: settings.latinScale.toDouble(),
-                        parameter: latinScaleParameter,
-                        unit: '%',
+                    ),
+                    const SizedBox(height: 6),
+                    if (fontFile != null)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.font_download_outlined),
+                        title: Text(
+                          fontFile!.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          tooltip: l.remove,
+                          onPressed: locked ? null : onRemoveFont,
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
+                    if (onBrowseLocalFonts != null)
+                      FilledButton.tonalIcon(
+                        onPressed: locked ? null : onBrowseLocalFonts,
+                        icon: const Icon(Icons.font_download_outlined),
+                        label: Text(l.localFonts),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: locked ? null : onUploadFont,
+                      icon: const Icon(Icons.file_open_outlined),
+                      label: Text(l.importFontFile),
+                    ),
+                    const SizedBox(height: 10),
+                    SettingsFieldLabel(
+                      label: l.latinFont,
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('latin-font-$settingsRevision'),
+                        isExpanded: true,
+                        initialValue: settings.latinFont ?? '',
+                        items: [
+                          DropdownMenuItem(
+                            value: '',
+                            child: Text(l.inheritLatinFont),
+                          ),
+                          for (final entry in latinFonts.entries)
+                            DropdownMenuItem(
+                              value: entry.key,
+                              child: Text(
+                                entry.value,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
                         onChanged: locked
                             ? null
                             : (value) {
-                                settings.latinScale = value.round();
+                                settings.latinFont = value == '' ? null : value;
                                 onEdited();
                               },
                       ),
-                      settingSwitch(
-                        l.digitsLatin,
-                        settings.latinDigits,
-                        (value) => settings.latinDigits = value,
-                      ),
-                      if (activeSection == null)
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: InkColorControl(
-                            key: const ValueKey('settings-ink-color'),
-                            color: Color(settings.inkLook.color),
-                            onChanged: locked ? null : onColorSelected,
-                          ),
+                    ),
+                    NumericSlider(
+                      label: l.latinFontScale,
+                      id: 'latin-font-scale',
+                      value: settings.latinScale.toDouble(),
+                      parameter: latinScaleParameter,
+                      unit: '%',
+                      onChanged: locked
+                          ? null
+                          : (value) {
+                              settings.latinScale = value.round();
+                              onEdited();
+                            },
+                    ),
+                    settingSwitch(
+                      l.digitsLatin,
+                      settings.latinDigits,
+                      (value) => settings.latinDigits = value,
+                    ),
+                    if (activeSection == null)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: InkColorControl(
+                          key: const ValueKey('settings-ink-color'),
+                          color: Color(settings.inkLook.color),
+                          onChanged: locked ? null : onColorSelected,
                         ),
-                    ],
-                    collapsible: false,
-                  ),
+                      ),
+                  ], collapsible: false),
                   section('layout', l.layoutPreset, Icons.space_bar, [
                     LayoutBuilder(
                       builder: (context, constraints) =>
@@ -527,19 +535,18 @@ class WorkbenchSettings extends StatelessWidget {
     bool value,
     ValueChanged<bool> change, {
     IconData? icon,
-  }) =>
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(title),
-        secondary: icon == null ? null : Icon(icon),
-        value: value,
-        onChanged: locked
-            ? null
-            : (next) {
-                change(next);
-                onEdited();
-              },
-      );
+  }) => SwitchListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(title),
+    secondary: icon == null ? null : Icon(icon),
+    value: value,
+    onChanged: locked
+        ? null
+        : (next) {
+            change(next);
+            onEdited();
+          },
+  );
 
   Widget parameterGrid(
     BuildContext context,
