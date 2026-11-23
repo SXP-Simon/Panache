@@ -279,3 +279,113 @@ fn fine_edit_moves_one_homework_character_and_exports_the_same_pages() {
     request.params.fine_edits.as_mut().unwrap().key = "0".repeat(64);
     assert_eq!(before, page_images(&request));
 }
+
+#[test]
+fn photo_camera_tags_and_manual_fallback_survive_page_exports() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use exif::{Field, In, Reader, Tag, Value, experimental::Writer};
+    use image::ImageEncoder;
+    let mut source = Cursor::new(vec![]);
+    let mut writer = Writer::new();
+    let fields = [
+        (Tag::Model, Value::Ascii(vec![b"Source phone".to_vec()])),
+        (Tag::ExposureTime, Value::Rational(vec![(1, 125).into()])),
+        (Tag::Orientation, Value::Short(vec![6])),
+        (
+            Tag::BodySerialNumber,
+            Value::Ascii(vec![b"private serial".to_vec()]),
+        ),
+        (Tag::GPSLongitudeRef, Value::Ascii(vec![b"E".to_vec()])),
+    ]
+    .map(|(tag, value)| Field {
+        tag,
+        value,
+        ifd_num: In::PRIMARY,
+    });
+    for f in &fields {
+        writer.push_field(f);
+    }
+    writer.write(&mut source, false).unwrap();
+    let mut jpeg = Vec::new();
+    let mut encoder = image::codecs::jpeg::JpegEncoder::new(&mut jpeg);
+    encoder.set_exif_metadata(source.into_inner()).unwrap();
+    encoder
+        .encode_image(&image::RgbImage::from_pixel(180, 240, image::Rgb([240; 3])))
+        .unwrap();
+
+    let mut req = request("hello\n---\nworld");
+    req.background = Some(jpeg);
+    req.params.preview = false;
+    req.params.camera.camera_model = Some("Ignored model".into());
+    req.params.camera.camera_iso = Some(400);
+    let cancel = Cancellation::default();
+    let mut pages = vec![];
+    generation::generate(
+        &req,
+        &cancel,
+        Output::Preview(&mut |_, page| {
+            pages.push(page);
+            Ok(())
+        }),
+        |_| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(pages.len(), 2);
+    let verify = |exif: exif::Exif| {
+        let field = |tag| &exif.get_field(tag, In::PRIMARY).unwrap().value;
+        assert!(matches!(field(Tag::Model), Value::Ascii(v) if v[0] == b"Source phone"));
+        assert_eq!(field(Tag::PhotographicSensitivity).get_uint(0), Some(400));
+        assert!(
+            matches!(field(Tag::ExposureTime), Value::Rational(v) if (v[0].num, v[0].denom) == (1, 125))
+        );
+        assert!(
+            matches!(field(Tag::ImageDescription), Value::Ascii(v) if v[0].ends_with(b"User supplied: ISO."))
+        );
+        for tag in [
+            Tag::Orientation,
+            Tag::GPSLongitudeRef,
+            Tag::BodySerialNumber,
+        ] {
+            assert!(exif.get_field(tag, In::PRIMARY).is_none());
+        }
+    };
+    let mut zip = Cursor::new(vec![]);
+    generation::generate(&req, &cancel, Output::Zip(&mut zip), |_| Ok(())).unwrap();
+    let mut zip = zip::ZipArchive::new(zip).unwrap();
+    for (index, page) in pages.iter().enumerate() {
+        verify(
+            Reader::new()
+                .read_from_container(&mut Cursor::new(page))
+                .unwrap(),
+        );
+        let mut archived = vec![];
+        zip.by_index(index)
+            .unwrap()
+            .read_to_end(&mut archived)
+            .unwrap();
+        assert_eq!(&archived, page);
+    }
+    let mut pdf = vec![];
+    generation::generate(&req, &cancel, Output::Pdf(&mut pdf), |_| Ok(())).unwrap();
+    let pdf = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf.contains("/Subject")
+            && pdf.contains("Source phone")
+            && pdf.contains("User supplied: ISO.")
+    );
+    req.params.ink_layers = true;
+    generation::generate(
+        &req,
+        &cancel,
+        Output::InkLayers(&mut |_, page| {
+            verify(
+                Reader::new()
+                    .read_raw(STANDARD.decode(page.camera_exif.unwrap()).unwrap())
+                    .unwrap(),
+            );
+            Ok(())
+        }),
+        |_| Ok(()),
+    )
+    .unwrap();
+}

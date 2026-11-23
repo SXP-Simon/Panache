@@ -83,6 +83,41 @@ class WorkbenchSettings extends StatelessWidget {
   final ValueChanged<SettingsSection>? onSectionChanged;
   final Widget? inkControls;
 
+  Widget _paperCamera(AppLocalizations l) => ExpansionTile(
+    title: Text(l.paperCamera),
+    children: [
+      Text(l.paperCameraHint),
+      for (final field in [
+        ('camera_make', l.cameraMake),
+        ('camera_model', l.cameraModel),
+        ('camera_lens', l.cameraLens),
+        ('camera_iso', 'ISO'),
+      ])
+        TextFormField(
+          key: ValueKey('${field.$1}-$settingsRevision'),
+          initialValue: settings.camera[field.$1] ?? '',
+          enabled: !locked,
+          maxLength: field.$1 == 'camera_iso' ? 5 : 96,
+          keyboardType: field.$1 == 'camera_iso'
+              ? TextInputType.number
+              : TextInputType.text,
+          decoration: InputDecoration(labelText: field.$2),
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          validator: (value) => Settings.validCameraValue(field.$1, value ?? '')
+              ? null
+              : l.cameraValueHint,
+          onChanged: (s) {
+            if (s.isEmpty) {
+              settings.camera.remove(field.$1);
+            } else {
+              settings.camera[field.$1] = s;
+            }
+            onEdited();
+          },
+        ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -374,6 +409,7 @@ class WorkbenchSettings extends StatelessWidget {
                             ),
                           ],
                         ),
+                      _paperCamera(l),
                     ],
                     collapsible: false,
                   ),

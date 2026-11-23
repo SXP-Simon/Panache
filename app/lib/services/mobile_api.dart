@@ -54,6 +54,28 @@ class MobileHandwritingApi extends HandwritingApi {
   @override
   bool get usesMobilePaperLimits => true;
 
+  @override
+  Future<Uint8List?> readPaperExif(Upload file) async {
+    // This separate import reads metadata only. Rendering still uses the 16 MiB limit.
+    const sourceLimit = 64 * 1024 * 1024;
+    final source = file.bytes.length <= sourceLimit
+        ? file
+        : Upload(
+            'paper-header',
+            Uint8List.sublistView(file.bytes, 0, 512 * 1024),
+          );
+    final paths = await stage({'file': source}, byteLimit: sourceLimit);
+    try {
+      final value = await call('paper_camera', files: paths) as String;
+      return value.isEmpty ? null : base64Decode(value);
+    } on ApiException catch (e) {
+      if (e.code == 'invalid_command') return null;
+      rethrow;
+    } finally {
+      await removeUploads(paths);
+    }
+  }
+
   static Future<MobileHandwritingApi> bundled() async {
     final root = await getTemporaryDirectory();
     final directory = Directory('${root.path}/handwriting-engine');
@@ -144,14 +166,17 @@ class MobileHandwritingApi extends HandwritingApi {
     return response['data'];
   }
 
-  Future<Map<String, dynamic>> stage(Map<String, Upload> uploads) async {
+  Future<Map<String, dynamic>> stage(
+    Map<String, Upload> uploads, {
+    int byteLimit = mobileImageBytes,
+  }) async {
     final parent = await Directory('$dataDirectory/uploads')
         .create(recursive: true);
     final directory = await parent.createTemp('request-');
     final paths = <String, dynamic>{};
     try {
       for (final entry in uploads.entries) {
-        if (entry.value.bytes.length > mobileImageBytes) {
+        if (entry.value.bytes.length > byteLimit) {
           throw ApiException('文件超过移动端限制 / File exceeds mobile limit');
         }
         final path = '${directory.path}/${paths.length}.bin';

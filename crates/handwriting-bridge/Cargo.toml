@@ -6,6 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
+base64 = "0.23.1"
 handwriting-core.workspace = true
 serde.workspace = true
 serde_json = "1"
@@ -15,6 +16,5 @@ fontdue = "0.9.4"
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [dev-dependencies]
-base64 = "0.23.1"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 tempfile = "3.27.0"

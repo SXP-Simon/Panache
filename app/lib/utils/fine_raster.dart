@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'paper_exif.dart';
+
 import '../models/fine_edit.dart';
 import '../models/fine_transform.dart';
 import '../models/ink_page.dart';
@@ -309,7 +311,7 @@ Future<Uint8List> compositeFinePage(
 ) async {
   final raster = await FineRaster.decode(page);
   try {
-    return await raster.png(edits, look);
+    return withPaperExif(await raster.png(edits, look), page.cameraExif);
   } finally {
     raster.dispose();
   }

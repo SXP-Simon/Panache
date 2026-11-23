@@ -146,13 +146,14 @@ impl Engine {
             return Ok((hit.png.clone(), true));
         }
         let mut background = draft.background()?;
+        let camera = draft.camera(background.as_deref())?;
         let photo = Self::photo(draft, &mut background)?;
         let request = self.request(draft, section, background, edits)?;
         let mut image = None;
         let pages =
             Self::render_pages(&request, photo.as_ref(), cancel, page_number, |i, page| {
                 if i + 1 == page_number {
-                    image = Some(STANDARD.encode(export::png(&page)?));
+                    image = Some(STANDARD.encode(camera.png(&page)?));
                 }
                 Ok(())
             })?;
@@ -438,6 +439,7 @@ impl Engine {
         let mut temp = NamedTempFile::new_in(dir)?;
         let mut count = 0;
         let mut background = draft.background()?;
+        let camera = draft.camera(background.as_deref())?;
         let photo = Self::photo(draft, &mut background)?;
         let render_sections = |emit: &mut PageSink<'_>| -> Result<()> {
             for section in sections {
@@ -460,12 +462,12 @@ impl Engine {
             Format::Pdf => {
                 let mut pdf = export::PdfExport::lossless();
                 render_sections(&mut |_, page| pdf.add(page))?;
-                temp.write_all(&pdf.finish())?;
+                temp.write_all(&pdf.finish_with_camera(&camera))?;
                 "pdf"
             }
             Format::Zip => {
                 let mut zip = export::ZipExport::new(temp.as_file_mut());
-                render_sections(&mut |i, page| zip.add(i, page))?;
+                render_sections(&mut |i, page| zip.add_with_camera(i, page, &camera))?;
                 zip.finish()?;
                 "zip"
             }

@@ -26,6 +26,11 @@ pub fn merge(current: &Changes, patch: &Changes, fonts: &[String]) -> Result<Cha
             continue;
         }
         let valid = match spec["type"].as_str() {
+            Some("string") => value.as_str().is_some_and(|s| {
+                !s.trim().is_empty()
+                    && s.len() <= spec["maxLength"].as_u64().unwrap() as usize
+                    && s.bytes().all(|b| (b' '..=b'~').contains(&b))
+            }),
             Some("boolean") => value.is_boolean(),
             Some("choice") => spec["values"].as_array().unwrap().contains(value),
             Some("font") => fonts.iter().any(|f| value.as_str() == Some(f.as_str())),

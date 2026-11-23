@@ -32,6 +32,7 @@ class HandwritingApi {
   final String base;
   final String accessToken;
   bool get usesMobilePaperLimits => false;
+  Future<Uint8List?> readPaperExif(Upload file) async => null;
   Map<String, String> get headers =>
       accessToken.isEmpty ? const {} : {'Authorization': 'Bearer $accessToken'};
   final http.Client client;

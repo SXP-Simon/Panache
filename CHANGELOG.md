@@ -1,6 +1,9 @@
 # Panache 更新记录
 
 ## 未发布
+[拍摄设备信息]: website/content/zh/guide/preview-export.md
+
+- 图片和 PDF 导出保留底纸的相机与曝光信息，App 和 MCP 可补录缺少的机型、镜头和 ISO。[拍摄设备信息]
 
 ## v1.19.0 (2026-11-22)
 

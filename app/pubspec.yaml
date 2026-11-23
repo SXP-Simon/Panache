@@ -17,6 +17,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   web: ^1.1.1
   http: ^1.6.0
+  archive: ^4.5.2
   ffi: ^2.1.4
   handwriting_assets:
     path: ../assets

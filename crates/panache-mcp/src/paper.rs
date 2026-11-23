@@ -170,7 +170,7 @@ impl ImportedPaper {
         } else {
             let detected = match mode {
                 PaperMode::Photo => imaging::identify_photo(&image),
-                PaperMode::Flatten => imaging::identify(&image),
+                PaperMode::Flatten => imaging::identify_paper(&image, &bytes),
             };
             match detected {
                 Ok(mut lines) => {

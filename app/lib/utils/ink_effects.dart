@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'paper_exif.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/ink_page.dart';
@@ -146,9 +148,10 @@ Future<Uint8List> compositeInkPage(InkPage page, InkLook look) async {
       try {
         final rendered = await picture.toImage(paper.width, paper.height);
         try {
-          return (await rendered.toByteData(format: ui.ImageByteFormat.png))!
-              .buffer
-              .asUint8List();
+          final png = (await rendered.toByteData(
+            format: ui.ImageByteFormat.png,
+          ))!;
+          return withPaperExif(Uint8List.sublistView(png), page.cameraExif);
         } finally {
           rendered.dispose();
         }

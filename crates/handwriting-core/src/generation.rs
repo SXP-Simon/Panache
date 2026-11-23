@@ -20,6 +20,8 @@ pub enum Output<'a> {
 pub struct EncodedInkPage {
     pub paper: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub camera_exif: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ink: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fine: Option<fine_edit::EncodedFinePage>,
@@ -42,11 +44,13 @@ pub fn generate(
     cancel.check()?;
     progress(Event::Rendering)?;
     cancel.check()?;
+    let camera =
+        export::CameraMetadata::from_paper(request.background.as_deref(), &request.params.camera)?;
     match output {
         Output::Preview(emit) => {
             render::render(request, cancel, |index, image| {
                 cancel.check()?;
-                let bytes = export::png(&image)?;
+                let bytes = camera.png(&image)?;
                 cancel.check()?;
                 emit(index, bytes)?;
                 progress(Event::PageReady(index + 1))?;
@@ -80,7 +84,16 @@ pub fn generate(
                             )?),
                         ),
                     };
-                emit(index, EncodedInkPage { paper, ink, fine })?;
+                emit(
+                    index,
+                    EncodedInkPage {
+                        paper,
+                        ink,
+                        fine,
+                        camera_exif: (!camera.exif().is_empty())
+                            .then(|| STANDARD.encode(camera.exif())),
+                    },
+                )?;
                 progress(Event::PageReady(index + 1))?;
                 cancel.check()
             })?;
@@ -100,14 +113,14 @@ pub fn generate(
             progress(Event::Exporting)?;
             cancel.check()?;
             writer
-                .write_all(&pdf.finish())
+                .write_all(&pdf.finish_with_camera(&camera))
                 .map_err(|e| Error::new("storage_failed", e.to_string()))?;
         }
         Output::Zip(writer) => {
             let mut zip = export::ZipExport::new(writer);
             render::render(request, cancel, |index, image| {
                 cancel.check()?;
-                zip.add(index, &image)?;
+                zip.add_with_camera(index, &image, &camera)?;
                 progress(Event::PageReady(index + 1))?;
                 cancel.check()
             })?;

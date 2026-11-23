@@ -166,6 +166,27 @@ class Settings {
   final Map<String, String> values = {
     for (final p in [...parameters, ...inkParameters]) p.key: '${p.value}',
   };
+  static const cameraKeys = [
+    'camera_make',
+    'camera_model',
+    'camera_lens',
+    'camera_iso',
+  ];
+  final Map<String, String> camera = {};
+  static bool validCameraValue(String key, String value) {
+    if (value.isEmpty) return true;
+    if (key == 'camera_iso') {
+      final n = int.tryParse(value);
+      return RegExp(r'^[0-9]+$').hasMatch(value) &&
+          n != null &&
+          n >= 1 &&
+          n <= 65535;
+    }
+    return value.trim().isNotEmpty &&
+        value.length <= 96 &&
+        !RegExp(r'[^ -~]').hasMatch(value);
+  }
+
   bool strikethroughEnabled = false;
   String fill = '(0, 0, 0, 255)';
   String layoutStyle = 'standard';
@@ -211,6 +232,7 @@ class Settings {
 
   Map<String, dynamic> toJson() => {
     ...values,
+    ...camera,
     'fill': fill,
     'layoutStyle': layoutStyle,
     'font_option': font,
@@ -232,6 +254,11 @@ class Settings {
       for (final entry in legacyFields.entries)
         if (json.containsKey(entry.key)) entry.value: json[entry.key],
     };
+    camera.clear();
+    for (final key in cameraKeys) {
+      final value = json[key]?.toString() ?? '';
+      if (value.isNotEmpty && validCameraValue(key, value)) camera[key] = value;
+    }
     for (final p in [...parameters, ...inkParameters]) {
       final value = num.tryParse('${json[p.key]}');
       if (value != null &&
@@ -278,6 +305,7 @@ class Settings {
   }
 
   bool get valid =>
+      camera.entries.every((e) => validCameraValue(e.key, e.value)) &&
       parameters.every((p) => p.accepts(values[p.key])) &&
       num.parse(values['left_margin']!) + num.parse(values['right_margin']!) <
           num.parse(values['width']!) &&
@@ -290,6 +318,7 @@ class Settings {
     required bool pdf,
   }) => {
     ...values,
+    ...camera,
     if (!strikethroughEnabled) 'strikethrough_probability': '0',
     'text': text,
     'fill': fill,

@@ -56,7 +56,11 @@ class WorkspaceDocuments {
   Future<bool> setPaperBackground(Upload file) async {
     final api = workspace.api;
     final paper = api.usesMobilePaperLimits
-        ? (await preparePaperBackground(file, mobile: true)).file
+        ? (await preparePaperBackground(
+            file,
+            mobile: true,
+            readPaperExif: api.readPaperExif,
+          )).file
         : file;
     if (workspace.disposed || !identical(workspace.api, api)) return false;
     workspace.background = paper;
@@ -124,6 +128,7 @@ class WorkspaceDocuments {
       final prepared = await preparePaperBackground(
         Upload('aligned-paper.png', bytes),
         mobile: api.usesMobilePaperLimits,
+        readPaperExif: api.readPaperExif,
         correctedSize: (width: width, height: height),
       );
       if (prepared.width != width || prepared.height != height) {

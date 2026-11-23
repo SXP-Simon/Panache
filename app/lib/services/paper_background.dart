@@ -1,5 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:typed_data';
+
+import '../utils/paper_exif.dart';
 
 import 'api.dart';
 
@@ -10,6 +13,7 @@ const mobilePaperPixels = 12000000;
 Future<({Upload file, int width, int height})> preparePaperBackground(
   Upload file, {
   required bool mobile,
+  Future<Uint8List?> Function(Upload)? readPaperExif,
   ({int width, int height})? correctedSize,
 }) async {
   final buffer = await ui.ImmutableBuffer.fromUint8List(file.bytes);
@@ -44,6 +48,7 @@ Future<({Upload file, int width, int height})> preparePaperBackground(
       if (!resize && correctedSize == null) {
         return (file: file, width: width, height: height);
       }
+      final exif = resize ? await readPaperExif?.call(file) : null;
       Future<({Upload file, int width, int height})?> decode(
         double scale,
       ) async {
@@ -57,14 +62,17 @@ Future<({Upload file, int width, int height})> preparePaperBackground(
           try {
             if (!resize) return (file: file, width: width, height: height);
             final png = await image.toByteData(format: ui.ImageByteFormat.png);
-            if (png == null || png.lengthInBytes > mobileImageBytes) {
+            if (png == null ||
+                png.lengthInBytes +
+                        (exif == null || exif.isEmpty ? 0 : exif.length + 12) >
+                    mobileImageBytes) {
               return null;
             }
             final stem = file.name.replaceFirst(RegExp(r'\.[^.]+$'), '');
             return (
               file: Upload(
                 '$stem.png',
-                png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+                withPaperExif(Uint8List.sublistView(png), exif),
               ),
               width: image.width,
               height: image.height,

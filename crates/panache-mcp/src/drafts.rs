@@ -14,19 +14,27 @@ pub struct Snapshot<'a> {
     pub style: Style,
     pub controls: crate::controls::Changes,
     pub settings_revision: u32,
+    layout_revision: u32,
     pub id: &'a str,
     pub paper: Option<PaperLayout>,
     drafts: &'a Drafts,
 }
 
 impl Snapshot<'_> {
+    pub fn camera(&self, paper: Option<&[u8]>) -> Result<handwriting_core::export::CameraMetadata> {
+        let input = serde_json::from_value(Value::Object(self.controls.clone()))?;
+        Ok(handwriting_core::export::CameraMetadata::from_paper(
+            paper, &input,
+        )?)
+    }
+
     pub fn edits(
         &self,
         section: &Section,
     ) -> Result<(u32, Option<handwriting_core::fine_edit::Adjustments>)> {
         let row:Option<(u32,String)>=self.drafts.connect()?.query_row(
             "SELECT revision,edits FROM glyph_edits WHERE draft=?1 AND section=?2 AND source_revision=?3 AND settings_revision=?4 AND revision<=?5 ORDER BY revision DESC LIMIT 1",
-            params![self.id,section.number,section.version,self.settings_revision,self.revision],
+            params![self.id,section.number,section.version,self.layout_revision,self.revision],
             |r|Ok((r.get(0)?,r.get(1)?))).optional()?;
         match row {
             Some((rev, json)) => Ok((rev, Some(serde_json::from_str(&json)?))),
@@ -49,7 +57,7 @@ impl Snapshot<'_> {
                 self.id,
                 section,
                 version,
-                self.settings_revision,
+                self.layout_revision,
                 next,
                 serde_json::to_string(edits)?
             ],
@@ -95,6 +103,10 @@ impl Drafts {
             CREATE TABLE IF NOT EXISTS settings (
                 draft TEXT NOT NULL REFERENCES drafts(id), revision INTEGER NOT NULL,
                 controls TEXT NOT NULL, PRIMARY KEY(draft,revision)
+            );
+            CREATE TABLE IF NOT EXISTS camera_revisions (
+                draft TEXT NOT NULL REFERENCES drafts(id), revision INTEGER NOT NULL,
+                layout_revision INTEGER NOT NULL, PRIMARY KEY(draft, revision)
             );
             CREATE TABLE IF NOT EXISTS sections (
                 draft TEXT NOT NULL REFERENCES drafts(id), number INTEGER NOT NULL,
@@ -214,16 +226,24 @@ impl Drafts {
             (1..=latest).contains(&revision),
             "Unknown revision (latest: {latest})"
         );
-        let settings: Option<(u32,String)> = self.connect()?.query_row(
-            "SELECT revision,controls FROM settings WHERE draft=?1 AND revision<=?2 ORDER BY revision DESC LIMIT 1",
-            params![id,revision], |r| Ok((r.get(0)?,r.get(1)?))).optional()?;
-        let (settings_revision, controls) = match settings {
-            Some((r, s)) => (r, serde_json::from_str(&s)?),
-            None => (0, crate::controls::Changes::new()),
+        let settings: Option<(u32, u32, String)> = self
+            .connect()?
+            .query_row(
+                "SELECT s.revision,COALESCE(c.layout_revision,s.revision),s.controls
+             FROM settings s LEFT JOIN camera_revisions c USING(draft,revision)
+             WHERE s.draft=?1 AND s.revision<=?2 ORDER BY s.revision DESC LIMIT 1",
+                params![id, revision],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?;
+        let (settings_revision, layout_revision, controls) = match settings {
+            Some((r, layout, s)) => (r, layout, serde_json::from_str(&s)?),
+            None => (0, 0, crate::controls::Changes::new()),
         };
         Ok(Snapshot {
             controls,
             settings_revision,
+            layout_revision,
             id,
             drafts: self,
             paper: layout.as_deref().map(serde_json::from_str).transpose()?,
@@ -233,17 +253,23 @@ impl Drafts {
     }
     pub fn tune(
         &self,
-        id: &str,
-        expected: u32,
+        draft: &Snapshot<'_>,
         controls: &crate::controls::Changes,
+        camera_only: bool,
     ) -> Result<u32> {
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let next = Self::advance(&tx, id, expected)?;
+        let next = Self::advance(&tx, draft.id, draft.revision)?;
         tx.execute(
             "INSERT INTO settings VALUES (?1,?2,?3)",
-            params![id, next, serde_json::to_string(controls)?],
+            params![draft.id, next, serde_json::to_string(controls)?],
         )?;
+        if camera_only {
+            tx.execute(
+                "INSERT INTO camera_revisions VALUES (?1,?2,?3)",
+                params![draft.id, next, draft.layout_revision],
+            )?;
+        }
         tx.commit()?;
         Ok(next)
     }
