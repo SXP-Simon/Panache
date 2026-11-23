@@ -186,8 +186,8 @@ pub(super) fn normalize(source: &str) -> Option<String> {
     while s.starts_with('{') && s.ends_with('}') {
         s = s[1..s.len() - 1].trim();
     }
-    if s.starts_with('$') && s.ends_with('$') {
-        s = &s[1..s.len() - 1];
+    if let Some(inner) = s.strip_prefix('$').and_then(|rest| rest.strip_suffix('$')) {
+        s = inner;
     } else if s.starts_with("\\(") && s.ends_with("\\)") {
         s = &s[2..s.len() - 2];
     }
@@ -211,4 +211,28 @@ pub(super) fn normalize(source: &str) -> Option<String> {
     };
     let value = result.split_whitespace().collect::<Vec<_>>().join(" ");
     if value.is_empty() { None } else { Some(value) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize;
+
+    #[test]
+    fn empty_and_incomplete_math_labels_are_rejected() {
+        for label in ["$", "{ $ }", "$$", "$Ω", "Ω$"] {
+            assert_eq!(normalize(label), None, "{label}");
+        }
+    }
+
+    #[test]
+    fn math_delimiters_preserve_label_contents_and_argument_parsing() {
+        for (label, expected) in [
+            ("Ω", "Ω"),
+            ("{$Ω_1$}", "Ω_(1)"),
+            (r"\(Ω_1\)", "Ω_(1)"),
+            ("Ω_$", "Ω_($)"),
+        ] {
+            assert_eq!(normalize(label).as_deref(), Some(expected), "{label}");
+        }
+    }
 }
