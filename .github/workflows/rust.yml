@@ -1,4 +1,6 @@
 name: Rust 后端
+run-name: >-
+  ${{ github.event_name == 'pull_request' && format('PR #{0} · base {1}', github.event.pull_request.number, github.event.pull_request.base.sha) || github.workflow }}
 on:
   pull_request:
     paths:
@@ -7,31 +9,36 @@ on:
       - "scripts/build-text-worker.py"
       - "scripts/tests/test_web_build_version.py"
       - "crates/**"
-      - "!crates/README.md"
-      - "!crates/*/README.md"
-      - "!crates/panache-mcp/tool-design.md"
       - "Cargo.toml"
       - "Cargo.lock"
       - "app/**"
-      - "!app/README.md"
-      - "!app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md"
       - "scripts/*release*.*"
-      - "!scripts/*release*.md"
       - "scripts/tests/test-flutter-release.cjs"
       - ".github/workflows/publish_flutter.yml"
       - "vendor/**"
-      - "!vendor/**/README.md"
-      - "!vendor/**/CHANGELOG.md"
-      - "!vendor/**/docs/**/*.md"
-      - "assets/font_assets/**"
-      - "assets/licenses/**"
       - "LICENSE"
       - "scripts/build-rust-service.sh"
       - "deploy/rust/**"
+      - ".github/scripts/markdown-update*.cjs"
+      - ".github/workflows/markdown-update.yml"
       - ".github/workflows/rust.yml"
+      - "!**/*.md"
+      - "assets/licenses/**"
+      - "assets/font_assets/**"
+      - "crates/*/licenses/**"
+      - "deploy/rust/README.md"
   workflow_dispatch:
 jobs:
+  markdown-update:
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/markdown-update.yml
+    with:
+      workflow: rust.yml
   verify:
+    needs: markdown-update
+    if: ${{ !cancelled() && needs.markdown-update.outputs.skip != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -49,6 +56,8 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo build --locked --release -p handwriting-server
   flutter-integration:
+    needs: markdown-update
+    if: ${{ !cancelled() && needs.markdown-update.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
