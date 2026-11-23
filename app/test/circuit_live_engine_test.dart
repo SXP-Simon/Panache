@@ -9,6 +9,8 @@ import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/latex.dart';
 import 'package:handwriting_app/utils/text_tools.dart';
 
+import 'support/desktop_backend_executable.dart';
+
 // Record the multipart contract while sending every request to the real API.
 // This catches edits or serialization between the editor and native engine.
 class _RecordingApi extends HandwritingApi {
@@ -42,7 +44,7 @@ void main() {
       try {
         final api = _RecordingApi(
           await backend.start(
-            executable: executable,
+            executable: await prepareBackendExecutable(executable, directory),
             dataDirectory: directory.path,
           ),
         );
