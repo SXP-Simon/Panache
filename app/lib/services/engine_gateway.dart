@@ -1,17 +1,9 @@
 import 'dart:typed_data';
 
+import '../models/task_phase.dart';
 import 'api.dart';
 
-enum TaskPhase {
-  pending,
-  processing,
-  cancelling,
-  completed,
-  failed,
-  cancelled;
-
-  bool get terminal => this == completed || this == failed || this == cancelled;
-}
+export '../models/task_phase.dart';
 
 /// Owns the submitted values, including upload bytes, across asynchronous work.
 class GenerationRequest {
@@ -45,9 +37,7 @@ class EngineTask {
 
   factory EngineTask.fromJson(Map<String, dynamic> data) {
     final value = data['task_status'] ?? data['status'];
-    final phase = value == 'error'
-        ? TaskPhase.failed
-        : TaskPhase.values.where((phase) => phase.name == value).firstOrNull;
+    final phase = TaskPhase.fromWire(value);
     if (phase == null) throw ApiException('Unknown task status: $value');
     return EngineTask(
       phase: phase,

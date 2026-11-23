@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/engine_failure.dart';
+import '../models/task_phase.dart';
 
 class Upload {
   const Upload(this.name, this.bytes);
@@ -186,7 +187,7 @@ class HandwritingApi {
     while (true) {
       final data = await status(id);
       final phase = data['task_status'] ?? data['status'];
-      if (['completed', 'failed', 'error', 'cancelled'].contains(phase)) return;
+      if (TaskPhase.fromWire(phase)?.terminal == true) return;
       if (DateTime.now().isAfter(deadline)) {
         throw TimeoutException('Task cancellation has not been confirmed');
       }

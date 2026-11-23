@@ -9,9 +9,17 @@ import '../services/engine_gateway.dart';
 class _GenerationOperation {
   _GenerationOperation(this.engine);
   final EngineGateway engine;
-  final submitted = Completer<String?>();
+  final _submitted = Completer<String?>();
   bool cancelled = false;
   Future<void>? stopping;
+
+  // Both user cancellation and shutdown must wait for the original engine's
+  // identity. A locally reserved ID is usable before submission completes.
+  void resolveId(String? id) {
+    if (!_submitted.isCompleted) _submitted.complete(id);
+  }
+
+  Future<String?> get id => _submitted.future;
 }
 
 /// Task state owns engine operations; it has no navigation or editor controllers.
@@ -53,26 +61,15 @@ class GenerationViewModel extends ChangeNotifier {
     bool current() =>
         !disposed && generation == _generation && !operation.cancelled;
     var succeeded = false;
-    busy = true;
-    taskId = '';
-    error = '';
-    errorCode = null;
-    queueWaitSeconds = null;
-    progress = 0;
-    phase = 'pending';
-    stage = 'preparing';
-    pagesCompleted = 0;
-    emit();
+    _begin();
     try {
       final requestedId = engine.createTaskId();
       if (requestedId != null) {
         taskId = requestedId;
-        operation.submitted.complete(requestedId);
+        operation.resolveId(requestedId);
       }
       final submittedId = await engine.submit(request, taskId: requestedId);
-      if (!operation.submitted.isCompleted) {
-        operation.submitted.complete(submittedId);
-      }
+      operation.resolveId(submittedId);
       if (!current()) return false;
       taskId = submittedId;
       await onSubmitted?.call();
@@ -81,22 +78,7 @@ class GenerationViewModel extends ChangeNotifier {
       while (current()) {
         final task = await engine.status(submittedId);
         if (!current()) return false;
-        phase = task.phase.name;
-        progress = task.progress;
-        stage = task.stage ?? '';
-        pagesCompleted = task.pagesCompleted;
-        emit();
-        if (task.phase == TaskPhase.failed ||
-            task.phase == TaskPhase.cancelled) {
-          throw EngineFailure(
-            task.errorMessage ?? 'Task failed',
-            code: task.errorCode,
-          );
-        }
-        if (task.phase == TaskPhase.completed) break;
-        if (DateTime.now().isAfter(deadline)) {
-          throw TimeoutException('Task timed out');
-        }
+        if (_publishStatus(task, deadline)) break;
         await Future<void>.delayed(const Duration(seconds: 2));
       }
       if (!current()) return false;
@@ -104,16 +86,12 @@ class GenerationViewModel extends ChangeNotifier {
         if (acceptPreview?.call() == false) return false;
         final rendered = await engine.preview(submittedId);
         if (!current() || acceptPreview?.call() == false) return false;
-        inkPages = rendered.map(InkPage.fromPacket).toList(growable: false);
-        pages = [
-          for (var i = 0; i < rendered.length; i++)
-            inkPages[i]?.paper ?? rendered[i],
-        ];
-        previewRevision = revision;
-        previewTaskId = submittedId;
-        page = acceptPreview == null || pages.isEmpty
-            ? 0
-            : page.clamp(0, pages.length - 1);
+        _publishPreview(
+          rendered,
+          submittedId,
+          revision,
+          keepPage: acceptPreview != null,
+        );
       } else {
         final bytes = await engine.export(submittedId);
         if (!current()) return false;
@@ -124,22 +102,13 @@ class GenerationViewModel extends ChangeNotifier {
       succeeded = true;
     } on EngineFailure catch (e) {
       if (!current()) return false;
-      error = e.message;
-      errorCode = e.code;
-      queueWaitSeconds = e.retryAfterSeconds;
-      if (e.retryAfterSeconds != null) {
-        retryAt = DateTime.now().add(Duration(seconds: e.retryAfterSeconds!));
-      }
+      _publishFailure(e);
     } catch (e) {
       if (!current()) return false;
       error = '$e';
     } finally {
-      if (!operation.submitted.isCompleted) operation.submitted.complete(null);
-      if (!succeeded &&
-          current() &&
-          taskId.isNotEmpty &&
-          engine.supportsCancel &&
-          !['completed', 'failed', 'error', 'cancelled'].contains(phase)) {
+      operation.resolveId(null);
+      if (!succeeded && current() && _needsStop(engine)) {
         final failure = error;
         await cancel();
         if (!disposed && !busy) {
@@ -156,6 +125,68 @@ class GenerationViewModel extends ChangeNotifier {
     return current() && succeeded;
   }
 
+  void _begin() {
+    busy = true;
+    taskId = '';
+    error = '';
+    errorCode = null;
+    queueWaitSeconds = null;
+    progress = 0;
+    phase = 'pending';
+    stage = 'preparing';
+    pagesCompleted = 0;
+    emit();
+  }
+
+  bool _publishStatus(EngineTask task, DateTime deadline) {
+    phase = task.phase.name;
+    progress = task.progress;
+    stage = task.stage ?? '';
+    pagesCompleted = task.pagesCompleted;
+    emit();
+    if (task.phase == TaskPhase.failed || task.phase == TaskPhase.cancelled) {
+      throw EngineFailure(
+        task.errorMessage ?? 'Task failed',
+        code: task.errorCode,
+      );
+    }
+    if (task.phase == TaskPhase.completed) return true;
+    if (DateTime.now().isAfter(deadline)) {
+      throw TimeoutException('Task timed out');
+    }
+    return false;
+  }
+
+  void _publishPreview(
+    List<Uint8List> rendered,
+    String id,
+    int revision, {
+    required bool keepPage,
+  }) {
+    inkPages = rendered.map(InkPage.fromPacket).toList(growable: false);
+    pages = [
+      for (var i = 0; i < rendered.length; i++)
+        inkPages[i]?.paper ?? rendered[i],
+    ];
+    previewRevision = revision;
+    previewTaskId = id;
+    page = !keepPage || pages.isEmpty ? 0 : page.clamp(0, pages.length - 1);
+  }
+
+  void _publishFailure(EngineFailure e) {
+    error = e.message;
+    errorCode = e.code;
+    queueWaitSeconds = e.retryAfterSeconds;
+    if (e.retryAfterSeconds != null) {
+      retryAt = DateTime.now().add(Duration(seconds: e.retryAfterSeconds!));
+    }
+  }
+
+  bool _needsStop(EngineGateway engine) =>
+      taskId.isNotEmpty &&
+      engine.supportsCancel &&
+      TaskPhase.fromWire(phase)?.terminal != true;
+
   Future<void> cancel() {
     final operation = _operation;
     if (!busy ||
@@ -170,7 +201,7 @@ class GenerationViewModel extends ChangeNotifier {
     error = '';
     final stopped = () async {
       try {
-        final id = await operation.submitted.future;
+        final id = await operation.id;
         if (id != null) await operation.engine.cancel(id);
         if (disposed || !identical(operation, _operation)) return;
         ++_generation;
@@ -203,7 +234,7 @@ class GenerationViewModel extends ChangeNotifier {
       operation.cancelled = true;
       unawaited(() async {
         try {
-          final id = await operation.submitted.future;
+          final id = await operation.id;
           if (id != null) await operation.engine.cancel(id);
         } catch (_) {
           // Shutdown cannot publish a new UI error.
