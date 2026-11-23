@@ -53,8 +53,8 @@ struct Collector<'a> {
     visibility: Visibility,
 }
 
-fn show(operator: &str) -> bool {
-    matches!(operator, "Tj" | "TJ" | "'" | "\"")
+fn shows_text(operator: &[u8]) -> bool {
+    matches!(operator, b"Tj" | b"TJ" | b"'" | b"\"")
 }
 
 pub(super) fn extract(
@@ -96,76 +96,9 @@ pub(super) fn extract(
         visibility: Visibility::new(target.height()),
     };
     // 2026-11-23：直接文字指令独立标记。嵌套表单、批注和不支持的字形仍由原 PDF 绘制。
-    let mut original = page.operations();
-    let mut has_inline_image = false;
-    let mut has_text = false;
-    let mut operators = 0usize;
-    while let Some(op) = original.next() {
-        operators += 1;
-        if operators > 200_000 {
-            return Err(Error::new("archive_limit", "PDF 页面绘图指令过多"));
-        }
-        let name: &[u8] = op.operator;
-        has_inline_image |= name == b"BI";
-        has_text |= matches!(name, b"Tj" | b"TJ" | b"'" | b"\"");
-    }
-    let mut content = if has_text && !has_inline_image {
-        Content::decode(stream).ok()
-    } else {
-        None
-    };
+    let content = checked_content(page, stream)?;
     if let Some(parsed) = content.as_ref() {
-        // 2026-11-23：两种解析器必须读到相同的指令，才允许重写页面内容。
-        let mut original = page.operations();
-        if !parsed.operations.iter().all(|op| {
-            original
-                .next()
-                .is_some_and(|raw| &**raw.operator == op.operator.as_bytes())
-        }) || original.next().is_some()
-        {
-            content = None;
-        }
-    }
-    if let Some(parsed) = content.as_ref() {
-        let mut marked = Vec::new();
-        let mut mode = 0;
-        let mut saved = Vec::new();
-        for (index, op) in parsed.operations.iter().enumerate() {
-            match op.operator.as_str() {
-                "Tr" => {
-                    mode = op
-                        .operands
-                        .first()
-                        .and_then(|o| o.as_i64().ok())
-                        .unwrap_or(-1)
-                }
-                "q" => saved.push(mode),
-                "Q" => mode = saved.pop().unwrap_or(0),
-                _ => {}
-            }
-            if show(&op.operator) && matches!(mode, 0 | 1) {
-                let number = device.candidates.len();
-                device.candidates.push(Candidate {
-                    index,
-                    mode,
-                    lines: Vec::new(),
-                    supported: true,
-                });
-                marked.push(Operation::new(
-                    "BMC",
-                    vec![Object::Name(
-                        format!("{}{number}", device.marker_prefix).into_bytes(),
-                    )],
-                ));
-                marked.push(op.clone());
-                marked.push(Operation::new("EMC", vec![]));
-            } else {
-                marked.push(op.clone());
-            }
-        }
-        let annotated = Content { operations: marked }
-            .encode()
-            .map_err(|e| Error::new("invalid_document", e.to_string()))?;
+        let annotated = mark_candidates(parsed, &device.marker_prefix, &mut device.candidates)?;
         interpret(
             TypedIter::new(&annotated),
             page.resources(),
@@ -197,42 +130,124 @@ pub(super) fn extract(
         return Err(Error::new("text_limit", "PDF 页面文字过长"));
     }
     let mut lines = Vec::new();
-    let mut background = None;
-    let mut accepted = device
-        .candidates
-        .into_iter()
-        .filter(|c| c.supported && !c.lines.is_empty())
-        .peekable();
-    if accepted.peek().is_some()
-        && let Some(content) = content
-    {
-        let mut output = Vec::new();
-        for (index, op) in content.operations.into_iter().enumerate() {
-            if accepted.peek().is_some_and(|c| c.index == index) {
-                let item = accepted.next().unwrap();
-                for line in item.lines {
-                    append(&mut lines, line);
-                }
-                // 2026-11-23：让字形不可见但保留原字距、推进量和文字状态。
-                output.push(Operation::new("Tr", vec![3.into()]));
-                output.push(op);
-                output.push(Operation::new("Tr", vec![item.mode.into()]));
-            } else {
-                output.push(op);
-            }
-        }
-        background = Some(
-            Content { operations: output }
-                .encode()
-                .map_err(|e| Error::new("invalid_document", e.to_string()))?,
-        );
-    }
+    let background = if let Some(content) = content {
+        rewrite_background(content, device.candidates, &mut lines)?
+    } else {
+        None
+    };
     lines.retain(|line| !line.text.trim().is_empty());
     Ok(Extraction {
         lines,
         background,
         unsupported: device.unsupported,
     })
+}
+
+fn checked_content(page: &Page<'_>, stream: &[u8]) -> Result<Option<Content>> {
+    let mut original = page.operations();
+    let mut has_inline_image = false;
+    let mut has_text = false;
+    let mut operators = 0usize;
+    while let Some(op) = original.next() {
+        operators += 1;
+        if operators > 200_000 {
+            return Err(Error::new("archive_limit", "PDF 页面绘图指令过多"));
+        }
+        let name: &[u8] = op.operator;
+        has_inline_image |= name == b"BI";
+        has_text |= shows_text(name);
+    }
+    if !has_text || has_inline_image {
+        return Ok(None);
+    }
+    let Ok(parsed) = Content::decode(stream) else {
+        return Ok(None);
+    };
+    // 两种解析器必须读到相同的指令，才允许重写页面内容。
+    let mut original = page.operations();
+    let same_operators = parsed.operations.iter().all(|op| {
+        original
+            .next()
+            .is_some_and(|raw| &**raw.operator == op.operator.as_bytes())
+    }) && original.next().is_none();
+    Ok(same_operators.then_some(parsed))
+}
+
+fn mark_candidates(
+    parsed: &Content,
+    prefix: &str,
+    candidates: &mut Vec<Candidate>,
+) -> Result<Vec<u8>> {
+    let mut marked = Vec::with_capacity(parsed.operations.len());
+    let mut mode = 0;
+    let mut saved = Vec::new();
+    for (index, op) in parsed.operations.iter().enumerate() {
+        match op.operator.as_str() {
+            "Tr" => {
+                mode = op
+                    .operands
+                    .first()
+                    .and_then(|o| o.as_i64().ok())
+                    .unwrap_or(-1)
+            }
+            "q" => saved.push(mode),
+            "Q" => mode = saved.pop().unwrap_or(0),
+            _ => {}
+        }
+        if shows_text(op.operator.as_bytes()) && matches!(mode, 0 | 1) {
+            let number = candidates.len();
+            candidates.push(Candidate {
+                index,
+                mode,
+                lines: Vec::new(),
+                supported: true,
+            });
+            marked.push(Operation::new(
+                "BMC",
+                vec![Object::Name(format!("{prefix}{number}").into_bytes())],
+            ));
+            marked.push(op.clone());
+            marked.push(Operation::new("EMC", vec![]));
+        } else {
+            marked.push(op.clone());
+        }
+    }
+    encode_operations(marked)
+}
+
+fn rewrite_background(
+    content: Content,
+    candidates: Vec<Candidate>,
+    lines: &mut Vec<TextLine>,
+) -> Result<Option<Vec<u8>>> {
+    let mut accepted = candidates
+        .into_iter()
+        .filter(|c| c.supported && !c.lines.is_empty())
+        .peekable();
+    if accepted.peek().is_none() {
+        return Ok(None);
+    }
+    let mut output = Vec::new();
+    for (index, op) in content.operations.into_iter().enumerate() {
+        if let Some(item) = accepted.next_if(|candidate| candidate.index == index) {
+            for line in item.lines {
+                append(lines, line);
+            }
+            // 2026-11-23：让字形不可见但保留原字距、推进量和文字状态。
+            output.push(Operation::new("Tr", vec![3.into()]));
+            output.push(op);
+            output.push(Operation::new("Tr", vec![item.mode.into()]));
+        } else {
+            output.push(op);
+        }
+    }
+    encode_operations(output).map(Some)
+}
+
+fn encode_operations(operations: Vec<Operation>) -> Result<Vec<u8>> {
+    Content { operations }
+        .encode()
+        .map_err(|e| Error::new("invalid_document", e.to_string()))
 }
 
 fn append(lines: &mut Vec<TextLine>, next: TextLine) {
