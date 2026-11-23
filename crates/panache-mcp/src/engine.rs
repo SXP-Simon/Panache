@@ -255,7 +255,8 @@ impl Engine {
         section: Section,
         page: usize,
         cancel: &Cancellation,
-    ) -> Result<Vec<[f32; 2]>> {
+    ) -> Result<crate::review::PageSample> {
+        let source_revision = section.version;
         let req = self.fine_request(draft, section)?;
         let (_, glyphs) = fine_edit::inspect_page(&req, page, cancel)?;
         let edits = req
@@ -270,7 +271,21 @@ impl Engine {
             })
             .unwrap_or_default();
         let stride = glyphs.len().div_ceil(384).max(1);
-        Ok(glyphs
+        // Bind page membership to the immutable section text and all layout units, not just the measurement sample.
+        use sha2::{Digest, Sha256};
+        let mut membership = Sha256::new();
+        membership.update(source_revision.to_le_bytes());
+        for glyph in &glyphs {
+            membership.update(glyph.id.to_le_bytes());
+            membership.update(
+                glyph
+                    .source_utf16
+                    .unwrap_or([u32::MAX; 2])
+                    .map(u32::to_le_bytes)
+                    .concat(),
+            );
+        }
+        let baselines = glyphs
             .iter()
             .filter(|g| g.illustration.is_none())
             .step_by(stride)
@@ -281,7 +296,11 @@ impl Engine {
                     glyph_point(g, edits.get(&g.id).copied(), [0., dy]),
                 )
             })
-            .collect())
+            .collect();
+        Ok(crate::review::PageSample {
+            baselines,
+            content_sha256: format!("{:x}", membership.finalize()),
+        })
     }
 
     pub fn layout(

@@ -75,12 +75,17 @@ fn ruling_offset(paper: &RgbaImage, point: [f32; 2], radius: i32) -> Option<i32>
     (best.0 >= 7 * 8).then_some(best.2)
 }
 
+pub struct PageSample {
+    pub baselines: Vec<[f32; 2]>,
+    pub content_sha256: String,
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
     page: usize,
     png: &str,
-    baselines: &[[f32; 2]],
+    sample: &PageSample,
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
@@ -91,6 +96,13 @@ pub fn page(
     };
     let mut finished = imaging::decode(&bytes, &limits)?.into_rgba8();
     drop(bytes);
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    hash.update(finished.width().to_le_bytes());
+    hash.update(finished.height().to_le_bytes());
+    hash.update(finished.as_raw());
+    let pixel_digest = format!("{:x}", hash.finalize());
+    let baselines = &sample.baselines;
     let paper = match draft.background()? {
         Some(b) => imaging::decode(&b, &Limits::default())?.into_rgba8(),
         None => handwriting_core::render::preset_paper(
@@ -225,6 +237,8 @@ pub fn page(
         .collect::<Vec<_>>();
     let evidence = json!({
         "visibility":status,
+        "photo_size":[w,h],
+        "global_ink":{"rgba":params.fill,"opacity":params.ink_opacity,"thickness":params.ink_thickness,"softness":params.ink_softness,"depth_sigma":params.ink_depth_sigma},
         "alignment":draft.paper.as_ref().map(|p|p.summary()["alignment"].clone()),
         "baseline_samples":baselines.len(),
         "nearby_dark_ridge_by_image_third":band_alignment,
@@ -234,7 +248,14 @@ pub fn page(
         "changed_pixels_outside_reference":outside,
         "transparent_png":params.transparent_background,
     });
-    draft.record_review(section, page, &evidence)?;
+    let observation = draft.record_review(
+        section,
+        page,
+        "paper-review/1",
+        &pixel_digest,
+        &sample.content_sha256,
+        &evidence,
+    )?;
     let next = if peak == 0 {
         "If this page should contain text, check ink opacity/color, local edits and off-page placement. Review the new revision."
     } else if outside > 0 || draft.paper.as_ref().is_some_and(|p| !p.ruled) {
@@ -242,7 +263,13 @@ pub fn page(
     } else {
         "Compare the upper, middle and lower writing with the saved paper. Check header clearance, contrast, focus and letter size. Ask the user if the desired appearance is unclear."
     };
-    let metadata = json!({"draft_id":draft.id,"revision":draft.revision,"section":section,"page":page,"photo_size":[w,h],"thumbnail_size":[result.width(),result.height()],"evidence":evidence,"next_step":next});
+    let metadata = {
+        let mut metadata = observation;
+        metadata["photo_size"] = json!([w, h]);
+        metadata["thumbnail_size"] = json!([result.width(), result.height()]);
+        metadata["next_step"] = json!(next);
+        metadata
+    };
     let mut response = reply(
         format!(
             "{metadata}\nOrange = estimated writing area; cyan = projected layout guides. Baseline offsets sample nearby dark ridges on unmarked paper (null = no supported sample); a decoration can also form a ridge. Transparent PNG is shown on its paper for comparison."

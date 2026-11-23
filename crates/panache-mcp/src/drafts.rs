@@ -1,3 +1,4 @@
+mod observations;
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
@@ -21,16 +22,6 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
-    pub fn record_review(&self, section: u32, page: usize, evidence: &Value) -> Result<()> {
-        self.drafts
-            .record_review(self.id, self.revision, section, page, evidence)
-    }
-
-    pub fn review_counts(&self) -> Result<(u32, u32)> {
-        Ok(self.drafts.connect()?.query_row(
-            "SELECT count(*),count(CASE WHEN json_extract(evidence,'$.visibility') IN ('no_visible_change','very_low_contrast') THEN 1 END) FROM page_reviews WHERE draft=? AND revision=?",
-            params![self.id,self.revision], |r|Ok((r.get(0)?,r.get(1)?)))?)
-    }
     pub fn has_font(&self, handle: &str) -> Result<bool> {
         Ok(self.drafts.connect()?.query_row(
             "SELECT EXISTS(SELECT 1 FROM draft_fonts WHERE draft=? AND handle=?)",
@@ -155,15 +146,12 @@ impl Drafts {
                 draft TEXT NOT NULL, revision INTEGER NOT NULL, details TEXT NOT NULL,
                 PRIMARY KEY(draft,revision)
             );
-            CREATE TABLE IF NOT EXISTS page_reviews (
-                draft TEXT NOT NULL, revision INTEGER NOT NULL, section INTEGER NOT NULL,
-                page INTEGER NOT NULL, evidence TEXT NOT NULL, PRIMARY KEY(draft,revision,section,page)
-            );
             CREATE TABLE IF NOT EXISTS papers (
                 draft TEXT PRIMARY KEY REFERENCES drafts(id), layout TEXT NOT NULL, image BLOB NOT NULL
             );
         ",
         )?;
+        observations::initialize(&mut drafts.connect()?)?;
         Ok(drafts)
     }
     fn connect(&self) -> Result<Connection> {
@@ -356,36 +344,25 @@ impl Drafts {
         );
         Ok(next)
     }
-    pub fn record_review(
-        &self,
-        id: &str,
-        rev: u32,
-        section: u32,
-        page: usize,
-        evidence: &Value,
-    ) -> Result<()> {
-        self.connect()?.execute(
-            "INSERT OR REPLACE INTO page_reviews VALUES(?,?,?,?,?)",
-            params![id, rev, section, u32::try_from(page)?, evidence.to_string()],
-        )?;
-        Ok(())
-    }
-
     pub fn trajectory(&self, id: &str, rev: u32, offset: u32, limit: u32) -> Result<Value> {
         ensure!((1..=50).contains(&limit), "Trajectory limit must be 1..50");
         let db = self.connect()?;
         let mut stmt=db.prepare(
-            "WITH events(revision,action,section,page,evidence) AS (
-              SELECT revision,'save_section',number,NULL,NULL FROM sections WHERE draft=?1
-              UNION ALL SELECT revision,'tune_handwriting',NULL,NULL,NULL FROM settings WHERE draft=?1
-              UNION ALL SELECT revision,'adjust_glyphs',section,NULL,NULL FROM glyph_edits WHERE draft=?1
-              UNION ALL SELECT revision,'page_review',section,page,evidence FROM page_reviews WHERE draft=?1
+            "WITH events(revision,action,section,page,evidence,review_id,origin,seq) AS (
+              SELECT revision,'save_section',number,NULL,NULL,NULL,'draft_edit',0 FROM sections WHERE draft=?1
+              UNION ALL SELECT revision,'tune_handwriting',NULL,NULL,NULL,NULL,'draft_edit',0 FROM settings WHERE draft=?1
+              UNION ALL SELECT revision,'adjust_glyphs',section,NULL,NULL,NULL,'draft_edit',0 FROM glyph_edits WHERE draft=?1
+              UNION ALL SELECT revision,'page_review',section,page,evidence,review_id,'measurement',seq
+                FROM review_observations WHERE draft=?1
+              UNION ALL SELECT o.revision,'review_feedback',o.section,o.page,json_object('text',f.note),
+                       o.review_id,f.origin,f.rowid FROM review_feedback f JOIN review_observations o USING(review_id)
+                WHERE o.draft=?1
             )
             SELECT e.revision,e.action,e.section,COALESCE(e.page,json_extract(n.details,'$.page')),
-                   COALESCE(e.evidence,n.details,'{}')
+                   COALESCE(e.evidence,n.details,'{}'),e.review_id,e.origin
             FROM events e LEFT JOIN edit_notes n ON n.draft=?1 AND n.revision=e.revision
             WHERE e.revision<=?2
-            ORDER BY e.revision DESC,(e.action='page_review') DESC,e.section,e.page
+            ORDER BY e.revision DESC,(e.action='review_feedback') DESC,(e.action='page_review') DESC,e.seq DESC,e.section,e.page
             LIMIT ?3 OFFSET ?4")?;
         let mut entries = Vec::new();
         let mut rows = stmt.query(params![id, rev, limit + 1, offset])?;
@@ -394,6 +371,7 @@ impl Drafts {
             entries.push(json!({
                 "revision":row.get::<_,u32>(0)?,
                 "action":row.get::<_,String>(1)?,
+                "review_id":row.get::<_,Option<String>>(5)?,"origin":row.get::<_,String>(6)?,
                 "section":row.get::<_,Option<u32>>(2)?,
                 "page":row.get::<_,Option<u32>>(3)?,
                 "details":serde_json::from_str::<Value>(&details)?,

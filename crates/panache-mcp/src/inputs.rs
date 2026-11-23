@@ -134,6 +134,7 @@ pub struct List {
 #[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadView {
+    Review,
     Trajectory,
     #[default]
     Excerpt,
@@ -144,6 +145,8 @@ pub enum ReadView {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Read {
+    /// With view=review, retrieve one immutable measurement and its attributed feedback.
+    pub review_id: Option<String>,
     /// Default excerpt omits inline image bytes; summary omits text; source reads exact Markdown.
     pub view: Option<ReadView>,
     pub draft_id: String,
@@ -211,6 +214,8 @@ pub struct Nudge {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// With view=review, compare stored evidence on this section/page with an earlier draft revision. Returns data only. Offset/limit paginate intervening edit actions.
+    pub compare_revision: Option<u32>,
     /// Layout only. Select glyph centers in this polygon (3..32 original image pixel pairs). Returned IDs can be adjusted together.
     pub region: Option<Vec<[i32; 2]>>,
     /// In layout view, only return illustration outlines and isolated details.
@@ -233,4 +238,22 @@ pub struct Export {
     pub draft_id: String,
     pub revision: Option<u32>,
     pub format: Option<Format>,
+}
+
+#[derive(Deserialize, JsonSchema, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackOrigin {
+    UserQuote,
+    ModelObservation,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewFeedback {
+    pub draft_id: String,
+    pub review_id: String,
+    /// user_quote is reserved for the user's actual words; use model_observation for your interpretation.
+    pub origin: FeedbackOrigin,
+    /// Short, page-specific feedback, up to 320 characters.
+    pub text: String,
 }

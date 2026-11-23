@@ -54,6 +54,7 @@ cargo build --locked --release -p panache-mcp
 | `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。 |
 | `describe_controls` | 先列参数组，再按 `group` 查看单位、范围和枚举值。附上 `draft_id` 和 `revision` 可读取该版的实际值。 |
 | `tune_handwriting` | 可在原稿上更新参考线、导入本机字体，并一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
+| `annotate_review` | 将用户原话或模型观察挂到指定复盘 ID，保持稿件版本号。 |
 | `adjust_glyphs` | 先用 `preview_handwriting(view="layout")` 取编号和坐标，再按同一节、页和版本调整选中字形。 |
 
 面向 AI 客户端的调用示例、披露边界和测量口径见[工具设计](tool-design.md)。
@@ -73,6 +74,20 @@ cargo build --locked --release -p panache-mcp
 5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。可锁定版本，用 `offset/limit` 向前翻。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
 
 `tune_handwriting(font_path=…)` 会把本机 TTF/OTF 随稿保存。可用返回的字体标识在同一稿内切回该字体。墨迹组的 `transparent_background` 控制原尺寸 PNG 预览和 ZIP，PDF 保留纸张。透明稿复盘会把墨迹放回底纸，方便判断实际可读性。
+
+### 比较两版，找回当时的依据
+
+先对要看的两个版本分别调用 `preview_handwriting(view="review", revision=…)`，记下返回的 `review_id`。用户明确表达偏好后，用 `annotate_review(draft_id, review_id, origin="user_quote", text=…)` 保存原话。模型自己的观察使用 `model_observation`。
+
+例如，比较第 1 节第 1 页的 v3 与 v4：
+
+```json
+{"draft_id":"…","view":"review","section":1,"page":1,"revision":4,"compare_revision":3}
+```
+
+该调用读取两版各自最近归档的该页复盘，返回测量、所引用的评语及其间全稿的编辑动作。差值为 v4 减 v3。先确认正文仍然可见，再结合每个区域的支持样本数解释偏差。全局墨色设置相同只说明参数一致，局部精修及肉眼观感还要另查。可用 `offset/limit` 翻阅编辑动作。某版缺复盘时，先查看所缺版本；算法不同、页面内容改变或尺寸不同时仅列两侧证据，保留比较限制。
+
+精确复查用 `read_section(view="review",draft_id=…,review_id=…)`，跨会话可用。要看图时再按版本取 `view="image"`。像素摘要用于核对重渲染结果，系统不为每次复盘归档整页图片。
 
 ## 验证
 

@@ -14,6 +14,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
+import review_comparison
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -111,6 +113,7 @@ async def smoke(command, arguments, out):
             assert info.serverInfo.name == "panache-mcp"
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
+                "annotate_review",
                 "list_fonts",
                 "describe_controls",
                 "tune_handwriting",
@@ -209,6 +212,7 @@ async def smoke(command, arguments, out):
                 "save_section", {"markdown": "missing", "paper_path": str(paper_path)}
             )
             assert failed.isError
+            comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
             poem = POEM.replace("，", "，\n")
             saved = (
@@ -297,6 +301,13 @@ async def smoke(command, arguments, out):
             )
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
             await client.initialize()
+            retrieved = (await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)).structuredContent
+            assert retrieved["revision"] == 3 and retrieved["section"] == retrieved["page"] == 1
+            assert retrieved["feedback"] == [{"origin":"user_quote","text":user_quote}]
+            assert (await call(client,"read_section",**comparison_key,view="summary")).structuredContent["revision"] == 6
+            events = (await call(client,"read_section",**comparison_key,view="trajectory",limit=50)).structuredContent["events"]
+            assert {e["origin"] for e in events} >= {"draft_edit","measurement","user_quote","model_observation"}
+            assert (await client.call_tool("read_section",{**gkey,"view":"review","review_id":reviewed_id})).isError
             assert png(await call(client, "preview_handwriting", **gkey, revision=6)) == imported_preview
             assert (await call(client, "list_drafts")).structuredContent["drafts"][0][
                 "draft_id"
