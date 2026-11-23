@@ -151,7 +151,7 @@ impl Panache {
         };
         let permit = self.0.prepare_slot.clone().acquire_owned().await?;
         let worker = self.0.worker.clone();
-        let saved = tokio::task::spawn_blocking({
+        let mut saved = tokio::task::spawn_blocking({
             let state = self.0.clone();
             move || -> Result<serde_json::Value> {
                 let _permit = permit;
@@ -186,12 +186,18 @@ impl Panache {
             }
         })
         .await??;
-        let message = format!(
+        let mut message = format!(
             "已保存稿件 `{}` 的第 {} 节，当前版本 **{}**。",
             saved["draft_id"].as_str().unwrap_or_default(),
             saved["section"],
             saved["revision"]
         );
+        if saved["paper"]["alignment"] == "unverified" {
+            let hint = "未识别到可靠横线。无横线纸和画作均可继续使用。若落字位置不明确，先问用户想写在哪一侧、是否方便圈出区域，或哪些图案要留白。已有指定区域或用户已委托选位时，可直接按意图在本稿排版；用 tune_handwriting 的 paper_guides 定位，再用 preview_handwriting 的 review 视图复查。";
+            saved["placement_guidance"] = json!(hint);
+            message.push('\n');
+            message.push_str(hint);
+        }
         Ok(reply(message, saved))
     }
 }
@@ -205,9 +211,11 @@ impl ServerHandler for Panache {
             .with_instructions(concat!(
                 "Start with save_section(markdown). Use its draft_id and revision for preview_handwriting or export_handwriting. ",
                 "Use list_fonts for names and list_drafts to resume. A paper_path must be readable on the server computer. ",
-                "For photo placement use preview_handwriting(view=review). Inspect the returned images when available. ",
+                "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
                 "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
-                "Ask for clarification on ambiguous regions. Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
+                "Unruled paper and artwork are supported. If placement is unclear ask where to write or what to keep clear; follow specified or delegated choices. ",
+                "Only suggest a clearer, flatter photo if visible blur, occlusion or perspective prevents the requested placement; identify the obstruction. ",
+                "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
                 "Review the edited revision. Use read_section(view=trajectory) to revisit actions and evidence."
             ))
     }
@@ -281,7 +289,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. For a special writing area ask the user for first/last writable baselines. Review the new revision before export."
+        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. Map the intended area onto first/last writable baselines even on artwork or unruled paper. Review the new revision before export."
     )]
     async fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
         let state = self.0.clone();

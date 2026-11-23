@@ -1,10 +1,14 @@
 """Page comparison through actual MCP calls, using a synthetic sloping ruled sheet."""
 
+import base64
+import io
 import sqlite3
 import struct
 import zlib
 from contextlib import closing
 from pathlib import Path
+
+from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 
 def slanted_sheet(path):
@@ -38,7 +42,67 @@ def slanted_sheet(path):
     ]
 
 
+async def unruled_artwork(client, directory, call):
+    path = directory / "unruled.png"
+    paper = Image.new("RGB", (1100, 640), "#eee5d8")
+    ImageDraw.Draw(paper).ellipse((830, 150, 1020, 480), fill="#ada7ba")
+    paper.save(path)
+    saved = await call(client, "save_section", markdown="春风又绿江南岸。", paper_path=str(path),
+                       style={"font_size": 34, "seed": 27})
+    key = {"draft_id": saved.structuredContent["draft_id"]}
+    assert saved.structuredContent["paper"]["alignment"] == "unverified"
+    assert "哪一侧" in saved.structuredContent["placement_guidance"]
+    assert "已委托选位" in saved.content[0].text
+    path.unlink()
+    # The user picks the left side, leaving the drawing on the right clear.
+    await call(client, "tune_handwriting", **key, expected_revision=1, paper_guides=[
+        {"row": 0, "left": [100, 180], "right": [650, 170]},
+        {"row": 5, "left": [70, 450], "right": [700, 440]},
+    ])
+    whole = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
+    appearance = whole["photo_appearance"]
+    args = appearance["preview_arguments"]
+    assert args["revision"] == 2 and args["draft_id"] == key["draft_id"]
+    assert "ink_softness" in appearance["controls"]
+    archived = await call(client, "read_section", **key, view="review", review_id=whole["review_id"])
+    assert "photo_appearance" not in archived.structuredContent["evidence"]
+    crop = await call(client, "preview_handwriting", **args)
+    x, y, w, h = crop.structuredContent["crop_bounds"]
+    assert crop.structuredContent["crop_image_size"] == [w, h] and max(w, h) <= 900
+    assert crop.structuredContent["after"]["region"]["ink_pixels"] > 0
+
+    def images(result):
+        return [Image.open(io.BytesIO(base64.b64decode(item.data))).convert("RGB")
+                for item in result.content if item.type == "image"]
+
+    base, finished = images(crop)
+    full = images(await call(client, "preview_handwriting", **key, revision=2))[0]
+    bounds = (x, y, x + w, y + h)
+    assert base.tobytes() == paper.crop(bounds).tobytes()
+    assert finished.tobytes() == full.crop(bounds).tobytes()
+    assert full.crop((800, 0, 1100, 640)).tobytes() == paper.crop((800, 0, 1100, 640)).tobytes()
+    for rev, change in [(2, {"ink_softness": 0.8}), (3, {"ink": "#843522"}), (4, {"ink_opacity": 70})]:
+        await call(client, "tune_handwriting", **key, expected_revision=rev, changes=change)
+        paired = await call(client, "preview_handwriting", **{**args, "revision": rev + 1},
+                            compare_revision=rev)
+        assert paired.structuredContent["difference"]["region_changed_pixels"] > 0, change
+        paper_crop, before, after = images(paired)
+        assert paper_crop.tobytes() == base.tobytes() and before.tobytes() == finished.tobytes()
+        old_delta = ImageChops.difference(base, before).convert("L")
+        new_delta = ImageChops.difference(base, after).convert("L")
+        if "ink_softness" in change:
+            # Feathered strokes reach more of the surrounding paper.
+            assert new_delta.histogram()[0] < old_delta.histogram()[0]
+        elif "ink" in change:
+            # Moving the pen toward brick red leaves more red in the finished crop.
+            assert ImageStat.Stat(after).sum[0] > ImageStat.Stat(before).sum[0]
+        else:
+            assert ImageStat.Stat(new_delta).sum[0] < ImageStat.Stat(old_delta).sum[0]
+        finished = after
+
+
 async def exercise(client, directory, call):
+    await unruled_artwork(client, directory, call)
     path = directory / "slanted.png"
     guides = slanted_sheet(path)
     shifted = [
@@ -150,7 +214,7 @@ async def exercise(client, directory, call):
     )
     await tune(4, changes={"ink_opacity": 0})
     assert "missing_after_review" in (await compare(4, 5))["comparison"]["limitations"]
-    await review(5)
+    assert "photo_appearance" in await review(5)
     invisible = (await compare(4, 5))["comparison"]["delta"]
     assert (
         invisible["visibility_after"] == "no_visible_change"
@@ -175,6 +239,8 @@ async def exercise(client, directory, call):
     await incompatible(key["draft_id"], 4, 6, "page_content_changed_or_repaginated")
     preset = (await call(client, "save_section", markdown="字", style={"seed": 13})).structuredContent
     preset_id = preset["draft_id"]
+    plain = await call(client, "preview_handwriting", draft_id=preset_id, view="review")
+    assert "photo_appearance" not in plain.structuredContent
     await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=1, changes={"paper": "grid"})
     await incompatible(preset_id, 1, 2, "different_reference_paper")
     await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=2, changes={"width": 800})

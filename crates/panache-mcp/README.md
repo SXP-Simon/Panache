@@ -94,13 +94,15 @@ cargo build --locked --release -p panache-mcp
 
 ## 照片排版与成品复盘
 
-1. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。图片最多长边 900 像素，像素坐标以返回的 `photo_size` 为准。需要看笔画细节时取原尺寸 `view="image"`。
-2. 上、中、下分别看字是否顺着实际横线、有没有盖住页眉，以及墨色和笔画锐度是否适合底纸。复盘附带像素对比和附近暗线的偏差。无横线或用户只说“放这边”时，把底纸或叠图展示给人，确认目标区域、首末行或四个角，再做修改。
+1. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。整页复查图长边最多 900 像素，像素坐标以返回的 `photo_size` 为准。检查有字区域的横线、页眉、页边和需要保留的图案。
+2. 无横线纸和画作均可排字。若位置不明确，先问“你想把字写在哪一侧？也可以圈一块区域，或指出要留白的图案”。用户已指定位置或委托选位时，可以直接排版给出预览。拍摄清楚、页边可辨的照片方便定位；只有失焦、遮挡或斜拍确实妨碍了本次要求时，才指出具体看不清的部分，建议换一张平整清晰的照片。
 3. 调用 `tune_handwriting(draft_id, expected_revision, paper_guides, note)` 在原照片上重排全文。至少给两条参考线，每条提供行号与左右端点。无横线纸也可以指定想写入的区域。传空数组恢复建稿时的校准。旧版本仍可回看；改写书写区域会重置冲突的边距覆盖，重新排版后需重新选字。
 4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和相同版本交给 `adjust_glyphs`。`place_center` 将一组字移到指定照片位置；`target_quad` 按左上、右上、右下、左下四角放置所选字块，替换该组已有几何调整。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
 5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。可锁定版本，用 `offset/limit` 向前翻。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
 
 要核对局部改动，用 `preview_handwriting(view="review", region=…, revision=新版本, compare_revision=旧版本)` 查看同一区域的底纸、改前和改后图。移动字块时还可用 `previous_region` 圈出旧位置。需要保护的文字或页眉可单独圈选复查。区域使用原尺寸成品像素。[局部坐标与测量示例](tool-design.md#局部改动的复查)
+
+如果字像贴在照片上，在照片整页复查的 `photo_appearance` 中取 `preview_arguments` 再调用一次 `preview_handwriting`。有页内文字基线样本时，这组参数会给出该版本一处字迹附近的原像素底纸和成品裁图；也可以自己圈选。对照邻近印字或横线的边缘清晰度、墨色深浅，再看字号与可写空间是否相称。用 `describe_controls` 指定稿件、版本和 `ink`、`layout` 或 `typography` 参数组可查当前值。正文的柔化和粗细以投影前纸面像素为单位，透明度用百分比。改一版后，对同一选区加入 `compare_revision` 比较。只有文字结果的客户端可转述测量，请用户看图判断观感。
 
 `tune_handwriting(font_path=…)` 会把本机 TTF/OTF 随稿保存。可用返回的字体标识在同一稿内切回该字体。墨迹组的 `transparent_background` 控制原尺寸 PNG 预览和 ZIP，PDF 保留纸张。透明稿复盘会把墨迹放回底纸，方便判断实际可读性。
 

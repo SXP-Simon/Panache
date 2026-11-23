@@ -82,6 +82,30 @@ pub struct PageSample {
     pub content_sha256: String,
 }
 
+// Suggest a crop around a sampled text line at native resolution, including neighboring paper.
+fn detail_region(
+    baselines: &[[f32; 2]],
+    (width, height): (u32, u32),
+    font_size: f32,
+) -> Option<[[u32; 2]; 4]> {
+    let on_page = |&&[x, y]: &&[f32; 2]| {
+        (0. ..width as f32).contains(&x) && (0. ..height as f32).contains(&y)
+    };
+    let mut points = baselines.iter().filter(on_page);
+    let middle = points.clone().count() / 2;
+    let &[x, y] = points.nth(middle)?;
+    let w = width.min((font_size * 10.).round().clamp(160., 800.) as u32);
+    let h = height.min((font_size * 4.).round().clamp(96., 480.) as u32);
+    let left = (x as u32).saturating_sub(w / 2).min(width - w);
+    let top = (y as u32).saturating_sub(h / 2).min(height - h);
+    Some([
+        [left, top],
+        [left + w, top],
+        [left + w, top + h],
+        [left, top + h],
+    ])
+}
+
 fn decode_page(png: &str) -> Result<RgbaImage> {
     let bytes = STANDARD.decode(png)?;
     let limits = Limits {
@@ -272,15 +296,29 @@ pub fn page(
     let next = if peak == 0 {
         "If this page should contain text, check ink opacity/color, local edits and off-page placement. Review the new revision."
     } else if outside > 0 || draft.paper.as_ref().is_some_and(|p| !p.ruled) {
-        "Confirm the intended writing area against the overlay. If ambiguous, show the user the image and ask which corners or first/last baselines to use."
+        "Check the overlay against the intended area. If placement is unclear, ask where to write (which side, a marked area, or what to keep clear). If the user specified the area or delegated placement, use that direction and review the result."
     } else {
-        "Compare the upper, middle and lower writing with the saved paper. Check header clearance, contrast, focus and letter size. Ask the user if the desired appearance is unclear."
+        "Compare writing across the occupied parts of the page with the saved paper. Check the requested position, header clearance, contrast, focus and letter size."
     };
     let metadata = {
         let mut metadata = observation;
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
+        if draft.paper.is_some() {
+            let mut appearance = json!({
+                "inspect":"Compare the strokes with nearby photographed marks for edge softness, contrast and size, and with the available writing space for letter size. Baseline offsets only measure placement. If images are unavailable, ask the user to inspect the crop before judging appearance.",
+                "controls":"describe_controls with draft_id, revision and group: ink (ink #RRGGBB, ink_opacity %, ink_softness and ink_thickness in paper-space px); layout (font_size in paper-space px); typography (font).",
+                "after_edit":"Review the edited revision. Use the same region with compare_revision for paper/before/after crops. If text reflowed onto different pages, inspect each revision separately."
+            });
+            if let Some(region) = detail_region(baselines, (w, h), params.font_size) {
+                appearance["preview_arguments"] = json!({
+                    "draft_id":draft.id,"revision":draft.revision,"section":section,"page":page,
+                    "view":"review","region":region
+                });
+            }
+            metadata["photo_appearance"] = appearance;
+        }
         metadata
     };
     let mut response = reply(
