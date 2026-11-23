@@ -752,6 +752,7 @@ dependencies = [
  "base64 0.23.1",
  "flate2",
  "fontdue",
+ "icu_properties",
  "image",
  "imageproc",
  "kamadak-exif",

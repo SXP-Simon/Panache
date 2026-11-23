@@ -1,19 +1,30 @@
 //! 2026-10-15：基底及其脚标是同一个换行单元，防止窄纸把化学价态/积分上下限单独放到下一行。
 use crate::Parameters;
 use crate::text::Node;
+use icu_properties::{CodePointMapData, props::Script};
 pub(super) fn closing_punctuation(c: char) -> bool {
     "，。；：！？、,.!?;:)]}）】〕〉》」』”’…".contains(c)
 }
 
-// Keep contractions and hyphenated words together while both neighbours are letters.
+fn latin_word_unit(unit: &[Node]) -> bool {
+    match unit {
+        [Node::Char(c)] => {
+            c.is_ascii_alphanumeric()
+                || (c.is_alphabetic() && CodePointMapData::<Script>::new().get(*c) == Script::Latin)
+        }
+        [Node::Accent(base, _)] => latin_word_unit(base),
+        _ => false,
+    }
+}
+
+// Join an apostrophe or hyphen only between word characters.
 fn word_part(units: &[&[Node]], i: usize) -> bool {
-    let alphanumeric = |unit: &[Node]| matches!(unit, [Node::Char(c)] if c.is_ascii_alphanumeric());
-    alphanumeric(units[i])
+    latin_word_unit(units[i])
         || (matches!(units[i], [Node::Char('\'' | '’' | '-')])
             && i > 0
             && i + 1 < units.len()
-            && alphanumeric(units[i - 1])
-            && alphanumeric(units[i + 1]))
+            && latin_word_unit(units[i - 1])
+            && latin_word_unit(units[i + 1]))
 }
 
 pub(super) fn starts_wrap_group(units: &[&[Node]], i: usize) -> bool {

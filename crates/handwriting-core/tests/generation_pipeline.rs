@@ -76,9 +76,37 @@ fn standard_wrap_keeps_words_and_closing_punctuation_with_their_neighbours() {
     assert_eq!(lines("中文 planet!", 140), ["中文", "planet!"]);
     assert_eq!(lines("12345 nice ,", 140), ["12345", "nice,"]);
     assert_eq!(lines("a              ,", 140), ["a,"]);
+    assert_eq!(lines("12345 café", 130), ["12345", "café"]);
+    assert_eq!(lines("12345 résumé", 140), ["12345", "résumé"]);
     assert_eq!(lines("prefix don't", 140), ["prefix", "don't"]);
     assert_eq!(lines("1234567890123456", 140), ["1234567890", "123456"]);
     assert_eq!(lines("end\n，start", 140), ["end", "，start"]);
+}
+
+#[test]
+fn first_word_reclaims_indent_only_if_needed_and_wrapped_words_start_at_the_margin() {
+    let layout = |text: &str, indent| {
+        let mut req = request(text);
+        req.params.width = Some(140);
+        req.params.monospaced = true;
+        req.params.first_line_indent = indent;
+        req.params.fine_edit = true;
+        fine_edit::inspect_page(&req, 1, &Cancellation::default())
+            .unwrap()
+            .1
+    };
+    let reference = layout("notebook", false);
+    let indented = layout("notebook", true);
+    assert_eq!(reference.len(), 8);
+    assert_eq!(indented.len(), reference.len());
+    for (a, b) in indented.iter().zip(reference) {
+        assert_eq!((a.baseline, a.bounds), (b.baseline, b.bounds));
+    }
+    assert!(layout("note", true)[0].bounds[0] > layout("note", false)[0].bounds[0]);
+    let wrapped = layout("12345 planet,", false);
+    let alone = layout("planet,", false);
+    assert!(wrapped[5].baseline > wrapped[0].baseline);
+    assert_eq!(wrapped[5].bounds[0], alone[0].bounds[0]);
 }
 
 #[test]

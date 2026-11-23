@@ -849,7 +849,9 @@ fn render_planes(
                         // A word wider than a fresh line falls back to character boundaries.
                         let fits = |at: usize| {
                             pages.line.get(at).is_some_and(|first| {
-                                at > 0
+                                // Reclaim an indented first word's offset before splitting it.
+                                let left = p.left_margin - first.glyph.left.min(0) as f32;
+                                (at > 0 || first.x as f32 > left.round())
                                     && x + footprint
                                         - first.x as f32
                                         - first.glyph.left.min(0) as f32
