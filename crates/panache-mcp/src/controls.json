@@ -1,9 +1,9 @@
 {
   "camera": {
-    "camera_make": {"type":"string","maxLength":96,"description":"Optional paper camera maker in printable ASCII. Source EXIF takes precedence."},
-    "camera_model": {"type":"string","maxLength":96,"description":"Optional paper camera model in printable ASCII."},
-    "camera_lens": {"type":"string","maxLength":96,"description":"Optional lens model in printable ASCII."},
-    "camera_iso": {"type":"integer","min":1,"max":65535,"unit":"ISO"}
+    "camera_make": {"type":"string","maxLength":96,"description":"Camera make for export metadata. Used when the paper has no valid EXIF make."},
+    "camera_model": {"type":"string","maxLength":96,"description":"Camera model for export metadata when missing from the paper EXIF."},
+    "camera_lens": {"type":"string","maxLength":96,"description":"Lens model for export metadata when missing from the paper EXIF. Use ink_softness in the ink group to soften strokes."},
+    "camera_iso": {"type":"integer","min":1,"max":65535,"unit":"ISO","description":"ISO for export metadata when missing from the paper EXIF. Ink appearance is controlled by the ink group."}
   },
   "layout": {
     "font_size": {"type":"number","min":1,"max":2048,"unit":"px"},

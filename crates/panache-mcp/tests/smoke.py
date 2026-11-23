@@ -491,6 +491,9 @@ async def smoke(command, arguments, out):
             assert camera_change.structuredContent["fine_layout"] == "preserved"
             tagged = png(await call(client, "preview_handwriting", draft_id=paper_id))
             assert b"eXIf" in tagged and b"Test Camera" in tagged and tagged != adjusted
+            with Image.open(io.BytesIO(adjusted)) as untagged, Image.open(io.BytesIO(tagged)) as with_exif:
+                assert untagged.size == with_exif.size
+                assert untagged.convert("RGBA").tobytes() == with_exif.convert("RGBA").tobytes()
             tagged_layout = (await call(client, "preview_handwriting", **probe)).structuredContent
             assert tagged_layout["glyphs"][0]["adjustment"] == again["adjustment"]
             cleared = await call(client, "tune_handwriting", draft_id=paper_id,
