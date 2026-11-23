@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <utility>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -18,12 +19,13 @@ bool FlutterWindow::OnCreate() {
 
   // The size here must match the window dimensions to avoid unnecessary surface
   // creation / destruction in the startup path.
-  flutter_controller_ = std::make_unique<flutter::FlutterViewController>(
+  auto controller = std::make_unique<flutter::FlutterViewController>(
       frame.right - frame.left, frame.bottom - frame.top, project_);
   // Ensure that basic setup of the controller was successful.
-  if (!flutter_controller_->engine() || !flutter_controller_->view()) {
+  if (!controller->engine() || !controller->view()) {
     return false;
   }
+  flutter_controller_ = std::move(controller);
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
@@ -61,10 +63,8 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     }
   }
 
-  switch (message) {
-    case WM_FONTCHANGE:
-      flutter_controller_->engine()->ReloadSystemFonts();
-      break;
+  if (message == WM_FONTCHANGE && flutter_controller_) {
+    flutter_controller_->engine()->ReloadSystemFonts();
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
