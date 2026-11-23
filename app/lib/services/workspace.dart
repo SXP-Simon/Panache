@@ -172,31 +172,7 @@ class Workspace extends ChangeNotifier {
     final saved = storage!.read('flutter.workspace');
     var restoreUploadedFont = false;
     if (saved != null && revision == _editRevision) {
-      try {
-        final data = jsonDecode(saved) as Map<String, dynamic>;
-        // Restore each valid field independently; one damaged field must not
-        // discard the user's otherwise readable draft.
-        if (data['text'] is String) text = data['text'] as String;
-        if (data['settings'] is Map<String, dynamic>) {
-          settings.restore(data['settings'] as Map<String, dynamic>);
-        }
-        restoreUploadedFont = data['uploadedFont'] == true;
-        if (data['images'] is Map) {
-          images = {
-            for (final entry in (data['images'] as Map).entries)
-              if (entry.key is String &&
-                  int.tryParse(entry.key as String) != null &&
-                  entry.value is String &&
-                  decodeImageData(entry.value as String) != null)
-                entry.key as String: entry.value as String,
-          };
-        }
-        if (data['fineEdits'] case final Map<String, dynamic> edits) {
-          if (_fineHistory.restore(text, edits)) fineEnabled = true;
-        }
-      } catch (_) {
-        /* Leave invalid drafts untouched until the next edit. */
-      }
+      restoreUploadedFont = _restoreSavedDraft(saved);
     }
     if (restoreUploadedFont) {
       final fontRevision = _fontRevision;
@@ -215,12 +191,7 @@ class Workspace extends ChangeNotifier {
     }
     if (disposed) return;
     if (saved == null && revision == _editRevision) {
-      final legacy = readLegacyDraft();
-      if (legacy.isNotEmpty) {
-        settings.restore(legacy);
-        text = collapseImages('${legacy['text'] ?? ''}', images);
-        legacyFontIndex = int.tryParse('${legacy['selectedOption']}');
-      }
+      _restoreLegacyDraft();
     }
     final base = storage!.read('flutter.api');
     if (base != null && base != api.base && !kIsWeb && !managedBackend) {
@@ -231,6 +202,42 @@ class Workspace extends ChangeNotifier {
     if (revision != _editRevision) await persist();
     emit();
     await connect();
+  }
+
+  /// Restores readable draft fields and reports whether the binary font needs loading.
+  bool _restoreSavedDraft(String saved) {
+    var restoreUploadedFont = false;
+    try {
+      final data = jsonDecode(saved) as Map<String, dynamic>;
+      if (data['text'] case final String draftText) text = draftText;
+      if (data['settings'] case final Map<String, dynamic> values) {
+        settings.restore(values);
+      }
+      restoreUploadedFont = data['uploadedFont'] == true;
+      if (data['images'] case final Map<String, dynamic> entries) {
+        images = {
+          for (final MapEntry(:key, :value) in entries.entries)
+            if (int.tryParse(key) != null &&
+                value is String &&
+                decodeImageData(value) != null)
+              key: value,
+        };
+      }
+      if (data['fineEdits'] case final Map<String, dynamic> edits) {
+        if (_fineHistory.restore(text, edits)) fineEnabled = true;
+      }
+    } catch (_) {
+      // Leave invalid drafts untouched until the next edit.
+    }
+    return restoreUploadedFont;
+  }
+
+  void _restoreLegacyDraft() {
+    final legacy = readLegacyDraft();
+    if (legacy.isEmpty) return;
+    settings.restore(legacy);
+    text = collapseImages('${legacy['text'] ?? ''}', images);
+    legacyFontIndex = int.tryParse('${legacy['selectedOption']}');
   }
 
   Future<void> connect() async {
