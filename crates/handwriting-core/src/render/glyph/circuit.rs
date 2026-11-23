@@ -240,6 +240,12 @@ fn pen_paths(paths: Vec<CircuitPath>, width: f32) -> Result<Option<Glyph>> {
                     let distance = (px - t * dx).hypot(py - t * dy);
                     let alpha =
                         ((reach - distance).clamp(0., diameter.min(1.)) * 255.).round() as u8;
+                    // 刚性图在 128 取墨；亚像素细笔的中心线也要能通过这个阈值。
+                    let alpha = if diameter < 1. && distance <= 0.5 {
+                        alpha.max(128)
+                    } else {
+                        alpha
+                    };
                     let value = &mut mask[((x - left) as u32, (y - top) as u32)][0];
                     *value = (*value).max(alpha);
                 }
@@ -566,6 +572,24 @@ mod tests {
                 .map(|y| ink.mask[((10 - ink.left) as u32, y)][0] as f32 / 255.)
                 .sum();
             assert!((coverage - width).abs() < 0.01, "{coverage} vs {width}");
+        }
+    }
+
+    #[test]
+    fn subpixel_wires_survive_the_page_ink_threshold() {
+        use imageproc::region_labelling::{Connectivity, connected_components};
+        for end in [(72, 31), (31, -72), (-72, -13), (-17, 72), (72, 0), (0, 72)] {
+            let wire = pen_paths(vec![(vec![(0, 0), end], Stroke::Pen)], 0.75)
+                .unwrap()
+                .unwrap();
+            let ink = GrayImage::from_fn(wire.mask.width(), wire.mask.height(), |x, y| {
+                Luma([u8::from(wire.mask[(x, y)][0] >= 128)])
+            });
+            let labels = connected_components(&ink, Connectivity::Eight, Luma([0]));
+            assert_eq!(labels.pixels().map(|p| p[0]).max(), Some(1), "{end:?}");
+            for (x, y) in [(0, 0), end] {
+                assert_eq!(ink[((x - wire.left) as u32, (y - wire.top) as u32)][0], 1);
+            }
         }
     }
 
