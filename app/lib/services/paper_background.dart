@@ -2,9 +2,9 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 
+import '../models/engine_failure.dart';
+import '../models/upload.dart';
 import '../utils/paper_exif.dart';
-
-import 'api.dart';
 
 const mobileImageBytes = 16 * 1024 * 1024;
 const mobilePaperPixels = 12000000;

@@ -3,7 +3,7 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
-import 'api.dart';
+import '../models/upload.dart';
 import 'uploaded_font_storage.dart';
 
 class FontStorage implements UploadedFontStorage {

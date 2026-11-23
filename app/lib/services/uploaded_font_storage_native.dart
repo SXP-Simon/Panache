@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import 'api.dart';
+import '../models/upload.dart';
 import 'uploaded_font_storage.dart';
 
 class FontStorage implements UploadedFontStorage {

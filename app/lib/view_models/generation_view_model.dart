@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/engine_failure.dart';
 import '../models/ink_page.dart';
-import '../services/engine_gateway.dart';
+import '../services/engine_contract.dart';
 
 class _GenerationOperation {
   _GenerationOperation(this.engine);

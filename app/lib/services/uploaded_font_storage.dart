@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'api.dart';
+import '../models/upload.dart';
 import 'uploaded_font_storage_native.dart'
     if (dart.library.js_interop) 'uploaded_font_storage_web.dart'
     as platform;

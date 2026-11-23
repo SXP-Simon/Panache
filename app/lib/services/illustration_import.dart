@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 
-import 'api.dart';
+import '../models/upload.dart';
 
 const maxIllustrationImportBytes = 12 * 1024 * 1024;
 

@@ -8,3 +8,10 @@ class EngineFailure implements Exception {
   @override
   String toString() => message;
 }
+
+class ApiException extends EngineFailure {
+  ApiException(super.message, {this.status, int? waitSeconds, super.code})
+    : super(retryAfterSeconds: waitSeconds);
+  final int? status;
+  int? get waitSeconds => retryAfterSeconds;
+}

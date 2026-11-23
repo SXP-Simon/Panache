@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../models/detected_paper_layout.dart';
+import '../models/upload.dart';
 import '../utils/text_tools.dart';
-import 'api.dart';
 import 'paper_background.dart';
 import 'workspace.dart';
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/settings.dart';
-import '../../services/api.dart';
+import '../../models/upload.dart';
 import '../paper_style_picker.dart';
 import 'settings_fields.dart';
 

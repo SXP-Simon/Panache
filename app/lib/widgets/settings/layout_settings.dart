@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/settings.dart';
-import '../../services/api.dart';
+import '../../models/upload.dart';
 import '../ink_color_control.dart';
 import '../ink_parameter_controls.dart';
 import 'settings_fields.dart';
