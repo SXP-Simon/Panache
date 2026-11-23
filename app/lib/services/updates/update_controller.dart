@@ -48,6 +48,7 @@ class UpdateController extends ChangeNotifier {
   DownloadCancellation? _cancellation;
   DesktopPreparedUpdate? _prepared;
   bool _restartIntent = false, _restartRunning = false;
+  bool get _restartRequested => _restartIntent && !_disposed;
   bool get desktopAutomatic => desktop && installed!.canRestartDesktop;
   bool get desktop =>
       installed != null &&
@@ -242,8 +243,7 @@ class UpdateController extends ChangeNotifier {
     _restartIntent = true;
     try {
       if (phase != UpdatePhase.ready) await download();
-      if (!_restartIntent ||
-          _disposed ||
+      if (!_restartRequested ||
           phase != UpdatePhase.ready ||
           _package == null ||
           release == null) {
@@ -265,40 +265,32 @@ class UpdateController extends ChangeNotifier {
         cancellation: preparingCancellation,
       );
       _prepared = prepared;
-      if (!_restartIntent || _disposed) {
-        await prepared.abort();
-        _prepared = null;
-        phase = UpdatePhase.ready;
-        return;
+      UpdateProblem? rollbackProblem;
+      if (_restartRequested) {
+        if (!await persist()) {
+          throw const UpdateException(UpdateProblem.saveFailed);
+        }
+        if (_restartRequested && canRestart()) {
+          prepared.arm();
+          phase = UpdatePhase.restarting;
+          _emit();
+          // An accepted exit leaves the armed helper waiting for process EOF.
+          if (await requestExit()) return;
+          rollbackProblem = UpdateProblem.restartCancelled;
+        } else {
+          rollbackProblem = UpdateProblem.restartDeferred;
+        }
       }
-      if (!await persist()) {
-        throw const UpdateException(UpdateProblem.saveFailed);
-      }
-      if (!_restartIntent || _disposed || !canRestart()) {
-        await prepared.abort();
-        _prepared = null;
-        phase = UpdatePhase.ready;
-        problem = UpdateProblem.restartDeferred;
-        return;
-      }
-      prepared.arm();
-      phase = UpdatePhase.restarting;
-      _emit();
-      if (!await requestExit()) {
-        await prepared.abort();
-        _prepared = null;
-        phase = UpdatePhase.ready;
-        problem = UpdateProblem.restartCancelled;
-      }
-    } on UpdateException catch (error) {
+      await prepared.abort();
+      _prepared = null;
+      phase = UpdatePhase.ready;
+      if (rollbackProblem != null) problem = rollbackProblem;
+    } catch (error) {
       await _prepared?.abort();
       _prepared = null;
-      problem = error.problem;
-      phase = downloadedPath == null ? UpdatePhase.failed : UpdatePhase.ready;
-    } catch (_) {
-      await _prepared?.abort();
-      _prepared = null;
-      problem = UpdateProblem.openFailed;
+      problem = error is UpdateException
+          ? error.problem
+          : UpdateProblem.openFailed;
       phase = downloadedPath == null ? UpdatePhase.failed : UpdatePhase.ready;
     } finally {
       _restartRunning = false;
