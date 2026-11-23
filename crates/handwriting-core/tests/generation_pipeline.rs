@@ -117,16 +117,32 @@ fn transparent_png_and_zip_keep_ink_alpha_and_pdf_keeps_the_paper() {
         let opaque_pdf = pdf(&req);
         req.params.transparent_background = true;
         assert_eq!(pdf(&req), opaque_pdf);
+        // Locate solid ink independently of the alpha under test, once per page.
+        let alpha = req.params.fill[3];
+        req.params.fill[3] = 255;
+        let mut solid_points = Vec::new();
+        render(&req, &cancel, |_, page| {
+            let (x, y, _) = page
+                .enumerate_pixels()
+                .find(|(_, _, p)| p[3] == 255)
+                .unwrap();
+            solid_points.push((x, y));
+            Ok(())
+        })
+        .unwrap();
+        req.params.fill[3] = alpha;
         let mut pngs = Vec::new();
         generation::generate(
             &req,
             &cancel,
-            Output::Preview(&mut |_, bytes| {
+            Output::Preview(&mut |index, bytes| {
                 let im = image::load_from_memory(&bytes).unwrap().to_rgba8();
                 assert_eq!(im.dimensions(), (240, 180));
                 assert_eq!(im[(0, 0)][3], 0);
                 assert_eq!(im[(150, 46)][3], 0);
-                assert!(im.pixels().any(|p| p[3] > 0 && p[3] < 255 && p[2] > p[0]));
+                let solid = im[solid_points[index]];
+                assert_eq!(solid[3], alpha, "fully covered stroke");
+                assert!(solid[2] > solid[0]);
                 pngs.push(bytes);
                 Ok(())
             }),

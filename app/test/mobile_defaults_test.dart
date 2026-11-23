@@ -27,6 +27,9 @@ void main() {
     () {
       final settings = Settings()..restore({'transparentBackground': true});
       final restored = Settings()..restore(settings.toJson());
+      expect(restored.transparentBackground, isTrue);
+      restored.smallPreset();
+      expect(restored.transparentBackground, isTrue);
       expect(
         restored.form('x', preview: true, pdf: false)['transparent_background'],
         'true',

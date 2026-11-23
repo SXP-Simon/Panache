@@ -40,7 +40,8 @@ fn default_latin_scale() -> u8 {
     100
 }
 
-/// For complete pre-camera struct literals, add `camera: Default::default()`.
+/// Complete struct literals must supply `transparent_background: false` for paper output.
+/// For complete pre-camera struct literals, also add `camera: Default::default()`.
 /// A struct update using `..Parameters::default()` picks up optional export fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameters {
