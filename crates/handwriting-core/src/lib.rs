@@ -11,6 +11,7 @@ mod inline_document;
 pub mod local_fonts;
 pub use inline_document::{review_text, validate as validate_document};
 mod parameters;
+pub mod pdf_page;
 pub mod photo;
 pub mod render;
 pub mod text;

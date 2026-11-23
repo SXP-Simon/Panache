@@ -174,6 +174,7 @@ impl Server {
             .route("/version", get(version))
             .route("/textfileprocess", post(textfile))
             .route("/imagefileprocess", post(imagefile))
+            .route("/pdfpageprocess", post(pdfpage))
             .route("/generate_handwriting", post(submit))
             .route("/generate_handwriting/task/{id}", get(status))
             .route("/generate_handwriting/task/{id}/result", get(result))
@@ -766,6 +767,27 @@ async fn textfile(
             .map_err(|e| Error::new("worker_failed", e.to_string()))??;
     Ok(Json(serde_json::json!({"text":text})))
 }
+async fn pdfpage(
+    State(s): State<Server>,
+    Input(fields, mut files): Input,
+) -> ApiResult<Json<handwriting_core::pdf_page::PdfPage>> {
+    let file = files
+        .remove("file")
+        .ok_or_else(|| Error::new("invalid_upload", "缺少 file"))?;
+    let limits = s.0.config.limits.clone();
+    let permit =
+        s.0.semaphore
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::new("queue_full", "工作线程繁忙，请稍后重试"))?;
+    let page = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        handwriting_core::pdf_page::import(file.bytes, &fields, &limits)
+    })
+    .await
+    .map_err(|e| Error::new("worker_failed", e.to_string()))??;
+    Ok(Json(page))
+}
 async fn imagefile(
     State(s): State<Server>,
     Input(_, mut files): Input,
@@ -895,7 +917,10 @@ async fn boundary(State(s): State<Server>, request: Request<Body>, next: Next) -
             .map(|v| v.0.ip().to_string())
             .unwrap_or_else(|| "local".into());
         let path = request.uri().path();
-        let group = if path == "/api/generate_handwriting" || path.ends_with("fileprocess") {
+        let group = if path == "/api/generate_handwriting"
+            || path.ends_with("fileprocess")
+            || path == "/api/pdfpageprocess"
+        {
             "upload"
         } else {
             "query"
@@ -1291,6 +1316,33 @@ mod tests {
                 assert_eq!(data["images"].as_array().unwrap().len(), 2);
             }
         }
+    }
+    #[tokio::test]
+    async fn imports_selected_pdf_page() {
+        let (_dir, s) = setup();
+        let mut pdf = export::PdfExport::new();
+        pdf.add(&image_for_test()).unwrap();
+        let bytes = pdf.finish();
+        let (status, data) = send(
+            &s,
+            "/api/pdfpageprocess",
+            &[("pageIndex", "0"), ("mode", "fill")],
+            Some(("file", "paper.pdf", &bytes)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{data}");
+        assert_eq!(data["pageCount"], 1);
+        assert_eq!(data["pageIndex"], 0);
+        assert!(data["backgroundPng"].as_str().unwrap().starts_with("iVBOR"));
+        let (status, data) = send(
+            &s,
+            "/api/pdfpageprocess",
+            &[("pageIndex", "1")],
+            Some(("file", "paper.pdf", &bytes)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(data["error_code"], "invalid_parameter");
     }
     #[tokio::test]
     async fn uploads_text_and_background_identification() {

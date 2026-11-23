@@ -61,6 +61,30 @@ fn local_engine_lifecycle_and_abi() {
         };
         image::Rgba([shade, shade, shade, 255])
     });
+    let pdf_path = root.path().join("paper.pdf");
+    let mut pdf = handwriting_core::export::PdfExport::new();
+    pdf.add(&paper).unwrap();
+    std::fs::write(&pdf_path, pdf.finish()).unwrap();
+    let imported = call(
+        "pdf_page",
+        HashMap::from([("mode".into(), "fill".into())]),
+        HashMap::from([(
+            "file".into(),
+            Upload {
+                name: "paper.pdf".into(),
+                path: pdf_path,
+            },
+        )]),
+        "",
+    )
+    .unwrap();
+    assert_eq!(imported["pageCount"], 1);
+    assert!(
+        imported["backgroundPng"]
+            .as_str()
+            .unwrap()
+            .starts_with("iVBOR")
+    );
     let paper_path = root.path().join("paper.png");
     paper.save(&paper_path).unwrap();
     let expected =
