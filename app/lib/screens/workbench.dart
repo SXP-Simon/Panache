@@ -184,7 +184,10 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     if (widget.workspace == null) unawaited(w.initialize());
   }
 
-  void refreshPreparation() => setState(() {});
+  void refreshPreparation() {
+    setState(() {});
+    livePreview.refresh();
+  }
 
   void refreshUpdates() {
     if (mounted &&
