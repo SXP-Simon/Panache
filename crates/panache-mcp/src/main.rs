@@ -209,12 +209,14 @@ impl ServerHandler for Panache {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
             .with_instructions(concat!(
-                "Start with save_section(markdown). Use its draft_id and revision for preview_handwriting or export_handwriting. ",
+                "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
+                "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
+                "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
                 "Use list_fonts for names and list_drafts to resume. A paper_path must be readable on the server computer. ",
                 "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
                 "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
-                "Unruled paper and artwork are supported. If placement is unclear ask where to write or what to keep clear; follow specified or delegated choices. ",
-                "Only suggest a clearer, flatter photo if visible blur, occlusion or perspective prevents the requested placement; identify the obstruction. ",
+                "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
+                "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
                 "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
                 "Review the edited revision. Use read_section(view=trajectory) to revisit actions and evidence."
             ))

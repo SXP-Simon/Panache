@@ -296,7 +296,7 @@ pub fn page(
     let next = if peak == 0 {
         "If this page should contain text, check ink opacity/color, local edits and off-page placement. Review the new revision."
     } else if outside > 0 || draft.paper.as_ref().is_some_and(|p| !p.ruled) {
-        "Check the overlay against the intended area. If placement is unclear, ask where to write (which side, a marked area, or what to keep clear). If the user specified the area or delegated placement, use that direction and review the result."
+        "Check the overlay against the intended fields and protected print. Writing outside the reference can belong in a header or sidebar. If placement is unclear, ask where to write or what to keep clear; follow specified or delegated placement."
     } else {
         "Compare writing across the occupied parts of the page with the saved paper. Check the requested position, header clearance, contrast, focus and letter size."
     };

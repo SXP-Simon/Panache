@@ -190,7 +190,7 @@ pub struct Nudge {
     pub ids: Vec<u32>,
     /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
     pub place_center: Option<[u32; 2]>,
-    /// Absolute placement of the original selected block into four image pixels (TL,TR,BR,BL). Replaces prior geometric edits for these IDs. Exclusive with other geometry changes.
+    /// Image destinations of the original block's TL,TR,BR,BL corners, in that order (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Replaces prior geometry; use separately from other geometry changes.
     pub target_quad: Option<[[u32; 2]; 4]>,
     /// Absolute offsets in pixels from the original glyph position. Omitted fields retain their values.
     pub dx: Option<i32>,

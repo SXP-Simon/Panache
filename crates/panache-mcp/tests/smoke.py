@@ -17,6 +17,7 @@ from zipfile import ZipFile
 
 from PIL import Image
 
+import coursework_form
 import review_comparison
 from mcp_client import call
 
@@ -154,6 +155,11 @@ async def smoke(command, arguments, out):
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
             info = await client.initialize()
             assert info.serverInfo.name == "panache-mcp"
+            # These branches guide the client before a draft exists, including on ruled paper.
+            before_save, _, _ = info.instructions.partition("save_section(")
+            assert "outside the frame" in before_save and "wait before saving" in before_save
+            assert "partial work was requested" in before_save
+            assert "ask which field" in info.instructions
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
                 "annotate_review",
@@ -259,6 +265,7 @@ async def smoke(command, arguments, out):
             )
             assert failed.isError
             await placement_pixels(client)
+            await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
             poem = POEM.replace("，", "，\n")
