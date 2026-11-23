@@ -177,9 +177,13 @@ fn grid_corner_overruns_are_local_bounded_and_repeatable() {
             base.mask.height(),
         );
         assert_eq!(interior.to_image(), base.mask);
+        let mut axes = [[false; 2]; 4];
         for (x, y, _) in g.mask.enumerate_pixels().filter(|(_, _, p)| p[0] > 0) {
             let (x, y) = (g.left + x as i32, g.top + y as i32);
             if !(base.left..base.right()).contains(&x) || !(base.top..base.bottom()).contains(&y) {
+                let col = usize::from(x >= base.right() - 1);
+                let row = usize::from(y >= base.bottom() - 1);
+                axes[row * 2 + col][usize::from(y < base.top || y >= base.bottom())] = true;
                 let dx = (x - base.left).abs().min((x - (base.right() - 1)).abs());
                 let dy = (y - base.top).abs().min((y - (base.bottom() - 1)).abs());
                 assert!(
@@ -188,6 +192,7 @@ fn grid_corner_overruns_are_local_bounded_and_repeatable() {
                 );
             }
         }
+        assert!(axes.iter().all(|axes| *axes != [true, true]));
     }
     let first = natural.unit(&grid, 40., 0).unwrap();
     let second = natural.unit(&grid, 40., 1).unwrap();
