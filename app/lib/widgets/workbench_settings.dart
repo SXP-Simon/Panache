@@ -95,7 +95,8 @@ class WorkbenchSettings extends StatelessWidget {
         ('camera_iso', 'ISO'),
       ])
         TextFormField(
-          key: ValueKey('${field.$1}-$settingsRevision'),
+          // Keep the field's scroll offset separate from the tile's expanded state.
+          key: PageStorageKey('${field.$1}-$settingsRevision'),
           initialValue: settings.camera[field.$1] ?? '',
           enabled: !locked,
           maxLength: field.$1 == 'camera_iso' ? 5 : 96,
@@ -423,7 +424,7 @@ class WorkbenchSettings extends StatelessWidget {
                         (value) => settings.transparentBackground = value,
                         icon: Icons.texture,
                       ),
-                      _paperCamera(l),
+                      if (background != null) _paperCamera(l),
                     ],
                     collapsible: false,
                   ),
