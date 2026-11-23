@@ -346,6 +346,12 @@ pub fn render_until_page<F: FnMut(usize, RgbaImage) -> Result<()>>(
         emit,
     )
 }
+/// Unmarked preset stationery for comparison with a rendered page.
+pub fn preset_paper(w: u32, h: u32, params: &Parameters, limits: &Limits) -> Result<RgbaImage> {
+    params.validate(w, h, limits)?;
+    Ok(blank_paper(w, h, params))
+}
+
 pub fn render_on_photo<F: FnMut(usize, RgbaImage) -> Result<()>>(
     r: &RenderRequest,
     cancel: &Cancellation,
@@ -395,6 +401,12 @@ pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
             None => paper,
         };
         let output = match photo {
+            Some((projection, background))
+                if r.params.transparent_background && !r.params.pdf_save =>
+            {
+                let clear = RgbaImage::new(background.width(), background.height());
+                projection.composite_into(clear, &image, cancel)?
+            }
             Some((projection, background)) => projection.composite(background, &image, cancel)?,
             None => image,
         };
