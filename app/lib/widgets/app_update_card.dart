@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-import 'workbench_card.dart';
-
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/updates/update_controller.dart';
 import '../services/updates/update_model.dart';
 import '../services/updates/update_notes.dart';
+import 'workbench_card.dart';
 
 class AppUpdateCard extends StatelessWidget {
   const AppUpdateCard({
@@ -29,35 +28,8 @@ class AppUpdateCard extends StatelessWidget {
       final l = AppLocalizations.of(context)!;
       final c = controller;
       final changes = summarizeReleaseNotes(c.release?.notes ?? '');
-      final status = switch (c.phase) {
-        UpdatePhase.idle => l.updateIdle,
-        UpdatePhase.checking => l.updateChecking,
-        UpdatePhase.current => l.updateCurrent,
-        UpdatePhase.available => l.updateAvailable,
-        UpdatePhase.downloading => l.updateDownloading,
-        UpdatePhase.ready => l.updateReady,
-        UpdatePhase.preparing => l.updatePreparing,
-        UpdatePhase.restarting => l.updateRestarting,
-        UpdatePhase.failed => l.updateFailed,
-      };
-      final problem = switch (c.problem) {
-        null => null,
-        UpdateProblem.network => l.updateNetwork,
-        UpdateProblem.rateLimited => l.updateRateLimited,
-        UpdateProblem.invalidResponse => l.updateInvalidResponse,
-        UpdateProblem.unknownVersion => l.updateUnknownVersion,
-        UpdateProblem.unsupportedPlatform => l.updateUnsupported,
-        UpdateProblem.missingAsset => l.updateMissingAsset,
-        UpdateProblem.verification => l.updateVerification,
-        UpdateProblem.cancelled => l.updateCancelled,
-        UpdateProblem.storage => l.updateStorage,
-        UpdateProblem.openFailed => l.updateOpenFailed,
-        UpdateProblem.desktopUnavailable => l.updateDesktopUnavailable,
-        UpdateProblem.saveFailed => l.updateSaveFailed,
-        UpdateProblem.restartDeferred => l.updateRestartDeferred,
-        UpdateProblem.restartCancelled => l.updateRestartCancelled,
-        UpdateProblem.anotherInstance => l.updateAnotherInstance,
-      };
+      final status = _phaseLabel(c.phase, l);
+      final problem = _problemLabel(c.problem, l);
       return WorkbenchCard(
         key: const ValueKey('app-updates'),
         child: Padding(
@@ -100,17 +72,7 @@ class AppUpdateCard extends StatelessWidget {
                   child: Text(problem, key: const ValueKey('update-problem')),
                 ),
               const SizedBox(height: 8),
-              Text(
-                c.web
-                    ? l.updateWebHelp
-                    : c.installed?.target.os == 'android'
-                    ? l.updateAndroidSummary
-                    : c.installed?.target.os == 'ios'
-                    ? l.updateIosHelp
-                    : c.desktopAutomatic
-                    ? l.updateDesktopSummary
-                    : l.updateDesktopUnavailable,
-              ),
+              Text(_platformHelp(c, l)),
               if ({
                 UpdatePhase.preparing,
                 UpdatePhase.restarting,
@@ -141,98 +103,7 @@ class AppUpdateCard extends StatelessWidget {
                   ),
               ],
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  if (!compact)
-                    OutlinedButton.icon(
-                      key: const ValueKey('check-updates'),
-                      onPressed: c.busy || c.opening ? null : c.check,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(l.checkUpdates),
-                    ),
-                  if ({
-                    UpdatePhase.downloading,
-                    UpdatePhase.preparing,
-                    UpdatePhase.restarting,
-                  }.contains(c.phase))
-                    TextButton.icon(
-                      onPressed: c.cancel,
-                      icon: const Icon(Icons.close),
-                      label: Text(l.cancel),
-                    ),
-                  if (!c.web &&
-                      c.release != null &&
-                      c.canDownload &&
-                      {
-                        UpdatePhase.available,
-                        UpdatePhase.failed,
-                      }.contains(c.phase))
-                    FilledButton.icon(
-                      key: const ValueKey('download-update'),
-                      onPressed: c.desktopAutomatic && onRestart != null
-                          ? onRestart
-                          : c.download,
-                      icon: const Icon(Icons.download_outlined),
-                      label: Text(
-                        c.desktopAutomatic && onRestart != null
-                            ? l.updateRestart
-                            : l.updateDownload,
-                      ),
-                    ),
-                  if (c.phase == UpdatePhase.ready)
-                    FilledButton.icon(
-                      key: const ValueKey('open-update'),
-                      onPressed: c.opening
-                          ? null
-                          : c.desktopAutomatic &&
-                                onRestart != null &&
-                                c.problem != UpdateProblem.desktopUnavailable
-                          ? onRestart
-                          : c.open,
-                      icon: const Icon(Icons.open_in_new),
-                      label: Text(
-                        c.installed?.target.os == 'android'
-                            ? l.updateInstall
-                            : c.desktopAutomatic &&
-                                  onRestart != null &&
-                                  c.problem != UpdateProblem.desktopUnavailable
-                            ? l.updateRestart
-                            : l.updateOpenArchive,
-                      ),
-                    ),
-                  if (c.phase == UpdatePhase.ready &&
-                      c.problem == UpdateProblem.anotherInstance)
-                    OutlinedButton.icon(
-                      key: const ValueKey('manual-update'),
-                      onPressed: c.opening ? null : c.open,
-                      icon: const Icon(Icons.folder_open),
-                      label: Text(l.updateOpenArchive),
-                    ),
-                  if (c.web)
-                    FilledButton.icon(
-                      onPressed: c.busy ? null : onReload,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(l.updateReload),
-                    ),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      if (!await launchUrl(
-                            c.release?.page ?? releasesPage,
-                            mode: LaunchMode.externalApplication,
-                          ) &&
-                          context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l.updateOpenFailed)),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.open_in_new),
-                    label: Text(l.updateReleasePage),
-                  ),
-                ],
-              ),
+              _actions(context, l),
               if (!compact)
                 SwitchListTile.adaptive(
                   key: const ValueKey('auto-check-updates'),
@@ -276,4 +147,131 @@ class AppUpdateCard extends StatelessWidget {
       );
     },
   );
+
+  Widget _actions(BuildContext context, AppLocalizations l) {
+    final c = controller;
+    final canRestart = c.desktopAutomatic && onRestart != null;
+    final canRestartReady =
+        canRestart && c.problem != UpdateProblem.desktopUnavailable;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        if (!compact)
+          OutlinedButton.icon(
+            key: const ValueKey('check-updates'),
+            onPressed: c.busy || c.opening ? null : c.check,
+            icon: const Icon(Icons.refresh),
+            label: Text(l.checkUpdates),
+          ),
+        if ({
+          UpdatePhase.downloading,
+          UpdatePhase.preparing,
+          UpdatePhase.restarting,
+        }.contains(c.phase))
+          TextButton.icon(
+            onPressed: c.cancel,
+            icon: const Icon(Icons.close),
+            label: Text(l.cancel),
+          ),
+        if (!c.web &&
+            c.release != null &&
+            c.canDownload &&
+            {UpdatePhase.available, UpdatePhase.failed}.contains(c.phase))
+          FilledButton.icon(
+            key: const ValueKey('download-update'),
+            onPressed: canRestart ? onRestart : c.download,
+            icon: const Icon(Icons.download_outlined),
+            label: Text(canRestart ? l.updateRestart : l.updateDownload),
+          ),
+        if (c.phase == UpdatePhase.ready)
+          FilledButton.icon(
+            key: const ValueKey('open-update'),
+            onPressed: c.opening
+                ? null
+                : canRestartReady
+                ? onRestart
+                : c.open,
+            icon: const Icon(Icons.open_in_new),
+            label: Text(
+              c.installed?.target.os == 'android'
+                  ? l.updateInstall
+                  : canRestartReady
+                  ? l.updateRestart
+                  : l.updateOpenArchive,
+            ),
+          ),
+        if (c.phase == UpdatePhase.ready &&
+            c.problem == UpdateProblem.anotherInstance)
+          OutlinedButton.icon(
+            key: const ValueKey('manual-update'),
+            onPressed: c.opening ? null : c.open,
+            icon: const Icon(Icons.folder_open),
+            label: Text(l.updateOpenArchive),
+          ),
+        if (c.web)
+          FilledButton.icon(
+            onPressed: c.busy ? null : onReload,
+            icon: const Icon(Icons.refresh),
+            label: Text(l.updateReload),
+          ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            if (!await launchUrl(
+                  c.release?.page ?? releasesPage,
+                  mode: LaunchMode.externalApplication,
+                ) &&
+                context.mounted) {
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(l.updateOpenFailed)));
+            }
+          },
+          icon: const Icon(Icons.open_in_new),
+          label: Text(l.updateReleasePage),
+        ),
+      ],
+    );
+  }
+}
+
+String _phaseLabel(UpdatePhase phase, AppLocalizations l) => switch (phase) {
+  UpdatePhase.idle => l.updateIdle,
+  UpdatePhase.checking => l.updateChecking,
+  UpdatePhase.current => l.updateCurrent,
+  UpdatePhase.available => l.updateAvailable,
+  UpdatePhase.downloading => l.updateDownloading,
+  UpdatePhase.ready => l.updateReady,
+  UpdatePhase.preparing => l.updatePreparing,
+  UpdatePhase.restarting => l.updateRestarting,
+  UpdatePhase.failed => l.updateFailed,
+};
+
+String? _problemLabel(UpdateProblem? problem, AppLocalizations l) =>
+    switch (problem) {
+      null => null,
+      UpdateProblem.network => l.updateNetwork,
+      UpdateProblem.rateLimited => l.updateRateLimited,
+      UpdateProblem.invalidResponse => l.updateInvalidResponse,
+      UpdateProblem.unknownVersion => l.updateUnknownVersion,
+      UpdateProblem.unsupportedPlatform => l.updateUnsupported,
+      UpdateProblem.missingAsset => l.updateMissingAsset,
+      UpdateProblem.verification => l.updateVerification,
+      UpdateProblem.cancelled => l.updateCancelled,
+      UpdateProblem.storage => l.updateStorage,
+      UpdateProblem.openFailed => l.updateOpenFailed,
+      UpdateProblem.desktopUnavailable => l.updateDesktopUnavailable,
+      UpdateProblem.saveFailed => l.updateSaveFailed,
+      UpdateProblem.restartDeferred => l.updateRestartDeferred,
+      UpdateProblem.restartCancelled => l.updateRestartCancelled,
+      UpdateProblem.anotherInstance => l.updateAnotherInstance,
+    };
+
+String _platformHelp(UpdateController c, AppLocalizations l) {
+  if (c.web) return l.updateWebHelp;
+  return switch (c.installed?.target.os) {
+    'android' => l.updateAndroidSummary,
+    'ios' => l.updateIosHelp,
+    _ =>
+      c.desktopAutomatic ? l.updateDesktopSummary : l.updateDesktopUnavailable,
+  };
 }
