@@ -16,18 +16,20 @@
 
 | 模块 | 职责 |
 |---|---|
-| `widgets/workbench_shell.dart` | 桌面 AppBar 与导航栏、手机紧凑标题栏与应用设置菜单；信息页保留后台编辑器 |
+| `widgets/workbench_shell.dart` | 组合桌面与手机外壳。导航由 `workbench_navigation.dart` 构建，应用设置菜单由 `workbench_preferences.dart` 构建 |
 | `widgets/theme_color_editor.dart` | 整套配色选择、当前方案预览、主色和点缀色 HEX 编辑及恢复默认 |
 | `services/appearance_preferences.dart` | 主题色与减少动态效果的恢复、串行保存与失败状态，独立于工作区渲染设置 |
-| `widgets/workbench_layout.dart` | 编辑/参数/预览的响应式布局、错误和任务进度、全局生成与取消入口 |
+| `widgets/workbench_layout.dart` | 组合编辑、参数与预览的响应式布局。`workbench_task_status.dart` 呈现任务进度和操作入口 |
 | `widgets/workbench_editor.dart` | 编辑器、焦点与撤销控制器接入、字符数及插图缩略图 |
 | `widgets/workbench_controls.dart` | 通用面板和有图标、名称及用途说明的编辑工具菜单 |
-| `widgets/workbench_settings.dart` | 纸张背景、字体墨色、字号间距、边距排版、笔迹变化、删除线六组参数；预设操作集中呈现，文件和网络操作回调给页面 |
+| `widgets/workbench_settings.dart` | 组合设置与预设操作。`widgets/settings/` 按纸张、版面和墨迹组织输入控件，参数元数据来自 `models/render_parameter.dart` |
 | `widgets/workbench_preview.dart` | 图片预览、缩放、分页和保存动作呈现 |
-| `widgets/preview_pager.dart` | 图片滑动、缩放手势与全屏共享元素转场；通过页码回调表达选择 |
+| `widgets/preview_pager.dart` | 组织翻页和全屏共享元素转场，单页变换矩阵与缩放手势由 `zoomable_preview_page.dart` 持有 |
 | `widgets/workbench_motion.dart` | 工作台分区的保留式过渡及动效时长，不依赖工作区或引擎 |
 | `widgets/workbench_information.dart` | 使用说明、项目来源及本地数据说明 |
 | `screens/dialogs/` | 连接设置、文本整理/书信输入及数学预览对话框，返回用户选择而不直接操作工作区 |
+
+`screens/editor_preparation.dart` 持有当前文本整理任务和最近一次格式转换，页面继续持有编辑器、输入焦点与原生撤销栈。`view_models/fine_selection_drag.dart` 将手势位置转换为精修范围，绘制入口在 `widgets/fine_preview_painter.dart`。明暗色的推导在 `theme/handwriting_palette.dart`，控件的形状与不同交互状态的配方在 `theme/handwriting_controls.dart`。
 
 「整理文本」统一按 Markdown 清理、公式转换的顺序处理粘贴内容；代码在整个流程中保留字面内容。整理前的原文可通过编辑器撤销恢复，未编辑的整理结果重复操作保持稳定；更换表格模式时使用保留的原文重新整理。
 
@@ -66,6 +68,12 @@ Rust 的 `handwriting-core::generation` 统一编排渲染、逐页 PNG 编码�
 生成任务有独立代次。提交、状态查询、预览和导出返回后都确认该代次仍有效；取消、销毁后的迟到响应不能覆盖界面，也不能清除后续任务的 busy 状态。引擎支持取消时，提交尚未返回也可先取消，待任务 ID 返回后补发取消。
 
 连接探测也使用独立代次，旧服务的迟到响应不能覆盖新连接。生成期间不替换 API。关闭工作区会关闭客户端并释放图片、上传文件和导出字节引用。预览保留上一份成功结果，新的生成失败或取消时仍可查看。
+
+## 引擎各入口的职责
+
+HTTP 请求先由 `crates/handwriting-server/src/access.rs` 检查来源、凭据与请求频率。`render_job.rs` 处理生成请求，队列状态由 `tasks.rs` 持有。移动端在 `handwriting-bridge/src/api.rs` 暴露 C ABI，后台生成、取消检查和成品发布集中在 `api/worker.rs`。
+
+共享引擎在 `handwriting-core/src/render/` 中分别处理段落换行（`paragraph.rs`）、单行墨迹边界和缩放（`line.rs`）与字形组合（`composition.rs`）。分页与进度回调由外层渲染流程按顺序驱动。MCP 的保存和预览入口位于 `panache-mcp/src/save.rs` 和 `preview.rs`，逐字调整与局部评审分别位于 `engine/adjustments.rs` 和 `review/local.rs`。
 
 ## 扩展约定
 
