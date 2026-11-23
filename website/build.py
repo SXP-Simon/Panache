@@ -40,8 +40,7 @@ def prepare_gallery(assets):
     return names
 
 
-def build(out):
-    assets = out / "assets"
+def prepare_assets(assets):
     shutil.copytree(SITE / "static", assets, dirs_exist_ok=True)
     shutil.copyfile(ROOT / "app/assets/branding/panache.png", assets / "app-icon.png")
     revisions = {name: hashlib.sha256((assets / name).read_bytes()).hexdigest()[:12]
@@ -51,46 +50,61 @@ def build(out):
     gallery = prepare_gallery(assets)
     for name in ("panache-showcase.webp", "panache-custom-background.webp"):
         shutil.copyfile(ROOT / "docs/assets/images" / name, assets / name)
+    return revisions, gallery
+
+
+def load_articles(lang, assets):
+    folder = SITE / "content" / lang
+    articles = {p.relative_to(folder).with_suffix("").as_posix(): p.read_text(encoding="utf8")
+                for p in folder.rglob("*.md")}
+    titles = {key: value.splitlines()[0].removeprefix("# ") for key, value in articles.items()}
+    if set(titles) != {*GUIDES, "journal", "journal/ink-on-paper", "journal/iris-and-ink", "journal/paper-studies"}:
+        raise ValueError(f"Incomplete navigation in {lang}")
+    search_index = [{"route": key, "title": titles[key],
+                     "text": " ".join(value.splitlines()[1:])}
+                    for key, value in articles.items()]
+    (assets / f"search-{lang}.json").write_text(
+        json.dumps(search_index, ensure_ascii=False), encoding="utf8")
+    titles["search"] = "Search" if lang == "en" else "搜索"
+    return articles, titles
+
+
+def render_language(out, templates, lang, revisions, gallery):
+    articles, titles = load_articles(lang, out / "assets")
+    for key in ("", "search", *articles):
+        parts = ([lang] if lang == "en" else []) + ([key] if key else [])
+        route = "/".join(parts)
+        def link(target):
+            return posixpath.relpath(target or ".", route or ".") + "/"
+        def local(target):
+            return link(("/".join((lang, target)).rstrip("/") if lang == "en" else target))
+        def asset(filename):
+            url = posixpath.relpath("assets/" + filename, route or ".")
+            return url + "?v=" + revisions[filename] if filename in revisions else url
+        content = ""
+        if key in articles:
+            source = "\n".join(articles[key].splitlines()[1:])
+            source = re.sub(r"\]\(site:([\w/-]+)\)", lambda m: "](" + local(m[1]) + ")", source)
+            content = markdown.markdown(source, extensions=["fenced_code", "tables", "toc"],
+                                        extension_configs={"toc": {"slugify": slugify_unicode}})
+        target = out / route / "index.html"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        html = templates.get_template("page.html").render(
+            key=key, lang=lang, en=lang == "en", titles=titles, guides=GUIDES,
+            content=Markup(content), gallery=gallery, asset=asset, local=local,
+            other=link(key if lang == "en" else "en/" + key), repo=REPO,
+            year=datetime.date.today().year,
+        )
+        target.write_text(html, encoding="utf8")
+
+
+def build(out):
+    assets = out / "assets"
+    revisions, gallery = prepare_assets(assets)
     templates = Environment(loader=FileSystemLoader(SITE / "templates"),
                             undefined=StrictUndefined, autoescape=select_autoescape())
     for lang in ("zh", "en"):
-        folder = SITE / "content" / lang
-        articles = {p.relative_to(folder).with_suffix("").as_posix(): p.read_text(encoding="utf8")
-                    for p in folder.rglob("*.md")}
-        titles = {key: value.splitlines()[0].removeprefix("# ") for key, value in articles.items()}
-        if set(titles) != {*GUIDES, "journal", "journal/ink-on-paper", "journal/iris-and-ink", "journal/paper-studies"}:
-            raise ValueError(f"Incomplete navigation in {lang}")
-        search_index = [{"route": key, "title": titles[key],
-                         "text": " ".join(value.splitlines()[1:])}
-                        for key, value in articles.items()]
-        (assets / f"search-{lang}.json").write_text(
-            json.dumps(search_index, ensure_ascii=False), encoding="utf8")
-        titles["search"] = "Search" if lang == "en" else "搜索"
-        for key in ("", "search", *articles):
-            parts = ([lang] if lang == "en" else []) + ([key] if key else [])
-            route = "/".join(parts)
-            def link(target):
-                return posixpath.relpath(target or ".", route or ".") + "/"
-            def local(target):
-                return link(("/".join((lang, target)).rstrip("/") if lang == "en" else target))
-            def asset(filename):
-                url = posixpath.relpath("assets/" + filename, route or ".")
-                return url + "?v=" + revisions[filename] if filename in revisions else url
-            content = ""
-            if key in articles:
-                source = "\n".join(articles[key].splitlines()[1:])
-                source = re.sub(r"\]\(site:([\w/-]+)\)", lambda m: "](" + local(m[1]) + ")", source)
-                content = markdown.markdown(source, extensions=["fenced_code", "tables", "toc"],
-                                            extension_configs={"toc": {"slugify": slugify_unicode}})
-            target = out / route / "index.html"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            html = templates.get_template("page.html").render(
-                key=key, lang=lang, en=lang == "en", titles=titles, guides=GUIDES,
-                content=Markup(content), gallery=gallery, asset=asset, local=local,
-                other=link(key if lang == "en" else "en/" + key), repo=REPO,
-                year=datetime.date.today().year,
-            )
-            target.write_text(html, encoding="utf8")
+        render_language(out, templates, lang, revisions, gallery)
 
 
 if __name__ == "__main__":
