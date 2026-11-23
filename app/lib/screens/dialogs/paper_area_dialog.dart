@@ -91,8 +91,10 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
     super.dispose();
   }
 
-  void start(Offset screenPoint, double scale) {
-    final point = this.point(screenPoint, scale);
+  void _pointerDown(PointerDownEvent event, double scale) {
+    if (activePointer != null || event.buttons != kPrimaryButton) return;
+    activePointer = event.pointer;
+    final point = this.point(event.localPosition, scale);
     if (free) {
       setState(() {
         path = [point];
@@ -115,8 +117,9 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
     if (hit >= 0) anchor = corners[3 - hit];
   }
 
-  void move(Offset screenPoint, double scale) {
-    final next = point(screenPoint, scale);
+  void _pointerMove(PointerMoveEvent event, double scale) {
+    if (activePointer != event.pointer) return;
+    final next = point(event.localPosition, scale);
     if (free) {
       appendLassoPoint(path, next, 4 / scale);
       setState(() => shownPath = [...path, next]);
@@ -125,15 +128,107 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
     final start = anchor;
     if (start == null) return;
     setState(() {
-      area = Rect.fromPoints(
-        start,
-        Offset(
-          next.dx.clamp(0, widget.size.width),
-          next.dy.clamp(0, widget.size.height - 1),
-        ),
-      );
+      area = Rect.fromPoints(start, next);
       if (!editedRows) rows.text = suggestedRows;
     });
+  }
+
+  void _pointerUp(PointerUpEvent event, double scale) {
+    if (activePointer != event.pointer) return;
+    activePointer = null;
+    if (!free) return;
+    setState(() {
+      shownPath = [...path, point(event.localPosition, scale)];
+      enclosed = enclosedRectangle(shownPath);
+      if (!editedRows) rows.text = suggestedRows;
+    });
+  }
+
+  void _pointerCancel(PointerCancelEvent event) {
+    if (activePointer != event.pointer) return;
+    if (free) {
+      setState(() {
+        path = [];
+        shownPath = [];
+        enclosed = null;
+      });
+    } else if (previous != null) {
+      setState(() => area = previous!);
+    }
+    if (!editedRows) rows.text = suggestedRows;
+    activePointer = null;
+  }
+
+  Widget _paperSurface(Rect? paper, Map<String, String>? layout, int count) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxHeight = math.min(
+          540.0,
+          MediaQuery.sizeOf(context).height * .50,
+        );
+        final scale = math.min(
+          constraints.maxWidth / widget.size.width,
+          maxHeight / widget.size.height,
+        );
+        double? firstLine, step;
+        if (free && layout != null) {
+          final spacing = int.parse(layout['line_spacing']!);
+          firstLine = (int.parse(layout['top_margin']!) + spacing) * scale;
+          step = spacing * scale;
+        }
+        final scaledArea = paper == null
+            ? null
+            : Rect.fromLTRB(
+                paper.left * scale,
+                paper.top * scale,
+                paper.right * scale,
+                paper.bottom * scale,
+              );
+        return Center(
+          child: SizedBox(
+            width: widget.size.width * scale,
+            height: widget.size.height * scale,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.precise,
+              child: RawGestureDetector(
+                key: const ValueKey('paper-area-image'),
+                behavior: HitTestBehavior.opaque,
+                gestures: {
+                  EagerGestureRecognizer:
+                      GestureRecognizerFactoryWithHandlers<
+                        EagerGestureRecognizer
+                      >(EagerGestureRecognizer.new, (_) {}),
+                },
+                child: Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (event) => _pointerDown(event, scale),
+                  onPointerMove: (event) => _pointerMove(event, scale),
+                  onPointerUp: (event) => _pointerUp(event, scale),
+                  onPointerCancel: _pointerCancel,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.memory(widget.bytes, fit: BoxFit.fill),
+                      CustomPaint(
+                        painter: _PaperAreaPainter(
+                          scaledArea,
+                          layout == null ? 0 : count,
+                          path: free
+                              ? [for (final point in shownPath) point * scale]
+                              : [],
+                          firstLine: firstLine,
+                          step: step,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -176,119 +271,7 @@ class _PaperAreaDialogState extends State<PaperAreaDialog> {
               const SizedBox(height: 8),
               Text(free ? l.paperAreaLassoHelp : l.paperAreaHelp),
               const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final maxHeight = math.min(
-                    540.0,
-                    MediaQuery.sizeOf(context).height * .50,
-                  );
-                  final scale = math.min(
-                    constraints.maxWidth / widget.size.width,
-                    maxHeight / widget.size.height,
-                  );
-                  final scaledArea = paper == null
-                      ? null
-                      : Rect.fromLTRB(
-                          paper.left * scale,
-                          paper.top * scale,
-                          paper.right * scale,
-                          paper.bottom * scale,
-                        );
-                  return Center(
-                    child: SizedBox(
-                      width: widget.size.width * scale,
-                      height: widget.size.height * scale,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.precise,
-                        child: RawGestureDetector(
-                          key: const ValueKey('paper-area-image'),
-                          behavior: HitTestBehavior.opaque,
-                          gestures: {
-                            EagerGestureRecognizer:
-                                GestureRecognizerFactoryWithHandlers<
-                                  EagerGestureRecognizer
-                                >(EagerGestureRecognizer.new, (_) {}),
-                          },
-                          child: Listener(
-                            behavior: HitTestBehavior.opaque,
-                            onPointerDown: (event) {
-                              if (activePointer != null ||
-                                  event.buttons != kPrimaryButton) {
-                                return;
-                              }
-                              activePointer = event.pointer;
-                              start(event.localPosition, scale);
-                            },
-                            onPointerMove: (event) {
-                              if (activePointer == event.pointer) {
-                                move(event.localPosition, scale);
-                              }
-                            },
-                            onPointerUp: (event) {
-                              if (activePointer == event.pointer) {
-                                activePointer = null;
-                                if (free) {
-                                  setState(() {
-                                    shownPath = [
-                                      ...path,
-                                      point(event.localPosition, scale),
-                                    ];
-                                    enclosed = enclosedRectangle(shownPath);
-                                    if (!editedRows) rows.text = suggestedRows;
-                                  });
-                                }
-                              }
-                            },
-                            onPointerCancel: (event) {
-                              if (activePointer != event.pointer) return;
-                              if (free) {
-                                setState(() {
-                                  path = [];
-                                  shownPath = [];
-                                  enclosed = null;
-                                });
-                              } else if (previous != null) {
-                                setState(() => area = previous!);
-                              }
-                              if (!editedRows) rows.text = suggestedRows;
-                              activePointer = null;
-                            },
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                Image.memory(widget.bytes, fit: BoxFit.fill),
-                                CustomPaint(
-                                  painter: _PaperAreaPainter(
-                                    scaledArea,
-                                    layout == null ? 0 : count,
-                                    path: free
-                                        ? [
-                                            for (final point in shownPath)
-                                              point * scale,
-                                          ]
-                                        : [],
-                                    firstLine: free && layout != null
-                                        ? (int.parse(layout['top_margin']!) +
-                                                  int.parse(
-                                                    layout['line_spacing']!,
-                                                  )) *
-                                              scale
-                                        : null,
-                                    step: free && layout != null
-                                        ? int.parse(layout['line_spacing']!) *
-                                              scale
-                                        : null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+              _paperSurface(paper, layout, count),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
