@@ -66,6 +66,11 @@ impl Glyph {
         glyph
     }
     pub fn fit(mut self, width: f32, height: f32) -> Self {
+        self.fit_in_place(width, height);
+        self
+    }
+
+    pub(super) fn fit_in_place(&mut self, width: f32, height: f32) {
         let footprint = self.advance.max(self.right() as f32) - self.left.min(0) as f32;
         let ratio = (width / footprint.max(1.))
             .min(height / self.mask.height() as f32)
@@ -85,7 +90,6 @@ impl Glyph {
             self.top = (self.top as f32 * ratio).floor() as i32;
             self.advance = (self.advance * ratio).floor().max(1.);
         }
-        self
     }
 }
 pub(super) struct Glyphs<'a> {

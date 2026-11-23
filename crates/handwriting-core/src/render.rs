@@ -39,6 +39,7 @@ mod glyph;
 mod homework;
 mod illustration;
 mod ink;
+mod line;
 mod paragraph;
 mod units;
 use glyph::{Glyph, Glyphs};
@@ -142,114 +143,17 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
             return Ok(());
         }
         let mut units = std::mem::take(&mut self.line);
-        let top = self.p.top_margin;
-        let bottom = self.canvas.height() as f32 - self.p.bottom_margin;
-        let available = (bottom - top).max(1.);
-        let ruled = ((self.p.underlined || self.p.paper_pattern.is_some())
-            && self.p.width.is_some())
-            || self.p.background_ruled;
-        let standard_ruled = ruled && self.p.layout_style == LayoutStyle::Standard;
-        let mut gap = (self.p.font_size * 0.12).round().max(2.);
-        if standard_ruled {
-            gap = gap.min((self.p.line_spacing - self.p.font_size).max(2.));
-        }
-        let bounds = |units: &[LineUnit]| {
-            let visible: Vec<_> = units.iter().filter(|u| u.glyph.ink).collect();
-            (
-                visible
-                    .iter()
-                    .map(|u| u.glyph.top + u.dy)
-                    .min()
-                    .unwrap_or(0),
-                visible
-                    .iter()
-                    .map(|u| u.glyph.bottom() + u.dy)
-                    .max()
-                    .unwrap_or(0),
-            )
-        };
-        let (mut min_y, mut max_y) = bounds(&units);
-        if (max_y - min_y) as f32 > available {
-            let factor = available / (max_y - min_y) as f32;
-            for u in &mut units {
-                let old_top = u.glyph.top;
-                let old_dy = u.dy;
-                u.glyph = u.glyph.clone().fit(
-                    u.glyph.mask.width() as f32 * factor,
-                    (u.glyph.mask.height() as f32 * factor).max(1.),
-                );
-                u.dy = ((old_top + old_dy - min_y) as f32 * factor).floor() as i32 - u.glyph.top;
-            }
-            (min_y, max_y) = bounds(&units);
-        }
-        if standard_ruled {
-            let height = (self.p.line_spacing - gap).floor() as i32;
-            let descent = (self.p.font_size * 0.30).round() as i32;
-            fit_standard_ruled_row(&mut units, min_y, max_y, height, descent);
-            (min_y, max_y) = bounds(&units);
-        }
-        // 2026-10-17：公式可占多格，后续基线仍须落在原纸张横线上。
-        let align = |anchor: f32| {
-            if ruled {
-                top + (((anchor - top) / self.p.line_spacing) - 0.00001)
-                    .ceil()
-                    .max(1.)
-                    * self.p.line_spacing
-            } else {
-                anchor
-            }
-        };
-        let mut anchor = self.y.max(top - min_y as f32);
-        if self.dirty {
-            anchor = anchor.max(self.previous_bottom + gap - min_y as f32);
-        }
-        anchor = align(anchor);
-        if anchor + max_y as f32 > bottom && self.dirty {
+        let mut layout = line::LineLayout::fit(&mut units, self.p, self.canvas.height());
+        let mut anchor = layout.baseline(self.y, self.dirty.then_some(self.previous_bottom));
+        if layout.overflows(anchor) && self.dirty {
             self.emit_page(false)?;
             if self.stopped {
                 return Ok(());
             }
-            anchor = align(self.y.max(top - min_y as f32));
+            anchor = layout.baseline(self.y, None);
         }
-        if anchor + max_y as f32 > bottom {
-            if ruled {
-                // 2026-10-17：仅空页也装不下的极高公式缩至实际横线，不把基线移到页底。
-                let mut best = (0f32, top + self.p.line_spacing);
-                let mut row = 1usize;
-                loop {
-                    let baseline = top + row as f32 * self.p.line_spacing;
-                    if baseline >= bottom {
-                        break;
-                    }
-                    let above = if min_y < 0 {
-                        ((baseline - top - 1.) / -(min_y as f32)).max(0.)
-                    } else {
-                        1.
-                    };
-                    let below = if max_y > 0 {
-                        ((bottom - baseline - 1.) / max_y as f32).max(0.)
-                    } else {
-                        1.
-                    };
-                    let factor = above.min(below).min(1.);
-                    if factor > best.0 {
-                        best = (factor, baseline);
-                    }
-                    row += 1;
-                }
-                anchor = best.1;
-                for u in &mut units {
-                    let offset = u.glyph.top + u.dy;
-                    u.glyph = u.glyph.clone().fit(
-                        u.glyph.mask.width() as f32 * best.0,
-                        (u.glyph.mask.height() as f32 * best.0).max(1.),
-                    );
-                    u.dy = (offset as f32 * best.0).round() as i32 - u.glyph.top;
-                }
-                (_, max_y) = bounds(&units);
-            } else {
-                anchor = bottom - max_y as f32;
-            }
+        if layout.overflows(anchor) {
+            anchor = layout.fit_empty_page(&mut units);
         }
         for u in units {
             let origin = (
@@ -275,7 +179,7 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
             }
         }
         self.written_lines += 1;
-        self.previous_bottom = anchor + max_y as f32;
+        self.previous_bottom = layout.ink_bottom(anchor);
         self.y = anchor + self.p.line_spacing;
         self.x = self.p.left_margin;
         self.dirty = true;
@@ -386,44 +290,6 @@ pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
         };
         emit(i, output)
     })
-}
-
-fn fit_standard_ruled_row(
-    units: &mut [LineUnit],
-    min_y: i32,
-    max_y: i32,
-    height: i32,
-    descent: i32,
-) {
-    let ink_height = max_y - min_y;
-    let top = descent - height;
-    if height <= 0
-        || ink_height <= 0
-        || ink_height as f32 > height as f32 * 1.2
-        || (min_y >= top && max_y <= descent)
-    {
-        return;
-    }
-    // 2026-11-17：轻微越界先在同一行格内纵向适配，保留横向字距和高公式的跨行避让。
-    let fit_height = height.min(ink_height);
-    let start = min_y.clamp(top, descent - fit_height);
-    for unit in units.iter_mut().filter(|unit| unit.glyph.ink) {
-        let offset = unit.glyph.top + unit.dy - min_y;
-        let end = offset + unit.glyph.mask.height() as i32;
-        let first = offset * fit_height / ink_height;
-        let last = (end * fit_height + ink_height - 1) / ink_height;
-        let new_height = (last - first) as u32;
-        if new_height != unit.glyph.mask.height() {
-            let mut mask = GrayImage::new(unit.glyph.mask.width(), new_height);
-            // 2026-11-17：合并缩小后落在同一行的像素，保留分数线等细笔画。
-            for (x, y, pixel) in unit.glyph.mask.enumerate_pixels() {
-                let row = (y * new_height) / unit.glyph.mask.height();
-                mask[(x, row)][0] = mask[(x, row)][0].max(pixel[0]);
-            }
-            unit.glyph.mask = mask;
-        }
-        unit.dy = start + first - unit.glyph.top;
-    }
 }
 
 pub(crate) fn render_pages(
