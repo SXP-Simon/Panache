@@ -72,7 +72,12 @@ void main() {
   });
 
   test('an unmatched backtick run leaves later complete code spans intact', () {
-    const source = 'Type ``` literally, then `**keep**` and ``a`b``.';
-    expect(cleanMarkdown(source), 'Type ``` literally, then **keep** and a`b.');
+    const source = 'Type ``` literally, then `**keep**` and finish with ``.';
+    expect(
+      cleanMarkdown(source),
+      'Type ``` literally, then **keep** and finish with ``.',
+    );
+    const multiline = 'Type ``` here,\nthen type ```` in the margin.';
+    expect(cleanMarkdown(multiline), multiline);
   });
 }

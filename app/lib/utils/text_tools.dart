@@ -157,11 +157,7 @@ String cleanMarkdown(
         ),
         '',
       );
-  s = s.replaceAllMapped(
-    RegExp(r'```[^\n]*\n([\s\S]*?)```|~~~[^\n]*\n([\s\S]*?)~~~'),
-    (m) => m[1] ?? m[2]!,
-  );
-  s = s.replaceAllMapped(RegExp(r'`([^`\n]+)`'), (m) => m[1]!);
+  s = s.replaceAllMapped(RegExp(r'~~~[^\n]*\n([\s\S]*?)~~~'), (m) => m[1]!);
   s = stripMarkdownLinks(s);
   s = _cleanLines(s, tableMode, english);
   for (final marker in ['***', '___', '**', '__', '~~', '==']) {
