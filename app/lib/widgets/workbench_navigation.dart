@@ -1,7 +1,83 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import 'workbench_guide.dart';
 import 'workbench_motion.dart';
+
+/// Classify the window for its toolbar and the available body for its panes.
+enum WorkbenchWidth {
+  compact,
+  medium,
+  expanded;
+
+  static WorkbenchWidth from(double width) {
+    if (width < 900) return compact;
+    if (width < 1100) return medium;
+    return expanded;
+  }
+}
+
+List<Widget> workbenchAppActions(
+  AppLocalizations l, {
+  required WorkbenchWidth size,
+  required bool guideUnread,
+  required bool updateAvailable,
+  required Color foreground,
+  required Color unreadColor,
+  required ValueChanged<int> onDestinationSelected,
+  required VoidCallback onPreferences,
+  required VoidCallback onToggleLocale,
+  required VoidCallback onToggleTheme,
+}) {
+  final compact = size == WorkbenchWidth.compact;
+  return [
+    if (!compact) ...[
+      IconButton(
+        key: const ValueKey('open-guide'),
+        tooltip: guideUnread ? '${l.guide} · ${l.guideUnread}' : l.guide,
+        onPressed: () => onDestinationSelected(1),
+        icon: GuideUnreadBadge(
+          unread: guideUnread,
+          child: const Icon(Icons.menu_book_outlined),
+        ),
+      ),
+      IconButton(
+        tooltip: l.about,
+        onPressed: () => onDestinationSelected(2),
+        icon: Badge(
+          isLabelVisible: updateAvailable,
+          child: const Icon(Icons.info_outline),
+        ),
+      ),
+    ],
+    Semantics(
+      hint: guideUnread && compact ? l.guideUnread : null,
+      child: TextButton.icon(
+        key: const ValueKey('app-preferences'),
+        style: TextButton.styleFrom(foregroundColor: foreground),
+        onPressed: onPreferences,
+        icon: Badge(
+          isLabelVisible: compact && (updateAvailable || guideUnread),
+          backgroundColor: updateAvailable ? null : unreadColor,
+          child: const Icon(Icons.tune),
+        ),
+        label: Text(l.appPreferences),
+      ),
+    ),
+    if (size == WorkbenchWidth.expanded) ...[
+      IconButton(
+        tooltip: l.language,
+        onPressed: onToggleLocale,
+        icon: const Icon(Icons.translate),
+      ),
+      IconButton(
+        tooltip: l.theme,
+        onPressed: onToggleTheme,
+        icon: const Icon(Icons.contrast),
+      ),
+    ],
+  ];
+}
 
 Widget mobilePaneNavigation(
   BuildContext context, {

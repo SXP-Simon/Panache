@@ -5,24 +5,27 @@ import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/widgets/workbench_shell.dart';
 
 void main() {
-  Widget shell({VoidCallback? onLocale, ValueChanged<int>? onDestination}) =>
-      MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: WorkbenchShell(
-          destination: 0,
-          onDestinationSelected: onDestination ?? (_) {},
-          connected: true,
-          managedBackend: false,
-          locked: false,
-          onConnection: () {},
-          onToggleLocale: onLocale ?? () {},
-          onToggleTheme: () {},
-          workspaceBuilder: (_, _) => const SizedBox.expand(),
-          informationBuilder: () => const SizedBox.expand(),
-        ),
-      );
+  Widget shell({
+    VoidCallback? onLocale,
+    ValueChanged<int>? onDestination,
+    Widget Function(bool, double)? workspaceBuilder,
+  }) => MaterialApp(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: WorkbenchShell(
+      destination: 0,
+      onDestinationSelected: onDestination ?? (_) {},
+      connected: true,
+      managedBackend: false,
+      locked: false,
+      onConnection: () {},
+      onToggleLocale: onLocale ?? () {},
+      onToggleTheme: () {},
+      workspaceBuilder: workspaceBuilder ?? (_, _) => const SizedBox.expand(),
+      informationBuilder: () => const SizedBox.expand(),
+    ),
+  );
 
   for (final width in [320.0, 375.0, 1280.0]) {
     testWidgets('repository link stays accessible at $width px', (
@@ -100,20 +103,57 @@ void main() {
     expect(find.byType(BottomSheet), findsNothing);
   });
 
-  testWidgets('mobile keyboard hides bottom navigation and offers dismissal', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(375, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetViewInsets);
-    await tester.pumpWidget(shell());
-    expect(find.byType(NavigationBar), findsNothing);
-    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    await tester.pumpAndSettle();
-    expect(find.byType(NavigationBar), findsNothing);
-    expect(find.byType(AppBar), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  for (final width in [899.0, 900.0, 1099.0, 1100.0]) {
+    testWidgets('keyboard and navigation actions at width ${width.toInt()}', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetViewInsets);
+      tester.view.padding = const FakeViewPadding(left: 25, right: 25);
+      addTearDown(tester.view.resetPadding);
+      bool? bodyWide;
+      final focus = FocusNode();
+      addTearDown(focus.dispose);
+      await tester.pumpWidget(
+        shell(
+          workspaceBuilder: (wide, _) {
+            bodyWide = wide;
+            return TextField(focusNode: focus);
+          },
+        ),
+      );
+      final labels = AppLocalizations.of(
+        tester.element(find.byType(WorkbenchShell)),
+      )!;
+      expect(bodyWide, width - 50 >= 900);
+      expect(
+        find.byKey(const ValueKey('open-guide')),
+        width >= 900 ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.byTooltip(labels.language),
+        width >= 1100 ? findsOneWidget : findsNothing,
+      );
+      expect(find.byIcon(Icons.keyboard_hide_outlined), findsNothing);
+      await tester.tap(find.byType(TextField));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      expect(focus.hasFocus, isTrue);
+      if (width >= 1100) {
+        expect(find.byIcon(Icons.keyboard_hide_outlined), findsNothing);
+      } else {
+        final button = find.widgetWithIcon(
+          width < 900 ? FloatingActionButton : TextButton,
+          Icons.keyboard_hide_outlined,
+        );
+        expect(button, findsOneWidget);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(focus.hasFocus, isFalse);
+      }
+    });
+  }
 }

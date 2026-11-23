@@ -175,9 +175,12 @@ class WorkbenchLayout extends StatelessWidget {
     );
   }
 
+  bool get _expanded => WorkbenchWidth.from(width) == WorkbenchWidth.expanded;
+  double get _paneGap => _expanded ? 16 : 8;
+
   Widget wideWorkspace(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.all(width >= 1100 ? 16 : 8),
+      padding: EdgeInsets.all(_paneGap),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -188,7 +191,7 @@ class WorkbenchLayout extends StatelessWidget {
               inspector?.hasSelection == true ? inspector : null,
             ),
           ),
-          SizedBox(width: width >= 1100 ? 16 : 8),
+          SizedBox(width: _paneGap),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -221,7 +224,7 @@ class WorkbenchLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          width: width >= 1100 ? 134 : 108,
+          width: _expanded ? 134 : 108,
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: colors.brightness == Brightness.dark
@@ -236,7 +239,7 @@ class WorkbenchLayout extends StatelessWidget {
               builder: (context, bounds) => Stack(
                 children: [
                   if (bounds.maxHeight > 570 &&
-                      width >= 1100 &&
+                      _expanded &&
                       MediaQuery.textScalerOf(context).scale(16) < 24)
                     Positioned(
                       bottom: 16,
@@ -296,7 +299,7 @@ class WorkbenchLayout extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(width: width >= 1100 ? 16 : 8),
+        SizedBox(width: _paneGap),
         SizedBox(
           width: (width * .29).clamp(260.0, 430.0),
           child: RetainedPaneSwitcher(
