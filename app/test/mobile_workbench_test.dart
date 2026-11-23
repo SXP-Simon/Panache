@@ -342,6 +342,7 @@ void main() {
       final remove = find.text(l.remove);
       await scrollTo(remove, -180);
       await tester.tap(remove);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
       expect(workspace.background, isNull);
       expect(camera, findsNothing);
