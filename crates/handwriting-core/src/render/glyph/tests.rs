@@ -166,9 +166,9 @@ fn grid_corner_overruns_are_local_bounded_and_repeatable() {
     let base = quiet.sequence(&grid, 40.).unwrap();
     for seed in [0, 1, 7, 20261123] {
         natural.pen.seed = seed;
-        let g = natural.sequence(&grid, 40.).unwrap();
+        let g = natural.unit(&grid, 40., 0).unwrap();
         assert_ne!(g.mask, base.mask);
-        assert_eq!(g.mask, natural.sequence(&grid, 40.).unwrap().mask);
+        assert_eq!(g.mask, natural.unit(&grid, 40., 0).unwrap().mask);
         let interior = image::imageops::crop_imm(
             &g.mask,
             (base.left - g.left) as u32,
@@ -189,6 +189,10 @@ fn grid_corner_overruns_are_local_bounded_and_repeatable() {
             }
         }
     }
+    let first = natural.unit(&grid, 40., 0).unwrap();
+    let second = natural.unit(&grid, 40., 1).unwrap();
+    assert_ne!(first.mask, second.mask);
+    assert_eq!(first.mask, natural.unit(&grid, 40., 0).unwrap().mask);
     let dashed = text::parse("⟦ ╌╌ ; A | 1 ; B | 2 ; ╌╌ ⟧");
     assert!(matches!(&dashed[..], [Node::Table(_)]));
     assert_eq!(
@@ -518,7 +522,7 @@ fn scripts_follow_actual_base_height_and_natural_ink_width() {
         for size in [24., 40., 70.] {
             let mut glyphs = Glyphs::new(book);
             for letter in ['x', 'H', 'g'] {
-                let base = glyphs.unit(&[Node::Char(letter)], size).unwrap();
+                let base = glyphs.unit(&[Node::Char(letter)], size, 0).unwrap();
                 let upper = glyphs
                     .scripts(&[Node::Char('2')], &[], size, &base, 0)
                     .unwrap();
@@ -540,7 +544,7 @@ fn scripts_follow_actual_base_height_and_natural_ink_width() {
                     combined.advance < base.mask.width() as f32 + size,
                     "{letter}/{size}: excessive trailing bearing"
                 );
-                let chinese = glyphs.unit(&[Node::Char('中')], size).unwrap();
+                let chinese = glyphs.unit(&[Node::Char('中')], size, 0).unwrap();
                 assert_eq!(chinese.advance, glyphs.glyph('中', size).unwrap().advance);
             }
         }

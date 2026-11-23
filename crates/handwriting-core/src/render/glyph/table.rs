@@ -1,8 +1,7 @@
 //! 2026-10-20：整表按真实手写墨迹测量列宽与基线，作为单个刚性结构缩放和分页。
 use super::*;
 use crate::text::{Table, TableKind, TableRule};
-use rand::{RngExt, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use rand::RngExt;
 pub(super) mod matrix;
 
 impl Glyphs<'_> {
@@ -111,7 +110,7 @@ impl Glyphs<'_> {
         let reach = (size * 0.105).min(5.) * self.pen.naturalness;
         if table.kind == TableKind::Grid && corner_tails_fit(width, height, grid_thickness, reach) {
             // 横竖两笔都经过交点，只让其中一笔沿原方向多走一点。
-            let mut rng = ChaCha8Rng::seed_from_u64(self.pen.seed);
+            let mut rng = self.next_drawing_rng();
             for (row, dy) in [(0, -1), (ys.len() - 1, 1)] {
                 for (col, dx) in [(0, -1), (columns, 1)] {
                     if table.horizontal[row] == TableRule::Dashed

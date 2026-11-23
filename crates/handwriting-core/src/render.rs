@@ -568,7 +568,7 @@ fn render_planes(
             let hanging = if prefix.is_empty() {
                 0.
             } else {
-                glyphs.unit(&prefix, p.font_size)?.advance + p.word_spacing
+                glyphs.unit(&prefix, p.font_size, i)?.advance + p.word_spacing
             };
             continuation = p.left_margin + indent + hanging.min(available * 0.25);
             pages.x = p.left_margin + indent;
@@ -613,8 +613,8 @@ fn render_planes(
                     .take_while(|unit| !matches!(unit[0], Node::Newline | Node::Break));
                 let mut cursor = 0f32;
                 let mut width = 0f32;
-                for unit in rest {
-                    let mut g = glyphs.unit(unit, p.font_size)?;
+                for (offset, unit) in rest.enumerate() {
+                    let mut g = glyphs.unit(unit, p.font_size, i + 1 + offset)?;
                     if let Some(cell) = fixed_cell(unit, p) {
                         g = g.place_in_cell(cell);
                     }
@@ -709,7 +709,7 @@ fn render_planes(
                     ));
                     composed
                 } else {
-                    glyphs.unit(units[i], size)?
+                    glyphs.unit(units[i], size, i)?
                 };
                 let mut compound = units[i].len() > 1
                     || !matches!(node, Node::Char(_))
