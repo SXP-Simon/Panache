@@ -6,23 +6,14 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'process_identity.dart';
+import 'updater_failure.dart';
+
+export 'updater_failure.dart';
 
 const protocolVersion = 1;
 const product = 'Panache';
 const markerName = 'panache-install.json';
 const supportedPlatforms = {'windows-x64', 'macos-arm64', 'linux-x64'};
-
-class UpdaterFailure implements Exception {
-  const UpdaterFailure(this.code, {this.osError});
-  final int? osError;
-  final String code;
-  @override
-  String toString() =>
-      'UpdaterFailure($code${osError == null ? '' : ', osError: $osError'})';
-}
-
-Never reject(String code, {int? osError}) =>
-    throw UpdaterFailure(code, osError: osError);
 
 /// Prefix only an ordinary local absolute path at the Win32 FFI boundary.
 /// Protocol paths stay canonical and never contain a device/UNC namespace.

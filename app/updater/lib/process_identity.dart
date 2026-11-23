@@ -6,7 +6,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
-import 'protocol.dart';
+import 'updater_failure.dart';
 
 part 'process_identity/linux.dart';
 part 'process_identity/macos.dart';
