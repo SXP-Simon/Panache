@@ -1,7 +1,9 @@
 //! 2026-10-22：电路作为刚性手写结构，统一笔宽、精确端点，不抖动拓扑连接。
 use super::*;
 use crate::text::circuit::{Circuit, Point};
-use std::f32::consts::PI;
+use rand::RngExt;
+use rand_chacha::ChaCha8Rng;
+use std::f32::consts::{PI, TAU};
 
 #[derive(Clone, Copy)]
 enum Stroke {
@@ -13,6 +15,8 @@ type CircuitPath = (Vec<(i32, i32)>, Stroke);
 struct Drawing {
     paths: Vec<CircuitPath>,
     scale: f32,
+    naturalness: f32,
+    rng: ChaCha8Rng,
     holes: Vec<Point>,
     contacts: Vec<Point>,
 }
@@ -28,7 +32,7 @@ impl Drawing {
             return;
         }
         let mut screen_points: Vec<(i32, i32)> = Vec::new();
-        let max_dev = (self.scale * 0.015).clamp(0.6, 1.7);
+        let max_dev = (self.scale * 0.03).min(2.25);
         for pair in points.windows(2) {
             let (p1, p2) = (self.point(pair[0]), self.point(pair[1]));
             let dx = (p2.0 - p1.0) as f32;
@@ -43,13 +47,9 @@ impl Drawing {
             }
             let nx = -dy / dist;
             let ny = dx / dist;
-            let seed_raw = ((dist * 10.0).round() * 137.0
-                + (dx * 10.0).round() * 31.0
-                + (dy * 10.0).round() * 73.0)
-                .abs() as u32;
-            let phase1 = (seed_raw % 1000) as f32 / 1000.0 * 2.0 * PI;
-            let phase2 = ((seed_raw / 1000) % 1000) as f32 / 1000.0 * 2.0 * PI;
-            let dev = (dist * 0.015).min(max_dev);
+            let phase1 = self.rng.random::<f32>() * TAU;
+            let phase2 = self.rng.random::<f32>() * TAU;
+            let dev = (dist * 0.022).min(max_dev) * self.naturalness;
             let steps = (dist / 9.0).round().max(3.0) as usize;
             if screen_points.is_empty() {
                 screen_points.push(p1);
@@ -94,16 +94,19 @@ impl Drawing {
             .collect();
         self.path(points);
     }
+    fn line_through(&mut self, a: Point, contact: Point, b: Point) {
+        self.line(a, contact);
+        self.line(contact, b);
+    }
     fn circle(&mut self, c: Point, r: f32) {
         self.contact_circle(c, r, 0.);
     }
     fn contact_circle(&mut self, c: Point, r: f32, contact_angle: f32) {
         // 2026-10-23：只在端子之间扰动，任意方向的引线端点都与圆周精确重合。
         let radius = (r * self.scale).round().max(1.0);
-        let seed = (radius * 89.0).round() as u32;
-        let p1 = (seed % 1000) as f32 / 1000.0 * 2.0 * PI;
-        let p2 = ((seed / 1000) % 1000) as f32 / 1000.0 * 2.0 * PI;
-        let w_dev = (radius * 0.022).clamp(0.4, 1.2);
+        let p1 = self.rng.random::<f32>() * TAU;
+        let p2 = self.rng.random::<f32>() * TAU;
+        let w_dev = (radius * 0.022).clamp(0.4, 1.2) * self.naturalness;
         let steps = 40;
         let mut screen_points = Vec::new();
         for i in 0..steps {
@@ -270,6 +273,8 @@ impl Glyphs<'_> {
         let mut draw = Drawing {
             paths: Vec::new(),
             scale,
+            naturalness: self.pen.naturalness,
+            rng: self.next_drawing_rng(),
             holes: Vec::new(),
             contacts: circuit
                 .segments
@@ -316,6 +321,7 @@ impl Glyphs<'_> {
                         p(-half, 0.),
                         p(-half, h),
                         p(half, h),
+                        p(half, 0.),
                         p(half, -h),
                         p(-half, -h),
                         p(-half, 0.),
@@ -323,8 +329,8 @@ impl Glyphs<'_> {
                     "C" => {
                         draw.line(p(-half, 0.), p(-0.055, 0.));
                         draw.line(p(0.055, 0.), p(half, 0.));
-                        draw.line(p(-0.055, -h * 1.5), p(-0.055, h * 1.5));
-                        draw.line(p(0.055, -h * 1.5), p(0.055, h * 1.5));
+                        draw.line_through(p(-0.055, -h * 1.5), p(-0.055, 0.), p(-0.055, h * 1.5));
+                        draw.line_through(p(0.055, -h * 1.5), p(0.055, 0.), p(0.055, h * 1.5));
                     }
                     "L" => {
                         let radius = half / 4.;
@@ -377,14 +383,14 @@ impl Glyphs<'_> {
                     "battery1" => {
                         draw.line(p(-half, 0.), p(-0.055, 0.));
                         draw.line(p(0.055, 0.), p(half, 0.));
-                        draw.line(p(0.055, -h * 1.5), p(0.055, h * 1.5));
-                        draw.line(p(-0.055, -h * 0.75), p(-0.055, h * 0.75));
+                        draw.line_through(p(0.055, -h * 1.5), p(0.055, 0.), p(0.055, h * 1.5));
+                        draw.line_through(p(-0.055, -h * 0.75), p(-0.055, 0.), p(-0.055, h * 0.75));
                     }
                     "D" | "led" => {
                         draw.line(p(-half, 0.), p(-h, 0.));
                         draw.line(p(h, 0.), p(half, 0.));
-                        draw.path(vec![p(-h, -h), p(h, 0.), p(-h, h), p(-h, -h)]);
-                        draw.line(p(h, -h), p(h, h));
+                        draw.path(vec![p(-h, -h), p(h, 0.), p(-h, h), p(-h, 0.), p(-h, -h)]);
+                        draw.line_through(p(h, -h), p(h, 0.), p(h, h));
                         if kind == "led" {
                             draw.arrow(p(0., h * 1.7), p(h * 0.9, h * 2.6));
                             draw.arrow(p(h * 0.9, h * 1.7), p(h * 1.8, h * 2.6));
@@ -456,7 +462,7 @@ impl Glyphs<'_> {
                     for i in 0..3 {
                         let h = 0.2 - i as f32 * 0.06;
                         let y = p.1 - 0.18 - i as f32 * 0.07;
-                        draw.line(Point(p.0 - h, y), Point(p.0 + h, y));
+                        draw.line_through(Point(p.0 - h, y), Point(p.0, y), Point(p.0 + h, y));
                     }
                 }
                 "rground" => {
@@ -465,6 +471,7 @@ impl Glyphs<'_> {
                         Point(p.0 - 0.2, p.1 - 0.18),
                         Point(p.0, p.1 - 0.48),
                         Point(p.0 + 0.2, p.1 - 0.18),
+                        Point(p.0, p.1 - 0.18),
                         Point(p.0 - 0.2, p.1 - 0.18),
                     ]);
                 }
@@ -520,6 +527,8 @@ mod tests {
         Drawing {
             paths: Vec::new(),
             scale,
+            naturalness: 1.,
+            rng: rand::SeedableRng::seed_from_u64(20261123),
             holes: Vec::new(),
             contacts: Vec::new(),
         }
@@ -591,6 +600,31 @@ mod tests {
         }
     }
     #[test]
+    fn parallel_wires_vary_within_one_drawing_and_replay_with_the_same_seed() {
+        let strokes = |naturalness| {
+            let mut draw = drawing(80.);
+            draw.naturalness = naturalness;
+            for y in [0., 1.] {
+                draw.line(Point(0., y), Point(6., y));
+            }
+            draw.paths
+                .into_iter()
+                .enumerate()
+                .map(|(row, (path, _))| {
+                    path.into_iter()
+                        .map(|(_, y)| y + row as i32 * 80)
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+        let lines = strokes(1.);
+        assert_eq!(lines, strokes(1.));
+        assert_ne!(lines[0], lines[1]);
+        assert!(lines.iter().flatten().all(|y| y.abs() <= 3));
+        assert!(strokes(0.).iter().flatten().all(|&y| y == 0));
+    }
+
+    #[test]
     fn natural_wires_keep_every_corner_and_both_endpoints() {
         for scale in [10., 70., 160.] {
             let mut draw = drawing(scale);
@@ -644,7 +678,10 @@ mod tests {
             crate::text::circuit::END
         );
         let circuit = crate::text::circuit::parse(&source).unwrap();
-        Glyphs::new(book).circuit(&circuit, 40., 0).unwrap()
+        Glyphs::with_parameters(book, &Parameters::default())
+            .unwrap()
+            .circuit(&circuit, 40., 0)
+            .unwrap()
     }
     #[test]
     fn common_components_have_distinct_actual_ink() {
@@ -788,6 +825,9 @@ mod tests {
         let y = g.mask.height() / 2;
         assert_eq!(g.mask[(4, y)][0], 0);
         assert_eq!(g.mask[(g.mask.width() - 5, y)][0], 0);
-        assert!(g.mask[(g.mask.width() / 2, y)][0] > 0);
+        assert!(
+            (10..g.mask.width() - 10)
+                .all(|x| { (y - 3..=y + 3).any(|row| g.mask[(x, row)][0] > 0) })
+        );
     }
 }
