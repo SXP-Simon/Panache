@@ -119,7 +119,7 @@ String? _chemicalSpecies(String source) {
   var result = coefficient?[1] ?? '';
   if (result.contains('/')) {
     final parts = result.split('/');
-    if (int.parse(parts[1]) == 0) return null;
+    if (!RegExp(r'[1-9]').hasMatch(parts[1])) return null;
     result = '\\frac{${parts[0]}}{${parts[1]}}\\,';
   }
   if (coefficient != null) value = value.substring(coefficient.end);

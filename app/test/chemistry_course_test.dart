@@ -80,6 +80,34 @@ void main() {
       expect(convertLatex(cleanMarkdown(source)), source);
     });
   }
+  test('分数系数保留各位数字，分母全零才退回原文', () {
+    for (final denominator in ['0', '000', '0' * 128]) {
+      final source = '\\ce{H2 + 1/$denominator O2}';
+      expect(normalizeCourseLatex(source), source);
+      expect(
+        normalizeCourseLatex(
+          '$source +'
+          r'\num{2e3}',
+        ),
+        '$source +'
+        r'2\times10^{3}',
+      );
+      expect(convertLatex('\$$source\$'), '\$$source\$');
+    }
+    for (final (numerator, denominator) in [
+      ('0', '02'),
+      ('123456789012345678901234567890', '2'),
+      ('1', '9223372036854775807'),
+      ('1', '9223372036854775808'),
+      ('1', '9' * 128),
+      ('1', '${'0' * 32}2'),
+    ]) {
+      expect(
+        normalizeCourseLatex('\\ce{$numerator/$denominator O2}'),
+        '\\mathrm{\\frac{$numerator}{$denominator}\\,O_{2}}',
+      );
+    }
+  });
   test('化学长度预算和文字语境', () {
     final huge =
         r'\ce{'
