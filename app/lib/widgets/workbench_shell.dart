@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/mcp_connection_stub.dart'
     if (dart.library.io) '../services/mcp_connection_native.dart';
@@ -10,6 +9,7 @@ import 'atelier_ornament.dart';
 import 'project_source_link.dart';
 import 'workbench_guide.dart';
 import 'workbench_motion.dart';
+import 'workbench_preferences.dart';
 import 'theme_color_editor.dart';
 import '../theme/handwriting_theme.dart';
 
@@ -326,31 +326,7 @@ class WorkbenchShell extends StatelessWidget {
                         },
                 ),
                 if (mcpConfig != null)
-                  ListTile(
-                    key: const ValueKey('connect-ai-client'),
-                    leading: const Icon(Icons.hub_outlined),
-                    title: Text(l.connectAiClient),
-                    subtitle: Text(l.copyMcpConfig),
-                    trailing: const Icon(Icons.copy_outlined),
-                    onTap: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      try {
-                        await Clipboard.setData(ClipboardData(text: mcpConfig));
-                      } on PlatformException {
-                        if (messenger.mounted) {
-                          messenger.showSnackBar(
-                            SnackBar(content: Text(l.mcpCopyFailed)),
-                          );
-                        }
-                        return;
-                      }
-                      if (!sheetContext.mounted) return;
-                      Navigator.pop(sheetContext);
-                      messenger.showSnackBar(
-                        SnackBar(content: Text(l.mcpConfigCopied)),
-                      );
-                    },
-                  ),
+                  mcpConnectionTile(context, sheetContext, l, mcpConfig),
                 ListTile(
                   leading: const Icon(Icons.translate),
                   title: Text(l.language),
@@ -359,52 +335,12 @@ class WorkbenchShell extends StatelessWidget {
                     onToggleLocale();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.contrast),
-                  title: Text(l.theme),
-                  subtitle: Text(switch (themeMode) {
-                    ThemeMode.system => l.themeSystem,
-                    ThemeMode.light => l.themeLight,
-                    ThemeMode.dark => l.themeDark,
-                  }),
-                  trailing: onThemeModeChanged == null
-                      ? null
-                      : PopupMenuButton<ThemeMode>(
-                          tooltip: l.chooseTheme,
-                          icon: const Icon(Icons.expand_more),
-                          initialValue: themeMode,
-                          itemBuilder: (_) => [
-                            for (final (mode, label) in [
-                              (ThemeMode.system, l.themeSystem),
-                              (ThemeMode.light, l.themeLight),
-                              (ThemeMode.dark, l.themeDark),
-                            ])
-                              CheckedPopupMenuItem(
-                                value: mode,
-                                checked: themeMode == mode,
-                                child: Text(label),
-                              ),
-                          ],
-                          onSelected: (value) {
-                            final nextBrightness = switch (value) {
-                              ThemeMode.system =>
-                                MediaQuery.platformBrightnessOf(sheetContext),
-                              ThemeMode.light => Brightness.light,
-                              ThemeMode.dark => Brightness.dark,
-                            };
-                            if (Theme.of(sheetContext).brightness ==
-                                nextBrightness) {
-                              Navigator.pop(sheetContext);
-                            } else {
-                              _dismissForAppearanceChange(sheetContext);
-                            }
-                            onThemeModeChanged!(value);
-                          },
-                        ),
-                  onTap: () {
-                    _dismissForAppearanceChange(sheetContext);
-                    onToggleTheme();
-                  },
+                themePreferenceTile(
+                  sheetContext,
+                  l,
+                  themeMode: themeMode,
+                  onThemeModeChanged: onThemeModeChanged,
+                  onToggleTheme: onToggleTheme,
                 ),
                 ThemeColorEditor(
                   color: themeColor,
@@ -456,11 +392,4 @@ class WorkbenchShell extends StatelessWidget {
       ),
     );
   }
-}
-
-// The global appearance transition already blends the painted sheet into the
-// new workbench. Retiring its route immediately avoids laying out and animating
-// the outgoing sheet in a second theme on every frame of that same gesture.
-void _dismissForAppearanceChange(BuildContext sheetContext) {
-  Navigator.of(sheetContext).removeRoute(ModalRoute.of(sheetContext)!);
 }

@@ -6,6 +6,8 @@ import '../theme/nouveau_ornament.dart';
 import 'atelier_ornament.dart';
 import 'fine_preview.dart';
 import 'workbench_motion.dart';
+import 'workbench_navigation.dart';
+import 'workbench_task_status.dart';
 import 'workbench_settings.dart';
 
 class WorkbenchLayout extends StatelessWidget {
@@ -109,74 +111,20 @@ class WorkbenchLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final taskStatus = generating
-        ? Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                const LinearProgressIndicator(),
-                const SizedBox(height: 8),
-                if (onCancel != null)
-                  TextButton.icon(
-                    key: const ValueKey('cancel-generation'),
-                    onPressed: onCancel,
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: Text(l.stopGeneration),
-                  ),
-                Text(
-                  generating
-                      ? switch (phase) {
-                          'pending' => l.pending,
-                          'completed' => l.completed,
-                          'cancelling' => l.stoppingTask,
-                          _ =>
-                            stage == 'exporting'
-                                ? l.exportingTask
-                                : l.processing,
-                        }
-                      : l.processing,
-                ),
-                if (pagesCompleted > 0) Text(l.generatedPages(pagesCompleted)),
-              ],
-            ),
-          )
-        : const SizedBox(width: double.infinity);
     final content = Column(
       children: [
-        if (!fineFullscreen && error.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Material(
-              animationDuration: Duration.zero,
-              color: Theme.of(context).colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(16),
-              child: ListTile(
-                leading: const Icon(Icons.error_outline),
-                title: Text(
-                  error == 'validation'
-                      ? l.validation
-                      : queueWaitSeconds != null
-                      ? '${l.queueFull} ${queueWaitSeconds}s'
-                      : error,
-                ),
-                trailing: TextButton.icon(
-                  label: Text(l.close),
-                  onPressed: onDismissError,
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ),
-          ),
         if (!fineFullscreen)
-          MediaQuery.disableAnimationsOf(context)
-              ? taskStatus
-              : AnimatedSize(
-                  duration: WorkbenchMotion.pane,
-                  curve: Curves.easeInOut,
-                  alignment: Alignment.topCenter,
-                  child: taskStatus,
-                ),
+          ...workbenchTaskStatus(
+            context,
+            error: error,
+            queueWaitSeconds: queueWaitSeconds,
+            generating: generating,
+            phase: phase,
+            stage: stage,
+            pagesCompleted: pagesCompleted,
+            onCancel: onCancel,
+            onDismissError: onDismissError,
+          ),
         Expanded(
           key: const ValueKey('workbench-panes'),
           child: Form(
@@ -201,92 +149,10 @@ class WorkbenchLayout extends StatelessWidget {
               child: previewActions(context, mobile: true),
             ),
           const NouveauWaveDivider(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    for (final (i, key, icon, label) in [
-                      (
-                        0,
-                        'back-to-editor',
-                        Icons.edit_outlined,
-                        l.mobileEditor,
-                      ),
-                      (1, 'open-paper', Icons.tune, l.parametersShort),
-                      (
-                        2,
-                        'open-preview',
-                        Icons.visibility_outlined,
-                        l.mobilePreview,
-                      ),
-                    ])
-                      Expanded(
-                        child: Semantics(
-                          selected: mobileTab == i,
-                          child: TextButton(
-                            key: ValueKey(key),
-                            style: mobileTab == i
-                                ? selectedToolStyle(context)
-                                : null,
-                            onPressed: () => onTabChanged(i),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AnimatedSlide(
-                                  offset: mobileTab == i
-                                      ? const Offset(0, -.1)
-                                      : Offset.zero,
-                                  duration:
-                                      MediaQuery.disableAnimationsOf(context)
-                                      ? Duration.zero
-                                      : WorkbenchMotion.selection,
-                                  curve: WorkbenchMotion.enter,
-                                  child: Icon(icon, size: 20),
-                                ),
-                                Text(label, textAlign: TextAlign.center),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                SizedBox(
-                  height: 4,
-                  width: double.infinity,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: FractionallySizedBox(
-                      widthFactor: 1 / 3,
-                      child: AnimatedSlide(
-                        offset: Offset(
-                          mobileTab.toDouble() *
-                              (Directionality.of(context) == TextDirection.rtl
-                                  ? -1
-                                  : 1),
-                          0,
-                        ),
-                        duration: MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : WorkbenchMotion.selection,
-                        curve: WorkbenchMotion.enter,
-                        child: Center(
-                          child: DecoratedBox(
-                            decoration: ShapeDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              shape: const StadiumBorder(),
-                            ),
-                            child: const SizedBox(width: 22, height: 3),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          mobilePaneNavigation(
+            context,
+            selected: mobileTab,
+            onSelected: onTabChanged,
           ),
         ],
       ],
@@ -306,18 +172,6 @@ class WorkbenchLayout extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  ButtonStyle selectedToolStyle(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return TextButton.styleFrom(
-      backgroundColor: colors.brightness == Brightness.dark
-          ? colors.primary.withValues(alpha: .12)
-          : colors.primary,
-      foregroundColor: colors.brightness == Brightness.dark
-          ? colors.primary
-          : colors.onPrimary,
     );
   }
 
@@ -479,12 +333,15 @@ class WorkbenchLayout extends StatelessWidget {
     selected: selected,
     child: TextButton(
       key: ValueKey('workspace-tool-$id'),
-      style: (selected ? selectedToolStyle(context) : TextButton.styleFrom())
-          .copyWith(
-            padding: const WidgetStatePropertyAll(
-              EdgeInsets.symmetric(horizontal: 5, vertical: 8),
-            ),
-          ),
+      style:
+          (selected
+                  ? selectedWorkbenchToolStyle(context)
+                  : TextButton.styleFrom())
+              .copyWith(
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+                ),
+              ),
       onPressed: select,
       child: Row(
         children: [
