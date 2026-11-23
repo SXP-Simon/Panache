@@ -15,6 +15,7 @@ import '../view_models/fine_selection_drag.dart';
 import 'color_picker_dialog.dart';
 import 'fine_adjustment_sliders.dart';
 import 'fine_preview_painter.dart';
+import 'fine_selection_inspector.dart';
 import 'preview_image_actions.dart';
 import 'preview_zoom.dart';
 import 'workbench_controls.dart';
@@ -141,19 +142,7 @@ class _FinePreviewState extends State<FinePreview> {
 
   void _sourceSelection() {
     final range = widget.source;
-    if (range == null || !model.glyphs.any((glyph) => glyph.source != null)) {
-      return;
-    }
-    _selection.select(
-      model.glyphs
-          .where((glyph) {
-            final span = glyph.source;
-            return span != null &&
-                span.start < range.end &&
-                span.end > range.start;
-          })
-          .map((glyph) => glyph.id),
-    );
+    if (range != null) _selection.selectSource(model, range);
   }
 
   Future<void> _paintCommitted() async {
@@ -421,20 +410,14 @@ class _FinePreviewState extends State<FinePreview> {
     final changesShape = thickness != null || softness != null;
     setState(() {
       _shapeDraft = changesShape;
-      _draft = _selection.change(
+      _draft = _selection.adjust(
         widget.edits,
-        (v) => (
-          id: v.id,
-          dx: v.dx,
-          dy: v.dy,
-          scale: scale ?? v.scale,
-          angle: angle ?? v.angle,
-          opacity: opacity ?? v.opacity,
-          color: color ?? v.color,
-          thickness: thickness ?? v.thickness,
-          softness: softness ?? v.softness,
-          warp: v.warp,
-        ),
+        scale: scale,
+        angle: angle,
+        opacity: opacity,
+        color: color,
+        thickness: thickness,
+        softness: softness,
       );
     });
     if (changesShape) unawaited(_paintCommitted());
@@ -885,6 +868,11 @@ class _FinePreviewState extends State<FinePreview> {
     );
   }
 
+  void _selectDrawing(int group) {
+    setState(() => _selection.selectIllustration(model, group));
+    widget.onCanvasSelect?.call();
+  }
+
   Widget _inspector(
     BuildContext context,
     double maxHeight, {
@@ -893,7 +881,6 @@ class _FinePreviewState extends State<FinePreview> {
   }) {
     final l = AppLocalizations.of(context)!;
     final selection = _selection.selected;
-    final scrollActions = settingsOnly || maxHeight < 160;
     final first = selection.firstOrNull;
     final current = _visible[first] ?? defaultFineAdjustment(first ?? 0);
     final glyph = model.glyphs.where((g) => g.id == first).firstOrNull;
@@ -901,137 +888,54 @@ class _FinePreviewState extends State<FinePreview> {
     final baseLook = glyph == null
         ? widget.look
         : fineInkLook(glyph, widget.look);
-    final summary = Text(
-      first == null
-          ? l.fineHint
-          : selection.length == 1 && group != null
-          ? (first == group ? l.fineDrawingLines : l.fineDrawingDetail)
-          : l.fineSelected(selection.length),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: _compact || sidebar ? TextAlign.center : TextAlign.start,
-      style: Theme.of(context).textTheme.bodySmall,
-    );
-    final parameterActions = Wrap(
-      spacing: 4,
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        TextButton.icon(
-          key: const ValueKey('fine-color'),
-          onPressed: () => _pickColor(current, baseLook),
-          icon: ColorSwatchIndicator(Color(current.color ?? baseLook.color)),
-          label: Text(l.fineColor),
-        ),
-        if (group != null)
-          TextButton.icon(
-            key: const ValueKey('fine-select-drawing'),
-            onPressed: () {
-              setState(
-                () => _selection.select(
-                  model.glyphs
-                      .where((g) => g.illustrationId == group)
-                      .map((g) => g.id),
-                ),
-              );
-              widget.onCanvasSelect?.call();
-            },
-            icon: const Icon(Icons.select_all),
-            label: Text(l.fineSelectDrawing),
-          ),
-        FilterChip(
-          label: Text(l.fineSnap),
-          selected: _selection.snap,
-          onSelected: (value) => setState(() => _selection.snap = value),
-        ),
-        TextButton.icon(
-          key: const ValueKey('fine-reset'),
-          label: Text(l.fineReset),
-          icon: const Icon(Icons.restart_alt),
-          onPressed: () =>
-              _finish(selection.map(defaultFineAdjustment).toList()),
-        ),
-      ],
-    );
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: SingleChildScrollView(
-                primary: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_compact || sidebar || settingsOnly) summary,
-                    if (!settingsOnly)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (!_compact && !sidebar) Flexible(child: summary),
-                          Flexible(
-                            child: Wrap(
-                              alignment: WrapAlignment.center,
-                              children: [
-                                ..._historyActions(l),
-                                _zoomButton(l, zoomIn: false),
-                                _zoomButton(l, zoomIn: true),
-                                if (!_touchNavigation)
-                                  IconButton(
-                                    isSelected: _selection.tool == FineTool.pan,
-                                    tooltip: l.finePan,
-                                    onPressed: () => setState(() {
-                                      _selection.tool =
-                                          _selection.tool == FineTool.pan
-                                          ? FineTool.select
-                                          : FineTool.pan;
-                                    }),
-                                    icon: const Icon(Icons.pan_tool_outlined),
-                                    selectedIcon: const Icon(Icons.pan_tool),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    if (!settingsOnly && widget.inspector == null)
-                      _selectionTools(context),
-                    if (!settingsOnly &&
-                        _selection.tool == FineTool.perspective)
-                      Text(l.finePerspectiveHint, textAlign: TextAlign.center),
-                    Visibility(
-                      visible: first != null,
-                      maintainState: true,
-                      maintainAnimation: true,
-                      maintainSize: true,
-                      child: FineAdjustmentSliders(
-                        current: current,
-                        selectionCount: selection.length,
-                        baseLook: baseLook,
-                        transformDraft: _transformDraft,
-                        onAdjust: _adjust,
-                        onTransform: _transform,
-                        onCommit: _commitDraft,
-                      ),
-                    ),
-                    if (scrollActions && first != null) parameterActions,
-                  ],
-                ),
-              ),
+    return FineSelectionInspector(
+      maxHeight: maxHeight,
+      centerSummary: _compact || sidebar,
+      count: selection.length,
+      glyph: glyph,
+      navigation: settingsOnly
+          ? null
+          : Wrap(
+              alignment: WrapAlignment.center,
+              children: [
+                ..._historyActions(l),
+                _zoomButton(l, zoomIn: false),
+                _zoomButton(l, zoomIn: true),
+                if (!_touchNavigation)
+                  IconButton(
+                    isSelected: _selection.tool == FineTool.pan,
+                    tooltip: l.finePan,
+                    onPressed: () => setState(() {
+                      _selection.tool = _selection.tool == FineTool.pan
+                          ? FineTool.select
+                          : FineTool.pan;
+                    }),
+                    icon: const Icon(Icons.pan_tool_outlined),
+                    selectedIcon: const Icon(Icons.pan_tool),
+                  ),
+              ],
             ),
-            if (!scrollActions)
-              Visibility(
-                visible: first != null,
-                maintainState: true,
-                maintainAnimation: true,
-                maintainSize: true,
-                child: parameterActions,
-              ),
-          ],
-        ),
+      tools: !settingsOnly && widget.inspector == null
+          ? _selectionTools(context)
+          : null,
+      showPerspectiveHint:
+          !settingsOnly && _selection.tool == FineTool.perspective,
+      sliders: FineAdjustmentSliders(
+        current: current,
+        selectionCount: selection.length,
+        baseLook: baseLook,
+        transformDraft: _transformDraft,
+        onAdjust: _adjust,
+        onTransform: _transform,
+        onCommit: _commitDraft,
+      ),
+      actions: FineSelectionActions(
+        color: Color(current.color ?? baseLook.color),
+        snap: _selection.snap,
+        onPickColor: () => _pickColor(current, baseLook),
+        onSelectDrawing: group == null ? null : () => _selectDrawing(group),
+        onSnapChanged: (value) => setState(() => _selection.snap = value),
+        onReset: () => _finish(selection.map(defaultFineAdjustment).toList()),
       ),
     );
   }
