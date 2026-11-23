@@ -28,7 +28,7 @@ import '../models/fine_edit.dart';
 import '../services/desktop_exit.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
-import '../services/text_preparation/prepare.dart';
+import 'editor_preparation.dart';
 import '../widgets/workbench_controls.dart';
 import '../widgets/fine_preview.dart';
 import '../widgets/workbench_editor.dart';
@@ -101,17 +101,14 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   bool firstFrameReady = false;
   bool recoveryShown = false;
   UpdatePromptCoordinator? updatePrompts;
-  String tableMode = 'latex';
-  TextPreparationJob? preparation;
-  bool preparationStopping = false;
-  ({String original, String formatted, String mode})? preparedText;
+  late final EditorPreparation preparation;
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';
   bool get locked => w.busy || editingLocked;
   bool get editingLocked =>
       operation ||
-      preparation != null ||
+      preparation.running ||
       {
         UpdatePhase.preparing,
         UpdatePhase.restarting,
@@ -125,6 +122,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     destination = widget.initialDestination;
     w = widget.workspace ?? Workspace();
+    preparation = EditorPreparation(
+      readText: () => editor.text,
+      applyText: (text) => replace(text, keepPreparation: true),
+      onFailure: () => notify(l.prepareTextFailed),
+    )..addListener(refreshPreparation);
     editor.text = w.text;
     editor.addListener(rememberEditorSelection);
     w.addListener(refresh);
@@ -166,6 +168,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     if (widget.workspace == null) unawaited(w.initialize());
   }
 
+  void refreshPreparation() => setState(() {});
+
   void refreshUpdates() {
     if (mounted &&
         !recoveryShown &&
@@ -185,8 +189,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       settingsRevision++;
     }
     if (editor.text != w.text) {
-      if (preparation != null) unawaited(stopPreparation());
-      preparedText = null;
+      if (preparation.running) unawaited(preparation.stop());
+      preparation.forgetFormatting();
       editor.value = TextEditingValue(
         text: w.text,
         selection: TextSelection.collapsed(offset: w.text.length),
@@ -210,8 +214,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   @override
   void dispose() {
     liveTimer?.cancel();
-    final job = preparation;
-    if (job != null) unawaited(job.cancel());
+    preparation.dispose();
     WidgetsBinding.instance.removeObserver(this);
     w.removeListener(refresh);
     widget.updates?.removeListener(refreshUpdates);
@@ -323,7 +326,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   }
 
   void replace(String value, {bool keepPreparation = false}) {
-    if (!keepPreparation) preparedText = null;
+    if (!keepPreparation) preparation.forgetFormatting();
     editor.text = value;
     w.text = value;
     w.edit();
@@ -638,29 +641,29 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     onOpenGuide: () => selectDestination(1),
     guideUnread: widget.guideUnread,
     onUndo: () {
-      final prepared = preparedText;
-      if (prepared != null && editor.text == prepared.formatted) {
-        replace(prepared.original, keepPreparation: true);
+      final text = preparation.undoText(editor.text);
+      if (text != null) {
+        replace(text, keepPreparation: true);
       } else {
         undo.undo();
       }
     },
     onRedo: () {
-      final prepared = preparedText;
-      if (prepared != null && editor.text == prepared.original) {
-        replace(prepared.formatted, keepPreparation: true);
+      final text = preparation.redoText(editor.text);
+      if (text != null) {
+        replace(text, keepPreparation: true);
       } else {
         undo.redo();
       }
     },
     onChanged: (value) {
-      preparedText = null;
+      preparation.forgetFormatting();
       w.text = collapseImages(value, w.images);
       w.edit();
     },
-    preparing: preparation != null,
-    preparationStopping: preparationStopping,
-    onStopPreparation: stopPreparation,
+    preparing: preparation.running,
+    preparationStopping: preparation.stopping,
+    onStopPreparation: preparation.stop,
     toolbar: EditorToolbar(
       moreLabel: l.editingTools,
       hint: l.editingToolsHint,
@@ -922,58 +925,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Future<void> prepareTextDialog() async {
     if (locked) return;
-    final mode = await showPrepareTextDialog(context, initialMode: tableMode);
-    if (!mounted || mode == null || locked) return;
-    tableMode = mode;
-    final previous = preparedText;
-    if (previous != null &&
-        editor.text == previous.formatted &&
-        mode == previous.mode) {
-      return;
-    }
-    final original = previous != null && editor.text == previous.formatted
-        ? previous.original
-        : editor.text;
-    final input = editor.text;
-    final job = startTextPreparation(
-      original,
-      tableMode: mode,
-      english: english,
+    final mode = await showPrepareTextDialog(
+      context,
+      initialMode: preparation.tableMode,
     );
-    setState(() {
-      preparation = job;
-      preparationStopping = false;
-    });
-    try {
-      final formatted = await job.result;
-      if (!mounted ||
-          preparation != job ||
-          preparationStopping ||
-          editor.text != input ||
-          formatted == input) {
-        return;
-      }
-      preparedText = (original: original, formatted: formatted, mode: mode);
-      replace(formatted, keepPreparation: true);
-    } on TextPreparationCancelled {
-      // Keep the exact source and the previous undo snapshot after stopping.
-    } catch (_) {
-      if (mounted && preparation == job) notify(l.prepareTextFailed);
-    } finally {
-      if (mounted && preparation == job) {
-        setState(() {
-          preparation = null;
-          preparationStopping = false;
-        });
-      }
-    }
-  }
-
-  Future<void> stopPreparation() async {
-    final job = preparation;
-    if (job == null || preparationStopping) return;
-    setState(() => preparationStopping = true);
-    await job.cancel();
+    if (!mounted || mode == null || locked) return;
+    await preparation.run(mode, english: english);
   }
 
   Future<void> letterDialog() async {
