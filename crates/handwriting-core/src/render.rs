@@ -289,6 +289,9 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
             .rev()
             .find(|(i, u)| u.break_after && *i + 1 < self.line.len() && u.x as f32 >= cutoff)
             .map(|(i, _)| i + 1);
+        self.wrap_at(split, continuation)
+    }
+    fn wrap_at(&mut self, split: Option<usize>, continuation: f32) -> Result<()> {
         let mut tail = split.map(|at| self.line.split_off(at)).unwrap_or_default();
         let old_cursor = self.x;
         self.finish_line()?;
@@ -563,6 +566,7 @@ fn render_planes(
     let mut i = 0;
     let mut node_index = 0;
     let mut paragraph_start = true;
+    let mut group_start = 0;
     let mut section_line_start = 0;
     let mut continuation = p.left_margin;
     while i < units.len() && !pages.stopped {
@@ -809,6 +813,30 @@ fn render_planes(
                     .round()
                     .max(p.left_margin - g.left as f32);
                 let footprint = cell.unwrap_or_else(|| g.right() as f32);
+                let separator = matches!(units[i], [Node::Char(' ' | '\t')]);
+                let closing = matches!(units[i], [Node::Char(c)] if units::closing_punctuation(*c));
+                if !homework_mode && (pages.line.is_empty() || units::starts_wrap_group(&units, i))
+                {
+                    group_start = pages.line.len();
+                }
+                if !homework_mode
+                    && closing
+                    && x + footprint > right
+                    && i > 0
+                    && matches!(units[i - 1], [Node::Char(c)] if c.is_whitespace())
+                    && let Some(last) = pages.line.iter().rev().find(|u| u.glyph.ink)
+                    && (last.x + last.glyph.right()) as f32 <= right - footprint
+                {
+                    // Use spare trailing whitespace before moving a closing mark to another line.
+                    x = right - footprint;
+                }
+                if !homework_mode && separator && x + footprint > right && !pages.line.is_empty() {
+                    // A separator at the right edge does not need a line of its own.
+                    pages.x = right;
+                    node_index += units[i].len();
+                    i += 1;
+                    continue;
+                }
                 if !pages.line.is_empty() && x + footprint > right {
                     if homework_mode {
                         pages.homework_wrap(continuation, right)?;
@@ -817,7 +845,28 @@ fn render_planes(
                             pages.x = continuation;
                         }
                     } else {
-                        pages.newline()?;
+                        // Move the buffered prefix with its measured advances and fine-edit IDs.
+                        // A word wider than a fresh line falls back to character boundaries.
+                        let fits = |at: usize| {
+                            pages.line.get(at).is_some_and(|first| {
+                                at > 0
+                                    && x + footprint
+                                        - first.x as f32
+                                        - first.glyph.left.min(0) as f32
+                                        <= usable_width
+                            })
+                        };
+                        let mut split = fits(group_start).then_some(group_start);
+                        if split.is_none() && closing {
+                            split = pages
+                                .line
+                                .iter()
+                                .rposition(|u| u.glyph.ink && !matches!(nodes[u.id as usize], Node::Char(c) if units::closing_punctuation(c)))
+                                .filter(|&at| fits(at));
+                        }
+                        let bearing = split.map_or(0, |at| pages.line[at].glyph.left.min(0));
+                        pages.wrap_at(split, p.left_margin - bearing as f32)?;
+                        group_start = 0;
                     }
                     if pages.stopped {
                         break;

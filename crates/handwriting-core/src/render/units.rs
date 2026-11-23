@@ -1,6 +1,28 @@
 //! 2026-10-15：基底及其脚标是同一个换行单元，防止窄纸把化学价态/积分上下限单独放到下一行。
 use crate::Parameters;
 use crate::text::Node;
+pub(super) fn closing_punctuation(c: char) -> bool {
+    "，。；：！？、,.!?;:)]}）】〕〉》」』”’…".contains(c)
+}
+
+// Keep contractions and hyphenated words together while both neighbours are letters.
+fn word_part(units: &[&[Node]], i: usize) -> bool {
+    let alphanumeric = |unit: &[Node]| matches!(unit, [Node::Char(c)] if c.is_ascii_alphanumeric());
+    alphanumeric(units[i])
+        || (matches!(units[i], [Node::Char('\'' | '’' | '-')])
+            && i > 0
+            && i + 1 < units.len()
+            && alphanumeric(units[i - 1])
+            && alphanumeric(units[i + 1]))
+}
+
+pub(super) fn starts_wrap_group(units: &[&[Node]], i: usize) -> bool {
+    if matches!(units[i], [Node::Char(c)] if c.is_whitespace() || closing_punctuation(*c)) {
+        return false;
+    }
+    i == 0 || !word_part(units, i - 1) || !word_part(units, i)
+}
+
 pub(super) fn layout_units(nodes: &[Node]) -> Vec<&[Node]> {
     let mut units = Vec::new();
     let mut index = 0;

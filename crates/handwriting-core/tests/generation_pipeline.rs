@@ -49,6 +49,39 @@ fn request(text: &str) -> RenderRequest {
 }
 
 #[test]
+fn standard_wrap_keeps_words_and_closing_punctuation_with_their_neighbours() {
+    fn lines(text: &str, width: u32) -> Vec<String> {
+        let mut req = request(text);
+        req.params.width = Some(width);
+        req.params.monospaced = true;
+        req.params.fine_edit = true;
+        req.params.full_preview = true;
+        let source: Vec<_> = text.encode_utf16().collect();
+        let (_, glyphs) = fine_edit::inspect_page(&req, 1, &Cancellation::default()).unwrap();
+        let mut lines = Vec::<String>::new();
+        let mut previous = None;
+        for glyph in glyphs {
+            if previous != Some(glyph.baseline) {
+                lines.push(String::new());
+                previous = Some(glyph.baseline);
+            }
+            let [start, end] = glyph.source_utf16.unwrap();
+            let letters = String::from_utf16(&source[start as usize..end as usize]).unwrap();
+            lines.last_mut().unwrap().push_str(&letters);
+        }
+        lines
+    }
+    assert_eq!(lines("12345 planet,", 140), ["12345", "planet,"]);
+    assert_eq!(lines("中文混排好，", 140), ["中文混排", "好，"]);
+    assert_eq!(lines("中文 planet!", 140), ["中文", "planet!"]);
+    assert_eq!(lines("12345 nice ,", 140), ["12345", "nice,"]);
+    assert_eq!(lines("a              ,", 140), ["a,"]);
+    assert_eq!(lines("prefix don't", 140), ["prefix", "don't"]);
+    assert_eq!(lines("1234567890123456", 140), ["1234567890", "123456"]);
+    assert_eq!(lines("end\n，start", 140), ["end", "，start"]);
+}
+
+#[test]
 fn transparent_png_and_zip_keep_ink_alpha_and_pdf_keeps_the_paper() {
     use base64::{Engine, engine::general_purpose::STANDARD};
     let cancel = Cancellation::default();
