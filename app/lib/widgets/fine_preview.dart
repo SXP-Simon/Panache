@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import '../utils/lasso.dart';
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +11,7 @@ import '../models/fine_edit.dart';
 import '../models/ink_page.dart';
 import '../utils/fine_raster.dart';
 import '../view_models/fine_selection.dart';
+import '../view_models/fine_selection_drag.dart';
 import 'color_picker_dialog.dart';
 import 'preview_image_actions.dart';
 import 'preview_zoom.dart';
@@ -76,25 +75,6 @@ class FinePreview extends StatefulWidget {
   State<FinePreview> createState() => _FinePreviewState();
 }
 
-typedef _Gesture = ({
-  int pointer,
-  Offset start,
-  Offset screen,
-  FineGlyph? hit,
-  bool move,
-  bool add,
-  bool tap,
-  List<Offset>? lasso,
-});
-
-class _CornerDrag {
-  _CornerDrag(this.pointer, this.index, this.start, this.frame);
-  final int pointer, index;
-  final Offset start;
-  final FinePerspectiveFrame frame;
-  FinePerspectiveChange? latest;
-}
-
 class _FinePreviewState extends State<FinePreview> {
   final _selection = FineSelection();
   final _focus = FocusNode();
@@ -102,17 +82,15 @@ class _FinePreviewState extends State<FinePreview> {
   FinePage get model => widget.page.fine!;
   FineRaster? _raster;
   ui.Image? _committed;
-  _Gesture? _gesture;
-  _CornerDrag? _cornerDrag;
+  FineSelectionDrag? _gesture;
+  FineCornerDrag? _cornerDrag;
   List<Offset>? get _corners => _selection.tool != FineTool.perspective
       ? null
       : _cornerDrag?.latest?.points ??
             _selection.perspectiveFrame(model, widget.edits)?.points;
-  Rect? _box;
-  List<Offset> _lasso = [];
   ({String field, int value})? _transformDraft;
   List<FineAdjustment> _draft = [];
-  bool _moved = false, _painting = false, _pending = false, _failed = false;
+  bool _painting = false, _pending = false, _failed = false;
   bool _awaitingPixels = false;
   bool _shapeDraft = false;
   bool? _zoomLayout;
@@ -301,61 +279,48 @@ class _FinePreviewState extends State<FinePreview> {
         event.kind == PointerDeviceKind.stylus;
     final at = event.localPosition / fit;
     if (_selection.tool == FineTool.perspective) {
-      final frame = _selection.perspectiveFrame(model, widget.edits);
-      if (frame == null) return;
-      final radius =
-          (touch ? 22 : 15) / (fit * _zoom.value.getMaxScaleOnAxis());
-      var nearest = radius;
-      int? index;
-      for (final (i, point) in frame.points.indexed) {
-        final distance = (at - point).distance;
-        if (distance <= nearest) {
-          nearest = distance;
-          index = i;
-        }
-      }
-      if (index != null) {
-        _cornerDrag = _CornerDrag(event.pointer, index, at, frame);
-        _focus.requestFocus();
-      }
+      _cornerDrag = FineCornerDrag.hit(
+        event.pointer,
+        at,
+        _selection.perspectiveFrame(model, widget.edits),
+        (touch ? 22 : 15) / (fit * _zoom.value.getMaxScaleOnAxis()),
+      );
+      if (_cornerDrag != null) _focus.requestFocus();
       return;
     }
-    final hit = _selection.hit(model, widget.edits, at);
-    final add = !touch && HardwareKeyboard.instance.isShiftPressed;
-    final group = _selection.bounds(model, widget.edits);
-    final selected =
-        group != null &&
-        group.contains(at) &&
-        (hit == null || _selection.selected.contains(hit.id));
-    final move = switch (_selection.tool) {
-      FineTool.move => true,
-      FineTool.select => !touch && !add && (selected || hit != null),
-      _ => false,
-    };
-    _gesture = (
+    _gesture = FineSelectionDrag.begin(
+      _selection,
+      model,
+      widget.edits,
       pointer: event.pointer,
       start: at,
       screen: event.position,
-      hit: hit,
-      move: move,
-      add: add,
-      tap: touch && _selection.tool == FineTool.select,
-      lasso: _selection.tool == FineTool.lasso ? [at] : null,
+      touch: touch,
+      shift: HardwareKeyboard.instance.isShiftPressed,
     );
-    _moved = false;
     _focus.requestFocus();
   }
 
+  List<FineAdjustment> _moveSelection(
+    FineSelectionDrag gesture,
+    Offset point,
+  ) => _selection.move(
+    model,
+    widget.edits,
+    point - gesture.start,
+    _size,
+    snapToLine: !HardwareKeyboard.instance.isAltPressed,
+  );
+
   void _move(PointerMoveEvent event, double fit) {
+    final point = event.localPosition / fit;
     final corner = _cornerDrag;
     if (corner != null && corner.pointer == event.pointer) {
-      final delta = event.localPosition / fit - corner.start;
-      final result = _selection.corner(
+      final result = corner.project(
+        _selection,
         model,
         widget.edits,
-        corner.frame,
-        corner.index,
-        delta,
+        point,
         _size,
       );
       if (result != null) {
@@ -368,56 +333,32 @@ class _FinePreviewState extends State<FinePreview> {
     }
     final gesture = _gesture;
     if (gesture == null ||
-        gesture.pointer != event.pointer ||
-        (!_moved && (event.position - gesture.screen).distance < 4)) {
+        !gesture.acceptsMove(event.pointer, event.position)) {
       return;
     }
-    if (!_moved &&
-        gesture.move &&
-        gesture.hit != null &&
-        !_selection.selected.contains(gesture.hit!.id) &&
-        event.kind == PointerDeviceKind.mouse) {
-      _selection.select([gesture.hit!.id]);
+    if (gesture.selectMoveTarget(
+      _selection,
+      mouse: event.kind == PointerDeviceKind.mouse,
+    )) {
       widget.onCanvasSelect?.call();
     }
-    _moved = true;
-    if (gesture.tap) return;
-    final point = event.localPosition / fit;
+    gesture.moved = true;
+    if (gesture.action == FineDragAction.tap) return;
     setState(() {
-      if (gesture.move) {
-        _draft = _selection.move(
-          model,
-          widget.edits,
-          point - gesture.start,
-          _size,
-          snapToLine: !HardwareKeyboard.instance.isAltPressed,
-        );
-      } else if (gesture.lasso case final path?) {
-        appendLassoPoint(
-          path,
-          point,
-          (3 / fit) / _zoom.value.getMaxScaleOnAxis(),
-        );
-        _lasso = [...path, point];
+      if (gesture.action == FineDragAction.move) {
+        _draft = _moveSelection(gesture, point);
       } else {
-        _box = Rect.fromPoints(gesture.start, point);
+        gesture.outline(point, (3 / fit) / _zoom.value.getMaxScaleOnAxis());
       }
     });
   }
 
   void _up(PointerUpEvent event, double fit) {
+    final point = event.localPosition / fit;
     final corner = _cornerDrag;
     if (corner != null && corner.pointer == event.pointer) {
-      final delta = event.localPosition / fit - corner.start;
       final result =
-          _selection.corner(
-            model,
-            widget.edits,
-            corner.frame,
-            corner.index,
-            delta,
-            _size,
-          ) ??
+          corner.project(_selection, model, widget.edits, point, _size) ??
           corner.latest;
       if (result != null && result.changes.isNotEmpty) {
         _selection.rememberCorner(corner.frame, result);
@@ -428,40 +369,16 @@ class _FinePreviewState extends State<FinePreview> {
     }
     final gesture = _gesture;
     if (gesture == null || gesture.pointer != event.pointer) return;
-    final point = event.localPosition / fit;
-    if (!_moved) {
-      if (event.kind == PointerDeviceKind.mouse || !gesture.move) {
-        _selection.select([
-          if (gesture.hit case final glyph?) glyph.id,
-        ], append: gesture.add);
-        widget.onCanvasSelect?.call();
-      }
-    } else if (!gesture.tap) {
-      if (gesture.move) {
-        _finish(
-          _selection.move(
-            model,
-            widget.edits,
-            point - gesture.start,
-            _size,
-            snapToLine: !HardwareKeyboard.instance.isAltPressed,
-          ),
-        );
-      } else if (gesture.lasso case final path?) {
-        _selection.lasso(model, widget.edits, [
-          ...path,
-          point,
-        ], append: gesture.add);
-        widget.onCanvasSelect?.call();
-      } else {
-        _selection.box(
-          model,
-          widget.edits,
-          Rect.fromPoints(gesture.start, point),
-          append: gesture.add,
-        );
-        widget.onCanvasSelect?.call();
-      }
+    if (gesture.moved && gesture.action == FineDragAction.move) {
+      _finish(_moveSelection(gesture, point));
+    } else if (gesture.finishSelection(
+      _selection,
+      model,
+      widget.edits,
+      point,
+      mouse: event.kind == PointerDeviceKind.mouse,
+    )) {
+      widget.onCanvasSelect?.call();
     }
     _cancelGesture();
   }
@@ -469,8 +386,6 @@ class _FinePreviewState extends State<FinePreview> {
   void _cancelGesture() => setState(() {
     _gesture = null;
     _cornerDrag = null;
-    _box = null;
-    _lasso = [];
     _draft = [];
     _transformDraft = null;
   });
@@ -748,8 +663,8 @@ class _FinePreviewState extends State<FinePreview> {
                             FinePose(glyph, _visible[glyph.id]).bounds,
                         }
                       : {},
-                  box: _box,
-                  lasso: _lasso,
+                  box: _gesture?.box,
+                  lasso: _gesture?.lasso ?? const [],
                   color: color,
                 ),
               ),
