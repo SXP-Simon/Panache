@@ -101,6 +101,44 @@ async def unruled_artwork(client, directory, call):
         finished = after
 
 
+async def check_filtered_history(client, call, draft_id):
+    key = {"draft_id": draft_id}
+    await call(client, "save_section", **key, expected_revision=3, markdown="第二节")
+    for revision, section, origin, note in [
+        (3, 1, "user_quote", "第一节的墨色保留。"),
+        (4, 2, "user_quote", "第二节用淡墨。"),
+        (4, 1, "model_observation", "我觉得第一节也可以调淡。"),
+        (4, 1, "user_quote", "第一节维持原样。"),
+    ]:
+        review = await call(client, "preview_handwriting", **key, revision=revision,
+                            section=section, view="review")
+        await call(client, "annotate_review", **key, review_id=review.structuredContent["review_id"],
+                   origin=origin, text=note)
+
+    async def history(**args):
+        result = await call(client, "read_section", **key, view="trajectory", **args)
+        return result.structuredContent
+
+    all_events = (await history(limit=50))["events"]
+    section_events = [e for e in all_events if e["section"] == 1]
+    assert (await history(section=1))["events"] == section_events
+    quotes = [e for e in section_events if e["origin"] == "user_quote"]
+    assert [e["details"]["text"] for e in quotes] == ["第一节维持原样。", "第一节的墨色保留。"]
+    query = dict(section=1, feedback_origin="user_quote", limit=1)
+    first = await history(**query)
+    assert first["events"] == quotes[:1] and first["next_offset"] == 1
+    second = await history(**query, offset=first["next_offset"])
+    assert second["events"] == quotes[1:] and second["next_offset"] is None
+    assert (await history(**query, revision=3))["events"] == quotes[1:]
+    empty = await history(section=2, feedback_origin="model_observation")
+    assert empty["events"] == [] and empty["next_offset"] is None
+    models = (await history(feedback_origin="model_observation"))["events"]
+    assert [e["details"]["text"] for e in models] == ["我觉得第一节也可以调淡。"]
+    for invalid in [dict(view="summary", feedback_origin="user_quote"),
+                    dict(view="trajectory", section=0)]:
+        assert (await client.call_tool("read_section", {**key, **invalid})).isError
+
+
 async def exercise(client, directory, call):
     await unruled_artwork(client, directory, call)
     path = directory / "slanted.png"
@@ -245,4 +283,5 @@ async def exercise(client, directory, call):
     await incompatible(preset_id, 1, 2, "different_reference_paper")
     await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=2, changes={"width": 800})
     await incompatible(preset_id, 2, 3, "different_image_dimensions")
+    await check_filtered_history(client, call, preset_id)
     return key, old["review_id"], quote

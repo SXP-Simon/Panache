@@ -154,7 +154,7 @@ impl Drafts {
             !text.is_empty() && text.chars().count() <= 320,
             "Feedback must contain 1..320 characters"
         );
-        let origin = serde_json::to_value(&input.origin)?;
+        let origin = input.origin.as_str();
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let revision: u32 = tx
@@ -168,7 +168,7 @@ impl Drafts {
         tx.execute(
             "INSERT INTO review_feedback(review_id,origin,note) VALUES(?,?,?)
             ON CONFLICT(review_id,origin,note) DO NOTHING",
-            params![input.review_id, origin.as_str(), text],
+            params![input.review_id, origin, text],
         )?;
         tx.commit()?;
         Ok(
@@ -240,7 +240,7 @@ mod tests {
             [serde_json::to_string(&crate::Style::default())?],
         )?;
         let old = drafts.snapshot("d", Some(1))?;
-        let legacy_id = drafts.trajectory("d", 1, 0, 5)?["events"][0]["review_id"]
+        let legacy_id = drafts.trajectory("d", 1, None, None, 0, 5)?["events"][0]["review_id"]
             .as_str()
             .unwrap()
             .to_owned();

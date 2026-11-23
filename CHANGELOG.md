@@ -2,6 +2,8 @@
 
 ## 未发布
 
+- MCP 续稿时可按节和评语来源筛选历史。用 `read_section(view="trajectory", section=2, feedback_origin="user_quote")` 可直接找回第 2 节记录的用户原话、关联版本和复盘 ID。
+
 ## v1.20.0 (2026-11-23)
 
 ### PDF 与字体

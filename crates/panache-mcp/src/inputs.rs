@@ -147,16 +147,18 @@ pub enum ReadView {
 pub struct Read {
     /// With view=review, retrieve one immutable measurement and its attributed feedback.
     pub review_id: Option<String>,
+    /// With trajectory, return only annotations from this source.
+    pub feedback_origin: Option<FeedbackOrigin>,
     /// Default excerpt omits inline image bytes; summary omits text; source reads exact Markdown.
     pub view: Option<ReadView>,
     pub draft_id: String,
     /// Omit for latest.
     pub revision: Option<u32>,
-    /// One-based. Defaults to the first section.
+    /// One-based. In trajectory, select events attributed to this section; omit for the whole draft, including global edits. Text views default to section 1.
     pub section: Option<u32>,
-    /// Unicode character offset.
+    /// Trajectory: matching events to skip. Text views: Unicode characters to skip.
     pub offset: Option<u32>,
-    /// Defaults to 1000, maximum 4000 characters.
+    /// Trajectory: 1..50 matching events (default 12). Text views: 1..4000 characters (default 1000).
     pub limit: Option<u32>,
 }
 #[derive(Deserialize, JsonSchema, PartialEq)]
@@ -248,6 +250,15 @@ pub struct Export {
 pub enum FeedbackOrigin {
     UserQuote,
     ModelObservation,
+}
+
+impl FeedbackOrigin {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::UserQuote => "user_quote",
+            Self::ModelObservation => "model_observation",
+        }
+    }
 }
 
 #[derive(Deserialize, JsonSchema)]

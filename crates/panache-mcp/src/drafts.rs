@@ -404,8 +404,17 @@ impl Drafts {
         );
         Ok(next)
     }
-    pub fn trajectory(&self, id: &str, rev: u32, offset: u32, limit: u32) -> Result<Value> {
+    pub fn trajectory(
+        &self,
+        id: &str,
+        rev: u32,
+        section: Option<u32>,
+        feedback_origin: Option<&crate::FeedbackOrigin>,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Value> {
         ensure!((1..=50).contains(&limit), "Trajectory limit must be 1..50");
+        ensure!(section != Some(0), "Section numbers start at 1");
         let db = self.connect()?;
         let mut stmt=db.prepare(
             "WITH events(revision,action,section,page,evidence,review_id,origin,seq) AS (
@@ -421,11 +430,18 @@ impl Drafts {
             SELECT e.revision,e.action,e.section,COALESCE(e.page,json_extract(n.details,'$.page')),
                    COALESCE(e.evidence,n.details,'{}'),e.review_id,e.origin
             FROM events e LEFT JOIN edit_notes n ON n.draft=?1 AND n.revision=e.revision
-            WHERE e.revision<=?2
+            WHERE e.revision<=?2 AND (?5 IS NULL OR e.section=?5) AND (?6 IS NULL OR e.origin=?6)
             ORDER BY e.revision DESC,(e.action='review_feedback') DESC,(e.action='page_review') DESC,e.seq DESC,e.section,e.page
             LIMIT ?3 OFFSET ?4")?;
         let mut entries = Vec::new();
-        let mut rows = stmt.query(params![id, rev, limit + 1, offset])?;
+        let mut rows = stmt.query(params![
+            id,
+            rev,
+            limit + 1,
+            offset,
+            section,
+            feedback_origin.map(crate::FeedbackOrigin::as_str)
+        ])?;
         while let Some(row) = rows.next()? {
             let details: String = row.get(4)?;
             entries.push(json!({

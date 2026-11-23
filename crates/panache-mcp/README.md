@@ -116,6 +116,8 @@ cargo build --locked --release -p panache-mcp
 
 先对要看的两个版本分别调用 `preview_handwriting(view="review", revision=…)`，记下返回的 `review_id`。用户明确表达偏好后，用 `annotate_review(draft_id, review_id, origin="user_quote", text=…)` 保存原话。模型自己的观察使用 `model_observation`。
 
+续稿时，`read_section(draft_id=…, view="trajectory", section=2, feedback_origin="user_quote")` 只返回归在第 2 节的用户原话，每条带有关联版本和 `review_id`。结果按关联稿件版本从高到低排列；事后补在旧版上的评语仍归旧版。省略 `section` 可查全稿，省略 `feedback_origin` 可查所有来源。按节筛选时只含明确归在该节的事件，全稿调参记录需在全稿轨迹中查看。每页默认 12 条、最多 50 条匹配事件，用返回的 `next_offset` 续读。
+
 例如，比较第 1 节第 1 页的 v3 与 v4：
 
 ```json
