@@ -102,7 +102,7 @@ cargo build --locked --release -p panache-mcp
 
 要核对局部改动，用 `preview_handwriting(view="review", region=…, revision=新版本, compare_revision=旧版本)` 查看同一区域的底纸、改前和改后图。移动字块时还可用 `previous_region` 圈出旧位置。需要保护的文字或页眉可单独圈选复查。区域使用原尺寸成品像素。[局部坐标与测量示例](tool-design.md#局部改动的复查)
 
-如果字像贴在照片上，在照片整页复查的 `photo_appearance` 中取 `preview_arguments` 再调用一次 `preview_handwriting`。有页内文字基线样本时，这组参数会给出该版本一处字迹附近的原像素底纸和成品裁图；也可以自己圈选。对照邻近印字或横线的边缘清晰度、墨色深浅，再看字号与可写空间是否相称。用 `describe_controls` 指定稿件、版本和 `ink`、`layout` 或 `typography` 参数组可查当前值。正文的柔化和粗细以投影前纸面像素为单位，透明度用百分比。改一版后，对同一选区加入 `compare_revision` 比较。只有文字结果的客户端可转述测量，请用户看图判断观感。
+如果字像贴在照片上，在照片整页复查的 `photo_appearance` 中取 `preview_arguments` 再调用一次 `preview_handwriting`。有页内文字基线样本时，这组参数会给出该版本一处字迹附近的原像素底纸和成品裁图；也可以自己圈选。对照邻近印字或横线的边缘清晰度、墨色深浅，再看字号与可写空间是否相称。用 `describe_controls` 指定稿件、版本和 `ink`、`layout` 或 `typography` 参数组可查当前值。正文的柔化和粗细以投影前纸面像素为单位，透明度用百分比。仅修改墨迹组参数时会保留已完成的单字移位和透视调整；更换字体、字号或参考线后应在新版本重新检查选区。改一版后，对同一选区加入 `compare_revision` 比较。只有文字结果的客户端可转述测量，请用户看图判断观感。
 
 `tune_handwriting(font_path=…)` 会把本机 TTF/OTF 随稿保存。可用返回的字体标识在同一稿内切回该字体。墨迹组的 `transparent_background` 控制原尺寸 PNG 预览和 ZIP，PDF 保留纸张。透明稿复盘会把墨迹放回底纸，方便判断实际可读性。
 

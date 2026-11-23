@@ -91,7 +91,7 @@ pub fn apply(state: &State, input: Tune) -> Result<CallToolResult> {
     );
     controls::parameters(&draft, 1, &changes)?;
     let preserve_layout = changes.keys().chain(draft.controls.keys()).all(|key| {
-        key == "transparent_background"
+        controls::catalog()["ink"].get(key).is_some()
             || controls::catalog()["camera"].get(key).is_some()
             || changes.get(key) == draft.controls.get(key)
     });

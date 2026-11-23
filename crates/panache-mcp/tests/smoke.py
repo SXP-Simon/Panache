@@ -500,6 +500,21 @@ async def smoke(command, arguments, out):
                                  expected_revision=4, changes={"camera_model": None, "camera_iso": None})
             assert cleared.structuredContent["revision"] == 5
             assert png(await call(client, "preview_handwriting", draft_id=paper_id)) == adjusted
+            ink_settings = {"ink": "#36363b", "ink_alpha": 247, "ink_opacity": 88,
+                            "ink_softness": 0.8, "ink_thickness": 0.2}
+            prior_ink = {key: tuned["controls"].get(key) for key in ink_settings}
+            for rev, patch in [(5, ink_settings), (6, prior_ink)]:
+                ink_change = await call(client, "tune_handwriting", draft_id=paper_id,
+                                        expected_revision=rev, changes=patch)
+                assert ink_change.structuredContent["fine_layout"] == "preserved"
+                glyph = (await call(client, "preview_handwriting", **probe)).structuredContent["glyphs"][0]
+                assert glyph["current_photo_quad"] == again["current_photo_quad"]
+                assert glyph["adjustment"] == again["adjustment"]
+                rendered = png(await call(client, "preview_handwriting", draft_id=paper_id))
+                if rev == 5:
+                    assert rendered != adjusted
+                else:
+                    assert rendered == adjusted
             # Exercise a long draft without ever exporting or rendering its tail.
             repeated = "逐题列出已知条件，检查解题步骤。\n" * 600
             large = (
@@ -553,7 +568,7 @@ async def smoke(command, arguments, out):
                 client,
                 "save_section",
                 draft_id=paper_id,
-                expected_revision=5,
+                expected_revision=7,
                 section=1,
                 markdown="重排后的版本",
             )
