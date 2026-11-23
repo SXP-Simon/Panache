@@ -1,16 +1,39 @@
+// Quote a literal occurrence at the document boundary before inserting tokens.
+const markdownTokenStart = '\uFDD0';
+
+/// Only exact tokens issued by this cleanup stage can restore a saved value.
+class MarkdownPlaceholders {
+  MarkdownPlaceholders(this.prefix, this.suffix);
+
+  final String prefix;
+  final String suffix;
+  final _values = <String, String>{};
+  late final _pattern = RegExp('${RegExp.escape(prefix)}[0-9]+$suffix');
+
+  String save(String value) {
+    final token = '$prefix${_values.length}$suffix';
+    _values[token] = value;
+    return token;
+  }
+
+  String restore(String text) => _values.isEmpty
+      ? text
+      : text.replaceAllMapped(_pattern, (match) {
+          final token = match[0]!;
+          return _values[token] ?? token;
+        });
+}
+
 ({String text, String Function(String) restore}) protectMarkdownCode(
   String source, {
   bool inline = true,
 }) {
-  var prefix = '\uE110CODE';
+  var prefix = '${markdownTokenStart}CODE';
   while (source.contains(prefix)) {
-    prefix += '\uE110';
+    prefix += markdownTokenStart;
   }
-  final values = <String>[];
-  String save(String value) {
-    values.add(value);
-    return '$prefix${values.length - 1}\uE111';
-  }
+  // A fenced block can be temporarily hidden from the inline pass.
+  final values = MarkdownPlaceholders(prefix, inline ? '\uE111' : '\uE113');
 
   final lines = source.replaceAll(RegExp(r'\r\n?'), '\n').split('\n');
   final output = <String>[];
@@ -36,22 +59,27 @@
       final leading = RegExp(r'^ *').firstMatch(current)![0]!.length;
       body.add(current.substring(indent < leading ? indent : leading));
     }
-    output.add(save(body.where((line) => line.trim().isNotEmpty).join('\n')));
+    output.add(
+      values.save(body.where((line) => line.trim().isNotEmpty).join('\n')),
+    );
   }
   final joined = output.join('\n');
   final result = StringBuffer();
   final runs = inline
       ? RegExp(r'`+').allMatches(joined).toList()
       : <RegExpMatch>[];
+  final nextByLength = <int, int>{};
+  final nextRun = List<int?>.filled(runs.length, null);
+  for (var i = runs.length - 1; i >= 0; i--) {
+    final length = runs[i].end - runs[i].start;
+    nextRun[i] = nextByLength[length];
+    nextByLength[length] = i;
+  }
   var cursor = 0;
   for (var index = 0; index < runs.length; index++) {
     final opening = runs[index];
-    var closing = index + 1;
-    while (closing < runs.length &&
-        runs[closing][0]!.length != opening[0]!.length) {
-      closing++;
-    }
-    if (closing == runs.length) break;
+    final closing = nextRun[index];
+    if (closing == null) continue;
     var value = joined
         .substring(opening.end, runs[closing].start)
         .replaceAll('\n', ' ');
@@ -61,18 +89,12 @@
       value = value.substring(1, value.length - 1);
     }
     result.write(joined.substring(cursor, opening.start));
-    result.write(save(value));
+    result.write(values.save(value));
     cursor = runs[closing].end;
     index = closing;
   }
   result.write(joined.substring(cursor));
-  return (
-    text: result.toString(),
-    restore: (value) => value.replaceAllMapped(
-      RegExp('${RegExp.escape(prefix)}(\\d+)\uE111'),
-      (match) => values[int.parse(match[1]!)],
-    ),
-  );
+  return (text: result.toString(), restore: values.restore);
 }
 
 String stripMarkdownLinks(String source) {

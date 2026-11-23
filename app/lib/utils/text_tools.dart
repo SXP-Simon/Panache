@@ -73,29 +73,29 @@ String cleanMarkdown(
   bool english = false,
   String Function(String)? transformMath,
 }) {
-  var s = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  const quotedStart = '$markdownTokenStart\uFDD1';
+  var s = text
+      .replaceAll(markdownTokenStart, quotedStart)
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n');
   final code = protectMarkdownCode(s, inline: false);
   s = code.text;
-  final protected = <String>[];
-  final scriptStars = <String>[];
-  var tokenPrefix = '\uE100HW';
-  while (s.contains(tokenPrefix)) {
-    tokenPrefix += '\uE100';
-  }
-  String protect(String source) {
-    protected.add(source);
-    return '$tokenPrefix${protected.length - 1}\uE101';
-  }
+  final protected = MarkdownPlaceholders('${markdownTokenStart}HW', '\uE101');
+  final scriptStars = MarkdownPlaceholders(
+    '${markdownTokenStart}HWSTAR',
+    '\uE101',
+  );
 
   // A diagram can contain pipes and Markdown-looking labels. Mask its entire
   // source before table recognition so an unsupported diagram stays editable.
   s = _replaceSegments(
     s,
-    (source) => source.contains(r'\begin{circuitikz}') ? protect(source) : null,
+    (source) =>
+        source.contains(r'\begin{circuitikz}') ? protected.save(source) : null,
   );
 
   if (tableMode == 'latex') {
-    s = _convertMarkdownTables(s, protect);
+    s = _convertMarkdownTables(s, protected.save);
   }
 
   s = _replaceSegments(s, (source) {
@@ -107,15 +107,15 @@ String cleanMarkdown(
     }
     final fenced = RegExp(r'^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\1$')
         .firstMatch(source);
-    return protect(fenced?[2] ?? source);
+    return protected.save(fenced?[2] ?? source);
   });
   final bodyCode = protectMarkdownCode(s);
   s = bodyCode.text;
   // Converted script stars must not become Markdown emphasis on a second cleanup.
-  s = s.replaceAllMapped(RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'), (match) {
-    scriptStars.add(match[0]!);
-    return '${tokenPrefix}STAR${scriptStars.length - 1}\uE101';
-  });
+  s = s.replaceAllMapped(
+    RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'),
+    (match) => scriptStars.save(match[0]!),
+  );
   final bareMath = StringBuffer();
   var cursor = 0;
   for (final match in RegExp(r'\\left\b').allMatches(s)) {
@@ -123,21 +123,22 @@ String cleanMarkdown(
     final end = bareDelimiterEnd(s, match.start);
     if (end <= match.start) continue;
     bareMath.write(s.substring(cursor, match.start));
-    bareMath.write(protect(s.substring(match.start, end)));
+    bareMath.write(protected.save(s.substring(match.start, end)));
     cursor = end;
   }
   bareMath.write(s.substring(cursor));
   final unprotectedImages = bareMath.toString();
   s = _replaceEmbeddedImages(
     unprotectedImages,
-    (match, end) => protect(unprotectedImages.substring(match.start, end + 1)),
+    (match, end) =>
+        protected.save(unprotectedImages.substring(match.start, end + 1)),
   );
   s = s.replaceAllMapped(
     RegExp(
       r'!\[[^\]]*\]\(img:?_?\d+\)|!\[插图(?:[ \t]*[#:_-]?[ \t]*\d+)?(?:\|[^\]]+)?\](?!\()',
     ),
     (m) {
-      return protect(m[0]!);
+      return protected.save(m[0]!);
     },
   );
   s = s.replaceFirst(
@@ -177,10 +178,7 @@ String cleanMarkdown(
     RegExp(r'(^|[^\w_])_([^\s_][^_\n]*?)_(?=[^\w_]|$)'),
     (m) => '${m[1]}${m[2]}',
   );
-  s = s.replaceAllMapped(
-    RegExp('${RegExp.escape(tokenPrefix)}(\\d+)\uE101'),
-    (m) => protected[int.parse(m[1]!)],
-  );
+  s = protected.restore(s);
   s = s
       .split('\n')
       .where((line) => line.trim().isNotEmpty && line.trim() != '---')
@@ -188,11 +186,10 @@ String cleanMarkdown(
       .trim();
   // Keep literal code masked until both cleanup stages have finished.
   s = transformMath?.call(s) ?? s;
-  s = s.replaceAllMapped(
-    RegExp('${RegExp.escape(tokenPrefix)}STAR(\\d+)\uE101'),
-    (match) => scriptStars[int.parse(match[1]!)],
-  );
-  return code.restore(bodyCode.restore(s));
+  s = scriptStars.restore(s);
+  return code
+      .restore(bodyCode.restore(s))
+      .replaceAll(quotedStart, markdownTokenStart);
 }
 
 String _cleanLines(String source, String tableMode, bool english) {
@@ -396,20 +393,9 @@ List<String>? _tableCells(String line) {
 
 String _tableLatexCell(String cell) {
   // Clean paired decorations before splitting a cell into text and formulas.
-  var prefix = '\uE130CELL';
-  while (cell.contains(prefix)) {
-    prefix += '\uE130';
-  }
-  final saved = <String>[];
-  final masked = _replaceSegments(cell, (source) {
-    final token = '$prefix${saved.length}\uE131';
-    saved.add(source);
-    return token;
-  });
-  cell = cleanMarkdown(masked, tableMode: 'clean').replaceAllMapped(
-    RegExp('${RegExp.escape(prefix)}(\\d+)\uE131'),
-    (match) => saved[int.parse(match[1]!)],
-  );
+  final saved = MarkdownPlaceholders('${markdownTokenStart}CELL', '\uE131');
+  final masked = _replaceSegments(cell, saved.save);
+  cell = saved.restore(cleanMarkdown(masked, tableMode: 'clean'));
   final output = StringBuffer();
   var cursor = 0;
   for (final segment in scanMathSegments(cell)) {
