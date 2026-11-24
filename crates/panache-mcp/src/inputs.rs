@@ -245,7 +245,7 @@ pub struct Preview {
     pub region: Option<Vec<[i32; 2]>>,
     /// With review, region and compare_revision, mark the original position of moved content. The crop covers both polygons; differences outside their union cover the rest of the page.
     pub previous_region: Option<Vec<[i32; 2]>>,
-    /// In layout view, only return illustration outlines and isolated details.
+    /// In layout view, only return raster illustration outlines and isolated details. Omit for generated circuitikz: its labels and lines are one glyph.
     pub illustrations_only: Option<bool>,
     /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     pub view: Option<PreviewView>,
