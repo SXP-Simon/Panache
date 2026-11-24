@@ -102,10 +102,12 @@ pub struct Save {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Describe {
-    /// Optionally include this draft's effective values for the selected group.
+    /// Pass with group to read this saved draft's effective values.
     pub draft_id: Option<String>,
+    /// Requires draft_id and group. Omit to read the latest saved revision.
     pub revision: Option<u32>,
-    /// Omit for group names. Supply a group to get field names, units and ranges.
+    /// Use {} to list group names, or group alone for its fields, units, ranges and choices.
+    /// Use "layout" for line spacing and page geometry, not paper guide calibration.
     pub group: Option<String>,
 }
 
