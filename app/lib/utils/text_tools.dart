@@ -337,53 +337,48 @@ String _convertMarkdownTables(String source, String Function(String) protect) {
   return output.join('\n');
 }
 
-List<String>? _tableCells(String line) {
-  final value = line.trim();
-  if (value.isEmpty || value.startsWith('⟦')) return null;
-  final cells = <String>[];
-  final cell = StringBuffer();
-  var ticks = 0;
-  var dollar = false;
-  var paren = false;
-  var split = false;
-  for (var i = 0; i < value.length; i++) {
-    final char = value[i];
-    if (char == '\\' && i + 1 < value.length) {
-      final next = value[i + 1];
-      if (next == '(' && ticks == 0 && !dollar) paren = true;
-      if (next == ')' && ticks == 0 && !dollar) paren = false;
-      cell.write(char);
-      cell.write(next);
-      i++;
+// A backslash consumes the next character, even inside code. A backtick run
+// must match its opening width and temporarily suspends any surrounding math.
+final _tableTokens = RegExp(r'\\.|`+|[$|]', dotAll: true);
+
+Iterable<int> _tableSeparators(String row) sync* {
+  String? codeFence, mathEnd;
+  for (final match in _tableTokens.allMatches(row)) {
+    final token = match[0]!;
+    if (codeFence != null) {
+      if (token == codeFence) codeFence = null;
       continue;
     }
-    if (char == '`') {
-      var count = 1;
-      while (i + count < value.length && value[i + count] == '`') {
-        count++;
-      }
-      ticks = ticks == count
-          ? 0
-          : ticks == 0
-          ? count
-          : ticks;
-      cell.write('`' * count);
-      i += count - 1;
+    if (token.startsWith('`')) {
+      codeFence = token;
       continue;
     }
-    if (char == r'$' && ticks == 0 && !paren) dollar = !dollar;
-    if (char == '|' && ticks == 0 && !dollar && !paren) {
-      cells.add(cell.toString().trim());
-      cell.clear();
-      split = true;
-    } else {
-      cell.write(char);
+    if (mathEnd != null) {
+      if (token == mathEnd) mathEnd = null;
+      continue;
+    }
+    switch (token) {
+      case r'\(':
+        mathEnd = r'\)';
+      case r'$':
+        mathEnd = token;
+      case '|':
+        yield match.start;
     }
   }
-  cells.add(cell.toString().trim());
-  if (!split) return null;
-  if (value.startsWith('|')) cells.removeAt(0);
-  if (value.endsWith('|') && cells.last.isEmpty) cells.removeLast();
+}
+
+List<String>? _tableCells(String line) {
+  final row = line.trim();
+  if (!row.contains('|') || row.startsWith('⟦')) return null;
+  final cells = <String>[];
+  var start = 0;
+  for (final end in _tableSeparators(row)) {
+    if (end > 0) cells.add(row.substring(start, end).trim());
+    start = end + 1;
+  }
+  if (start == 0) return null;
+  if (start < row.length) cells.add(row.substring(start).trim());
   return cells.isEmpty ? null : cells;
 }
 
