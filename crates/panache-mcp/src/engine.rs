@@ -418,7 +418,7 @@ impl Engine {
         sections: Vec<Section>,
         format: Format,
         cancel: &Cancellation,
-        mut progress: impl FnMut(usize),
+        mut on_page: impl FnMut(usize, u32, usize),
     ) -> Result<usize> {
         let mut count = 0;
         let mut background = draft.background()?;
@@ -428,15 +428,22 @@ impl Engine {
             for section in sections {
                 cancel.check()?;
                 let (_, edits) = draft.edits(&section)?;
+                let number = section.number;
                 let mut request = self.request(draft, section, background.take(), edits)?;
                 request.params.pdf_save = matches!(format, Format::Pdf);
                 request.limits.max_pages -= count;
-                Self::render_pages(&request, photo.as_ref(), cancel, usize::MAX, |_, page| {
-                    emit(count, &page)?;
-                    count += 1;
-                    progress(count);
-                    Ok(())
-                })?;
+                Self::render_pages(
+                    &request,
+                    photo.as_ref(),
+                    cancel,
+                    usize::MAX,
+                    |index, page| {
+                        emit(count, &page)?;
+                        count += 1;
+                        on_page(count, number, index + 1);
+                        Ok(())
+                    },
+                )?;
                 background = request.background.take();
             }
             cancel.check()?;

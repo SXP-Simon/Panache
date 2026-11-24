@@ -430,7 +430,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns a local file path and page count. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Review the intended revision, especially after moving glyphs or changing ink."
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. To finish checking an export, pass each listed section/page to preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Review the intended revision, especially after moving glyphs or changing ink."
     )]
     async fn export_handwriting(
         &self,
@@ -442,13 +442,19 @@ impl Panache {
         let result = self.render(ctx, move |state, engine, cancel| {
             let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
             let sections = state.drafts.sections(&input.draft_id, draft.revision, None)?;
-            let (reviewed,visibility_flags)=draft.review_counts()?;
-            let params=controls::parameters(&draft,1,&draft.controls)?;
-            let zero_text_ink=params.ink_opacity==0 || params.fill[3]==0;
+            let reviewed_pages = draft.reviewed_pages()?;
+            let mut unreviewed = Vec::new();
+            let mut visibility_flags = 0;
+            let params = controls::parameters(&draft, 1, &draft.controls)?;
+            let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
             let format = input.format.unwrap_or_default();
             let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
                 writer, &draft, sections, format, cancel,
-                |pages| {
+                |pages, section, page| {
+                    match reviewed_pages.get(&(section, page)) {
+                        Some(flagged) => visibility_flags += usize::from(*flagged),
+                        None => unreviewed.push(json!({"section":section,"page":page})),
+                    }
                     if let Some(token) = &progress_token {
                         let update = rmcp::model::ProgressNotificationParam::new(token.clone(), pages as f64)
                             .with_message(format!("{pages} pages rendered"));
@@ -456,10 +462,29 @@ impl Panache {
                     }
                 },
             ))?;
-            let warning=if zero_text_ink || visibility_flags>0 {"墨迹可见性需要复查。"}else if (reviewed as usize)<pages {"未复盘页的局部墨迹可见性尚未核验。"}else{""};
-            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。\n\n`{}`", draft.revision, path.display());
+            let reviewed = pages - unreviewed.len();
+            let warning = if zero_text_ink || visibility_flags > 0 {
+                "墨迹可见性需要复查。"
+            } else if reviewed < pages {
+                "未复盘页的局部墨迹可见性尚未核验。"
+            } else {
+                ""
+            };
+            let remaining = if unreviewed.is_empty() {
+                String::new()
+            } else {
+                format!(" 依次复查以下节内页码：{}。仅复盘不会修改稿件；复盘后可直接交付下方原文件。", serde_json::to_string(&unreviewed)?)
+            };
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。{remaining}\n\n`{}`", draft.revision, path.display());
             Ok(reply(message, json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review":{"pages_with_evidence":reviewed,"pages_with_visibility_flags":visibility_flags,"global_text_ink_zero":zero_text_ink,"pages_without_visibility_evidence":pages.saturating_sub(reviewed as usize)}
+                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages,
+                "review": {
+                    "pages_with_evidence": reviewed,
+                    "pages_with_visibility_flags": visibility_flags,
+                    "global_text_ink_zero": zero_text_ink,
+                    "pages_without_visibility_evidence": unreviewed.len(),
+                    "unreviewed_pages": unreviewed,
+                }
             })))
         }).await;
         tool_result(result)

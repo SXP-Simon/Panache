@@ -84,12 +84,20 @@ impl Snapshot<'_> {
         by_id(&self.drafts.connect()?, id, self)
     }
 
-    pub fn review_counts(&self) -> Result<(u32, u32)> {
-        Ok(self.drafts.connect()?.query_row("SELECT count(*),
-            count(CASE WHEN json_extract(evidence,'$.visibility') IN ('no_visible_change','very_low_contrast') THEN 1 END)
-            FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
-            WHERE draft=? AND revision=? GROUP BY section,page)",params![self.id,self.revision],
-            |r|Ok((r.get(0)?,r.get(1)?)))?)
+    /// Latest full-page visibility flag for each measured page in this revision.
+    pub fn reviewed_pages(&self) -> Result<std::collections::HashMap<(u32, usize), bool>> {
+        let db = self.drafts.connect()?;
+        let mut statement = db.prepare(
+            "SELECT section, page, COALESCE(json_extract(evidence,'$.visibility')
+                IN ('no_visible_change','very_low_contrast'), 0)
+             FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
+             WHERE draft=? AND revision=? GROUP BY section,page)",
+        )?;
+        Ok(statement
+            .query_map(params![self.id, self.revision], |row| {
+                Ok(((row.get(0)?, row.get::<_, u32>(1)? as usize), row.get(2)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn compare_reviews(
@@ -281,7 +289,7 @@ mod tests {
         )?;
         assert_ne!(first["review_id"], changed["review_id"]);
         assert_ne!(changed["review_id"], upgraded["review_id"]);
-        assert_eq!(rev2.review_counts()?, (1, 1));
+        assert_eq!(rev2.reviewed_pages()?, [((1, 1), true)].into());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;
         let comparison = rev3.compare_reviews(2, 1, 1, 0, 5)?;

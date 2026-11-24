@@ -73,11 +73,13 @@ async def review_workflow(client, key, guides, font_path):
     assert Path(same_pdf["path"]).read_bytes() == Path(pdf["path"]).read_bytes()
     await call(client, "tune_handwriting", **key, expected_revision=6, changes={"ink_opacity": 0})
     unreviewed = (await call(client, "export_handwriting", **key, format="zip")).structuredContent["review"]
+    assert unreviewed["unreviewed_pages"] == [{"section": 1, "page": 1}]
     assert unreviewed["pages_with_evidence"] == 0 and unreviewed["global_text_ink_zero"]
     invisible = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
     assert invisible["evidence"]["visibility"] == "no_visible_change"
     assert invisible["evidence"]["max_rgb_delta"] == 0
     flagged = (await call(client, "export_handwriting", **key, format="zip")).structuredContent["review"]
+    assert flagged["unreviewed_pages"] == []
     assert flagged["pages_with_evidence"] == 1 and flagged["pages_with_visibility_flags"] == 1
     recent = (await call(client, "read_section", **key, view="trajectory", limit=1)).structuredContent
     assert recent["next_offset"] == 1 and recent["events"][0]["details"]["visibility"] == "no_visible_change"
@@ -164,6 +166,7 @@ async def placement_pixels(client):
     assert measured["difference"]["outside_union_changed_pixels"] == 0
     exported = await call(client, "export_handwriting", **key)
     assert exported.structuredContent["review"]["pages_without_visibility_evidence"] == 1
+    assert exported.structuredContent["review"]["unreviewed_pages"] == [{"section": 1, "page": 1}]
     assert "局部墨迹" in exported.content[0].text
 
 
@@ -362,6 +365,9 @@ async def smoke(command, arguments, out):
                 client, "preview_handwriting", draft_id=doc, section=2, page=2
             )
             middle = png(later)
+            # Review a later sheet first. Earlier-revision and local evidence cannot fill gaps.
+            await call(client, "preview_handwriting", draft_id=doc, revision=1, view="review")
+            await call(client, "preview_handwriting", draft_id=doc, section=2, page=2, view="review")
             notifications = []
 
             async def progress(value, total, message=None):
@@ -377,6 +383,12 @@ async def smoke(command, arguments, out):
             assert notifications == list(range(1, archive["pages"] + 1))
             with ZipFile(archive["path"]) as z:
                 assert archive["pages"] == len(z.namelist()) >= 3
+                remaining = [{"section": 1, "page": 1}] + [
+                    {"section": 2, "page": page} for page in range(1, len(z.namelist())) if page != 2
+                ]
+                assert archive["review"]["unreviewed_pages"] == remaining
+                assert archive["review"]["pages_without_visibility_evidence"] == len(remaining)
+                assert archive["review"]["pages_with_evidence"] == 1
                 assert z.read("0.png") == original and z.read("2.png") == middle
             conflict = await client.call_tool(
                 "save_section",
