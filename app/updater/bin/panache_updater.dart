@@ -17,23 +17,7 @@ Future<void> main(List<String> arguments) async {
     if (Platform.isWindows &&
         arguments.length == 1 &&
         arguments.single == '--mcp') {
-      final root = p.dirname(Platform.resolvedExecutable);
-      final runtime = windowsRuntime(
-        root,
-        readJson(p.join(root, 'active.json')),
-      );
-      final server = await Process.start(
-        p.join(runtime, 'backend', 'panache-mcp.exe'),
-        const [],
-      );
-      // The Windows GUI launcher must explicitly bridge the client's stdio pipes.
-      unawaited(stdin.pipe(server.stdin).catchError((Object _) {}));
-      await Future.wait([
-        stdout.addStream(server.stdout),
-        stderr.addStream(server.stderr),
-      ]);
-      await Future.wait([stdout.flush(), stderr.flush()]);
-      exit(await server.exitCode);
+      exit(await _proxyWindowsMcp());
     }
     if (arguments.isEmpty && Platform.isWindows) {
       await launchWindows(p.dirname(Platform.resolvedExecutable));
@@ -43,66 +27,7 @@ Future<void> main(List<String> arguments) async {
         !{'--prepare', '--recover'}.contains(arguments[0])) {
       reject('invalid_arguments');
     }
-    requireUnprivilegedProcess();
-    final directory = p.normalize(p.absolute(arguments[1])),
-        token = arguments[2];
-    final plan = UpdatePlan.read(directory, token);
-    final transaction = UpdateTransaction(directory, plan);
-    final recovering = arguments[0] == '--recover';
-
-    try {
-      if (recovering) {
-        transaction.prepareRecovery();
-      } else {
-        await transaction.prepare();
-      }
-      stdout.writeln('PANACHE_UPDATE_READY $token');
-      await stdout.flush();
-      var armed = false, aborted = false;
-      await for (final line
-          in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
-        if (line == 'ARM $token') {
-          armed = true;
-        } else {
-          aborted = true;
-          break;
-        }
-      }
-      if (!armed || aborted) {
-        if (recovering) {
-          transaction.cancelRecovery();
-        } else {
-          await transaction.abort();
-        }
-        return;
-      }
-      if (recovering) {
-        await transaction.recover();
-      } else {
-        await transaction.applyAfterExit();
-      }
-      exit(0);
-    } catch (error) {
-      final reason = error is UpdaterFailure ? error.code : 'update_failed';
-      try {
-        File(p.join(directory, 'update.log')).writeAsStringSync(
-          '${DateTime.now().toUtc().toIso8601String()} failure $error\n',
-          mode: FileMode.append,
-          flush: true,
-        );
-      } catch (_) {
-        /* Recovery remains mandatory when diagnostics cannot be written. */
-      }
-      if (recovering) {
-        transaction.cancelRecovery();
-      } else if (transaction.ownsInstallation &&
-          (transaction.parentConfirmedExited || transaction.isApplied())) {
-        await transaction.rollback(reason);
-      } else {
-        await transaction.abort();
-      }
-      rethrow;
-    }
+    await _runUpdate(arguments);
   } catch (error) {
     if (error is UpdaterFailure && error.osError != null) {
       stderr.writeln('PANACHE_UPDATE_OS_ERROR ${error.code} ${error.osError}');
@@ -112,4 +37,84 @@ Future<void> main(List<String> arguments) async {
     );
     exit(1);
   }
+}
+
+Future<int> _proxyWindowsMcp() async {
+  final root = p.dirname(Platform.resolvedExecutable);
+  final runtime = windowsRuntime(root, readJson(p.join(root, 'active.json')));
+  final server = await Process.start(
+    p.join(runtime, 'backend', 'panache-mcp.exe'),
+    const [],
+  );
+  // The Windows GUI launcher must explicitly bridge the client's stdio pipes.
+  unawaited(stdin.pipe(server.stdin).catchError((Object _) {}));
+  await Future.wait([
+    stdout.addStream(server.stdout),
+    stderr.addStream(server.stderr),
+  ]);
+  await Future.wait([stdout.flush(), stderr.flush()]);
+  return server.exitCode;
+}
+
+Future<void> _runUpdate(List<String> arguments) async {
+  requireUnprivilegedProcess();
+  final directory = p.normalize(p.absolute(arguments[1])), token = arguments[2];
+  final plan = UpdatePlan.read(directory, token);
+  final transaction = UpdateTransaction(directory, plan);
+  final recovering = arguments[0] == '--recover';
+
+  try {
+    if (recovering) {
+      transaction.prepareRecovery();
+    } else {
+      await transaction.prepare();
+    }
+    stdout.writeln('PANACHE_UPDATE_READY $token');
+    await stdout.flush();
+    if (!await _armedAtEof(token)) {
+      if (recovering) {
+        transaction.cancelRecovery();
+      } else {
+        await transaction.abort();
+      }
+      return;
+    }
+    if (recovering) {
+      await transaction.recover();
+    } else {
+      await transaction.applyAfterExit();
+    }
+    exit(0);
+  } catch (error) {
+    final reason = error is UpdaterFailure ? error.code : 'update_failed';
+    try {
+      File(p.join(directory, 'update.log')).writeAsStringSync(
+        '${DateTime.now().toUtc().toIso8601String()} failure $error\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (_) {
+      /* Recovery remains mandatory when diagnostics cannot be written. */
+    }
+    if (recovering) {
+      transaction.cancelRecovery();
+    } else if (transaction.ownsInstallation &&
+        (transaction.parentConfirmedExited || transaction.isApplied())) {
+      await transaction.rollback(reason);
+    } else {
+      await transaction.abort();
+    }
+    rethrow;
+  }
+}
+
+/// EOF authorizes the switch only after a matching ARM and no other command.
+Future<bool> _armedAtEof(String token) async {
+  var armed = false;
+  await for (final line
+      in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
+    if (line != 'ARM $token') return false;
+    armed = true;
+  }
+  return armed;
 }

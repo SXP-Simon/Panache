@@ -1,0 +1,7 @@
+name: panache_dart_quality
+description: Measure the syntax and control flow of Dart code in a Git revision.
+publish_to: none
+environment:
+  sdk: '>=3.13.4 <4.0.0'
+dependencies:
+  analyzer: 10.1.0

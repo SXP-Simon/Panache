@@ -21,14 +21,15 @@ import '../utils/image_data.dart';
 import '../utils/image_markers.dart';
 import 'dialogs/text_tools_dialogs.dart';
 import 'dialogs/text_preview_dialog.dart';
-import '../services/api.dart';
+import '../models/upload.dart';
 import '../services/illustration_import.dart';
 import '../services/workspace.dart';
 import '../models/fine_edit.dart';
 import '../services/desktop_exit.dart';
 import '../services/workspace_documents.dart';
 import '../utils/text_tools.dart';
-import '../services/text_preparation/prepare.dart';
+import 'editor_preparation.dart';
+import 'live_preview_scheduler.dart';
 import '../widgets/workbench_controls.dart';
 import '../widgets/fine_preview.dart';
 import '../widgets/workbench_editor.dart';
@@ -89,9 +90,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   final undo = UndoHistoryController();
   int destination = 0, mobileTab = 0;
   SettingsSection settingsSection = SettingsSection.layout;
-  Timer? liveTimer;
-  int? liveSubmitted;
-  bool livePreview = false;
+  late final LivePreviewScheduler livePreview;
   bool fineFullscreen = false;
   bool composing = false;
   int navigationRevision = 0;
@@ -101,17 +100,14 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   bool firstFrameReady = false;
   bool recoveryShown = false;
   UpdatePromptCoordinator? updatePrompts;
-  String tableMode = 'latex';
-  TextPreparationJob? preparation;
-  bool preparationStopping = false;
-  ({String original, String formatted, String mode})? preparedText;
+  late final EditorPreparation preparation;
   WorkspaceDocuments get documents => WorkspaceDocuments(w);
   AppLocalizations get l => AppLocalizations.of(context)!;
   bool get english => Localizations.localeOf(context).languageCode == 'en';
   bool get locked => w.busy || editingLocked;
   bool get editingLocked =>
       operation ||
-      preparation != null ||
+      preparation.running ||
       {
         UpdatePhase.preparing,
         UpdatePhase.restarting,
@@ -125,6 +121,28 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     destination = widget.initialDestination;
     w = widget.workspace ?? Workspace();
+    preparation = EditorPreparation(
+      readText: () => editor.text,
+      applyText: (text) => replace(text, keepPreparation: true),
+      onFailure: () => notify(l.prepareTextFailed),
+    )..addListener(refreshPreparation);
+    livePreview = LivePreviewScheduler(
+      readDraft: () {
+        if (destination != 0 ||
+            locked ||
+            composing ||
+            !w.generation.available ||
+            editor.text.trim().isEmpty) {
+          return null;
+        }
+        return (
+          revision: w.editRevision,
+          previewRevision: w.generation.previewRevision,
+          full: w.settings.fullPreview,
+        );
+      },
+      submit: () => unawaited(w.generate(live: true)),
+    );
     editor.text = w.text;
     editor.addListener(rememberEditorSelection);
     w.addListener(refresh);
@@ -166,6 +184,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     if (widget.workspace == null) unawaited(w.initialize());
   }
 
+  void refreshPreparation() {
+    setState(() {});
+    livePreview.refresh();
+  }
+
   void refreshUpdates() {
     if (mounted &&
         !recoveryShown &&
@@ -185,19 +208,21 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       settingsRevision++;
     }
     if (editor.text != w.text) {
-      if (preparation != null) unawaited(stopPreparation());
-      preparedText = null;
+      if (preparation.running) unawaited(preparation.stop());
+      preparation.forgetFormatting();
       editor.value = TextEditingValue(
         text: w.text,
         selection: TextSelection.collapsed(offset: w.text.length),
       );
     }
-    if (livePreview && editor.text.trim().isEmpty && w.pages.isNotEmpty) {
+    if (livePreview.enabled &&
+        editor.text.trim().isEmpty &&
+        w.pages.isNotEmpty) {
       w.pages = [];
       w.page = 0;
     }
     setState(() {});
-    scheduleLivePreview();
+    livePreview.refresh();
     updatePrompts?.evaluate();
   }
 
@@ -209,9 +234,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    liveTimer?.cancel();
-    final job = preparation;
-    if (job != null) unawaited(job.cancel());
+    livePreview.dispose();
+    preparation.dispose();
     WidgetsBinding.instance.removeObserver(this);
     w.removeListener(refresh);
     widget.updates?.removeListener(refreshUpdates);
@@ -245,7 +269,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     } finally {
       if (mounted) {
         setState(() => operation = false);
-        scheduleLivePreview();
+        livePreview.refresh();
       }
     }
   }
@@ -290,7 +314,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         value.composing.isValid && !value.composing.isCollapsed;
     if (composing != composingNow) {
       composing = composingNow;
-      scheduleLivePreview();
+      livePreview.refresh();
     }
     if (value.selection.isValid && value.selection.end <= value.text.length) {
       lastEditorSelection = value;
@@ -305,7 +329,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   Future<bool> enterFineEdit() async {
     w.text = editor.text;
     final result = await w.enterFineEdit();
-    if (mounted && result) liveSubmitted = w.editRevision;
+    if (mounted && result) livePreview.markSubmitted(w.editRevision);
     return result;
   }
 
@@ -323,7 +347,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
   }
 
   void replace(String value, {bool keepPreparation = false}) {
-    if (!keepPreparation) preparedText = null;
+    if (!keepPreparation) preparation.forgetFormatting();
     editor.text = value;
     w.text = value;
     w.edit();
@@ -417,37 +441,6 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     w.edit();
   });
 
-  void scheduleLivePreview() {
-    liveTimer?.cancel();
-    if (!livePreview ||
-        destination != 0 ||
-        locked ||
-        !w.generation.available ||
-        editor.text.trim().isEmpty ||
-        w.generation.previewRevision == w.editRevision ||
-        liveSubmitted == w.editRevision ||
-        composing) {
-      return;
-    }
-    liveTimer = Timer(
-      Duration(milliseconds: w.settings.fullPreview ? 750 : 350),
-      () {
-        if (!mounted || locked || destination != 0 || !livePreview) return;
-        if (composing) return;
-        liveSubmitted = w.editRevision;
-        unawaited(w.generate(live: true));
-      },
-    );
-  }
-
-  void setLivePreview(bool enabled) {
-    setState(() {
-      livePreview = enabled;
-      liveSubmitted = null;
-    });
-    scheduleLivePreview();
-  }
-
   Future<void> generate({bool preview = true, bool pdf = false}) async {
     if (!(form.currentState?.validate() ?? w.settings.valid)) {
       notify(l.validation);
@@ -455,11 +448,11 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     }
     w.text = editor.text;
     if (!preview && w.finePreviewNeedsRefresh) {
-      liveSubmitted = w.editRevision;
+      livePreview.markSubmitted(w.editRevision);
       final refreshed = await w.generate();
       if (!mounted || !refreshed || w.previewStale) return;
     }
-    if (preview) liveSubmitted = w.editRevision;
+    if (preview) livePreview.markSubmitted(w.editRevision);
     final navigation = navigationRevision;
     final succeeded = await w.generate(preview: preview, pdf: pdf);
     if (!mounted || !succeeded) return;
@@ -498,7 +491,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       navigationRevision++;
     });
     if (index == 1) widget.onGuideOpened?.call();
-    scheduleLivePreview();
+    livePreview.refresh();
   }
 
   void openGuideTarget(GuideTarget target) {
@@ -515,7 +508,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       }
       navigationRevision++;
     });
-    scheduleLivePreview();
+    livePreview.refresh();
   }
 
   void selectSettingsSection(SettingsSection section) {
@@ -601,8 +594,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     mobileTab: mobileTab,
     settingsSection: settingsSection,
     onSectionSelected: selectSettingsSection,
-    livePreview: livePreview,
-    onLivePreview: setLivePreview,
+    livePreview: livePreview.enabled,
+    onLivePreview: (value) => setState(() => livePreview.setEnabled(value)),
     fullPreview: w.settings.fullPreview,
     onFullPreview: (value) {
       w.settings.fullPreview = value;
@@ -638,29 +631,29 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     onOpenGuide: () => selectDestination(1),
     guideUnread: widget.guideUnread,
     onUndo: () {
-      final prepared = preparedText;
-      if (prepared != null && editor.text == prepared.formatted) {
-        replace(prepared.original, keepPreparation: true);
+      final text = preparation.undoText(editor.text);
+      if (text != null) {
+        replace(text, keepPreparation: true);
       } else {
         undo.undo();
       }
     },
     onRedo: () {
-      final prepared = preparedText;
-      if (prepared != null && editor.text == prepared.original) {
-        replace(prepared.formatted, keepPreparation: true);
+      final text = preparation.redoText(editor.text);
+      if (text != null) {
+        replace(text, keepPreparation: true);
       } else {
         undo.redo();
       }
     },
     onChanged: (value) {
-      preparedText = null;
+      preparation.forgetFormatting();
       w.text = collapseImages(value, w.images);
       w.edit();
     },
-    preparing: preparation != null,
-    preparationStopping: preparationStopping,
-    onStopPreparation: stopPreparation,
+    preparing: preparation.running,
+    preparationStopping: preparation.stopping,
+    onStopPreparation: preparation.stop,
     toolbar: EditorToolbar(
       moreLabel: l.editingTools,
       hint: l.editingToolsHint,
@@ -922,58 +915,12 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   Future<void> prepareTextDialog() async {
     if (locked) return;
-    final mode = await showPrepareTextDialog(context, initialMode: tableMode);
-    if (!mounted || mode == null || locked) return;
-    tableMode = mode;
-    final previous = preparedText;
-    if (previous != null &&
-        editor.text == previous.formatted &&
-        mode == previous.mode) {
-      return;
-    }
-    final original = previous != null && editor.text == previous.formatted
-        ? previous.original
-        : editor.text;
-    final input = editor.text;
-    final job = startTextPreparation(
-      original,
-      tableMode: mode,
-      english: english,
+    final mode = await showPrepareTextDialog(
+      context,
+      initialMode: preparation.tableMode,
     );
-    setState(() {
-      preparation = job;
-      preparationStopping = false;
-    });
-    try {
-      final formatted = await job.result;
-      if (!mounted ||
-          preparation != job ||
-          preparationStopping ||
-          editor.text != input ||
-          formatted == input) {
-        return;
-      }
-      preparedText = (original: original, formatted: formatted, mode: mode);
-      replace(formatted, keepPreparation: true);
-    } on TextPreparationCancelled {
-      // Keep the exact source and the previous undo snapshot after stopping.
-    } catch (_) {
-      if (mounted && preparation == job) notify(l.prepareTextFailed);
-    } finally {
-      if (mounted && preparation == job) {
-        setState(() {
-          preparation = null;
-          preparationStopping = false;
-        });
-      }
-    }
-  }
-
-  Future<void> stopPreparation() async {
-    final job = preparation;
-    if (job == null || preparationStopping) return;
-    setState(() => preparationStopping = true);
-    await job.cancel();
+    if (!mounted || mode == null || locked) return;
+    await preparation.run(mode, english: english);
   }
 
   Future<void> letterDialog() async {

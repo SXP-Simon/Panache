@@ -4,6 +4,10 @@
 
 `app/lib/screens/` 负责页面、输入焦点、导航和文件选择交互；`app/lib/models/settings.dart` 管理渲染参数、校验与请求字段。`app/lib/services/workspace.dart` 是工作区业务协调器，对 UI 暴露草稿、设置与连接状态，通过 `ChangeNotifier` 通知变化。生成任务由 `view_models/generation_view_model.dart` 独立持有：提交、轮询、取消确认、任务身份、预览和导出结果均通过 `EngineGateway` 协调，不依赖页面、输入控制器或存储实现。工作区构造请求快照，并在提交后通过回调保存草稿；保留任务状态访问入口以供页面组合。
 
+`models/fine_edit_history.dart` 按草稿文本和渲染版面标识维护逐字微调与撤销重做。`Workspace` 检查当前预览能否编辑，通知页面并决定哪些微调记录进入草稿和导出请求。
+
+`services/engine_contract.dart` 定义请求快照、任务状态、引擎能力与调用接口。视图模型只导入这份契约。`services/engine_gateway.dart` 把当前传输适配到接口。上传文件的名称和字节由 `models/upload.dart` 表示，设置组件、底纸、PDF 和字体存储可以直接使用这一类型。
+
 `EngineGateway` 是生成任务的类型化入口，提供提交、状态、取消、预览字节和导出字节；`EngineCatalog` 提供字体列表与引擎能力。`ApiEngineGateway` 适配现有 `HandwritingApi` 传输，工作区确认连接仍有效后才应用探测到的能力。`EngineFailure` 保留错误码、说明和可选的重试等待时间，任务状态层不解析 HTTP 响应或错误字符串。移动端传输使用 Rust C ABI / Dart FFI，桌面端连接受令牌保护的本地 sidecar，Web 连接 HTTP 服务。界面不直接调用 FFI、轮询任务或写入偏好设置。
 
 `GenerationRequest` 在通知界面进入忙碌状态前冻结请求字段并复制上传字节。生成操作持有提交时的引擎，取消始终作用于同一引擎。成功预览记录提交时的编辑版本与任务 ID；后续编辑使预览过期，失败和取消保留上次成功预览。HTTP 与移动端的任务错误均提供独立的错误码与说明，任务终态区别于取消请求的确认。
@@ -14,22 +18,30 @@
 
 | 模块 | 职责 |
 |---|---|
-| `widgets/workbench_shell.dart` | 桌面 AppBar 与导航栏、手机紧凑标题栏与应用设置菜单；信息页保留后台编辑器 |
+| `widgets/workbench_shell.dart` | 组合桌面与手机外壳。`workbench_navigation.dart` 统一宽度分档、导航操作和提示，`workbench_masthead.dart` 绘制标题栏，`workbench_preferences.dart` 提供设置控件 |
 | `widgets/theme_color_editor.dart` | 整套配色选择、当前方案预览、主色和点缀色 HEX 编辑及恢复默认 |
 | `services/appearance_preferences.dart` | 主题色与减少动态效果的恢复、串行保存与失败状态，独立于工作区渲染设置 |
-| `widgets/workbench_layout.dart` | 编辑/参数/预览的响应式布局、错误和任务进度、全局生成与取消入口 |
+| `widgets/workbench_layout.dart` | 组合编辑、参数与预览的响应式布局。`workbench_task_status.dart` 呈现任务进度和操作入口 |
 | `widgets/workbench_editor.dart` | 编辑器、焦点与撤销控制器接入、字符数及插图缩略图 |
 | `widgets/workbench_controls.dart` | 通用面板和有图标、名称及用途说明的编辑工具菜单 |
-| `widgets/workbench_settings.dart` | 纸张背景、字体墨色、字号间距、边距排版、笔迹变化、删除线六组参数；预设操作集中呈现，文件和网络操作回调给页面 |
+| `widgets/workbench_settings.dart` | 组合设置与预设操作。`widgets/settings/` 按纸张、版面和墨迹组织输入控件，参数元数据来自 `models/render_parameter.dart` |
 | `widgets/workbench_preview.dart` | 图片预览、缩放、分页和保存动作呈现 |
-| `widgets/preview_pager.dart` | 图片滑动、缩放手势与全屏共享元素转场；通过页码回调表达选择 |
+| `widgets/preview_pager.dart` | 组织翻页和全屏共享元素转场，单页变换矩阵与缩放手势由 `zoomable_preview_page.dart` 持有 |
 | `widgets/workbench_motion.dart` | 工作台分区的保留式过渡及动效时长，不依赖工作区或引擎 |
 | `widgets/workbench_information.dart` | 使用说明、项目来源及本地数据说明 |
 | `screens/dialogs/` | 连接设置、文本整理/书信输入及数学预览对话框，返回用户选择而不直接操作工作区 |
 
+`screens/editor_preparation.dart` 持有当前文本整理任务和最近一次格式转换，页面继续持有编辑器、输入焦点与原生撤销栈。`view_models/fine_selection_drag.dart` 将手势位置转换为精修范围，绘制入口在 `widgets/fine_preview_painter.dart`。明暗色的推导在 `theme/handwriting_palette.dart`，控件的形状与不同交互状态的配方在 `theme/handwriting_controls.dart`。
+
+`screens/live_preview_scheduler.dart` 管理实时预览的等待时间和已提交草稿版本。页面在输入法组字、跳转和文本整理状态变化时报告可提交的草稿；生成任务及其取消仍归视图模型。
+
+`widgets/fine_selection_inspector.dart` 显示单字、字组和插图的可用操作。`view_models/fine_selection.dart` 计算实际字形和属性变更，画布保留尚未提交的编辑草稿，在原来的提交时点通知历史记录。
+
 「整理文本」统一按 Markdown 清理、公式转换的顺序处理粘贴内容；代码在整个流程中保留字面内容。整理前的原文可通过编辑器撤销恢复，未编辑的整理结果重复操作保持稳定；更换表格模式时使用保留的原文重新整理。
 
 界面局部导航、面板选择和文本光标由页面持有；渲染参数与任务状态由业务层持有。移动端工具菜单同时显示图标、动作名和用途说明；长任务的取消入口位于全局任务区域，不要求先切换到预览页。手机以编辑为首页，通过纸张设置和查看预览进入次级页面；次级页面与系统返回均回到编辑。键盘弹出时隐藏底部生成与页面入口，保留显式收起键盘入口。生成期间文本仍可编辑，完成后只有未离开原导航位置且草稿未再次修改时才进入预览，否则显示完成通知并保留当前输入焦点与组合输入；导出完成不改变页面。任务区域显示阶段与不定进度指示，不把估算百分比当成真实完成比例。
+
+PDF 工作台由 `screens/pdf_workbench.dart` 管理文档、页面缓存、编辑和导出。`widgets/pdf_workbench_layout.dart` 接收当前页、提示和可用操作，负责标题、翻页与内容布局。文字盒与页面的手势交互由 `widgets/pdf_writing_surface.dart` 处理。
 
 ## 动效与预览边界
 
@@ -65,11 +77,21 @@ Rust 的 `handwriting-core::generation` 统一编排渲染、逐页 PNG 编码�
 
 连接探测也使用独立代次，旧服务的迟到响应不能覆盖新连接。生成期间不替换 API。关闭工作区会关闭客户端并释放图片、上传文件和导出字节引用。预览保留上一份成功结果，新的生成失败或取消时仍可查看。
 
+## 引擎各入口的职责
+
+HTTP 请求先由 `crates/handwriting-server/src/access.rs` 检查来源、凭据与请求频率。`render_job.rs` 处理生成请求，队列状态由 `tasks.rs` 持有。移动端在 `handwriting-bridge/src/api.rs` 暴露 C ABI，后台生成、取消检查和成品发布集中在 `api/worker.rs`。
+
+共享引擎在 `handwriting-core/src/render/` 中分别处理段落换行（`paragraph.rs`）、单行墨迹边界和缩放（`line.rs`）与字形组合（`composition.rs`）。分页与进度回调由外层渲染流程按顺序驱动。MCP 的保存和预览入口位于 `panache-mcp/src/save.rs` 和 `preview.rs`，逐字调整与局部评审分别位于 `engine/adjustments.rs` 和 `review/local.rs`。
+
 ## 扩展约定
 
 界面局部状态留在组件；跨区域业务状态放入工作区，纯文本与数学转换放在 `utils/`，持久化放在存储适配器。新增服务能力通过 API 契约适配各平台，避免在 UI 中按操作系统复制业务逻辑。任务相关测试使用可控制 Future 的 API 替身验证异步顺序；公式转换同时验证 Dart 与 Rust 实现及真实引擎输出。
 
+`utils/course_latex.dart` 识别课程命令和它消费的参数。`utils/siunitx_latex.dart` 负责数值及 SI 单位的前缀、因子、分母和幂。调用方通过课程转换入口处理未识别的原文。
+
 数学转写的语义边界、课程测试和可复查图集入口见[数学支持与验证](math-support.md)。
+
+字体持久化由 `services/uploaded_font_storage.dart` 选择平台。原生文件和浏览器 IndexedDB 实现均依赖 `font_storage_contract.dart` 的读写接口和二进制格式。
 
 ## 应用更新边界
 
@@ -77,7 +99,7 @@ Rust 的 `handwriting-core::generation` 统一编排渲染、逐页 PNG 编码�
 
 原生版本读取实际安装包元数据；Web 编译版本和部署 `build_id` 由构建入口同时注入。Android 的系统安装适配器只接受更新缓存目录中的文件，并检查包名和实际版本码；系统负责升级签名及安装确认。iOS 不假定存在可侧载的正式安装包。
 
-`app/updater/` 是独立的纯 Dart 工程，使用原生 AOT 可执行文件承担桌面事务、归档校验、安装切换、健康确认与恢复；运行应用无需 Dart 或 Python。平台文件与进程身份操作通过受限 FFI 适配，归档解析使用 `archive`。Flutter 平台宿主负责下载和准备助手，工作区负责保存与首帧确认，退出入口可取消；安装助手不负责编辑器状态。
+`app/updater/` 是独立的纯 Dart 工程，使用原生 AOT 可执行文件承担桌面事务、归档校验、安装切换、健康确认与恢复；运行应用无需 Dart 或 Python。进程身份和升级协议共用 `updater_failure.dart` 中的错误类型，协议读取进程身份时沿用相同的错误码。平台文件与进程身份操作通过受限 FFI 适配，归档解析使用 `archive`。Flutter 平台宿主负责下载和准备助手，工作区负责保存与首帧确认，退出入口可取消；安装助手不负责编辑器状态。
 
 桌面更新按一次用户确认串联操作：先验证大小、SHA-256 与安装能力，准备完成且工作区保存成功后，助手等待旧界面和后端退出，再切换版本并等待健康确认。另一同入口实例仍运行时拒绝更新。Windows 使用稳定启动器与版本目录；Linux 和非沙盒 macOS 使用原子目录交换；沙盒、权限或文件系统受限时提供手动入口。启动检查可持久关闭，界面与任务恢复不等待网络。平台行为和 Web 构建入口见[应用更新](app-updates.md)。
 

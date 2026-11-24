@@ -4,6 +4,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Package the same architectures that the Rust build supplies.
+val engineAbis = when (project.findProperty("target-platform") as? String) {
+    "android-arm64" -> listOf("arm64-v8a")
+    "android-x64" -> listOf("x86_64")
+    else -> listOf("arm64-v8a", "x86_64")
+}
+
 android {
     namespace = "io.github.sxpsimon.handwriting"
     compileSdk = flutter.compileSdkVersion
@@ -23,13 +30,7 @@ android {
         // Flutter configures ABI splits itself. Combining splits with ndk ABI
         // filters is rejected by the Android Gradle plugin.
         if (project.findProperty("split-per-abi") != "true") {
-            val platforms = (project.findProperty("target-platform") as? String).orEmpty()
-            val abis = when (platforms) {
-                "android-arm64" -> listOf("arm64-v8a")
-                "android-x64" -> listOf("x86_64")
-                else -> listOf("arm64-v8a", "x86_64")
-            }
-            ndk { abiFilters += abis }
+            ndk { abiFilters += engineAbis }
         }
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
@@ -89,11 +90,8 @@ dependencies {
 val buildMobileEngine by tasks.registering(Exec::class) {
     val repository = rootProject.projectDir.parentFile.parentFile
     val output = layout.buildDirectory.dir("rust-jni").get().asFile
-    val platforms = (project.findProperty("target-platform") as? String).orEmpty()
-    val abis = if (platforms == "android-arm64") "arm64-v8a"
-        else if (platforms == "android-x64") "x86_64" else "arm64-v8a,x86_64"
     commandLine(if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3",
         repository.resolve("scripts/build-mobile-engine.py"), "android",
-        "--ndk", android.ndkDirectory, "--output", output, "--abis", abis)
+        "--ndk", android.ndkDirectory, "--output", output, "--abis", engineAbis.joinToString(","))
 }
 tasks.named("preBuild") { dependsOn(buildMobileEngine) }

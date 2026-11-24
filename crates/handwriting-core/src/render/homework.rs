@@ -15,103 +15,84 @@ pub(super) fn parameters(source: &Parameters, width: u32, height: u32) -> Parame
     p
 }
 
-pub(super) fn units(nodes: &[Node]) -> Vec<&[Node]> {
-    let original = layout_units(nodes);
-    let mut output: Vec<&[Node]> = Vec::new();
-    let mut offset = 0;
-    let mut i = 0;
-    while i < original.len() {
-        let mut end = i + 1;
-        if matches!(original[i].first(),Some(Node::Char(c)) if c.is_ascii_alphanumeric()) {
-            while end < original.len()
-                && end - i < 24
-                && matches!(original[end].first(),Some(Node::Char(c)) if c.is_ascii_alphanumeric())
+fn structural(node: &Node) -> bool {
+    matches!(
+        node,
+        Node::Break | Node::Newline | Node::Image { .. } | Node::Table(_) | Node::Circuit(_)
+    )
+}
+
+/// Count base units, keeping scripts attached to their base throughout the bounded lookahead.
+fn cluster_len(units: &[&[Node]]) -> usize {
+    let ascii_word = |unit: &[Node]| matches!(unit[0], Node::Char(c) if c.is_ascii_alphanumeric());
+    if ascii_word(units[0]) {
+        return units.iter().take(24).take_while(|u| ascii_word(u)).count();
+    }
+    let Node::Char(open @ ('(' | '[' | '（')) = units[0][0] else {
+        return 1;
+    };
+    let close = match open {
+        '(' => ')',
+        '[' => ']',
+        _ => '）',
+    };
+    let mut depth = 1;
+    for (i, unit) in units.iter().enumerate().skip(1).take(24) {
+        match &unit[0] {
+            node if structural(node) => break,
+            Node::Char(c) if *c == open => depth += 1,
+            Node::Char(c) if *c == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return i + 1;
+                }
+            }
+            _ => (),
+        }
+    }
+    1
+}
+
+fn word_groups(mut units: &[&[Node]]) -> impl Iterator<Item = std::ops::Range<usize>> {
+    let mut end = 0;
+    std::iter::from_fn(move || {
+        let first = units.first()?;
+        let start = end;
+        let (group, remaining) = units.split_at(cluster_len(units));
+        end += group.iter().map(|unit| unit.len()).sum::<usize>();
+        units = remaining;
+        // Closing punctuation attaches to the preceding group, up to 64 source nodes.
+        if !structural(&first[0]) {
+            while end - start < 64
+                && matches!(units.first(), Some(&[Node::Char(c)]) if "，。；：！？、,.!?;:)]）】".contains(*c))
             {
                 end += 1;
-            }
-        } else if let Some(Node::Char(open @ ('(' | '[' | '（'))) = original[i].first() {
-            let close = match open {
-                '(' => ')',
-                '[' => ']',
-                _ => '）',
-            };
-            let mut depth = 1;
-            for (j, unit) in original.iter().enumerate().skip(i + 1).take(24) {
-                match unit.first() {
-                    Some(
-                        Node::Newline
-                        | Node::Break
-                        | Node::Image { .. }
-                        | Node::Table(_)
-                        | Node::Circuit(_),
-                    ) => break,
-                    Some(Node::Char(c)) if c == open => depth += 1,
-                    Some(Node::Char(c)) if *c == close => {
-                        depth -= 1;
-                        if depth == 0 {
-                            end = j + 1;
-                            break;
-                        }
-                    }
-                    _ => (),
-                }
+                units = &units[1..];
             }
         }
-        let length: usize = original[i..end].iter().map(|u| u.len()).sum();
-        let slice = &nodes[offset..offset + length];
-        if matches!(slice,[Node::Char(c)] if "，。；：！？、,.!?;:)]）】".contains(*c))
-            && output.last().is_some_and(|u| {
-                u.len() + slice.len() <= 64 && {
-                    !matches!(
-                        u[0],
-                        Node::Newline
-                            | Node::Break
-                            | Node::Image { .. }
-                            | Node::Table(_)
-                            | Node::Circuit(_)
-                    )
-                }
-            })
-        {
-            let previous = output.pop().unwrap();
-            output.push(&nodes[offset - previous.len()..offset + length]);
-        } else {
-            output.push(slice);
-        }
-        offset += length;
-        i = end;
-    }
-    // 2026-10-24：关系符与首个右侧单元一起换行，空格不能把箭头孤立在上一行。
+        Some(start..end)
+    })
+}
+
+pub(super) fn units(nodes: &[Node]) -> Vec<&[Node]> {
+    let bases = layout_units(nodes);
+    let mut groups = word_groups(&bases).peekable();
     let mut joined = Vec::new();
-    let mut i = 0;
-    let mut offset = 0;
-    while i < output.len() {
-        let mut end = i + 1;
-        if break_before(output[i]) {
-            while end < output.len()
-                && output[end]
+    while let Some(mut span) = groups.next() {
+        if break_before(&nodes[span.clone()]) {
+            // The relation, any spaces, and its first right-hand group wrap together.
+            while let Some(space) = groups.next_if(|r| {
+                nodes[r.clone()]
                     .iter()
                     .all(|n| matches!(n,Node::Char(c) if c.is_whitespace()))
-            {
-                end += 1;
+            }) {
+                span.end = space.end;
             }
-            if end < output.len()
-                && !matches!(
-                    output[end][0],
-                    Node::Break
-                        | Node::Newline
-                        | Node::Image { .. }
-                        | Node::Table(_)
-                        | Node::Circuit(_)
-                )
-            {
-                end += 1;
+            if let Some(rhs) = groups.next_if(|r| !structural(&nodes[r.start])) {
+                span.end = rhs.end;
             }
         }
-        let length: usize = output[i..end].iter().map(|u| u.len()).sum();
-        joined.push(&nodes[offset..offset + length]);
-        offset += length;
-        i = end;
+        joined.push(&nodes[span]);
     }
     joined
 }
@@ -219,6 +200,17 @@ mod tests {
                     .all(|u| !matches!(u[0], Node::Scripts { .. }))
             );
         }
+    }
+    #[test]
+    fn word_and_punctuation_limits_apply_before_joining_relations() {
+        let source = format!("{}{}⇒  a，b\n。", "x".repeat(25), "，".repeat(64));
+        let nodes = text::parse(&source);
+        let groups = units(&nodes);
+        assert_eq!(
+            groups.iter().map(|g| g.len()).collect::<Vec<_>>(),
+            [24, 64, 1, 5, 1, 1, 1]
+        );
+        assert_eq!(groups[3], text::parse("⇒  a，"));
     }
     #[test]
     fn paragraphs_identify_questions_and_subitems_without_guessing_equations() {

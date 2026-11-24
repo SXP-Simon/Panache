@@ -51,6 +51,26 @@ class FineSelection {
     }
   }
 
+  void selectSource(FinePage page, FineRange range) {
+    if (!page.glyphs.any((glyph) => glyph.source != null)) return;
+    select(
+      page.glyphs
+          .where((glyph) {
+            final span = glyph.source;
+            return span != null &&
+                span.start < range.end &&
+                span.end > range.start;
+          })
+          .map((glyph) => glyph.id),
+    );
+  }
+
+  void selectIllustration(FinePage page, int group) => select(
+    page.glyphs
+        .where((glyph) => glyph.illustrationId == group)
+        .map((glyph) => glyph.id),
+  );
+
   void box(
     FinePage page,
     Map<int, FineAdjustment> edits,
@@ -269,6 +289,30 @@ class FineSelection {
       ),
     );
   }
+
+  List<FineAdjustment> adjust(
+    Map<int, FineAdjustment> edits, {
+    int? scale,
+    int? angle,
+    int? opacity,
+    int? color,
+    int? thickness,
+    int? softness,
+  }) => change(
+    edits,
+    (v) => (
+      id: v.id,
+      dx: v.dx,
+      dy: v.dy,
+      scale: scale ?? v.scale,
+      angle: angle ?? v.angle,
+      opacity: opacity ?? v.opacity,
+      color: color ?? v.color,
+      thickness: thickness ?? v.thickness,
+      softness: softness ?? v.softness,
+      warp: v.warp,
+    ),
+  );
 
   List<FineAdjustment> change(
     Map<int, FineAdjustment> edits,

@@ -43,6 +43,23 @@ void main() {
     },
   );
 
+  test('JPEG finds EXIF before scan data and ignores other APP1 segments', () {
+    const tiff = [73, 73, 42, 0, 8, 0, 0, 0];
+    final bytes = Uint8List.fromList([
+      0xff, 0xd8,
+      0xff, 0xff, 0xd0, // Fill and restart markers have no length.
+      0xff, 0xe1, 0, 5, 1, 2, 3,
+      0xff, 0xe1, 0, 16, 69, 120, 105, 102, 0, 0, ...tiff,
+    ]);
+    expect(paperExifSource(bytes), tiff);
+    expect(
+      paperExifSource(Uint8List.sublistView(bytes, 0, bytes.length - 1)),
+      isNull,
+    );
+    bytes[4] = 0xda; // Stop at the start of the image scan.
+    expect(paperExifSource(bytes), isNull);
+  });
+
   testWidgets(
     'saving an ink page inserts one EXIF chunk without changing pixels',
     (tester) async {
@@ -89,6 +106,7 @@ void main() {
         final original = await compositeInkPage(legacy, defaultInkLook);
         final tagged = await compositeInkPage(page, defaultInkLook);
         expect(tagged, withPaperExif(original, exif));
+        expect(paperExifSource(tagged), exif);
         final chunk = ByteData.sublistView(tagged);
         expect(chunk.getUint32(33), exif.length);
         expect(ascii.decode(tagged.sublist(37, 41)), 'eXIf');

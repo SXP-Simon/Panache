@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-import '../services/mcp_connection_stub.dart'
-    if (dart.library.io) '../services/mcp_connection_native.dart';
 
 import '../l10n/app_localizations.dart';
-import '../theme/nouveau_ornament.dart';
-import 'atelier_ornament.dart';
-import 'project_source_link.dart';
-import 'workbench_guide.dart';
-import 'workbench_motion.dart';
-import 'theme_color_editor.dart';
+import '../services/mcp_connection_stub.dart'
+    if (dart.library.io) '../services/mcp_connection_native.dart';
 import '../theme/handwriting_theme.dart';
+import '../theme/nouveau_ornament.dart';
+import 'project_source_link.dart';
+import 'theme_color_editor.dart';
+import 'workbench_guide.dart';
+import 'workbench_masthead.dart';
+import 'workbench_motion.dart';
+import 'workbench_navigation.dart';
+import 'workbench_preferences.dart';
 
 /// Adaptive app navigation and visible preference actions. Selection belongs to
 /// the caller; this shell only presents callbacks and responsive navigation.
@@ -58,165 +58,54 @@ class WorkbenchShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final showKeyboardDismiss =
-        MediaQuery.sizeOf(context).width < 1100 &&
-        MediaQuery.viewInsetsOf(context).bottom > 0;
-    final labels = [l.workspace, l.guide, l.about];
-    final compact = MediaQuery.sizeOf(context).width < 900;
-    final colors = Theme.of(context).colorScheme;
-    final dark = colors.brightness == Brightness.dark;
-    final mastheadInk =
-        Theme.of(context).appBarTheme.foregroundColor ?? colors.onSurface;
-    final usePaletteArt =
+    final size = WorkbenchWidth.from(MediaQuery.sizeOf(context).width);
+    final keyboardDismissAt =
+        !fineFullscreen && MediaQuery.viewInsetsOf(context).bottom > 0
+        ? size
+        : null;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final foreground = theme.appBarTheme.foregroundColor ?? colors.onSurface;
+    final palette =
         themeColor != defaultThemeColor ||
-        secondaryThemeColor != defaultSecondaryThemeColor;
+            secondaryThemeColor != defaultSecondaryThemeColor
+        ? colors
+        : null;
+    void dismissKeyboard() => FocusScope.of(context).unfocus();
     return Scaffold(
       appBar: fineFullscreen
           ? null
-          : AppBar(
-              toolbarHeight: compact ? 64 : 84,
-              titleSpacing: compact ? 6 : 18,
-              automaticallyImplyLeading: false,
-              centerTitle: false,
-              surfaceTintColor: Colors.transparent,
-              flexibleSpace: Stack(
-                children: [
-                  if (MediaQuery.sizeOf(context).width >= 1100)
-                    Positioned(
-                      top: 0,
-                      bottom: 0,
-                      left: 425,
-                      right: 355,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: CustomPaint(
-                          size: const Size(340, 84),
-                          painter: AtelierTendrils(
-                            palette: usePaletteArt ? colors : null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  const Align(
-                    alignment: Alignment.bottomCenter,
-                    child: NouveauWaveDivider(height: 7),
-                  ),
-                ],
-              ),
-              title: Row(
-                children: [
-                  CustomPaint(
-                    size: Size.square(compact ? 48 : 78),
-                    painter: AtelierIris(
-                      palette: usePaletteArt ? colors : null,
-                    ),
-                  ),
-                  SizedBox(width: compact ? 7 : 12),
-                  Flexible(
-                    child: Text(
-                      compact ? labels[destination] : 'Panache',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(
-                            color: mastheadInk,
-                            fontSize: compact ? 22 : 37,
-                            fontFamily: 'Playfair Display',
-                            fontFamilyFallback: const [
-                              'packages/handwriting_assets/LXGW WenKai',
-                            ],
-                            height: 1.1,
-                            letterSpacing: compact ? 0 : 1,
-                          ),
-                    ),
-                  ),
-                  if (!compact) ...[
-                    const SizedBox(width: 20),
-                    Material(
-                      animationDuration: Duration.zero,
-                      color: mastheadInk.withValues(alpha: .07),
-                      borderRadius: BorderRadius.circular(32),
-                      child: ProjectSourceLink(foreground: mastheadInk),
-                    ),
-                  ],
-                ],
-              ),
-              bottom: !compact && showKeyboardDismiss
-                  ? PreferredSize(
-                      preferredSize: const Size.fromHeight(40),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: mastheadInk,
-                          ),
-                          onPressed: () => FocusScope.of(context).unfocus(),
-                          icon: const Icon(Icons.keyboard_hide_outlined),
-                          label: Text(l.dismissKeyboard),
-                        ),
-                      ),
-                    )
+          : workbenchMasthead(
+              context,
+              size: size,
+              title: size == WorkbenchWidth.compact
+                  ? [l.workspace, l.guide, l.about][destination]
+                  : 'Panache',
+              foreground: foreground,
+              palette: palette,
+              onDismissKeyboard: keyboardDismissAt == WorkbenchWidth.medium
+                  ? dismissKeyboard
                   : null,
-              actions: [
-                if (!compact) ...[
-                  IconButton(
-                    key: const ValueKey('open-guide'),
-                    tooltip: guideUnread
-                        ? '${l.guide} · ${l.guideUnread}'
-                        : l.guide,
-                    onPressed: () => onDestinationSelected(1),
-                    icon: GuideUnreadBadge(
-                      unread: guideUnread,
-                      child: const Icon(Icons.menu_book_outlined),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l.about,
-                    onPressed: () => onDestinationSelected(2),
-                    icon: Badge(
-                      isLabelVisible: updateAvailable,
-                      child: const Icon(Icons.info_outline),
-                    ),
-                  ),
-                ],
-                Semantics(
-                  hint: guideUnread && compact ? l.guideUnread : null,
-                  child: TextButton.icon(
-                    key: const ValueKey('app-preferences'),
-                    style: TextButton.styleFrom(foregroundColor: mastheadInk),
-                    onPressed: () => preferencesSheet(context),
-                    icon: Badge(
-                      isLabelVisible:
-                          compact && (updateAvailable || guideUnread),
-                      backgroundColor: updateAvailable
-                          ? null
-                          : usePaletteArt
-                          ? colors.secondary
-                          : NouveauColors.gold,
-                      child: const Icon(Icons.tune),
-                    ),
-                    label: Text(l.appPreferences),
-                  ),
-                ),
-                if (MediaQuery.sizeOf(context).width >= 1100) ...[
-                  IconButton(
-                    tooltip: l.language,
-                    onPressed: onToggleLocale,
-                    icon: const Icon(Icons.translate),
-                  ),
-                  IconButton(
-                    tooltip: l.theme,
-                    onPressed: onToggleTheme,
-                    icon: const Icon(Icons.contrast),
-                  ),
-                ],
-                SizedBox(width: compact ? 3 : 16),
-              ],
+              actions: workbenchAppActions(
+                l,
+                size: size,
+                guideUnread: guideUnread,
+                updateAvailable: updateAvailable,
+                foreground: foreground,
+                unreadColor: palette?.secondary ?? NouveauColors.gold,
+                onDestinationSelected: onDestinationSelected,
+                onPreferences: () => preferencesSheet(context),
+                onToggleLocale: onToggleLocale,
+                onToggleTheme: onToggleTheme,
+              ),
             ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = !fineFullscreen && constraints.maxWidth >= 900;
+            final wide =
+                !fineFullscreen &&
+                WorkbenchWidth.from(constraints.maxWidth) !=
+                    WorkbenchWidth.compact;
             final content = RetainedPaneSwitcher(
               index: destination == 0 ? 0 : 1,
               children: [
@@ -237,7 +126,7 @@ class WorkbenchShell extends StatelessWidget {
                 ),
               ],
             );
-            return dark
+            return colors.brightness == Brightness.dark
                 ? DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: NightSurfaces.backdrop(colors.surface),
@@ -248,13 +137,10 @@ class WorkbenchShell extends StatelessWidget {
           },
         ),
       ),
-      floatingActionButton:
-          !fineFullscreen &&
-              MediaQuery.sizeOf(context).width < 900 &&
-              MediaQuery.viewInsetsOf(context).bottom > 0
+      floatingActionButton: keyboardDismissAt == WorkbenchWidth.compact
           ? FloatingActionButton.small(
               tooltip: l.dismissKeyboard,
-              onPressed: () => FocusScope.of(context).unfocus(),
+              onPressed: dismissKeyboard,
               child: const Icon(Icons.keyboard_hide_outlined),
             )
           : null,
@@ -326,31 +212,7 @@ class WorkbenchShell extends StatelessWidget {
                         },
                 ),
                 if (mcpConfig != null)
-                  ListTile(
-                    key: const ValueKey('connect-ai-client'),
-                    leading: const Icon(Icons.hub_outlined),
-                    title: Text(l.connectAiClient),
-                    subtitle: Text(l.copyMcpConfig),
-                    trailing: const Icon(Icons.copy_outlined),
-                    onTap: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      try {
-                        await Clipboard.setData(ClipboardData(text: mcpConfig));
-                      } on PlatformException {
-                        if (messenger.mounted) {
-                          messenger.showSnackBar(
-                            SnackBar(content: Text(l.mcpCopyFailed)),
-                          );
-                        }
-                        return;
-                      }
-                      if (!sheetContext.mounted) return;
-                      Navigator.pop(sheetContext);
-                      messenger.showSnackBar(
-                        SnackBar(content: Text(l.mcpConfigCopied)),
-                      );
-                    },
-                  ),
+                  mcpConnectionTile(context, sheetContext, l, mcpConfig),
                 ListTile(
                   leading: const Icon(Icons.translate),
                   title: Text(l.language),
@@ -359,52 +221,12 @@ class WorkbenchShell extends StatelessWidget {
                     onToggleLocale();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.contrast),
-                  title: Text(l.theme),
-                  subtitle: Text(switch (themeMode) {
-                    ThemeMode.system => l.themeSystem,
-                    ThemeMode.light => l.themeLight,
-                    ThemeMode.dark => l.themeDark,
-                  }),
-                  trailing: onThemeModeChanged == null
-                      ? null
-                      : PopupMenuButton<ThemeMode>(
-                          tooltip: l.chooseTheme,
-                          icon: const Icon(Icons.expand_more),
-                          initialValue: themeMode,
-                          itemBuilder: (_) => [
-                            for (final (mode, label) in [
-                              (ThemeMode.system, l.themeSystem),
-                              (ThemeMode.light, l.themeLight),
-                              (ThemeMode.dark, l.themeDark),
-                            ])
-                              CheckedPopupMenuItem(
-                                value: mode,
-                                checked: themeMode == mode,
-                                child: Text(label),
-                              ),
-                          ],
-                          onSelected: (value) {
-                            final nextBrightness = switch (value) {
-                              ThemeMode.system =>
-                                MediaQuery.platformBrightnessOf(sheetContext),
-                              ThemeMode.light => Brightness.light,
-                              ThemeMode.dark => Brightness.dark,
-                            };
-                            if (Theme.of(sheetContext).brightness ==
-                                nextBrightness) {
-                              Navigator.pop(sheetContext);
-                            } else {
-                              _dismissForAppearanceChange(sheetContext);
-                            }
-                            onThemeModeChanged!(value);
-                          },
-                        ),
-                  onTap: () {
-                    _dismissForAppearanceChange(sheetContext);
-                    onToggleTheme();
-                  },
+                themePreferenceTile(
+                  sheetContext,
+                  l,
+                  themeMode: themeMode,
+                  onThemeModeChanged: onThemeModeChanged,
+                  onToggleTheme: onToggleTheme,
                 ),
                 ThemeColorEditor(
                   color: themeColor,
@@ -456,11 +278,4 @@ class WorkbenchShell extends StatelessWidget {
       ),
     );
   }
-}
-
-// The global appearance transition already blends the painted sheet into the
-// new workbench. Retiring its route immediately avoids laying out and animating
-// the outgoing sheet in a second theme on every frame of that same gesture.
-void _dismissForAppearanceChange(BuildContext sheetContext) {
-  Navigator.of(sheetContext).removeRoute(ModalRoute.of(sheetContext)!);
 }

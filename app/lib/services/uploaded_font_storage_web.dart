@@ -3,8 +3,8 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
-import 'api.dart';
-import 'uploaded_font_storage.dart';
+import '../models/upload.dart';
+import 'font_storage_contract.dart';
 
 class FontStorage implements UploadedFontStorage {
   Future<web.IDBDatabase> _open() {

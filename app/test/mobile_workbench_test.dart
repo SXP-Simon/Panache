@@ -403,6 +403,103 @@ void main() {
     );
   }
 
+  testWidgets('live preview waits for the IME to commit on mobile', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(390, 880));
+    final api = workspace.api as MobileTestApi;
+    Finder keyed(String key) => find.byKey(ValueKey(key));
+    await tester.tap(keyed('open-preview'));
+    await tester.pumpAndSettle();
+    await tester.tap(keyed('live-preview'));
+    await tester.tap(keyed('back-to-editor'));
+    await tester.pumpAndSettle();
+    await tester.showKeyboard(keyed('text-editor'));
+    const value = TextEditingValue(
+      text: '中文',
+      selection: TextSelection.collapsed(offset: 2),
+      composing: TextRange(start: 0, end: 2),
+    );
+    tester.testTextInput.updateEditingValue(value);
+    await tester.pump(const Duration(seconds: 1));
+    expect(workspace.text, value.text);
+    expect(api.submissions, isEmpty);
+    tester.testTextInput.updateEditingValue(
+      value.copyWith(composing: TextRange.empty),
+    );
+    await tester.pump(const Duration(milliseconds: 349));
+    expect(api.submissions, isEmpty);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(api.submissions.single['text'], value.text);
+    api.terminal.complete({'task_status': 'completed'});
+    await tester.pumpAndSettle();
+    expect(api.previewReads, 1);
+    expect(keyed('text-editor'), findsOneWidget);
+  });
+
+  testWidgets('leaving the workbench pauses a pending full live preview', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(1280, 880));
+    final api = workspace.api as MobileTestApi;
+    Finder keyed(String key) => find.byKey(ValueKey(key));
+    await tester.tap(keyed('full-preview'));
+    await tester.pumpAndSettle();
+    await tester.tap(keyed('live-preview'));
+    await tester.pumpAndSettle();
+    await tester.enterText(keyed('text-editor'), 'before leaving');
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(api.submissions, isEmpty);
+    await tester.tap(keyed('open-guide'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(keyed('beginner-guide'), findsOneWidget);
+    expect(api.submissions, isEmpty);
+    final firstStep = keyed('guide-step-1');
+    await tester.ensureVisible(firstStep);
+    await tester.tap(firstStep);
+    await tester.pump(const Duration(milliseconds: 749));
+    expect(api.submissions, isEmpty);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(api.submissions.single['text'], 'before leaving');
+    expect(api.submissions.single['full_preview'], 'true');
+    api.terminal.complete({'task_status': 'completed'});
+    await tester.pumpAndSettle();
+    expect(api.previewReads, 1);
+    expect(keyed('text-editor'), findsOneWidget);
+  });
+
+  testWidgets('live preview resumes after text preparation unlocks editing', (
+    tester,
+  ) async {
+    final workspace = await openWorkbench(tester, size: const Size(390, 880));
+    final api = workspace.api as MobileTestApi;
+    api.terminal.complete({'task_status': 'completed'});
+    Finder keyed(String key) => find.byKey(ValueKey(key));
+    final l = labels(tester);
+    await tester.enterText(keyed('text-editor'), '### 第一段');
+    await tester.tap(keyed('open-preview'));
+    await tester.pumpAndSettle();
+    await tester.tap(keyed('live-preview'));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(api.submissions.single['text'], '### 第一段');
+    await tester.tap(keyed('back-to-editor'));
+    await tester.pumpAndSettle();
+    await tester.tap(keyed('editor-tools'));
+    await tester.pumpAndSettle();
+    final cleanup = find.widgetWithText(ListTile, l.prepareText);
+    await tester.ensureVisible(cleanup);
+    await tester.pumpAndSettle();
+    await tester.tap(cleanup);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, l.apply));
+    await waitPreparation(tester);
+    expect(workspace.text, '第一段');
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(api.submissions.map((fields) => fields['text']), ['### 第一段', '第一段']);
+    expect(workspace.previewStale, isFalse);
+  });
+
   testWidgets('generation completion respects navigation and newer edits', (
     tester,
   ) async {

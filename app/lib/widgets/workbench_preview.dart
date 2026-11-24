@@ -141,6 +141,217 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
           );
   }
 
+  Future<void> _toggleFineEdit(bool selected) async {
+    if (!selected) {
+      _closeFineEdit();
+      return;
+    }
+    if (await widget.onFineEdit!() && mounted) {
+      setState(() => _fineEditing = true);
+    }
+  }
+
+  Widget _fullscreenHeader(AppLocalizations l, ThemeData theme) => Row(
+    children: [
+      IconButton(
+        key: const ValueKey('exit-fullscreen-fine-edit'),
+        tooltip: l.fineExitFullscreen,
+        onPressed: () => widget.onFineFullscreen?.call(false),
+        icon: const BackButtonIcon(),
+      ),
+      Expanded(child: Text(l.fineEdit, style: theme.textTheme.titleMedium)),
+      if (widget.pages.length > 1)
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: 16),
+          child: Text('${widget.page + 1} / ${widget.pages.length}'),
+        ),
+    ],
+  );
+
+  Widget _previewActions(
+    AppLocalizations l,
+    FinePage? fine,
+    ColorScheme colors,
+  ) {
+    final canExpandEditor =
+        _fineEditing &&
+        fine != null &&
+        widget.onFineFullscreen != null &&
+        !widget.stale;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Align(
+        alignment: AlignmentDirectional.centerEnd,
+        child: Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            if (widget.onFineEdit != null)
+              FilterChip(
+                key: const ValueKey('fine-edit-toggle'),
+                label: Text(l.fineEdit),
+                avatar: const Icon(Icons.select_all, size: 17),
+                selected: _fineEditing,
+                onSelected: widget.locked ? null : _toggleFineEdit,
+              ),
+            if (widget.onAdjustBackground != null)
+              FilledButton.tonalIcon(
+                key: const ValueKey('preview-adjust-paper-area'),
+                onPressed: widget.locked ? null : widget.onAdjustBackground,
+                icon: const Icon(Icons.crop_free),
+                label: Text(l.paperAreaAction),
+              ),
+            if (widget.onInkChanged != null)
+              Semantics(
+                expanded: _inkExpanded,
+                child: FilledButton.tonalIcon(
+                  style: _inkExpanded
+                      ? FilledButton.styleFrom(
+                          backgroundColor: colors.primaryContainer,
+                          foregroundColor: colors.onPrimaryContainer,
+                        )
+                      : null,
+                  key: const ValueKey('preview-ink-effects'),
+                  onPressed: () => setState(() => _inkExpanded = !_inkExpanded),
+                  icon: Icon(_inkExpanded ? Icons.expand_less : Icons.tune),
+                  label: Text(l.inkEffects),
+                ),
+              ),
+            if (canExpandEditor)
+              OutlinedButton.icon(
+                key: const ValueKey('fullscreen-fine-edit'),
+                onPressed: widget.locked
+                    ? null
+                    : () => widget.onFineFullscreen?.call(true),
+                icon: const Icon(Icons.open_in_full),
+                label: Text(l.fineFullscreen),
+              )
+            else if (widget.pages.isNotEmpty)
+              OutlinedButton.icon(
+                key: const ValueKey('expand-preview'),
+                onPressed: _expand,
+                icon: const Icon(Icons.open_in_full),
+                label: Text(l.expandPreview),
+              ),
+            if (widget.fineInspector case final slot? when _fineEditing)
+              ValueListenableBuilder(
+                valueListenable: slot,
+                builder: (context, inspector, _) => IconButton(
+                  key: const ValueKey('fine-fit-page'),
+                  tooltip: l.resetPreviewZoom,
+                  onPressed: inspector?.fitPage,
+                  icon: const Icon(Icons.fit_screen_outlined),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyPreview(AppLocalizations l, ThemeData theme) {
+    final background = widget.backgroundBytes;
+    if (background != null) {
+      return Image.memory(background, fit: BoxFit.contain);
+    }
+    return LayoutBuilder(
+      builder: (context, space) => Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IrisQuill(height: (space.maxHeight * .48).clamp(42.0, 300.0)),
+              const SizedBox(height: 16),
+              Text(
+                l.previewHint,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _previewContent(
+    AppLocalizations l,
+    ThemeData theme,
+    InkPage? current,
+  ) {
+    if (widget.pages.isEmpty) return _emptyPreview(l, theme);
+    final fine = current?.fine;
+    if (_fineEditing && fine != null && current != null) {
+      return Column(
+        children: [
+          Expanded(child: _editor(current, fine)),
+          if (!widget.fineFullscreen && widget.pages.length > 1)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: l.previousPage,
+                  onPressed: widget.page > 0
+                      ? () => widget.onPageChanged(widget.page - 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text('${widget.page + 1} / ${widget.pages.length}'),
+                IconButton(
+                  tooltip: l.nextPage,
+                  onPressed: widget.page + 1 < widget.pages.length
+                      ? () => widget.onPageChanged(widget.page + 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+        ],
+      );
+    }
+    return PreviewPager(
+      pages: widget.pages,
+      page: widget.page,
+      heroOwner: _heroOwner,
+      onOpen: _expand,
+      copyImage: widget.copyImage,
+      inkPages: widget.inkPages,
+      inkLook: widget.inkLook,
+      fineEdits: _fineEdits(),
+      enlargeInitially: widget.fineInspector != null,
+      onPageChanged: widget.onPageChanged,
+    );
+  }
+
+  Widget _saveActions(AppLocalizations l) => Wrap(
+    alignment: WrapAlignment.center,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      if (widget.onCancel != null)
+        TextButton.icon(
+          onPressed: widget.onCancel,
+          icon: const Icon(Icons.cancel_outlined),
+          label: Text(l.cancel),
+        ),
+      if (widget.pages.isNotEmpty)
+        TextButton.icon(
+          onPressed: widget.locked ? null : widget.onSaveImage,
+          icon: const Icon(Icons.download),
+          label: Text(l.saveImage),
+        ),
+      if (widget.onSaveExport != null)
+        TextButton.icon(
+          onPressed: widget.locked ? null : widget.onSaveExport,
+          icon: const Icon(Icons.save_alt),
+          label: Text(l.saveExport),
+        ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -150,13 +361,7 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
     final paperActions = widget.onAdjustBackground != null;
     final inkActions = widget.onInkChanged != null;
     final current = widget.inkPages.elementAtOrNull(widget.page);
-    final fine = current?.fine;
     final fullscreen = widget.fineFullscreen;
-    final canExpandEditor =
-        _fineEditing &&
-        fine != null &&
-        widget.onFineFullscreen != null &&
-        !widget.stale;
     return WorkbenchPanel(
       title: l.previewTitle,
       icon: Icons.description_outlined,
@@ -165,113 +370,12 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
       child: Column(
         children: [
           if (fullscreen)
-            Row(
-              children: [
-                IconButton(
-                  key: const ValueKey('exit-fullscreen-fine-edit'),
-                  tooltip: l.fineExitFullscreen,
-                  onPressed: () => widget.onFineFullscreen?.call(false),
-                  icon: const BackButtonIcon(),
-                ),
-                Expanded(
-                  child: Text(l.fineEdit, style: theme.textTheme.titleMedium),
-                ),
-                if (widget.pages.length > 1)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 16),
-                    child: Text('${widget.page + 1} / ${widget.pages.length}'),
-                  ),
-              ],
-            )
+            _fullscreenHeader(l, theme)
           else if (paperActions ||
               inkActions ||
               hasPages ||
               widget.onFineEdit != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    if (widget.onFineEdit != null)
-                      FilterChip(
-                        key: const ValueKey('fine-edit-toggle'),
-                        label: Text(l.fineEdit),
-                        avatar: const Icon(Icons.select_all, size: 17),
-                        selected: _fineEditing,
-                        onSelected: widget.locked
-                            ? null
-                            : (selected) async {
-                                if (!selected) {
-                                  _closeFineEdit();
-                                  return;
-                                }
-                                if (await widget.onFineEdit!() && mounted) {
-                                  setState(() => _fineEditing = true);
-                                }
-                              },
-                      ),
-                    if (paperActions)
-                      FilledButton.tonalIcon(
-                        key: const ValueKey('preview-adjust-paper-area'),
-                        onPressed: widget.locked
-                            ? null
-                            : widget.onAdjustBackground,
-                        icon: const Icon(Icons.crop_free),
-                        label: Text(l.paperAreaAction),
-                      ),
-                    if (inkActions)
-                      Semantics(
-                        expanded: _inkExpanded,
-                        child: FilledButton.tonalIcon(
-                          style: _inkExpanded
-                              ? FilledButton.styleFrom(
-                                  backgroundColor: colors.primaryContainer,
-                                  foregroundColor: colors.onPrimaryContainer,
-                                )
-                              : null,
-                          key: const ValueKey('preview-ink-effects'),
-                          onPressed: () =>
-                              setState(() => _inkExpanded = !_inkExpanded),
-                          icon: Icon(
-                            _inkExpanded ? Icons.expand_less : Icons.tune,
-                          ),
-                          label: Text(l.inkEffects),
-                        ),
-                      ),
-                    if (canExpandEditor)
-                      OutlinedButton.icon(
-                        key: const ValueKey('fullscreen-fine-edit'),
-                        onPressed: widget.locked
-                            ? null
-                            : () => widget.onFineFullscreen?.call(true),
-                        icon: const Icon(Icons.open_in_full),
-                        label: Text(l.fineFullscreen),
-                      )
-                    else if (hasPages)
-                      OutlinedButton.icon(
-                        key: const ValueKey('expand-preview'),
-                        onPressed: _expand,
-                        icon: const Icon(Icons.open_in_full),
-                        label: Text(l.expandPreview),
-                      ),
-                    if (widget.fineInspector case final slot? when _fineEditing)
-                      ValueListenableBuilder(
-                        valueListenable: slot,
-                        builder: (context, inspector, _) => IconButton(
-                          key: const ValueKey('fine-fit-page'),
-                          tooltip: l.resetPreviewZoom,
-                          onPressed: inspector?.fitPage,
-                          icon: const Icon(Icons.fit_screen_outlined),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
+            _previewActions(l, current?.fine, colors),
           if (!fullscreen && _inkExpanded && inkActions)
             InkParameterControls(
               look: widget.inkLook,
@@ -303,109 +407,11 @@ class _WorkbenchPreviewState extends State<WorkbenchPreview> {
                 borderRadius: fullscreen ? null : BorderRadius.circular(28),
               ),
               clipBehavior: Clip.antiAlias,
-              child: widget.pages.isEmpty
-                  ? widget.backgroundBytes != null
-                        ? Image.memory(
-                            widget.backgroundBytes!,
-                            fit: BoxFit.contain,
-                          )
-                        : LayoutBuilder(
-                            builder: (context, space) => Center(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IrisQuill(
-                                      height: (space.maxHeight * .48).clamp(
-                                        42.0,
-                                        300.0,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      l.previewHint,
-                                      textAlign: TextAlign.center,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colors.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          )
-                  : _fineEditing && fine != null && current != null
-                  ? Column(
-                      children: [
-                        Expanded(child: _editor(current, fine)),
-                        if (!fullscreen && widget.pages.length > 1)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                tooltip: l.previousPage,
-                                onPressed: widget.page > 0
-                                    ? () =>
-                                          widget.onPageChanged(widget.page - 1)
-                                    : null,
-                                icon: const Icon(Icons.chevron_left),
-                              ),
-                              Text(
-                                '${widget.page + 1} / ${widget.pages.length}',
-                              ),
-                              IconButton(
-                                tooltip: l.nextPage,
-                                onPressed: widget.page + 1 < widget.pages.length
-                                    ? () =>
-                                          widget.onPageChanged(widget.page + 1)
-                                    : null,
-                                icon: const Icon(Icons.chevron_right),
-                              ),
-                            ],
-                          ),
-                      ],
-                    )
-                  : PreviewPager(
-                      pages: widget.pages,
-                      page: widget.page,
-                      heroOwner: _heroOwner,
-                      onOpen: _expand,
-                      copyImage: widget.copyImage,
-                      inkPages: widget.inkPages,
-                      inkLook: widget.inkLook,
-                      fineEdits: _fineEdits(),
-                      enlargeInitially: widget.fineInspector != null,
-                      onPageChanged: widget.onPageChanged,
-                    ),
+              child: _previewContent(l, theme, current),
             ),
           ),
           if (!fullscreen && (hasPages || widget.onCancel != null))
-            Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (widget.onCancel != null)
-                  TextButton.icon(
-                    onPressed: widget.onCancel,
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: Text(l.cancel),
-                  ),
-                if (hasPages)
-                  TextButton.icon(
-                    onPressed: widget.locked ? null : widget.onSaveImage,
-                    icon: const Icon(Icons.download),
-                    label: Text(l.saveImage),
-                  ),
-                if (widget.onSaveExport != null)
-                  TextButton.icon(
-                    onPressed: widget.locked ? null : widget.onSaveExport,
-                    icon: const Icon(Icons.save_alt),
-                    label: Text(l.saveExport),
-                  ),
-              ],
-            ),
+            _saveActions(l),
           if (!fullscreen && widget.version.isNotEmpty)
             Semantics(
               identifier: 'app-version',

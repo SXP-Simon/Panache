@@ -18,7 +18,13 @@ import 'mobile_api.dart';
 export 'desktop_backend.dart' show usesDesktopBackend, usesMobileBackend;
 
 class DesktopBootstrap extends StatefulWidget {
-  const DesktopBootstrap({super.key, required this.builder});
+  const DesktopBootstrap({
+    super.key,
+    required this.builder,
+    this.recoverInterruptedUpdate = updater.recoverInterruptedUpdate,
+  });
+  final Future<updater.PreparedDesktopUpdate?> Function(String)
+  recoverInterruptedUpdate;
   final Widget Function(Workspace) builder;
 
   @override
@@ -57,6 +63,7 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
 
   Future<void> start() async {
     if (starting) return;
+    final recoverInterruptedUpdate = widget.recoverInterruptedUpdate;
     setState(() {
       starting = true;
       failed = false;
@@ -73,10 +80,9 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
       if (!usesMobileBackend) {
         updateStartup = updater.DesktopUpdateStartup.read(support);
         if (updateStartup == null) {
-          final recovery = await updater.recoverInterruptedUpdate(support);
+          final recovery = await recoverInterruptedUpdate(support);
           if (recovery != null) {
-            recovery.arm();
-            if (!await requestDesktopUpdateExit()) await recovery.abort();
+            await _recoverAndExit(recovery);
             return;
           }
         }
@@ -103,12 +109,7 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
       if (!mounted || closing || !readyWorkspace.connected) {
         readyWorkspace.dispose();
         await current.stop();
-        if (mounted && !closing) {
-          setState(() {
-            failed = true;
-            starting = false;
-          });
-        }
+        _showStartupFailure();
         return;
       }
       setState(() {
@@ -143,13 +144,28 @@ class _DesktopBootstrapState extends State<DesktopBootstrap> {
       candidate?.dispose();
       await current.stop();
       debugPrint('Bundled backend startup failed: $error');
-      if (mounted && !closing) {
-        setState(() {
-          failed = true;
-          starting = false;
-        });
-      }
+      _showStartupFailure();
     }
+  }
+
+  Future<void> _recoverAndExit(updater.PreparedDesktopUpdate recovery) async {
+    var exitAccepted = false;
+    try {
+      recovery.arm();
+      exitAccepted = await requestDesktopUpdateExit();
+    } finally {
+      // An accepted exit leaves the armed helper waiting for process EOF.
+      if (!exitAccepted) await recovery.abort();
+    }
+    if (!exitAccepted) _showStartupFailure();
+  }
+
+  void _showStartupFailure() {
+    if (!mounted || closing) return;
+    setState(() {
+      failed = true;
+      starting = false;
+    });
   }
 
   @override

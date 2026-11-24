@@ -10,7 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import 'api.dart';
+import '../models/engine_failure.dart';
+import '../models/upload.dart';
 
 enum PdfImportMode { text, layout, fill }
 

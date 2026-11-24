@@ -105,24 +105,6 @@ fn local_engine_lifecycle_and_abi() {
     assert_eq!(identified, serde_json::to_value(&expected).unwrap());
     assert!(identified["correctedBackground"].as_str().unwrap().len() > 100);
     assert_eq!(identified["lineSpacing"], 60);
-    let fields: HashMap<String, String> = [
-        (
-            "text",
-            "第一页 √((a)/(b)) + xₙ²\n---\n第二页 ((a)/(b))/((c)/(d)) + (AB)⃗",
-        ),
-        ("width", "420"),
-        ("height", "320"),
-        ("font_size", "32"),
-        ("line_spacing", "45"),
-        ("left_margin", "20"),
-        ("right_margin", "20"),
-        ("top_margin", "20"),
-        ("bottom_margin", "20"),
-        ("seed", "42"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.into(), v.into()))
-    .collect();
     let wait = |id: &str| -> Value {
         for _ in 0..600 {
             let state = simple("status", id).unwrap();
@@ -144,34 +126,9 @@ fn local_engine_lifecycle_and_abi() {
         "cancel",
         "invalid",
     ] {
-        let mut fields = fields.clone();
-        if mode == "pdf" || mode == "zip" {
-            fields.insert("preview".into(), "false".into());
-            fields.insert("pdf_save".into(), (mode == "pdf").to_string());
-        }
-        if mode == "cancel" {
-            fields.insert("text".into(), "取消\n".repeat(1000));
-        }
-        if mode == "invalid" {
-            fields.insert("width".into(), "1000000".into());
-        }
-        if mode == "image" {
-            fields.insert("text".into(), image_support::image_document());
-        }
-        if mode == "layered" {
-            fields.insert("ink_layers".into(), "true".into());
-        }
-        if mode == "text_limit" {
-            fields.insert("text".into(), "字".repeat(20_001));
-        }
+        let fields = fields_for(mode);
         // 2026-10-15：公式经移动端同一 C ABI 进入真实 worker，不只测试直接 Rust 函数。
         let submitted = if mode == "math" || mode == "image" {
-            if mode == "math" {
-                fields.insert(
-                    "text".into(),
-                    "√((a)/(b)) + xₙ²\n---\n((a)/(b))/((c)/(d)) + (AB)⃗".into(),
-                );
-            }
             let input = CString::new(
                 json!({
                     "command":"submit", "data_dir":root.path(), "font_dir":font_dir,
@@ -180,12 +137,7 @@ fn local_engine_lifecycle_and_abi() {
                 .to_string(),
             )
             .unwrap();
-            let response: Value = unsafe {
-                let output = handwriting_bridge_call(input.as_ptr());
-                let response = serde_json::from_slice(CStr::from_ptr(output).to_bytes()).unwrap();
-                handwriting_bridge_free(output);
-                response
-            };
+            let response = bridge_response(Some(&input));
             assert_eq!(response["ok"], true, "{response}");
             response["data"].clone()
         } else {
@@ -219,25 +171,7 @@ fn local_engine_lifecycle_and_abi() {
                         .is_some_and(|code| !code.is_empty())
                 );
             }
-            "preview" | "math" | "image" | "layered" => {
-                assert_eq!(state["task_status"], "completed", "{state}");
-                assert_eq!(state["task_stage"], "completed");
-                assert_eq!(state["pages_completed"], 2);
-                assert!(state["error_code"].is_null());
-                assert_eq!(state["pages"].as_array().unwrap().len(), 2);
-                let bytes = std::fs::read(state["pages"][0].as_str().unwrap()).unwrap();
-                if mode == "layered" {
-                    use base64::{Engine, engine::general_purpose::STANDARD};
-
-                    let page: Value = serde_json::from_slice(&bytes).unwrap();
-                    for layer in ["paper", "ink"] {
-                        let png = STANDARD.decode(page[layer].as_str().unwrap()).unwrap();
-                        assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
-                    }
-                } else {
-                    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
-                }
-            }
+            "preview" | "math" | "image" | "layered" => assert_preview(&state, mode == "layered"),
             _ => {
                 assert_eq!(state["task_status"], "completed", "{state}");
                 let bytes = std::fs::read(state["result"].as_str().unwrap()).unwrap();
@@ -247,24 +181,103 @@ fn local_engine_lifecycle_and_abi() {
     }
     simple("reset", "").unwrap();
     assert!(!root.path().join("tasks").exists());
-    for request in [
-        "not-json".to_owned(),
-        json!({"command":"version", "data_dir":root.path(), "font_dir":font_dir}).to_string(),
-    ] {
-        let input = CString::new(request).unwrap();
-        unsafe {
-            let output = handwriting_bridge_call(input.as_ptr());
-            let response: Value =
-                serde_json::from_slice(CStr::from_ptr(output).to_bytes()).unwrap();
-            assert!(response.get("ok").unwrap().is_boolean());
-            handwriting_bridge_free(output);
-        }
-    }
+}
+
+#[test]
+fn abi_returns_json_for_valid_malformed_and_null_requests() {
+    let root = tempfile::tempdir().unwrap();
+    let version = CString::new(
+        json!({
+            "command":"version", "data_dir":root.path(), "font_dir":root.path()
+        })
+        .to_string(),
+    )
+    .unwrap();
+    assert_eq!(bridge_response(Some(&version))["ok"], true);
+    assert_eq!(
+        bridge_response(Some(c"not-json"))["code"],
+        "invalid_request"
+    );
+    assert_eq!(bridge_response(None)["code"], "invalid_request");
+    unsafe { handwriting_bridge_free(std::ptr::null_mut()) };
+}
+
+fn bridge_response(input: Option<&CStr>) -> Value {
     unsafe {
-        let output = handwriting_bridge_call(std::ptr::null());
-        let response: Value = serde_json::from_slice(CStr::from_ptr(output).to_bytes()).unwrap();
-        assert_eq!(response["code"], "invalid_request");
+        let output = handwriting_bridge_call(input.map_or(std::ptr::null(), CStr::as_ptr));
+        let response = serde_json::from_slice(CStr::from_ptr(output).to_bytes());
         handwriting_bridge_free(output);
-        handwriting_bridge_free(std::ptr::null_mut());
+        response.unwrap()
+    }
+}
+
+fn fields_for(mode: &str) -> HashMap<String, String> {
+    let mut fields: HashMap<String, String> = [
+        (
+            "text",
+            "第一页 √((a)/(b)) + xₙ²\n---\n第二页 ((a)/(b))/((c)/(d)) + (AB)⃗",
+        ),
+        ("width", "420"),
+        ("height", "320"),
+        ("font_size", "32"),
+        ("line_spacing", "45"),
+        ("left_margin", "20"),
+        ("right_margin", "20"),
+        ("top_margin", "20"),
+        ("bottom_margin", "20"),
+        ("seed", "42"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.into(), v.into()))
+    .collect();
+    match mode {
+        "pdf" | "zip" => {
+            fields.insert("preview".into(), "false".into());
+            fields.insert("pdf_save".into(), (mode == "pdf").to_string());
+        }
+        "cancel" => {
+            fields.insert("text".into(), "取消\n".repeat(1000));
+        }
+        "invalid" => {
+            fields.insert("width".into(), "1000000".into());
+        }
+        "image" => {
+            fields.insert("text".into(), image_support::image_document());
+        }
+        "math" => {
+            fields.insert(
+                "text".into(),
+                "√((a)/(b)) + xₙ²\n---\n((a)/(b))/((c)/(d)) + (AB)⃗".into(),
+            );
+        }
+        "layered" => {
+            fields.insert("ink_layers".into(), "true".into());
+        }
+        "text_limit" => {
+            fields.insert("text".into(), "字".repeat(20_001));
+        }
+        "preview" => (),
+        _ => panic!("unexpected scenario {mode}"),
+    }
+    fields
+}
+
+fn assert_preview(state: &Value, layered: bool) {
+    assert_eq!(state["task_status"], "completed", "{state}");
+    assert_eq!(state["task_stage"], "completed");
+    assert_eq!(state["pages_completed"], 2);
+    assert!(state["error_code"].is_null());
+    assert_eq!(state["pages"].as_array().unwrap().len(), 2);
+    let bytes = std::fs::read(state["pages"][0].as_str().unwrap()).unwrap();
+    if layered {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+
+        let page: Value = serde_json::from_slice(&bytes).unwrap();
+        for layer in ["paper", "ink"] {
+            let png = STANDARD.decode(page[layer].as_str().unwrap()).unwrap();
+            assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+        }
+    } else {
+        assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
     }
 }

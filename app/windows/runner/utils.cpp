@@ -9,15 +9,19 @@
 
 void CreateAndAttachConsole() {
   if (::AllocConsole()) {
-    FILE *unused;
-    if (freopen_s(&unused, "CONOUT$", "w", stdout)) {
-      _dup2(_fileno(stdout), 1);
+    FILE* reopened;
+    const bool stdout_open = freopen_s(&reopened, "CONOUT$", "w", stdout) == 0;
+    if (stdout_open) {
+      _dup2(_fileno(reopened), 1);
     }
-    if (freopen_s(&unused, "CONOUT$", "w", stderr)) {
-      _dup2(_fileno(stdout), 2);
+    const bool stderr_open = freopen_s(&reopened, "CONOUT$", "w", stderr) == 0;
+    if (stderr_open) {
+      _dup2(_fileno(reopened), 2);
     }
     std::ios::sync_with_stdio();
-    FlutterDesktopResyncOutputStreams();
+    if (stdout_open && stderr_open) {
+      FlutterDesktopResyncOutputStreams();
+    }
   }
 }
 

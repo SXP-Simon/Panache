@@ -49,25 +49,69 @@ def bundle_updater(bundle, backend, target, version, build, flutter):
     marker_path = Path('Contents/Resources/panache-install.json') if target == 'macos' else Path('panache-install.json')
     write_json(bundle / marker_path, marker)
     if target == 'windows':
-        runtime_id = f'{version}-{build}'
-        runtime = bundle.parent / f'.runtime-{runtime_id}'
-        if runtime.exists():
-            raise FileExistsError(runtime)
-        bundle.rename(runtime)
-        (bundle / 'versions').mkdir(parents=True)
-        runtime.rename(bundle / 'versions' / runtime_id)
-        launcher = bundle / 'handwriting_app.exe'
-        shutil.copy2(helper, launcher)
-        brand_launcher(bundle / 'versions' / runtime_id / 'handwriting_app.exe', launcher)
-        # GUI 子系统没有控制台；显式提供管道供 Dart 自检写入 stdout。
-        run(str(launcher), '--self-check', capture_output=True, timeout=30)
-        write_json(bundle / marker_path, {**marker, 'mcp_launcher': True})
-        pointer = {'schema': 1, 'product': 'Panache', 'version': version,
-                   'build_number': build, 'runtime': f'versions/{runtime_id}'}
-        write_json(bundle / 'active.json', pointer)
-        write_json(bundle / 'last-good.json', pointer)
+        install_windows_launcher(bundle, helper, version, build, marker)
     elif target == 'macos':
         run('codesign', '--force', '--sign', '-', str(backend / helper.name))
+
+
+def install_windows_launcher(bundle, helper, version, build, marker):
+    runtime_id = f'{version}-{build}'
+    runtime = bundle.parent / f'.runtime-{runtime_id}'
+    if runtime.exists():
+        raise FileExistsError(runtime)
+    bundle.rename(runtime)
+    (bundle / 'versions').mkdir(parents=True)
+    runtime.rename(bundle / 'versions' / runtime_id)
+    launcher = bundle / 'handwriting_app.exe'
+    shutil.copy2(helper, launcher)
+    brand_launcher(bundle / 'versions' / runtime_id / 'handwriting_app.exe', launcher)
+    # GUI 子系统没有控制台；显式提供管道供 Dart 自检写入 stdout。
+    run(str(launcher), '--self-check', capture_output=True, timeout=30)
+    write_json(bundle / 'panache-install.json', {**marker, 'mcp_launcher': True})
+    pointer = {'schema': 1, 'product': 'Panache', 'version': version,
+               'build_number': build, 'runtime': f'versions/{runtime_id}'}
+    write_json(bundle / 'active.json', pointer)
+    write_json(bundle / 'last-good.json', pointer)
+
+
+def stage_desktop_bundle(output, target, version):
+    if target == 'macos':
+        # Xcode embeds the signed sidecar in the app bundle.
+        source = ROOT / 'app/build/macos/Build/Products/Release/Panache.app'
+        bundle = output / source.name
+        shutil.copytree(source, bundle, symlinks=True)
+        return bundle, bundle / 'Contents/Resources/backend'
+
+    if target == 'windows':
+        source = ROOT / 'app/build/windows/x64/runner/Release'
+    else:
+        arch = 'arm64' if platform.machine() in ('arm64', 'aarch64') else 'x64'
+        source = ROOT / 'app/build/linux' / arch / 'release/bundle'
+    bundle = output / 'Panache'
+    # Rebuild backend from release inputs even when the Flutter build is incremental.
+    shutil.copytree(source, bundle, symlinks=True,
+                    ignore=lambda directory, names: {'backend'} if Path(directory) == source else set())
+    backend = bundle / 'backend'
+    backend.mkdir()
+    binary = 'handwriting-server.exe' if target == 'windows' else 'handwriting-server'
+    shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
+    shutil.copytree(ROOT / 'assets/font_assets', backend / 'font_assets')
+    (backend / 'VERSION').write_text(f'{version}\n', encoding='utf-8', newline='\n')
+    shutil.copy2(ROOT / 'LICENSE', backend / 'LICENSE')
+    shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
+    shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
+    shutil.copytree(ROOT / 'assets/licenses', backend / 'licenses', dirs_exist_ok=True)
+    return bundle, backend
+
+
+def archive_bundle(bundle, output, target, version):
+    if target == 'macos':
+        run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))
+        run('codesign', '--verify', '--deep', '--strict', str(bundle))
+        archive = output / f'Panache-{version}-{platform.machine()}.zip'
+        run('ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(bundle), str(archive))
+        return archive
+    return shutil.make_archive(str(output / f'Panache-{version}-{platform.machine()}'), 'zip' if target == 'windows' else 'gztar', root_dir=output, base_dir=bundle.name)
 
 
 def main():
@@ -96,32 +140,7 @@ def main():
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
-    if target == 'macos':
-        source = ROOT / 'app/build/macos/Build/Products/Release/Panache.app'
-        bundle = output / source.name
-        shutil.copytree(source, bundle, symlinks=True)
-        backend = bundle / 'Contents/Resources/backend'
-    else:
-        if target == 'windows':
-            source = ROOT / 'app/build/windows/x64/runner/Release'
-        else:
-            source = ROOT / 'app/build/linux' / ('arm64' if platform.machine() in ('arm64', 'aarch64') else 'x64') / 'release/bundle'
-        bundle = output / 'Panache'
-        # Rebuild backend from release inputs even when the Flutter build is incremental.
-        shutil.copytree(source, bundle, symlinks=True,
-                        ignore=lambda directory, names: {'backend'} if Path(directory) == source else set())
-        backend = bundle / 'backend'
-    # macOS 的 Xcode 构建阶段已包含 sidecar，分发时直接复用。
-    if target != 'macos':
-        backend.mkdir()
-        binary = 'handwriting-server.exe' if target == 'windows' else 'handwriting-server'
-        shutil.copy2(ROOT / 'target/release' / binary, backend / binary)
-        shutil.copytree(ROOT / 'assets/font_assets', backend / 'font_assets')
-        (backend / 'VERSION').write_text(f'{version}\n', encoding='utf-8', newline='\n')
-        shutil.copy2(ROOT / 'LICENSE', backend / 'LICENSE')
-        shutil.copy2(ROOT / 'crates/handwriting-core/NOTICE', backend / 'NOTICE')
-        shutil.copytree(ROOT / 'crates/handwriting-core/licenses', backend / 'licenses')
-        shutil.copytree(ROOT / 'assets/licenses', backend / 'licenses', dirs_exist_ok=True)
+    bundle, backend = stage_desktop_bundle(output, target, version)
     mcp = 'panache-mcp.exe' if target == 'windows' else 'panache-mcp'
     shutil.copy2(ROOT / 'target/release' / mcp, backend / mcp)
     shutil.copy2(ROOT / 'app/web/prepare-text-worker.js', backend / 'prepare-text-worker.js')
@@ -129,13 +148,7 @@ def main():
     if target == 'macos':
         run('codesign', '--force', '--sign', '-', str(backend / mcp))
     bundle_updater(bundle, backend, target, version, build, flutter)
-    if target == 'macos':
-        run('codesign', '--force', '--sign', '-', '--entitlements', str(ROOT / 'app/macos/Runner/Release.entitlements'), str(bundle))
-        run('codesign', '--verify', '--deep', '--strict', str(bundle))
-        archive = output / f'Panache-{version}-{platform.machine()}.zip'
-        run('ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(bundle), str(archive))
-    else:
-        archive = shutil.make_archive(str(output / f'Panache-{version}-{platform.machine()}'), 'zip' if target == 'windows' else 'gztar', root_dir=output, base_dir=bundle.name)
+    archive = archive_bundle(bundle, output, target, version)
     print(f'独立客户端：{bundle}\n分发包：{archive}')
 
 

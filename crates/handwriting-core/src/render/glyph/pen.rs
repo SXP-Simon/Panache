@@ -3,6 +3,8 @@ use super::{Glyph, Glyphs, Path};
 use crate::Result;
 use image::GrayImage;
 
+mod sample;
+
 pub(super) struct MathPen {
     width: f32,
     axis: f32,
@@ -15,120 +17,8 @@ pub(super) struct MathPen {
 }
 
 impl MathPen {
-    pub fn sample(font: &fontdue::Font) -> Self {
-        let size = 96.;
-        let mut widths = Vec::new();
-        for c in ['n', 'x', '1', '十', '口'] {
-            if font.lookup_glyph_index(c) == 0 {
-                continue;
-            }
-            let (m, data) = font.rasterize(c, size);
-            let mut area = 0.;
-            let mut perimeter = 0.;
-            for y in 0..m.height {
-                for x in 0..m.width {
-                    if data[y * m.width + x] < 96 {
-                        continue;
-                    }
-                    area += 1.;
-                    for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                        let (xx, yy) = (x as i32 + dx, y as i32 + dy);
-                        if xx < 0
-                            || yy < 0
-                            || xx >= m.width as i32
-                            || yy >= m.height as i32
-                            || data[yy as usize * m.width + xx as usize] < 96
-                        {
-                            perimeter += 1.;
-                        }
-                    }
-                }
-            }
-            if perimeter > 0. {
-                widths.push(2. * area / perimeter / size);
-            }
-        }
-        widths.sort_by(f32::total_cmp);
-        let width = widths
-            .get(widths.len() / 2)
-            .copied()
-            .unwrap_or(0.025)
-            .clamp(0.009, 0.065);
-        let (x, _) = font.rasterize('x', size);
-        let height = if x.height > 0 {
-            (x.height as f32 / size).clamp(0.30, 0.70)
-        } else {
-            0.48
-        };
-        let axis = if x.height > 0 {
-            -(x.height as f32 / 2. + x.ymin as f32) / size
-        } else {
-            -0.27
-        };
-        let (m, data) = font.rasterize('1', size);
-        let mut centers = Vec::new();
-        for y in m.height / 3..m.height * 2 / 3 {
-            let xs: Vec<_> = (0..m.width)
-                .filter(|x| data[y * m.width + x] >= 128)
-                .collect();
-            if !xs.is_empty() {
-                centers.push((y as f32, xs.iter().sum::<usize>() as f32 / xs.len() as f32));
-            }
-        }
-        let slant = if let (Some(a), Some(b)) = (centers.first(), centers.last()) {
-            ((a.1 - b.1) / (b.0 - a.0).max(1.)).clamp(-0.12, 0.12)
-        } else {
-            0.
-        };
-        Self {
-            width,
-            axis: axis.clamp(-0.4, -0.16),
-            height,
-            slant,
-            chevrons: ['<', '>'].map(|c| Self::sample_chevron(font, c)),
-            root: super::radical::RootShape::sample(font),
-            naturalness: 0.,
-            seed: 0,
-        }
-    }
     pub fn thickness(&self, size: f32) -> f32 {
         (self.width * size).max(0.75)
-    }
-    fn sample_chevron(font: &fontdue::Font, c: char) -> Option<GrayImage> {
-        if font.lookup_glyph_index(c) == 0 {
-            return None;
-        }
-        let (m, data) = font.rasterize(c, 96.);
-        if m.width < 3 || m.height < 3 {
-            return None;
-        }
-        let g = Glyphs::trim(Glyph {
-            mask: GrayImage::from_raw(m.width as u32, m.height as u32, data)?,
-            advance: m.advance_width,
-            left: 0,
-            top: 0,
-            ink: true,
-        });
-        let mask = g.mask;
-        let mut bands = [(0., 0.); 3];
-        for (x, y, p) in mask.enumerate_pixels() {
-            if p[0] >= 96 {
-                let band = (y * 3 / mask.height()).min(2) as usize;
-                bands[band].0 += x as f32;
-                bands[band].1 += 1.;
-            }
-        }
-        if bands.iter().any(|b| b.1 == 0.) {
-            return None;
-        }
-        let outer = (bands[0].0 / bands[0].1 + bands[2].0 / bands[2].1) / 2.;
-        let middle = bands[1].0 / bands[1].1;
-        let direction = if c == '<' {
-            outer - middle
-        } else {
-            middle - outer
-        };
-        (direction > mask.width() as f32 * 0.12).then_some(mask)
     }
     fn inequality(&self, c: char, size: f32) -> Result<Option<Glyph>> {
         let Some(source) = &self.chevrons[usize::from(c == '≥')] else {
@@ -219,10 +109,8 @@ impl MathPen {
             }
             '≤' | '≥' => {
                 width = w * 0.74;
-                let less = "<≤".contains(c);
-                let equal = "≤≥".contains(c);
-                let center = axis - if equal { h * 0.35 } else { 0. };
-                let tip = if less { 0. } else { width };
+                let center = axis - h * 0.35;
+                let tip = if c == '≤' { 0. } else { width };
                 let end = width - tip;
                 // 2026-10-24：缺字回退也保留不对称收笔，避免理想镜面对称的印刷折角。
                 paths.push(vec![
@@ -230,10 +118,8 @@ impl MathPen {
                     (tip, center + h * 0.08),
                     (end - width * 0.04, center + h),
                 ]);
-                if equal {
-                    let bar = center + h + (h * 0.85).max(self.thickness(size) + 2.5);
-                    paths.push(vec![(0., bar), (width, bar)]);
-                }
+                let bar = center + h + (h * 0.85).max(self.thickness(size) + 2.5);
+                paths.push(vec![(0., bar), (width, bar)]);
             }
             '≠' => {
                 width = w * 0.78;

@@ -51,91 +51,94 @@ String collapseImages(String text, Map<String, String> images) =>
       return '![插图 $id$scale]';
     });
 
+// Literal ranges from the shared scanner keep their original spelling unless replaced.
+String _replaceSegments(String text, String? Function(String) replacement) {
+  final out = StringBuffer();
+  var cursor = 0;
+  for (final segment in scanMathSegments(text)) {
+    final value = replacement(text.substring(segment.start, segment.end));
+    if (value == null) continue;
+    out.write(text.substring(cursor, segment.start));
+    out.write(value);
+    cursor = segment.end;
+  }
+  if (cursor == 0) return text;
+  out.write(text.substring(cursor));
+  return out.toString();
+}
+
 String cleanMarkdown(
   String text, {
   String tableMode = 'latex',
   bool english = false,
   String Function(String)? transformMath,
 }) {
-  var s = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  const quotedStart = '$markdownTokenStart\uFDD1';
+  var s = text
+      .replaceAll(markdownTokenStart, quotedStart)
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n');
   final code = protectMarkdownCode(s, inline: false);
   s = code.text;
-  final protected = <String>[];
-  final scriptStars = <String>[];
-  var tokenPrefix = '\uE100HW';
-  while (s.contains(tokenPrefix)) {
-    tokenPrefix += '\uE100';
-  }
-  String protect(String source) {
-    protected.add(source);
-    return '$tokenPrefix${protected.length - 1}\uE101';
-  }
+  final protected = MarkdownPlaceholders('${markdownTokenStart}HW', '\uE101');
+  final scriptStars = MarkdownPlaceholders(
+    '${markdownTokenStart}HWSTAR',
+    '\uE101',
+  );
 
   // A diagram can contain pipes and Markdown-looking labels. Mask its entire
   // source before table recognition so an unsupported diagram stays editable.
-  final diagrams = StringBuffer();
-  var diagramCursor = 0;
-  for (final segment in scanMathSegments(s)) {
-    final source = s.substring(segment.start, segment.end);
-    if (!source.contains(r'\begin{circuitikz}')) continue;
-    diagrams.write(s.substring(diagramCursor, segment.start));
-    diagrams.write(protect(source));
-    diagramCursor = segment.end;
-  }
-  diagrams.write(s.substring(diagramCursor));
-  s = diagrams.toString();
+  s = _replaceSegments(
+    s,
+    (source) =>
+        source.contains(r'\begin{circuitikz}') ? protected.save(source) : null,
+  );
 
   if (tableMode == 'latex') {
-    s = _convertMarkdownTables(s, protect);
+    s = _convertMarkdownTables(s, protected.save);
   }
 
-  final math = StringBuffer();
-  var cursor = 0;
-  for (final segment in scanMathSegments(s)) {
-    math.write(s.substring(cursor, segment.start));
-    final source = s.substring(segment.start, segment.end);
+  s = _replaceSegments(s, (source) {
+    // Links and images retain the existing Markdown extraction rules.
+    if (source.startsWith('![') ||
+        source.startsWith('[') ||
+        source.startsWith('`')) {
+      return null;
+    }
     final fenced = RegExp(r'^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\1$')
         .firstMatch(source);
-    // Links and images retain the existing Markdown extraction rules.
-    math.write(
-      source.startsWith('![') ||
-              source.startsWith('[') ||
-              source.startsWith('`')
-          ? source
-          : protect(fenced?[2] ?? source),
-    );
-    cursor = segment.end;
-  }
-  math.write(s.substring(cursor));
-  final bodyCode = protectMarkdownCode(math.toString());
+    return protected.save(fenced?[2] ?? source);
+  });
+  final bodyCode = protectMarkdownCode(s);
   s = bodyCode.text;
   // Converted script stars must not become Markdown emphasis on a second cleanup.
-  s = s.replaceAllMapped(RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'), (match) {
-    scriptStars.add(match[0]!);
-    return '${tokenPrefix}STAR${scriptStars.length - 1}\uE101';
-  });
+  s = s.replaceAllMapped(
+    RegExp(r'[_^](?:\(\*\)|\{\*\}|\*)'),
+    (match) => scriptStars.save(match[0]!),
+  );
   final bareMath = StringBuffer();
-  cursor = 0;
+  var cursor = 0;
   for (final match in RegExp(r'\\left\b').allMatches(s)) {
     if (match.start < cursor) continue;
     final end = bareDelimiterEnd(s, match.start);
     if (end <= match.start) continue;
     bareMath.write(s.substring(cursor, match.start));
-    bareMath.write(protect(s.substring(match.start, end)));
+    bareMath.write(protected.save(s.substring(match.start, end)));
     cursor = end;
   }
   bareMath.write(s.substring(cursor));
   final unprotectedImages = bareMath.toString();
   s = _replaceEmbeddedImages(
     unprotectedImages,
-    (match, end) => protect(unprotectedImages.substring(match.start, end + 1)),
+    (match, end) =>
+        protected.save(unprotectedImages.substring(match.start, end + 1)),
   );
   s = s.replaceAllMapped(
     RegExp(
       r'!\[[^\]]*\]\(img:?_?\d+\)|!\[插图(?:[ \t]*[#:_-]?[ \t]*\d+)?(?:\|[^\]]+)?\](?!\()',
     ),
     (m) {
-      return protect(m[0]!);
+      return protected.save(m[0]!);
     },
   );
   s = s.replaceFirst(
@@ -154,70 +157,47 @@ String cleanMarkdown(
         ),
         '',
       );
-  s = s.replaceAllMapped(
-    RegExp(r'```[^\n]*\n([\s\S]*?)```|~~~[^\n]*\n([\s\S]*?)~~~'),
-    (m) => m[1] ?? m[2]!,
-  );
-  s = s.replaceAllMapped(RegExp(r'`([^`\n]+)`'), (m) => m[1]!);
+  s = s.replaceAllMapped(RegExp(r'~~~[^\n]*\n([\s\S]*?)~~~'), (m) => m[1]!);
   s = stripMarkdownLinks(s);
+  s = _cleanLines(s, tableMode, english);
+  for (final marker in ['***', '___', '**', '__', '~~', '==']) {
+    s = s.replaceAllMapped(
+      RegExp('${RegExp.escape(marker)}(.+?)${RegExp.escape(marker)}'),
+      (m) => m[1]!,
+    );
+  }
+  s = s.replaceAllMapped(
+    RegExp(r'(^|[^\w*])\*([^\s*][^*\n]*?)\*(?=[^\w*]|$)'),
+    (m) => '${m[1]}${m[2]}',
+  );
+  s = s.replaceAllMapped(
+    RegExp(r'(^|[^\w_])_([^\s_][^_\n]*?)_(?=[^\w_]|$)'),
+    (m) => '${m[1]}${m[2]}',
+  );
+  s = protected.restore(s);
+  s = s
+      .split('\n')
+      .where((line) => line.trim().isNotEmpty && line.trim() != '---')
+      .join('\n')
+      .trim();
+  // Keep literal code masked until both cleanup stages have finished.
+  s = transformMath?.call(s) ?? s;
+  s = scriptStars.restore(s);
+  return code
+      .restore(bodyCode.restore(s))
+      .replaceAll(quotedStart, markdownTokenStart);
+}
+
+String _cleanLines(String source, String tableMode, bool english) {
   final output = <String>[], table = <String>[];
   void flush() {
     if (table.isEmpty) return;
-    final rows = table
-        .where((line) => !RegExp(r'^[\s|:\-]+$').hasMatch(line))
-        .map(
-          (line) => line
-              .trim()
-              .replaceAll(RegExp(r'^\||\|$'), '')
-              .split('|')
-              .map((c) => c.trim())
-              .toList(),
-        )
-        .toList();
-    if (rows.isNotEmpty) {
-      if (tableMode == 'list' && rows.length > 1) {
-        final headers = rows.first;
-        for (var i = 1; i < rows.length; i++) {
-          final row = rows[i];
-          final fields = [
-            for (var j = 1; j < row.length; j++)
-              '${j < headers.length ? headers[j] : '${english ? 'Column' : '列'}${j + 1}'}: ${row[j].isEmpty ? '-' : row[j]}',
-          ];
-          output.add(
-            '$i. ${headers.first}: ${row.first}${fields.isEmpty ? '' : ' (${fields.join('; ')})'}',
-          );
-        }
-      } else if (tableMode == 'aligned') {
-        int width(String value) =>
-            value.runes.fold(0, (a, b) => a + (b > 255 ? 2 : 1));
-        final columns = rows
-            .map((r) => r.length)
-            .reduce((a, b) => a > b ? a : b);
-        final widths = List.generate(
-          columns,
-          (i) => rows
-              .map((r) => i < r.length ? width(r[i]) : 0)
-              .reduce((a, b) => a > b ? a : b),
-        );
-        output.addAll(
-          rows.map(
-            (r) => [
-              for (var i = 0; i < r.length; i++)
-                r[i] + ' ' * (widths[i] - width(r[i]) + 2),
-            ].join().trimRight(),
-          ),
-        );
-      } else {
-        output.addAll(
-          rows.map((r) => r.join(tableMode == 'raw_pipe' ? ' | ' : '  ')),
-        );
-      }
-    }
+    output.addAll(_formatTable(table, tableMode, english));
     table.clear();
   }
 
   var listContinuation = false;
-  for (var line in s.split('\n')) {
+  for (var line in source.split('\n')) {
     if (tableMode != 'latex' && RegExp(r'^\s*\|.*\|\s*$').hasMatch(line)) {
       table.add(line);
       continue;
@@ -242,37 +222,63 @@ String cleanMarkdown(
     output.add(line.trimRight());
   }
   flush();
-  s = output.join('\n');
-  for (final marker in ['***', '___', '**', '__', '~~', '==']) {
-    s = s.replaceAllMapped(
-      RegExp('${RegExp.escape(marker)}(.+?)${RegExp.escape(marker)}'),
-      (m) => m[1]!,
-    );
+  return output.join('\n');
+}
+
+Iterable<String> _formatTable(
+  List<String> table,
+  String tableMode,
+  bool english,
+) {
+  final rows = table
+      .where((line) => !RegExp(r'^[\s|:\-]+$').hasMatch(line))
+      .map(
+        (line) => line
+            .trim()
+            .replaceAll(RegExp(r'^\||\|$'), '')
+            .split('|')
+            .map((c) => c.trim())
+            .toList(),
+      )
+      .toList();
+  if (rows.isEmpty) return const [];
+  if (tableMode == 'list' && rows.length > 1) return _listRows(rows, english);
+  if (tableMode == 'aligned') return _alignedRows(rows);
+  return rows.map((row) => row.join(tableMode == 'raw_pipe' ? ' | ' : '  '));
+}
+
+Iterable<String> _listRows(List<List<String>> rows, bool english) sync* {
+  final headers = rows.first;
+  for (var i = 1; i < rows.length; i++) {
+    final row = rows[i];
+    final fields = [
+      for (var j = 1; j < row.length; j++)
+        '${j < headers.length ? headers[j] : '${english ? 'Column' : '列'}${j + 1}'}: ${row[j].isEmpty ? '-' : row[j]}',
+    ];
+    yield '$i. ${headers.first}: ${row.first}${fields.isEmpty ? '' : ' (${fields.join('; ')})'}';
   }
-  s = s.replaceAllMapped(
-    RegExp(r'(^|[^\w*])\*([^\s*][^*\n]*?)\*(?=[^\w*]|$)'),
-    (m) => '${m[1]}${m[2]}',
+}
+
+Iterable<String> _alignedRows(List<List<String>> rows) {
+  int width(String value) =>
+      value.runes.fold(0, (a, b) => a + (b > 255 ? 2 : 1));
+  final widths = <int>[];
+  for (final row in rows) {
+    for (var i = 0; i < row.length; i++) {
+      final size = width(row[i]);
+      if (i == widths.length) {
+        widths.add(size);
+      } else if (size > widths[i]) {
+        widths[i] = size;
+      }
+    }
+  }
+  return rows.map(
+    (r) => [
+      for (var i = 0; i < r.length; i++)
+        r[i] + ' ' * (widths[i] - width(r[i]) + 2),
+    ].join().trimRight(),
   );
-  s = s.replaceAllMapped(
-    RegExp(r'(^|[^\w_])_([^\s_][^_\n]*?)_(?=[^\w_]|$)'),
-    (m) => '${m[1]}${m[2]}',
-  );
-  s = s.replaceAllMapped(
-    RegExp('${RegExp.escape(tokenPrefix)}(\\d+)\uE101'),
-    (m) => protected[int.parse(m[1]!)],
-  );
-  s = s
-      .split('\n')
-      .where((line) => line.trim().isNotEmpty && line.trim() != '---')
-      .join('\n')
-      .trim();
-  // Keep literal code masked until both cleanup stages have finished.
-  s = transformMath?.call(s) ?? s;
-  s = s.replaceAllMapped(
-    RegExp('${RegExp.escape(tokenPrefix)}STAR(\\d+)\uE101'),
-    (match) => scriptStars[int.parse(match[1]!)],
-  );
-  return code.restore(bodyCode.restore(s));
 }
 
 // Markdown 表格仅在完整分隔行后识别；不完整或超宽数据保持原文。
@@ -331,76 +337,56 @@ String _convertMarkdownTables(String source, String Function(String) protect) {
   return output.join('\n');
 }
 
-List<String>? _tableCells(String line) {
-  final value = line.trim();
-  if (value.isEmpty || value.startsWith('⟦')) return null;
-  final cells = <String>[];
-  final cell = StringBuffer();
-  var ticks = 0;
-  var dollar = false;
-  var paren = false;
-  var split = false;
-  for (var i = 0; i < value.length; i++) {
-    final char = value[i];
-    if (char == '\\' && i + 1 < value.length) {
-      final next = value[i + 1];
-      if (next == '(' && ticks == 0 && !dollar) paren = true;
-      if (next == ')' && ticks == 0 && !dollar) paren = false;
-      cell.write(char);
-      cell.write(next);
-      i++;
+// A backslash consumes the next character, even inside code. A backtick run
+// must match its opening width and temporarily suspends any surrounding math.
+final _tableTokens = RegExp(r'\\.|`+|[$|]', dotAll: true);
+
+Iterable<int> _tableSeparators(String row) sync* {
+  String? codeFence, mathEnd;
+  for (final match in _tableTokens.allMatches(row)) {
+    final token = match[0]!;
+    if (codeFence != null) {
+      if (token == codeFence) codeFence = null;
       continue;
     }
-    if (char == '`') {
-      var count = 1;
-      while (i + count < value.length && value[i + count] == '`') {
-        count++;
-      }
-      ticks = ticks == count
-          ? 0
-          : ticks == 0
-          ? count
-          : ticks;
-      cell.write('`' * count);
-      i += count - 1;
+    if (token.startsWith('`')) {
+      codeFence = token;
       continue;
     }
-    if (char == r'$' && ticks == 0 && !paren) dollar = !dollar;
-    if (char == '|' && ticks == 0 && !dollar && !paren) {
-      cells.add(cell.toString().trim());
-      cell.clear();
-      split = true;
-    } else {
-      cell.write(char);
+    if (mathEnd != null) {
+      if (token == mathEnd) mathEnd = null;
+      continue;
+    }
+    switch (token) {
+      case r'\(':
+        mathEnd = r'\)';
+      case r'$':
+        mathEnd = token;
+      case '|':
+        yield match.start;
     }
   }
-  cells.add(cell.toString().trim());
-  if (!split) return null;
-  if (value.startsWith('|')) cells.removeAt(0);
-  if (value.endsWith('|') && cells.last.isEmpty) cells.removeLast();
+}
+
+List<String>? _tableCells(String line) {
+  final row = line.trim();
+  if (!row.contains('|') || row.startsWith('⟦')) return null;
+  final cells = <String>[];
+  var start = 0;
+  for (final end in _tableSeparators(row)) {
+    if (end > 0) cells.add(row.substring(start, end).trim());
+    start = end + 1;
+  }
+  if (start == 0) return null;
+  if (start < row.length) cells.add(row.substring(start).trim());
   return cells.isEmpty ? null : cells;
 }
 
 String _tableLatexCell(String cell) {
   // Clean paired decorations before splitting a cell into text and formulas.
-  var prefix = '\uE130CELL';
-  while (cell.contains(prefix)) {
-    prefix += '\uE130';
-  }
-  final saved = <String>[];
-  final masked = StringBuffer();
-  var end = 0;
-  for (final segment in scanMathSegments(cell)) {
-    masked.write(cell.substring(end, segment.start));
-    masked.write('$prefix${saved.length}\uE131');
-    saved.add(cell.substring(segment.start, segment.end));
-    end = segment.end;
-  }
-  masked.write(cell.substring(end));
-  cell = cleanMarkdown(masked.toString(), tableMode: 'clean').replaceAllMapped(
-    RegExp('${RegExp.escape(prefix)}(\\d+)\uE131'),
-    (match) => saved[int.parse(match[1]!)],
-  );
+  final saved = MarkdownPlaceholders('${markdownTokenStart}CELL', '\uE131');
+  final masked = _replaceSegments(cell, saved.save);
+  cell = saved.restore(cleanMarkdown(masked, tableMode: 'clean'));
   final output = StringBuffer();
   var cursor = 0;
   for (final segment in scanMathSegments(cell)) {

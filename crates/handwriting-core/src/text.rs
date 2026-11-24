@@ -38,6 +38,7 @@ pub enum TableKind {
     Cases,
 }
 pub mod circuit;
+mod math;
 mod table;
 
 pub fn normalize(text: &str, english_spacing: bool) -> String {
@@ -385,88 +386,13 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
                 continue;
             }
         }
-        let mut rad_start = None;
-        let mut index = Vec::new();
-        if cs[i] == '√' || cs[i] == '∛' || cs[i] == '∜' {
-            if cs[i] != '√' {
-                index.push(Node::Char(if cs[i] == '∛' { '3' } else { '4' }));
-            }
-            rad_start = Some(i + 1);
-        } else if cs[i..].starts_with(&['\\', 's', 'q', 'r', 't'])
-            && cs.get(i + 5).is_none_or(|c| !c.is_ascii_alphabetic())
-        {
-            let mut p = i + 5;
-            while cs.get(p) == Some(&' ') {
-                p += 1;
-            }
-            if cs.get(p) == Some(&'[')
-                && let Some(e) = pairs.get(p).copied().flatten()
-            {
-                index = nodes(&cs[p + 1..e], depth);
-                p = e + 1;
-            }
-            while cs.get(p) == Some(&' ') {
-                p += 1;
-            }
-            rad_start = Some(p);
-        } else if "⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ".contains(cs[i]) {
-            let mut p = i;
-            while p < cs.len() && "⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ".contains(cs[p]) {
-                p += 1;
-            }
-            if cs.get(p) == Some(&'√') {
-                index = cs[i..p]
-                    .iter()
-                    .map(|&c| Node::Char(script_char(c).map_or(c, |(v, _)| v)))
-                    .collect();
-                rad_start = Some(p + 1);
-            }
+        if let Some((radical, end)) = math::radical(&cs, &pairs, i, depth) {
+            out.push(radical);
+            i = end;
+            continue;
         }
-        if let Some(mut p) = rad_start {
-            while cs.get(p) == Some(&' ') {
-                p += 1;
-            }
-            if let Some(&open) = cs.get(p)
-                && (open == '(' || open == '{')
-                && let Some(e) = pairs.get(p).copied().flatten()
-            {
-                out.push(Node::Radical(nodes(&cs[p + 1..e], depth), index));
-                i = e + 1;
-                continue;
-            }
-            let start = p;
-            while p < cs.len() && (token(cs[p]) || ('α'..='ω').contains(&cs[p])) {
-                p += 1;
-            }
-            if p > start {
-                out.push(Node::Radical(nodes(&cs[start..p], depth), index));
-                i = p;
-                continue;
-            }
-        }
-        let vulgar = match cs[i] {
-            '½' => Some(("1", "2")),
-            '⅓' => Some(("1", "3")),
-            '⅔' => Some(("2", "3")),
-            '¼' => Some(("1", "4")),
-            '¾' => Some(("3", "4")),
-            '⅕' => Some(("1", "5")),
-            '⅖' => Some(("2", "5")),
-            '⅗' => Some(("3", "5")),
-            '⅘' => Some(("4", "5")),
-            '⅙' => Some(("1", "6")),
-            '⅚' => Some(("5", "6")),
-            '⅛' => Some(("1", "8")),
-            '⅜' => Some(("3", "8")),
-            '⅝' => Some(("5", "8")),
-            '⅞' => Some(("7", "8")),
-            _ => None,
-        };
-        if let Some((n, d)) = vulgar {
-            out.push(Node::Fraction(
-                parse_inline(n, depth + 1),
-                parse_inline(d, depth + 1),
-            ));
+        if let Some(fraction) = math::vulgar_fraction(cs[i]) {
+            out.push(fraction);
             i += 1;
             continue;
         }
@@ -531,50 +457,10 @@ fn parse_inline(s: &str, depth: usize) -> Vec<Node> {
             i = end;
             continue;
         }
-        // 括号表达式或连续 token 的分式，嵌套结构受深度上限约束。
-        let mut end = i;
-        let mut numerator = None;
-        if cs[i] == '(' {
-            if let Some(e) = pairs.get(i).copied().flatten() {
-                end = e + 1;
-                numerator = Some(&cs[i + 1..e]);
-            }
-        } else if token(cs[i]) && (i == 0 || !token(cs[i - 1])) {
-            while end < cs.len() && token(cs[end]) {
-                end += 1;
-            }
-            numerator = Some(&cs[i..end]);
-        }
-        // 斜线紧邻两侧操作数时才视为分式简写。
-        if let Some(num) = numerator
-            && cs.get(end) == Some(&'/')
-        {
-            let start = end + 1;
-            let mut den_end = start;
-            let mut denominator = None;
-            if cs.get(start) == Some(&'(') {
-                if let Some(e) = pairs.get(start).copied().flatten() {
-                    den_end = e + 1;
-                    denominator = Some(&cs[start + 1..e]);
-                }
-            } else {
-                while den_end < cs.len() && token(cs[den_end]) {
-                    den_end += 1;
-                }
-                if den_end > start {
-                    if cs.get(den_end) == Some(&'(')
-                        && let Some(e) = pairs.get(den_end).copied().flatten()
-                    {
-                        den_end = e + 1;
-                    }
-                    denominator = Some(&cs[start..den_end]);
-                }
-            }
-            if let Some(den) = denominator {
-                out.push(Node::Fraction(nodes(num, depth), nodes(den, depth)));
-                i = den_end;
-                continue;
-            }
+        if let Some((fraction, end)) = math::slash_fraction(&cs, &pairs, i, depth) {
+            out.push(fraction);
+            i = end;
+            continue;
         }
         out.push(Node::Char(cs[i]));
         i += 1;

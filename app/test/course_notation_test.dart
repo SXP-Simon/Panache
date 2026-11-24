@@ -65,6 +65,32 @@ void main() {
       expect(normalizeCourseLatex(source), source);
     }
   });
+  test('分母、前缀和幂次只作用于紧邻的单位', () {
+    expect(
+      normalizeCourseLatex(
+        r'\unit{\per\milli\second\squared\metre\tothe{+003}\per\volt}',
+      ),
+      r'\mathrm{m}^{3}/(\mathrm{ms}^{2}\,\mathrm{V})',
+    );
+    for (final unit in [
+      r'\metre\squared\cubed',
+      r'\kilo\per\metre',
+      r'\per\micro',
+      r'\metre\tothe{1000}',
+      r'\metre\squared{2}',
+      r'\metre?\per\second',
+    ]) {
+      final invalid = '\\qty {1} {$unit}';
+      expect(
+        normalizeCourseLatex(
+          '$invalid + '
+          r'\num{2e3}',
+        ),
+        '$invalid + '
+        r'2\times10^{3}',
+      );
+    }
+  });
   test('表格文字不能伪装成矩阵协议，空格子显式占位', () {
     expect(
       convertLatex(

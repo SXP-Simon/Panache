@@ -61,6 +61,24 @@ class UpdateTransaction {
   }
 
   Future<void> prepare() async {
+    await _verifyRunningInstallation();
+    _lock = InstallationLock(plan.target);
+    if (ProcessIdentity.matchingExecutable(plan.parent.executable)
+        .any((instance) => instance.pid != plan.parent.pid)) {
+      reject('another_instance_running');
+    }
+    if (File(pendingPath(plan.target)).existsSync()) {
+      reject('recovery_required');
+    }
+    record('preparing');
+    final snapshot = await _snapshotArchive();
+    final payload = await extractPackage(snapshot, unpack, plan.platform);
+    await _stagePayload(payload);
+    if (await hashFile(snapshot) != plan.sha256) reject('package_changed');
+    record('prepared');
+  }
+
+  Future<void> _verifyRunningInstallation() async {
     verifyWritableInstallation(plan.target, plan.platform);
     final installed = currentInstall(plan);
     if (installed.version != plan.currentVersion ||
@@ -94,15 +112,9 @@ class UpdateTransaction {
         reject('invalid_process');
       }
     }
-    _lock = InstallationLock(plan.target);
-    if (ProcessIdentity.matchingExecutable(plan.parent.executable)
-        .any((instance) => instance.pid != plan.parent.pid)) {
-      reject('another_instance_running');
-    }
-    if (File(pendingPath(plan.target)).existsSync()) {
-      reject('recovery_required');
-    }
-    record('preparing');
+  }
+
+  Future<String> _snapshotArchive() async {
     final suffix = plan.platform == 'linux-x64'
         ? 'linux-x64.tar.gz'
         : '${plan.platform}.zip';
@@ -120,7 +132,10 @@ class UpdateTransaction {
     }
     await File(plan.archive).copy(snapshot);
     if (await hashFile(snapshot) != plan.sha256) reject('package_changed');
-    final payload = await extractPackage(snapshot, unpack, plan.platform);
+    return snapshot;
+  }
+
+  Future<void> _stagePayload(String payload) async {
     final next = InstallInfo.read(payload, plan.platform);
     if (next.version != plan.version || next.build != plan.build) {
       reject('package_version_mismatch');
@@ -149,8 +164,6 @@ class UpdateTransaction {
         await verifyMacBundle(stage, quarantineFrom: plan.archive);
       }
     }
-    if (await hashFile(snapshot) != plan.sha256) reject('package_changed');
-    record('prepared');
   }
 
   Future<void> applyAfterExit() async {

@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import 'api.dart';
-import 'uploaded_font_storage.dart';
+import '../models/upload.dart';
+import 'font_storage_contract.dart';
 
 class FontStorage implements UploadedFontStorage {
   FontStorage({Future<Directory> Function()? directory})

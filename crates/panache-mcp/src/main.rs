@@ -5,7 +5,9 @@ mod inputs;
 mod markdown;
 mod paper;
 mod placement;
+mod preview;
 mod review;
+mod save;
 mod storage;
 mod tuning;
 
@@ -118,115 +120,6 @@ impl Panache {
             result=worker=>result?,
             _=ctx.ct.cancelled()=>anyhow::bail!("Cancelled"),
         }
-    }
-    async fn save(&self, input: Save) -> Result<CallToolResult> {
-        ensure!(
-            !input.markdown.trim().is_empty() && !input.markdown.contains('\0'),
-            "Supply nonempty Markdown without NUL characters"
-        );
-        ensure!(
-            input.markdown.chars().count() <= Limits::default().max_text_chars,
-            "Section too long"
-        );
-        ensure!(
-            input.paper_path.is_some()
-                || (input.paper_mode.is_none() && input.paper_guides.is_none()),
-            "paper_mode and paper_guides require paper_path at creation"
-        );
-        let mut style = if input.draft_id.is_none() {
-            ensure!(
-                input.expected_revision.unwrap_or(0) == 0 && input.section.unwrap_or(1) == 1,
-                "A new draft starts at section 1"
-            );
-            ensure!(
-                input
-                    .title
-                    .as_ref()
-                    .is_none_or(|v| v.chars().count() <= 150),
-                "Title too long"
-            );
-            let style = input.style.clone().unwrap_or_default();
-            style.ink_rgba()?;
-            ensure!(
-                (16..=72).contains(&style.font_size),
-                "font_size must be 16..72"
-            );
-            Some(style)
-        } else {
-            ensure!(
-                input.title.is_none()
-                    && input.style.is_none()
-                    && input.paper_path.is_none()
-                    && input.expected_revision.is_some(),
-                "An update needs expected_revision and uses the saved title, style and paper"
-            );
-            None
-        };
-        let permit = self.0.prepare_slot.clone().acquire_owned().await?;
-        let worker = self.0.worker.clone();
-        let mut saved = tokio::task::spawn_blocking({
-            let state = self.0.clone();
-            move || -> Result<serde_json::Value> {
-                let _permit = permit;
-                let prepared = markdown::prepare(&worker, &input.markdown)?;
-                ensure!(
-                    !prepared.trim().is_empty(),
-                    "Markdown produced no printable text"
-                );
-                handwriting_core::validate_document(&prepared, &Limits::default())?;
-                let paper = match (&input.paper_path, &style) {
-                    (Some(path), Some(style)) => {
-                        ensure!(
-                            matches!(style.paper, Paper::Plain),
-                            "Choose either paper_path or a paper preset"
-                        );
-                        Some(paper::ImportedPaper::read(
-                            path,
-                            style.font_size,
-                            input.paper_mode.unwrap_or_default(),
-                            input.paper_guides.as_deref(),
-                        )?)
-                    }
-                    _ => None,
-                };
-                let font = match &mut style {
-                    Some(style) => {
-                        let font = state.import_catalog_font(&style.font, 1)?;
-                        if let Some((handle, _)) = &font {
-                            style.font.clone_from(handle);
-                        }
-                        font
-                    }
-                    None => None,
-                };
-                let bytes = paper.as_ref().map_or(0, |p| p.bytes.len())
-                    + font.as_ref().map_or(0, |(_, data)| data.len());
-                let _budget = (bytes > 0)
-                    .then(|| state.storage.import(bytes))
-                    .transpose()?;
-                state.drafts.save(
-                    &input,
-                    &prepared,
-                    style.as_ref(),
-                    paper.as_ref(),
-                    font.as_ref().map(|(_, bytes)| bytes.as_slice()),
-                )
-            }
-        })
-        .await??;
-        let mut message = format!(
-            "已保存稿件 `{}` 的第 {} 节，当前版本 **{}**。",
-            saved["draft_id"].as_str().unwrap_or_default(),
-            saved["section"],
-            saved["revision"]
-        );
-        if saved["paper"]["alignment"] == "unverified" {
-            let hint = "未识别到可靠横线。无横线纸和画作均可继续使用。若落字位置不明确，先问用户想写在哪一侧、是否方便圈出区域，或哪些图案要留白。已有指定区域或用户已委托选位时，可直接按意图在本稿排版；用 tune_handwriting 的 paper_guides 定位，再用 preview_handwriting 的 review 视图复查。";
-            saved["placement_guidance"] = json!(hint);
-            message.push('\n');
-            message.push_str(hint);
-        }
-        Ok(reply(message, saved))
     }
 }
 
@@ -368,7 +261,7 @@ impl Panache {
         description = "Save Markdown without rendering. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
-        tool_result(self.save(input).await)
+        tool_result(save::run(self, input).await)
     }
 
     #[tool(
@@ -458,85 +351,7 @@ impl Panache {
         Parameters(input): Parameters<Preview>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        if input.previous_region.is_some()
-            && !(input.view == Some(PreviewView::Review)
-                && input.region.is_some()
-                && input.compare_revision.is_some())
-        {
-            return tool_result(Err(anyhow::anyhow!(
-                "previous_region requires view=review, region and compare_revision"
-            )));
-        }
-        if let Some(before) = input.compare_revision
-            && input.region.is_none()
-        {
-            return tool_result((|| {
-                ensure!(
-                    input.view == Some(PreviewView::Review) && input.illustrations_only.is_none(),
-                    "compare_revision requires an unfiltered review view"
-                );
-                let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
-                let data = draft.compare_reviews(
-                    before,
-                    input.section.unwrap_or(1),
-                    input.page.unwrap_or(1),
-                    u32::try_from(input.offset.unwrap_or(0))?,
-                    u32::try_from(input.limit.unwrap_or(20))?,
-                )?;
-                Ok(reply(data.to_string(), data))
-            })());
-        }
-        let result = self
-            .render(ctx, move |state, engine, cancel| {
-                let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
-                ensure!(input.illustrations_only.is_none() || input.view==Some(PreviewView::Layout),"illustrations_only requires view=layout");
-                ensure!(input.region.is_none() || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review)),"region requires view=layout or review");
-                ensure!(input.compare_revision.is_none() || input.view==Some(PreviewView::Review),"compare_revision requires view=review");
-                if input.view==Some(PreviewView::Paper){
-                    ensure!(input.offset.is_none() && input.limit.is_none() && input.section.is_none() && input.page.is_none(),"view=paper takes only draft_id and revision");
-                    let bytes=draft.background()?.context("No imported paper for this draft")?;
-                    let img=handwriting_core::imaging::decode(&bytes,&Limits::default())?.into_rgba8();
-                    use base64::{Engine as _,engine::general_purpose::STANDARD};
-                    let mut result=reply("稿件底纸".into(),json!({"width":img.width(),"height":img.height(),"revision":draft.revision}));
-                    result.content.push(ContentBlock::image(STANDARD.encode(draft.camera(Some(&bytes))?.png(&img)?),"image/png"));return Ok(result);
-                }
-                let number = input.section.unwrap_or(1);
-                let section = state
-                    .drafts
-                    .sections(&input.draft_id, draft.revision, Some(number))?
-                    .pop()
-                    .context("Empty draft")?;
-                let page = input.page.unwrap_or(1);
-                if input.view == Some(PreviewView::Review) {
-                    ensure!(input.limit.is_none() && input.offset.is_none(),"Review a single page without pagination");
-                    if let Some(region) = &input.region {
-                        return review::local::page(&state.drafts, engine, &draft, section, &input, region, cancel);
-                    }
-                    let baselines=engine.review_baselines(&draft,section.clone(),page,cancel)?;
-                    let (preview,_)=engine.preview(&draft,section,page,cancel)?;
-                    return review::page(&draft,number,page,&preview.png,&baselines,cancel);
-                }
-                if input.view == Some(PreviewView::Layout) {
-                    let result = engine.layout(&draft, section, &input, cancel)?;
-                    return Ok(reply(result.to_string(), result));
-                }
-                ensure!(
-                    input.offset.is_none() && input.limit.is_none(),
-                    "offset and limit require view=layout"
-                );
-                let (preview, cached) = engine.preview(&draft, section, page, cancel)?;
-                let mut result = reply(
-                    format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision),
-                    json!({
-                        "draft_id": input.draft_id, "revision": draft.revision,
-                        "section": number, "page_in_section": page, "cached": cached
-                    }),
-                );
-                result.content.push(ContentBlock::image(preview.png, "image/png"));
-                Ok(result)
-            })
-            .await;
-        tool_result(result)
+        tool_result(preview::run(self, input, ctx).await)
     }
 
     #[tool(

@@ -34,3 +34,5 @@ cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 ```
+
+对比两个提交的 Dart 函数复杂度、嵌套与长度，可使用[仓库自带的 Dart 结构计量命令](scripts/dart-quality/README.md)。

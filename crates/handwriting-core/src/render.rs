@@ -4,7 +4,7 @@ use crate::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use image::{GrayImage, RgbaImage};
-use rand::{RngExt, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::sync::{
     Arc,
@@ -33,11 +33,14 @@ pub struct RenderRequest {
     pub fonts: FontBook,
     pub limits: Limits,
 }
+mod composition;
 mod fine;
 mod glyph;
 mod homework;
 mod illustration;
 mod ink;
+mod line;
+mod paragraph;
 mod units;
 use glyph::{Glyph, Glyphs};
 use ink::{blank_paper, normal, paint_math_unit, paste_mask, perturb};
@@ -140,114 +143,17 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
             return Ok(());
         }
         let mut units = std::mem::take(&mut self.line);
-        let top = self.p.top_margin;
-        let bottom = self.canvas.height() as f32 - self.p.bottom_margin;
-        let available = (bottom - top).max(1.);
-        let ruled = ((self.p.underlined || self.p.paper_pattern.is_some())
-            && self.p.width.is_some())
-            || self.p.background_ruled;
-        let standard_ruled = ruled && self.p.layout_style == LayoutStyle::Standard;
-        let mut gap = (self.p.font_size * 0.12).round().max(2.);
-        if standard_ruled {
-            gap = gap.min((self.p.line_spacing - self.p.font_size).max(2.));
-        }
-        let bounds = |units: &[LineUnit]| {
-            let visible: Vec<_> = units.iter().filter(|u| u.glyph.ink).collect();
-            (
-                visible
-                    .iter()
-                    .map(|u| u.glyph.top + u.dy)
-                    .min()
-                    .unwrap_or(0),
-                visible
-                    .iter()
-                    .map(|u| u.glyph.bottom() + u.dy)
-                    .max()
-                    .unwrap_or(0),
-            )
-        };
-        let (mut min_y, mut max_y) = bounds(&units);
-        if (max_y - min_y) as f32 > available {
-            let factor = available / (max_y - min_y) as f32;
-            for u in &mut units {
-                let old_top = u.glyph.top;
-                let old_dy = u.dy;
-                u.glyph = u.glyph.clone().fit(
-                    u.glyph.mask.width() as f32 * factor,
-                    (u.glyph.mask.height() as f32 * factor).max(1.),
-                );
-                u.dy = ((old_top + old_dy - min_y) as f32 * factor).floor() as i32 - u.glyph.top;
-            }
-            (min_y, max_y) = bounds(&units);
-        }
-        if standard_ruled {
-            let height = (self.p.line_spacing - gap).floor() as i32;
-            let descent = (self.p.font_size * 0.30).round() as i32;
-            fit_standard_ruled_row(&mut units, min_y, max_y, height, descent);
-            (min_y, max_y) = bounds(&units);
-        }
-        // 2026-10-17：公式可占多格，后续基线仍须落在原纸张横线上。
-        let align = |anchor: f32| {
-            if ruled {
-                top + (((anchor - top) / self.p.line_spacing) - 0.00001)
-                    .ceil()
-                    .max(1.)
-                    * self.p.line_spacing
-            } else {
-                anchor
-            }
-        };
-        let mut anchor = self.y.max(top - min_y as f32);
-        if self.dirty {
-            anchor = anchor.max(self.previous_bottom + gap - min_y as f32);
-        }
-        anchor = align(anchor);
-        if anchor + max_y as f32 > bottom && self.dirty {
+        let mut layout = line::LineLayout::fit(&mut units, self.p, self.canvas.height());
+        let mut anchor = layout.baseline(self.y, self.dirty.then_some(self.previous_bottom));
+        if layout.overflows(anchor) && self.dirty {
             self.emit_page(false)?;
             if self.stopped {
                 return Ok(());
             }
-            anchor = align(self.y.max(top - min_y as f32));
+            anchor = layout.baseline(self.y, None);
         }
-        if anchor + max_y as f32 > bottom {
-            if ruled {
-                // 2026-10-17：仅空页也装不下的极高公式缩至实际横线，不把基线移到页底。
-                let mut best = (0f32, top + self.p.line_spacing);
-                let mut row = 1usize;
-                loop {
-                    let baseline = top + row as f32 * self.p.line_spacing;
-                    if baseline >= bottom {
-                        break;
-                    }
-                    let above = if min_y < 0 {
-                        ((baseline - top - 1.) / -(min_y as f32)).max(0.)
-                    } else {
-                        1.
-                    };
-                    let below = if max_y > 0 {
-                        ((bottom - baseline - 1.) / max_y as f32).max(0.)
-                    } else {
-                        1.
-                    };
-                    let factor = above.min(below).min(1.);
-                    if factor > best.0 {
-                        best = (factor, baseline);
-                    }
-                    row += 1;
-                }
-                anchor = best.1;
-                for u in &mut units {
-                    let offset = u.glyph.top + u.dy;
-                    u.glyph = u.glyph.clone().fit(
-                        u.glyph.mask.width() as f32 * best.0,
-                        (u.glyph.mask.height() as f32 * best.0).max(1.),
-                    );
-                    u.dy = (offset as f32 * best.0).round() as i32 - u.glyph.top;
-                }
-                (_, max_y) = bounds(&units);
-            } else {
-                anchor = bottom - max_y as f32;
-            }
+        if layout.overflows(anchor) {
+            anchor = layout.fit_empty_page(&mut units);
         }
         for u in units {
             let origin = (
@@ -273,38 +179,10 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
             }
         }
         self.written_lines += 1;
-        self.previous_bottom = anchor + max_y as f32;
+        self.previous_bottom = layout.ink_bottom(anchor);
         self.y = anchor + self.p.line_spacing;
         self.x = self.p.left_margin;
         self.dirty = true;
-        Ok(())
-    }
-    // 2026-10-24：将末尾短语整体移至续行，已渲染的结构化公式保持原子性。
-    fn homework_wrap(&mut self, continuation: f32, right: f32) -> Result<()> {
-        let cutoff = self.p.left_margin + (right - self.p.left_margin) * 0.4;
-        let split = self
-            .line
-            .iter()
-            .enumerate()
-            .rev()
-            .find(|(i, u)| u.break_after && *i + 1 < self.line.len() && u.x as f32 >= cutoff)
-            .map(|(i, _)| i + 1);
-        self.wrap_at(split, continuation)
-    }
-    fn wrap_at(&mut self, split: Option<usize>, continuation: f32) -> Result<()> {
-        let mut tail = split.map(|at| self.line.split_off(at)).unwrap_or_default();
-        let old_cursor = self.x;
-        self.finish_line()?;
-        if let Some(first) = tail.first() {
-            let shift = continuation - first.x as f32;
-            for unit in &mut tail {
-                unit.x += shift.round() as i32;
-            }
-            self.x = old_cursor + shift;
-            self.line = tail;
-        } else {
-            self.x = continuation;
-        }
         Ok(())
     }
     fn flush(&mut self, force: bool) -> Result<()> {
@@ -414,44 +292,6 @@ pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
     })
 }
 
-fn fit_standard_ruled_row(
-    units: &mut [LineUnit],
-    min_y: i32,
-    max_y: i32,
-    height: i32,
-    descent: i32,
-) {
-    let ink_height = max_y - min_y;
-    let top = descent - height;
-    if height <= 0
-        || ink_height <= 0
-        || ink_height as f32 > height as f32 * 1.2
-        || (min_y >= top && max_y <= descent)
-    {
-        return;
-    }
-    // 2026-11-17：轻微越界先在同一行格内纵向适配，保留横向字距和高公式的跨行避让。
-    let fit_height = height.min(ink_height);
-    let start = min_y.clamp(top, descent - fit_height);
-    for unit in units.iter_mut().filter(|unit| unit.glyph.ink) {
-        let offset = unit.glyph.top + unit.dy - min_y;
-        let end = offset + unit.glyph.mask.height() as i32;
-        let first = offset * fit_height / ink_height;
-        let last = (end * fit_height + ink_height - 1) / ink_height;
-        let new_height = (last - first) as u32;
-        if new_height != unit.glyph.mask.height() {
-            let mut mask = GrayImage::new(unit.glyph.mask.width(), new_height);
-            // 2026-11-17：合并缩小后落在同一行的像素，保留分数线等细笔画。
-            for (x, y, pixel) in unit.glyph.mask.enumerate_pixels() {
-                let row = (y * new_height) / unit.glyph.mask.height();
-                mask[(x, row)][0] = mask[(x, row)][0].max(pixel[0]);
-            }
-            unit.glyph.mask = mask;
-        }
-        unit.dy = start + first - unit.glyph.top;
-    }
-}
-
 pub(crate) fn render_pages(
     r: &RenderRequest,
     cancel: &Cancellation,
@@ -547,6 +387,7 @@ fn render_planes(
     } else {
         layout_units(&nodes)
     };
+    let mut composer = composition::UnitComposer::new(p, &r.text, source.as_deref(), (w, h));
     let mut glyphs = Glyphs::with_parameters(&r.fonts, p)?;
     let mut pages = Pages {
         canvas: background.clone(),
@@ -575,74 +416,19 @@ fn render_planes(
         stopped: false,
     };
     let right = w as f32 - p.effective_right_margin();
-    let mut i = 0;
-    let mut node_index = 0;
-    let mut paragraph_start = true;
-    let mut group_start = 0;
-    let mut section_line_start = 0;
-    let mut continuation = p.left_margin;
-    while i < units.len() && !pages.stopped {
-        cancel.check()?;
-        if homework_mode && paragraph_start && !matches!(units[i][0], Node::Newline | Node::Break) {
-            let style = homework::paragraph(&units[i..], p.font_size);
-            let available = right - p.left_margin;
-            let indent = if p.first_line_indent
-                && !matches!(
-                    units[i][0],
-                    Node::RightAlign | Node::Char(' ' | '\t' | '\u{3000}')
-                ) {
-                (2. * p.font_size).min(available - p.font_size)
-            } else {
-                style.indent.min(available * 0.15)
-            };
-            let prefix: Vec<_> = units[i..]
-                .iter()
-                .flat_map(|u| u.iter())
-                .take(style.prefix_chars)
-                .cloned()
-                .collect();
-            let hanging = if prefix.is_empty() {
-                0.
-            } else {
-                glyphs.unit(&prefix, p.font_size, i)?.advance + p.word_spacing
-            };
-            continuation = p.left_margin + indent + hanging.min(available * 0.25);
-            pages.x = p.left_margin + indent;
-            if style.gap_before
-                && (style.title || pages.written_lines - section_line_start >= 3)
-                && pages.dirty
-                && i >= 2
-                && !matches!(units[i - 2][0], Node::Newline | Node::Break)
-            {
-                pages.y += p.line_spacing;
-            }
-            if style.gap_before {
-                section_line_start = pages.written_lines;
-            }
-            paragraph_start = false;
-        } else if !homework_mode
-            && paragraph_start
-            && !matches!(units[i][0], Node::Newline | Node::Break)
-        {
-            if p.first_line_indent
-                && !matches!(
-                    units[i][0],
-                    Node::RightAlign | Node::Char(' ' | '\t' | '\u{3000}')
-                )
-            {
-                pages.x = (p.left_margin + 2. * p.font_size).min(right - p.font_size);
-            }
-            paragraph_start = false;
+    let mut paragraph = paragraph::ParagraphLayout::new(&nodes, &units, p.left_margin, right);
+    let mut next_node_index = 0;
+    for (i, &unit) in units.iter().enumerate() {
+        if pages.stopped {
+            break;
         }
-        match &units[i][0] {
-            Node::Break => {
-                pages.flush(false)?;
-                paragraph_start = true;
-            }
-            Node::Newline => {
-                pages.newline()?;
-                paragraph_start = true;
-            }
+        cancel.check()?;
+        let node_index = next_node_index;
+        next_node_index += unit.len();
+        paragraph.begin_unit(&mut pages, &mut glyphs, i)?;
+        match &unit[0] {
+            Node::Break => pages.flush(false)?,
+            Node::Newline => pages.newline()?,
             Node::RightAlign => {
                 let rest = units[i + 1..]
                     .iter()
@@ -728,180 +514,41 @@ fn render_planes(
                 pages.y = pages.previous_bottom + p.line_spacing;
             }
             node => {
-                let size =
-                    (p.font_size + normal(&mut pages.rng, p.font_size_sigma)).clamp(1., 2048.);
-                let mut fine_parts = None;
-                let mut g = if p.fine_edit
-                    && units[i].len() > 1
-                    && units[i].iter().all(|node| matches!(node, Node::Char(_)))
-                {
-                    let (advance, children) = glyphs.sequence_parts(units[i], size, 0)?;
-                    let composed = Glyphs::compose(advance, children.clone(), vec![])?;
-                    fine_parts = Some(fine::Parts::new(
-                        &composed,
-                        children,
-                        node_index,
-                        source.as_deref(),
-                    ));
-                    composed
-                } else {
-                    glyphs.unit(units[i], size, i)?
-                };
-                let mut compound = units[i].len() > 1
-                    || !matches!(node, Node::Char(_))
-                    || matches!(node,Node::Char(c) if glyph::is_circled(*c));
-                if !p.monospaced
-                    && pages.rng.random::<f32>() < p.strikethrough_probability
-                    && !matches!(node,Node::Char(c) if c.is_whitespace())
-                {
-                    let candidates: Vec<_> = r
-                        .text
-                        .chars()
-                        .filter(|c| !c.is_whitespace() && !"，。！？,.!?".contains(*c))
-                        .take(1024)
-                        .collect();
-                    if !candidates.is_empty() {
-                        let wrong = glyphs.glyph(
-                            candidates[pages.rng.random_range(0..candidates.len())],
-                            size,
-                        )?;
-                        let length = (p.font_size * 2f32.sqrt()
-                            + normal(&mut pages.rng, p.strikethrough_length_sigma))
-                        .clamp(0., (w as f32 + h as f32).min(16384.));
-                        let angle = (45. + normal(&mut pages.rng, p.strikethrough_angle_sigma))
-                            .to_radians();
-                        let width = (p.strikethrough_width
-                            + normal(&mut pages.rng, p.strikethrough_width_sigma))
-                        .clamp(1., (w.min(h) as f32).clamp(1., 256.))
-                            as i32;
-                        let sy = wrong.top as f32 + length / 7.;
-                        let path = vec![
-                            ((length / 7.).round() as i32, sy.round() as i32),
-                            (
-                                (length / 7. + length * angle.cos() * 5. / 7.).round() as i32,
-                                (sy + length * angle.sin() * 5. / 7.).round() as i32,
-                            ),
-                        ];
-                        // 2026-10-15：正确字写在错字和完整删除线之后，不能让较长删除线划到正确内容。
-                        let stroke_right =
-                            path.iter().map(|p| p.0).max().unwrap_or(0) + width / 2 + 2;
-                        let shift = (wrong.advance + p.word_spacing)
-                            .max(wrong.right() as f32)
-                            .max(stroke_right as f32)
-                            .round() as i32;
-                        g = Glyphs::compose(
-                            g.advance + shift as f32,
-                            vec![(wrong, 0, 0), (g, shift, 0)],
-                            vec![(path, width)],
-                        )?;
-                        compound = true;
-                        fine_parts = None;
-                    }
-                }
+                let composition::PreparedGlyph {
+                    glyph,
+                    compound,
+                    fine_parts,
+                } = composer.prepare(&mut glyphs, &mut pages.rng, unit, i, node_index)?;
                 if homework_mode
-                    && homework::break_before(units[i])
+                    && homework::break_before(unit)
                     && let Some(previous) = pages.line.last_mut()
                 {
                     previous.break_after = true;
                 }
-                let usable_width = right
-                    - if homework_mode {
-                        continuation
-                    } else {
-                        p.left_margin
-                    };
                 let usable_height = h as f32 - p.top_margin - p.bottom_margin;
-                let cell = fixed_cell(units[i], p);
-                g = g.fit(usable_width, usable_height);
+                let cell = fixed_cell(unit, p);
+                let mut g = glyph.fit(paragraph.usable_width(), usable_height);
                 if let Some(cell) = cell {
                     g = g.place_in_cell(cell);
                 }
-                let jitter_x = if cell.is_none() && p.grid_layout && keeps_grid_cell(units[i]) {
+                let jitter_x = if cell.is_none() && p.grid_layout && keeps_grid_cell(unit) {
                     normal(&mut pages.rng, p.word_spacing_sigma)
                 } else {
                     0.
                 };
-                let mut x = (pages.x + jitter_x)
-                    .round()
-                    .max(p.left_margin - g.left as f32);
-                let footprint = cell.unwrap_or_else(|| g.right() as f32);
-                let separator = matches!(units[i], [Node::Char(' ' | '\t')]);
-                let closing = matches!(units[i], [Node::Char(c)] if units::closing_punctuation(*c));
-                if !homework_mode && (pages.line.is_empty() || units::starts_wrap_group(&units, i))
-                {
-                    group_start = pages.line.len();
-                }
-                if !homework_mode
-                    && closing
-                    && x + footprint > right
-                    && i > 0
-                    && matches!(units[i - 1], [Node::Char(c)] if c.is_whitespace())
-                    && let Some(last) = pages.line.iter().rev().find(|u| u.glyph.ink)
-                    && (last.x + last.glyph.right()) as f32 <= right - footprint
-                {
-                    // Use spare trailing whitespace before moving a closing mark to another line.
-                    x = right - footprint;
-                }
-                if !homework_mode && separator && x + footprint > right && !pages.line.is_empty() {
-                    // A separator at the right edge does not need a line of its own.
-                    pages.x = right;
-                    node_index += units[i].len();
-                    i += 1;
+                let Some(x) = paragraph.position(&mut pages, i, &g, cell, jitter_x)? else {
                     continue;
-                }
-                if !pages.line.is_empty() && x + footprint > right {
-                    if homework_mode {
-                        pages.homework_wrap(continuation, right)?;
-                        if !pages.line.is_empty() && pages.x + g.right() as f32 > right {
-                            pages.finish_line()?;
-                            pages.x = continuation;
-                        }
-                    } else {
-                        // Move the buffered prefix with its measured advances and fine-edit IDs.
-                        // A word wider than a fresh line falls back to character boundaries.
-                        let fits = |at: usize| {
-                            pages.line.get(at).is_some_and(|first| {
-                                // Reclaim an indented first word's offset before splitting it.
-                                let left = p.left_margin - first.glyph.left.min(0) as f32;
-                                (at > 0 || first.x as f32 > left.round())
-                                    && x + footprint
-                                        - first.x as f32
-                                        - first.glyph.left.min(0) as f32
-                                        <= usable_width
-                            })
-                        };
-                        let mut split = fits(group_start).then_some(group_start);
-                        if split.is_none() && closing {
-                            split = pages
-                                .line
-                                .iter()
-                                .rposition(|u| u.glyph.ink && !matches!(nodes[u.id as usize], Node::Char(c) if units::closing_punctuation(c)))
-                                .filter(|&at| fits(at));
-                        }
-                        let bearing = split.map_or(0, |at| pages.line[at].glyph.left.min(0));
-                        pages.wrap_at(split, p.left_margin - bearing as f32)?;
-                        group_start = 0;
-                    }
-                    if pages.stopped {
-                        break;
-                    }
-                    x = (pages.x + jitter_x)
-                        .round()
-                        .max(p.left_margin - g.left as f32);
-                }
-                x = x
-                    .min(right - g.right() as f32)
-                    .max(p.left_margin - g.left as f32);
+                };
                 let dy = normal(&mut pages.rng, p.line_spacing_sigma)
                     .round()
                     .clamp(-usable_height * 0.25, usable_height * 0.25)
                     as i32;
-                let extra = if p.grid_layout && keeps_grid_cell(units[i]) {
+                let extra = if p.grid_layout && keeps_grid_cell(unit) {
                     0.
                 } else {
                     normal(&mut pages.rng, p.word_spacing_sigma)
                 };
-                let advance = g.step(units[i], p, extra, compound);
+                let advance = g.step(unit, p, extra, compound);
                 pages.x = x + advance;
                 pages.line.push(LineUnit {
                     glyph: g,
@@ -910,20 +557,15 @@ fn render_planes(
                         && (p.background_ruled || p.underlined || p.paper_pattern.is_some()),
                     x: x.round() as i32,
                     dy,
-                    break_after: homework_mode && homework::break_after(units[i]),
+                    break_after: homework_mode && homework::break_after(unit),
                     id: node_index as u32,
-                    source: source.as_ref().map(|positions| {
-                        [
-                            positions[node_index],
-                            positions[node_index + units[i].len()],
-                        ]
-                    }),
+                    source: source
+                        .as_ref()
+                        .map(|positions| [positions[node_index], positions[next_node_index]]),
                     fine_parts,
                 });
             }
         }
-        node_index += units[i].len();
-        i += 1;
     }
     if !pages.stopped {
         pages.flush(pages.count == 0)?;

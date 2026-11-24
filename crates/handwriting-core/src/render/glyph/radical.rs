@@ -8,6 +8,13 @@ pub(super) struct RootShape {
     lead_y: f32,
     foot_x: f32,
 }
+fn mean(values: impl Iterator<Item = f32>) -> f32 {
+    let (sum, count) = values.fold((0.0, 0usize), |(sum, count), value| {
+        (sum + value, count + 1)
+    });
+    sum / count as f32
+}
+
 impl RootShape {
     pub fn sample(font: &fontdue::Font) -> Self {
         let fallback = Self {
@@ -35,15 +42,12 @@ impl RootShape {
         let max_y = ink.iter().map(|p| p.1).fold(0., f32::max);
         // 多数手写字库的√只有钩部，并不自带顶线；从上升臂最高点取得接点。
         let roof_y = ink.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
-        let upper: Vec<_> = ink.iter().filter(|p| p.1 <= roof_y + 1.).collect();
-        let roof_x = upper.iter().map(|p| p.0).sum::<f32>() / upper.len() as f32;
+        let roof_x = mean(ink.iter().filter(|p| p.1 <= roof_y + 1.).map(|p| p.0));
         if max_y - roof_y < 8. || roof_x - min_x < 4. {
             return fallback;
         }
-        let left: Vec<_> = ink.iter().filter(|p| p.0 <= min_x + 1.).collect();
-        let start_y = left.iter().map(|p| p.1).sum::<f32>() / left.len() as f32;
-        let lowest: Vec<_> = ink.iter().filter(|p| p.1 >= max_y - 1.).collect();
-        let foot = lowest.iter().map(|p| p.0).sum::<f32>() / lowest.len() as f32;
+        let start_y = mean(ink.iter().filter(|p| p.0 <= min_x + 1.).map(|p| p.1));
+        let foot = mean(ink.iter().filter(|p| p.1 >= max_y - 1.).map(|p| p.0));
         let lead_x = min_x + (foot - min_x) * 0.45;
         let lead_y = ink
             .iter()
@@ -147,31 +151,8 @@ impl Glyphs<'_> {
             ink: true,
         };
         let join = (origin + cx, top + cy);
-        let bar = if let Some(source) = self.native_stroke('-', size) {
-            let mask = stretch_bar(&source, (right - join.0 + 1).max(2) as u32);
-            let contact = mask
-                .enumerate_pixels()
-                .filter(|(_, _, p)| p[0] >= 128)
-                .min_by_key(|(x, y, _)| (*x, *y))
-                .map(|(x, y, _)| (x as i32, y as i32));
-            if let Some((x, y)) = contact {
-                Glyph {
-                    mask,
-                    advance: right as f32,
-                    left: join.0 - x,
-                    top: join.1 - y,
-                    ink: true,
-                }
-            } else {
-                self.pen.draw(
-                    size,
-                    right as f32,
-                    &[vec![
-                        (join.0 as f32, join.1 as f32),
-                        (right as f32, top as f32),
-                    ]],
-                )?
-            }
+        let bar = if let Some(bar) = self.native_bar(size, join, right) {
+            bar
         } else {
             self.pen.draw(
                 size,
@@ -188,6 +169,23 @@ impl Glyphs<'_> {
             vec![],
         )
         .map(Some)
+    }
+
+    fn native_bar(&self, size: f32, join: (i32, i32), right: i32) -> Option<Glyph> {
+        let source = self.native_stroke('-', size)?;
+        let mask = stretch_bar(&source, (right - join.0 + 1).max(2) as u32);
+        let (x, y) = mask
+            .enumerate_pixels()
+            .filter(|(_, _, p)| p[0] >= 128)
+            .min_by_key(|(x, y, _)| (*x, *y))
+            .map(|(x, y, _)| (x as i32, y as i32))?;
+        Some(Glyph {
+            mask,
+            advance: right as f32,
+            left: join.0 - x,
+            top: join.1 - y,
+            ink: true,
+        })
     }
 
     fn native_stroke(&self, c: char, size: f32) -> Option<GrayImage> {

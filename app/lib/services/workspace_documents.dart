@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../models/detected_paper_layout.dart';
+import '../models/upload.dart';
 import '../utils/text_tools.dart';
-import 'api.dart';
 import 'paper_background.dart';
 import 'workspace.dart';
 
@@ -95,43 +96,14 @@ class WorkspaceDocuments {
         jsonEncode(workspace.settings.toJson()) == settingsBefore;
     final result = await api.importFile('/api/imagefileprocess', background);
     if (!current()) return false;
-    int number(String key, {int? fallback, bool positive = false}) {
-      final value = result[key] ?? fallback;
-      if (value is! num ||
-          !value.isFinite ||
-          value < (positive ? 1 : 0) ||
-          value > 100000) {
-        throw const FormatException('Invalid paper identification');
-      }
-      return value.round();
-    }
-
-    var spacing = number('lineSpacing', positive: true);
-    final first = number('marginTop');
-    final legacyTop = first >= spacing ? first - spacing : first;
-    var top = number('layoutTopMargin', fallback: legacyTop);
-    var bottom = number('layoutBottomMargin', fallback: number('marginBottom'));
-    var left = number('marginLeft');
-    var right = number('marginRight');
-    var width = result.containsKey('imageWidth')
-        ? number('imageWidth', positive: true)
-        : null;
-    var height = result.containsKey('imageHeight')
-        ? number('imageHeight', positive: true)
-        : null;
-    if ((width == null) != (height == null) ||
-        (width != null &&
-            height != null &&
-            (left + right >= width || top + bottom + spacing >= height))) {
-      throw const FormatException('Invalid paper dimensions');
-    }
+    var layout = DetectedPaperLayout.fromJson(result);
     Upload? replacement;
     final corrected = result['correctedBackground'];
     if (corrected != null) {
+      final size = layout.size;
       if (corrected is! String ||
           corrected.length > 48 * 1024 * 1024 ||
-          width == null ||
-          height == null) {
+          size == null) {
         throw const FormatException('Invalid corrected background');
       }
       final bytes = base64Decode(corrected);
@@ -139,34 +111,14 @@ class WorkspaceDocuments {
         Upload('aligned-paper.png', bytes),
         mobile: api.usesMobilePaperLimits,
         readPaperExif: api.readPaperExif,
-        correctedSize: (width: width, height: height),
+        correctedSize: size,
       );
-      if (prepared.width != width || prepared.height != height) {
-        final horizontal = prepared.width / width;
-        final vertical = prepared.height / height;
-        left = (left * horizontal).round();
-        right = (right * horizontal).round();
-        top = (top * vertical).round();
-        bottom = (bottom * vertical).round();
-        spacing = (spacing * vertical).round().clamp(1, prepared.height);
-        width = prepared.width;
-        height = prepared.height;
-      }
+      layout = layout.scaledTo(prepared.width, prepared.height);
       replacement = prepared.file;
     }
     if (!current()) return false;
-    final fontSize = num.tryParse(workspace.settings.values['font_size'] ?? '');
-    workspace.settings.values.addAll({
-      if (fontSize != null && fontSize >= spacing)
-        'font_size': '${(spacing * 0.72).round().clamp(1, 100000)}',
-      'left_margin': '$left',
-      'right_margin': '$right',
-      'top_margin': '$top',
-      'bottom_margin': '$bottom',
-      'line_spacing': '$spacing',
-      if (width != null) 'width': '$width',
-      if (height != null) 'height': '$height',
-    });
+    final values = workspace.settings.values;
+    values.addAll(layout.settings(values['font_size']));
     if (replacement != null) workspace.background = replacement;
     workspace.backgroundRuled = true;
     workspace.edit();

@@ -204,6 +204,32 @@ void main() {
     expect(host.events, ['download', 'prepare', 'abort']);
     expect(c.phase, UpdatePhase.ready);
   });
+  test(
+    'cancelling during persistence leaves the downloaded package unarmed',
+    () async {
+      final host = Host();
+      final c = await controller(host);
+      addTearDown(c.dispose);
+      final saving = Completer<void>();
+      final saved = Completer<bool>();
+      final action = c.updateAndRestart(
+        canRestart: () => true,
+        persist: () {
+          saving.complete();
+          return saved.future;
+        },
+        requestExit: () async => fail('cancelled before the save completed'),
+      );
+      await saving.future;
+      c.cancel();
+      saved.complete(true);
+      await action;
+      expect(host.events, contains('abort'));
+      expect(host.events, isNot(contains('arm')));
+      expect(c.phase, UpdatePhase.ready);
+      expect(c.downloadedPath, '/cache/update.zip');
+    },
+  );
   test('cancel during download revokes complete restart chain', () async {
     final host = Host()..downloadHold = Completer<void>();
     final c = await controller(host);

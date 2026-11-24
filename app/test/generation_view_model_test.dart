@@ -11,6 +11,7 @@ class ControlledEngine implements EngineGateway {
   final exited = Completer<void>();
   final cancelled = <String>[];
   bool failIdentity = false;
+  int previewReads = 0;
   @override
   bool get supportsCancel => true;
   @override
@@ -32,9 +33,13 @@ class ControlledEngine implements EngineGateway {
   Future<EngineTask> status(String id) async =>
       const EngineTask(phase: TaskPhase.completed, progress: 100);
   @override
-  Future<List<Uint8List>> preview(String id) async => [
-    Uint8List.fromList([1]),
-  ];
+  Future<List<Uint8List>> preview(String id) async {
+    previewReads++;
+    return [
+      Uint8List.fromList([1]),
+    ];
+  }
+
   @override
   Future<Uint8List> export(String id) async => Uint8List.fromList([2]);
 }
@@ -91,6 +96,38 @@ void main() {
       expect(model.pages, isEmpty);
     },
   );
+
+  test('cancellation from the completed status notification prevents the result read', () async {
+    final model = GenerationViewModel();
+    final engine = ControlledEngine();
+    final previous = Uint8List.fromList([9]);
+    model.pages = [previous];
+    final completed = Completer<void>();
+    late Future<void> stopping;
+    model.addListener(() {
+      if (model.phase == 'completed' && !completed.isCompleted) {
+        stopping = model.cancel();
+        completed.complete();
+      }
+    });
+    final pending = model.generate(
+      GenerationRequest({}, {}),
+      engine,
+      revision: 2,
+      preview: true,
+      pdf: false,
+    );
+    engine.submitted.complete('task');
+    await completed.future;
+    expect(await pending, isFalse);
+    expect(model.busy, isTrue);
+    expect(engine.previewReads, 0);
+    expect(model.pages.single, same(previous));
+    engine.exited.complete();
+    await stopping;
+    expect(model.available, isTrue);
+    model.dispose();
+  });
 
   test('identity failure releases the task slot for retry', () async {
     final model = GenerationViewModel();
