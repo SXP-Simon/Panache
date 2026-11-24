@@ -48,7 +48,7 @@ def prepare_assets(assets):
     shutil.copyfile(ROOT / "app/assets/fonts/PlayfairDisplay.ttf", assets / "PlayfairDisplay.ttf")
     shutil.copyfile(ROOT / "assets/licenses/PlayfairDisplay-OFL.txt", assets / "PlayfairDisplay-OFL.txt")
     gallery = prepare_gallery(assets)
-    for name in ("panache-showcase.webp", "panache-custom-background.webp"):
+    for name in ("panache-showcase.webp", "panache-custom-background.webp", "panache-poem-banner.png"):
         shutil.copyfile(ROOT / "docs/assets/images" / name, assets / name)
     return revisions, gallery
 

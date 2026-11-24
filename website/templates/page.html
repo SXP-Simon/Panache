@@ -4,6 +4,22 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ titles[key] ~ ' · ' if key else '' }}Panache · {{ 'Handwriting studio' if en else '手写工坊' }}</title>
   <meta name="description" content="{{ 'Handwritten pages, studio notes and a practical guide to Panache.' if en else 'Panache 手写工坊。读开发手记，选字体和纸张，把文字、公式和表格排成手稿。' }}">
+  {% if not key %}
+  {% set home_url = 'https://heliannuits.me/Panache/' %}
+  {% set banner = 'panache-poem-banner.png' %}
+  {% set banner_url = home_url ~ 'assets/' ~ banner %}
+  {% set banner_alt = 'Panache · Handwritten poem with the motto “May you find the courage to write what’s on your mind”' if en else 'Panache 手写诗稿：予你勇气，写你所想' %}
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Panache · {{ 'Handwriting studio' if en else '手写工坊' }}">
+  <meta property="og:url" content="{{ home_url ~ ('en/' if en else '') }}">
+  <meta property="og:image" content="{{ banner_url }}">
+  <meta property="og:image:width" content="1920">
+  <meta property="og:image:height" content="1080">
+  <meta property="og:image:alt" content="{{ banner_alt }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ banner_url }}">
+  <meta name="twitter:image:alt" content="{{ banner_alt }}">
+  {% endif %}
   <script src="{{ asset('appearance.js') }}"></script>
   <link rel="stylesheet" href="{{ asset('atelier.css') }}">
   <link rel="icon" type="image/png" href="{{ asset('app-icon.png') }}">
@@ -27,15 +43,12 @@
 <main id="main">
 {% if not key %}
 <section class="hero wrap">
-<div class="hero-copy">
-<h1>{{ 'Handwriting generator' if en else '手写体生成器' }}</h1>
+<h1><img src="{{ asset(banner) }}" width="1920" height="1080" fetchpriority="high" alt="{{ banner_alt }}"></h1>
 <div class="actions">
   <a class="button" href="{{ repo }}/releases/latest">{{ 'Download Panache' if en else '下载 Panache' }} <span>↓</span></a>
   <a class="button button-secondary" href="{{ local('desktop') }}">{{ 'Mirror download guide' if en else '镜像下载指南' }}</a>
   <a class="text-link" href="{{ local('guide/getting-started') }}">{{ 'Write your first page' if en else '写下第一页' }} ↗</a>
 </div>
-</div>
-<img class="app-mark" src="{{ asset('app-icon.png') }}" width="512" height="512" alt="{{ 'Panache app icon' if en else 'Panache 应用图标' }}">
 </section>
 <section class="journal-band"><div class="wrap journal-feature">
 {% for path,picture in [('journal/ink-on-paper','panache-promo-f7d5275f09afde.webp'),('journal/iris-and-ink','poem.webp')] %}
