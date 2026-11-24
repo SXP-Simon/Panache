@@ -1,7 +1,23 @@
 use anyhow::{Result, ensure};
+use handwriting_core::local_fonts::FontSource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Default, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct FontList {
+    /// Case-insensitive substring of the face, localized family or filename.
+    pub query: String,
+    pub source: Option<FontSource>,
+    pub offset: usize,
+    /// Number of faces to return (default 20, maximum 100).
+    pub limit: Option<usize>,
+    /// Rescan after adding, removing or installing fonts.
+    pub refresh: bool,
+    /// Set false only to look up an already approved font or its ID when no new style choice is needed. Omit or set true for samples and style choices, even with an exact-name query.
+    pub include_sample_guidance: Option<bool>,
+}
 
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
