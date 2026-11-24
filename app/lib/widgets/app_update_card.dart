@@ -28,8 +28,6 @@ class AppUpdateCard extends StatelessWidget {
       final l = AppLocalizations.of(context)!;
       final c = controller;
       final changes = summarizeReleaseNotes(c.release?.notes ?? '');
-      final status = _phaseLabel(c.phase, l);
-      final problem = _problemLabel(c.problem, l);
       return WorkbenchCard(
         key: const ValueKey('app-updates'),
         child: Padding(
@@ -53,55 +51,7 @@ class AppUpdateCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                '${l.updateInstalled}: ${c.installed?.version.isNotEmpty == true ? c.installed!.version : l.updateVersionUnknown}',
-              ),
-              if (c.release != null || c.deployed != null)
-                Text(
-                  '${l.updateLatest}: ${c.web ? c.deployed!.version : c.release!.version}',
-                ),
-              const SizedBox(height: 12),
-              Text(
-                status,
-                key: const ValueKey('update-status'),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              if (problem != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(problem, key: const ValueKey('update-problem')),
-                ),
-              const SizedBox(height: 8),
-              Text(_platformHelp(c, l)),
-              if ({
-                UpdatePhase.preparing,
-                UpdatePhase.restarting,
-              }.contains(c.phase)) ...[
-                const SizedBox(height: 16),
-                const LinearProgressIndicator(),
-              ],
-              if (c.phase == UpdatePhase.downloading) ...[
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value: c.total == 0 ? null : c.received / c.total,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${(c.received / 1048576).toStringAsFixed(1)} / ${(c.total / 1048576).toStringAsFixed(1)} MB',
-                ),
-              ],
-              if (c.downloadedPath != null) ...[
-                const SizedBox(height: 12),
-                SelectableText(
-                  c.release?.packageFor(c.installed!.target)?.name ?? '',
-                ),
-                if (c.installed?.target.os != 'android')
-                  ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: Text(l.updateSavedLocation),
-                    children: [SelectableText(c.downloadedPath!)],
-                  ),
-              ],
+              ..._status(context, l),
               const SizedBox(height: 16),
               _actions(context, l),
               if (!compact)
@@ -148,11 +98,62 @@ class AppUpdateCard extends StatelessWidget {
     },
   );
 
+  List<Widget> _status(BuildContext context, AppLocalizations l) {
+    final c = controller;
+    final problem = _problemLabel(c.problem, l);
+    return [
+      Text(
+        '${l.updateInstalled}: ${c.installed?.version.isNotEmpty == true ? c.installed!.version : l.updateVersionUnknown}',
+      ),
+      if (c.release != null || c.deployed != null)
+        Text(
+          '${l.updateLatest}: ${c.web ? c.deployed!.version : c.release!.version}',
+        ),
+      const SizedBox(height: 12),
+      Text(
+        _phaseLabel(c.phase, l),
+        key: const ValueKey('update-status'),
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      if (problem != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(problem, key: const ValueKey('update-problem')),
+        ),
+      const SizedBox(height: 8),
+      Text(_platformHelp(c, l)),
+      if ({
+        UpdatePhase.preparing,
+        UpdatePhase.restarting,
+      }.contains(c.phase)) ...[
+        const SizedBox(height: 16),
+        const LinearProgressIndicator(),
+      ],
+      if (c.phase == UpdatePhase.downloading) ...[
+        const SizedBox(height: 16),
+        LinearProgressIndicator(
+          value: c.total == 0 ? null : c.received / c.total,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${(c.received / 1048576).toStringAsFixed(1)} / ${(c.total / 1048576).toStringAsFixed(1)} MB',
+        ),
+      ],
+      if (c.downloadedPath != null) ...[
+        const SizedBox(height: 12),
+        SelectableText(c.release?.packageFor(c.installed!.target)?.name ?? ''),
+        if (c.installed?.target.os != 'android')
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(l.updateSavedLocation),
+            children: [SelectableText(c.downloadedPath!)],
+          ),
+      ],
+    ];
+  }
+
   Widget _actions(BuildContext context, AppLocalizations l) {
     final c = controller;
-    final canRestart = c.desktopAutomatic && onRestart != null;
-    final canRestartReady =
-        canRestart && c.problem != UpdateProblem.desktopUnavailable;
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -164,51 +165,7 @@ class AppUpdateCard extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             label: Text(l.checkUpdates),
           ),
-        if ({
-          UpdatePhase.downloading,
-          UpdatePhase.preparing,
-          UpdatePhase.restarting,
-        }.contains(c.phase))
-          TextButton.icon(
-            onPressed: c.cancel,
-            icon: const Icon(Icons.close),
-            label: Text(l.cancel),
-          ),
-        if (!c.web &&
-            c.release != null &&
-            c.canDownload &&
-            {UpdatePhase.available, UpdatePhase.failed}.contains(c.phase))
-          FilledButton.icon(
-            key: const ValueKey('download-update'),
-            onPressed: canRestart ? onRestart : c.download,
-            icon: const Icon(Icons.download_outlined),
-            label: Text(canRestart ? l.updateRestart : l.updateDownload),
-          ),
-        if (c.phase == UpdatePhase.ready)
-          FilledButton.icon(
-            key: const ValueKey('open-update'),
-            onPressed: c.opening
-                ? null
-                : canRestartReady
-                ? onRestart
-                : c.open,
-            icon: const Icon(Icons.open_in_new),
-            label: Text(
-              c.installed?.target.os == 'android'
-                  ? l.updateInstall
-                  : canRestartReady
-                  ? l.updateRestart
-                  : l.updateOpenArchive,
-            ),
-          ),
-        if (c.phase == UpdatePhase.ready &&
-            c.problem == UpdateProblem.anotherInstance)
-          OutlinedButton.icon(
-            key: const ValueKey('manual-update'),
-            onPressed: c.opening ? null : c.open,
-            icon: const Icon(Icons.folder_open),
-            label: Text(l.updateOpenArchive),
-          ),
+        ..._packageActions(l),
         if (c.web)
           FilledButton.icon(
             onPressed: c.busy ? null : onReload,
@@ -231,6 +188,70 @@ class AppUpdateCard extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  List<Widget> _packageActions(AppLocalizations l) {
+    final c = controller;
+    final restart = c.desktopAutomatic ? onRestart : null;
+    switch (c.phase) {
+      case UpdatePhase.downloading:
+      case UpdatePhase.preparing:
+      case UpdatePhase.restarting:
+        return [
+          TextButton.icon(
+            onPressed: c.cancel,
+            icon: const Icon(Icons.close),
+            label: Text(l.cancel),
+          ),
+        ];
+      case UpdatePhase.available:
+      case UpdatePhase.failed:
+        if (c.web || c.release == null || !c.canDownload) return const [];
+        return [
+          FilledButton.icon(
+            key: const ValueKey('download-update'),
+            onPressed: restart ?? c.download,
+            icon: const Icon(Icons.download_outlined),
+            label: Text(restart == null ? l.updateDownload : l.updateRestart),
+          ),
+        ];
+      case UpdatePhase.ready:
+        return _readyActions(l, restart);
+      case UpdatePhase.idle:
+      case UpdatePhase.checking:
+      case UpdatePhase.current:
+        return const [];
+    }
+  }
+
+  List<Widget> _readyActions(
+    AppLocalizations l,
+    Future<void> Function()? restart,
+  ) {
+    final c = controller;
+    final restartReady = c.problem == UpdateProblem.desktopUnavailable
+        ? null
+        : restart;
+    final desktopLabel = restartReady == null
+        ? l.updateOpenArchive
+        : l.updateRestart;
+    return [
+      FilledButton.icon(
+        key: const ValueKey('open-update'),
+        onPressed: c.opening ? null : restartReady ?? c.open,
+        icon: const Icon(Icons.open_in_new),
+        label: Text(
+          c.installed?.target.os == 'android' ? l.updateInstall : desktopLabel,
+        ),
+      ),
+      if (c.problem == UpdateProblem.anotherInstance)
+        OutlinedButton.icon(
+          key: const ValueKey('manual-update'),
+          onPressed: c.opening ? null : c.open,
+          icon: const Icon(Icons.folder_open),
+          label: Text(l.updateOpenArchive),
+        ),
+    ];
   }
 }
 
