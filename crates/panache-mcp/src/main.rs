@@ -572,7 +572,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request return the file and missing pages. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Use view=image to inspect the intended appearance without filing a check."
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request report the file and missing pages. The returned path is local to the server, not an attachment or a link available to the user. Do not turn the path into a download link. Claim delivery only after a separate user-visible attachment is confirmed; otherwise say it was exported locally and give the path as a local path. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Use view=image to inspect the intended appearance without filing a check."
     )]
     async fn export_handwriting(
         &self,
