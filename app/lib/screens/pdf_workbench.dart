@@ -7,6 +7,7 @@ import '../models/engine_failure.dart';
 import '../models/upload.dart';
 import '../services/pdf_pages.dart';
 import '../services/pdf_writing_export.dart';
+import '../widgets/pdf_workbench_layout.dart';
 import '../widgets/pdf_writing_surface.dart';
 
 class PdfWorkbench extends StatefulWidget {
@@ -235,152 +236,73 @@ class _PdfWorkbenchState extends State<PdfWorkbench> {
     }
   }
 
+  String? _warningFor(PdfSourcePage? source) {
+    if (source == null) return null;
+    if (!fill && source.lines.isEmpty) return l.pdfNoText;
+    return relevantWarnings(source).isNotEmpty ? l.pdfPartial : null;
+  }
+
+  Widget _pageContent(PdfSourcePage? source) {
+    final progress = exporting;
+    if (progress != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 12),
+          Text(l.pdfProgress(progress, count)),
+        ],
+      );
+    }
+    final error = failure;
+    if (error != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(errorText(error), textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => load(index),
+            icon: const Icon(Icons.refresh),
+            label: Text(l.retry),
+          ),
+        ],
+      );
+    }
+    if (source == null) return const CircularProgressIndicator();
+    return PdfWritingSurface(
+      key: ValueKey(index),
+      page: source,
+      boxes: boxesFor(source),
+      family: family!,
+      ink: widget.ink,
+      fill: fill,
+      onAdd: (r) => editBox(r),
+      onEdit: (i) => editBox(boxesFor(source)[i].rect, at: i),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final source = page;
     final available = exporting == null;
-    final colors = Theme.of(context).colorScheme;
-    final warning = source == null
-        ? null
-        : !fill && source.lines.isEmpty
-        ? l.pdfNoText
-        : relevantWarnings(source).isNotEmpty
-        ? l.pdfPartial
-        : null;
+    final canNavigate = available && (source != null || failure != null);
     return PopScope(
       canPop: leaving || !dirty,
       onPopInvokedWithResult: (popped, _) {
         if (!popped) close();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            tooltip: l.close,
-            icon: const Icon(Icons.close),
-            onPressed: close,
-          ),
-          title: Text(fill ? l.pdfFill : l.pdfLayout),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: FilledButton.icon(
-                onPressed: source != null && available ? export : null,
-                icon: const Icon(Icons.file_download_outlined),
-                label: Text(l.exportPdf),
-              ),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.picture_as_pdf_outlined,
-                          size: 18,
-                          color: colors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.file.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(fill ? l.pdfFillHelp : l.pdfLayoutHelp),
-                    if (warning != null)
-                      Text(warning, style: TextStyle(color: colors.error)),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ColoredBox(
-                  color: colors.surfaceContainerHighest,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Center(
-                      child: exporting != null
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const CircularProgressIndicator(),
-                                const SizedBox(height: 12),
-                                Text(l.pdfProgress(exporting!, count)),
-                              ],
-                            )
-                          : failure != null
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  errorText(failure!),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                OutlinedButton.icon(
-                                  onPressed: () => load(index),
-                                  icon: const Icon(Icons.refresh),
-                                  label: Text(l.retry),
-                                ),
-                              ],
-                            )
-                          : source == null
-                          ? const CircularProgressIndicator()
-                          : PdfWritingSurface(
-                              key: ValueKey(index),
-                              page: source,
-                              boxes: boxesFor(source),
-                              family: family!,
-                              ink: widget.ink,
-                              fill: fill,
-                              onAdd: (r) => editBox(r),
-                              onEdit: (i) =>
-                                  editBox(boxesFor(source)[i].rect, at: i),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    tooltip: l.previousPage,
-                    onPressed:
-                        available &&
-                            index > 0 &&
-                            (page != null || failure != null)
-                        ? () => load(index - 1)
-                        : null,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                  Text(count == 0 ? '—' : '${index + 1} / $count'),
-                  IconButton(
-                    tooltip: l.nextPage,
-                    onPressed:
-                        available &&
-                            index + 1 < count &&
-                            (page != null || failure != null)
-                        ? () => load(index + 1)
-                        : null,
-                    icon: const Icon(Icons.chevron_right),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      child: PdfWorkbenchLayout(
+        fileName: widget.file.name,
+        fill: fill,
+        warning: _warningFor(source),
+        index: index,
+        count: count,
+        onClose: close,
+        onExport: source != null && available ? export : null,
+        onPrevious: canNavigate && index > 0 ? () => load(index - 1) : null,
+        onNext: canNavigate && index + 1 < count ? () => load(index + 1) : null,
+        child: _pageContent(source),
       ),
     );
   }
