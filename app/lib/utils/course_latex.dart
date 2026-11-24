@@ -116,54 +116,58 @@ String? _chemicalSpecies(String source) {
     value = value.substring(0, ion.start);
   }
   final coefficient = RegExp(r'^(\d+\/\d+|\d+(?:\.\d+)?)\s*').firstMatch(value);
-  var result = coefficient?[1] ?? '';
-  if (result.contains('/')) {
-    final parts = result.split('/');
+  var prefix = coefficient?[1] ?? '';
+  if (prefix.contains('/')) {
+    final parts = prefix.split('/');
     if (!RegExp(r'[1-9]').hasMatch(parts[1])) return null;
-    result = '\\frac{${parts[0]}}{${parts[1]}}\\,';
+    prefix = '\\frac{${parts[0]}}{${parts[1]}}\\,';
   }
-  if (coefficient != null) value = value.substring(coefficient.end);
-  final stack = <String>[];
-  var atoms = 0, previous = false;
+  final body = _chemicalSpeciesBody(value.substring(coefficient?.end ?? 0));
+  if (body == null) return null;
+  return '\\mathrm{$prefix$body$charge}$suffix';
+}
+
+final _elementSymbol = RegExp(r'[A-Z][a-z]?|e');
+final _atomCount = RegExp(r'\d+');
+
+String? _chemicalSpeciesBody(String value) {
+  final result = StringBuffer();
+  final closingBrackets = <String>[];
+  var canEndGroup = false;
   for (var cursor = 0; cursor < value.length;) {
-    final rest = value.substring(cursor);
-    final element = RegExp(r'^(?:[A-Z][a-z]?|e)').firstMatch(rest);
+    final element = _elementSymbol.matchAsPrefix(value, cursor);
     if (element != null) {
-      result += element[0]!;
-      atoms++;
-      previous = true;
-      cursor += element.end;
+      result.write(element[0]);
+      canEndGroup = true;
+      cursor = element.end;
       continue;
     }
-    final count = RegExp(r'^\d+').firstMatch(rest);
-    if (count != null && previous) {
-      if (count[0]!.length > 3) return null;
-      result += '_{${count[0]}}';
-      previous = true;
-      cursor += count.end;
+    final count = _atomCount.matchAsPrefix(value, cursor);
+    if (count != null && canEndGroup) {
+      if (count.end - cursor > 3) return null;
+      result.write('_{${count[0]}}');
+      cursor = count.end;
       continue;
     }
     final char = value[cursor];
     if (char == '(' || char == '[') {
-      if (stack.length >= 8) return null;
-      stack.add(char);
-      result += char;
-      previous = false;
+      if (closingBrackets.length >= 8) return null;
+      closingBrackets.add(char == '(' ? ')' : ']');
+      canEndGroup = false;
     } else if (char == ')' || char == ']') {
-      if (!previous ||
-          stack.isEmpty ||
-          stack.removeLast() != (char == ')' ? '(' : '[')) {
+      if (!canEndGroup ||
+          closingBrackets.isEmpty ||
+          closingBrackets.removeLast() != char) {
         return null;
       }
-      result += char;
-      previous = true;
     } else {
       return null;
     }
+    result.write(char);
     cursor++;
   }
-  if (atoms == 0 || stack.isNotEmpty) return null;
-  return '\\mathrm{$result$charge}$suffix';
+  if (!canEndGroup || closingBrackets.isNotEmpty) return null;
+  return result.toString();
 }
 
 String? _chemicalFormula(String source) {
