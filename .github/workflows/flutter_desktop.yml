@@ -1,11 +1,35 @@
 name: Flutter 独立桌面客户端
+permissions:
+  contents: read
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
+    paths:
+      - "VERSION"
+      - "app/**"
+      - "vendor/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "assets/pubspec.yaml"
+      - "LICENSE"
+      - "scripts/build-flutter-desktop.py"
+      - "scripts/windows_launcher.py"
+      - "scripts/tests/test_desktop_release_version.py"
+      - "scripts/tests/test_windows_launcher.py"
+      - "scripts/embed-macos-backend.sh"
+      - ".github/workflows/flutter_desktop.yml"
+      - "!**/*.md"
+      - "assets/licenses/**"
+      - "assets/font_assets/**"
+      - "crates/*/licenses/**"
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
 jobs:
   package:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     strategy:
       fail-fast: false
       matrix:

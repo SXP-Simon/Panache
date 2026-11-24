@@ -3,8 +3,28 @@ permissions:
   contents: read
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
+    paths:
+      - "VERSION"
+      - "app/**"
+      - "scripts/*release*.*"
+      - "scripts/tests/test-flutter-release.cjs"
+      - ".github/workflows/publish_flutter.yml"
+      - "vendor/**"
+      - "crates/**"
+      - "Cargo.*"
+      - "assets/pubspec.yaml"
+      - "LICENSE"
+      - "scripts/build-mobile-engine.py"
+      - ".github/workflows/flutter_mobile.yml"
+      - "!**/*.md"
+      - "assets/licenses/**"
+      - "assets/font_assets/**"
+      - "crates/*/licenses/**"
 jobs:
   android:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     runs-on: ubuntu-latest
     steps:
       - name: Free space for Android, Rust and emulator builds

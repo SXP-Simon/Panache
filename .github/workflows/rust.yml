@@ -1,8 +1,35 @@
 name: Rust 后端
+permissions:
+  contents: read
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
+    paths:
+      - "VERSION"
+      - "scripts/build-flutter-web.py"
+      - "scripts/build-text-worker.py"
+      - "scripts/tests/test_web_build_version.py"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "app/**"
+      - "scripts/*release*.*"
+      - "scripts/tests/test-flutter-release.cjs"
+      - ".github/workflows/publish_flutter.yml"
+      - "vendor/**"
+      - "LICENSE"
+      - "scripts/build-rust-service.sh"
+      - "deploy/rust/**"
+      - ".github/workflows/rust.yml"
+      - "!**/*.md"
+      - "assets/licenses/**"
+      - "assets/font_assets/**"
+      - "crates/*/licenses/**"
+      - "deploy/rust/README.md"
 jobs:
   verify:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     strategy:
       fail-fast: false
       matrix:
@@ -20,6 +47,7 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo build --locked --release -p handwriting-server
   flutter-integration:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

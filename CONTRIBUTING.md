@@ -16,9 +16,9 @@ Use Conventional Commits with a scope matching the affected directory. The commi
 
 ## Checks / 验证
 
-PR checks are opt-in for all authors, including maintainers. To approve a check for a branch in this repository, open **Actions**, select the relevant workflow, click **Run workflow**, and select the PR’s head branch. Each run covers the revision selected at dispatch. For a fork, the contributor can run the same workflow manually in their fork.
+To approve CI, add the `run-ci` label under **Labels** on the PR. This also works on drafts and your own PRs. The files changed in the PR determine which checks run. After another push, remove and reapply the label to check the new revision. To run an individual workflow on a repository branch, use **Actions → Run workflow**.
 
-所有 PR（包括维护者自己的 PR）均按需手动验证。在 **Actions** 选中所需检查，点 **Run workflow** 并选择 PR 的源分支。分支有新提交时，由维护者决定是否再次运行。来自 fork 的贡献者也可在自己的仓库手动运行相同检查。
+在 PR 右侧的 **Labels** 中添加 `run-ci` 即可批准本次 CI，草稿和自己开的 PR 也适用。检查范围由 PR 改动的文件决定。推送新提交后，移除再加回标签可验证新版。若只需运行某一项检查，可在 **Actions → Run workflow** 中选择本仓库的分支。
 
 Run the checks for the part you changed, starting from the repository root. 从仓库根目录运行与改动相关的检查。
 

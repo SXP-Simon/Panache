@@ -5,9 +5,35 @@ permissions:
 
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
+    paths:
+      - "VERSION"
+      - "scripts/build-flutter-web.py"
+      - "scripts/build-text-worker.py"
+      - "scripts/tests/test_web_build_version.py"
+      - "scripts/build-flutter-desktop.py"
+      - "scripts/windows_launcher.py"
+      - "scripts/test-desktop-updater.ps1"
+      - "scripts/tests/test_desktop_release_version.py"
+      - "scripts/tests/test_windows_launcher.py"
+      - "app/**"
+      - "scripts/*release*.*"
+      - "scripts/tests/test-flutter-release.cjs"
+      - ".github/workflows/publish_flutter.yml"
+      - "vendor/**"
+      - "assets/pubspec.yaml"
+      - "LICENSE"
+      - "scripts/test-flutter-web.py"
+      - "scripts/tests/test_flutter_web_runner.py"
+      - ".github/workflows/flutter.yml"
+      - "!**/*.md"
+      - "assets/licenses/**"
+      - "assets/font_assets/**"
 
 jobs:
   desktop-updater:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     name: Desktop updater (${{ matrix.os }})
     timeout-minutes: 20
     strategy:
@@ -60,6 +86,7 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p test_windows_launcher.py
 
   verify:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +113,7 @@ jobs:
       - run: node --test scripts/tests/test-flutter-release.cjs
 
   browser-persistence:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-ci' && github.event.sender.type == 'User')
     timeout-minutes: 15
     strategy:
       fail-fast: false

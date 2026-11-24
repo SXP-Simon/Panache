@@ -56,7 +56,7 @@ python3 scripts/build-flutter-web.py
 - 页面组合独立的 `widgets/` 和 `screens/dialogs/`；输入控制器与局部导航由页面持有，不通过 part 或 extension 共享父 State。职责和存储边界见 [客户端架构](docs/flutter-architecture.md)。
 - 界面采用新艺术运动风格的深浅色 Material Design 3 主题。标题使用 Playfair Display，中文回退霞鹜文楷，正文使用霞鹜文楷。纸张渲染字体由用户选择。第三方字体保留各自许可。
 - 操作同时显示图标与名称，复杂工具提供用途说明。反馈打开项目的 GitHub Issues，不接入旧邮件服务。
-- 所有 PR 的 CI 均由维护者在 Actions 中选择检查与 PR 源分支，手动运行；每次批准只覆盖当次提交。操作入口见[贡献指南](CONTRIBUTING.md)。发布时在 `main` 手动触发版本提交的三项检查。推送与版本提交同名的 `vX.Y.Z` 标签触发 Publish Flutter Release，由 CI 从通过检查的标签提交构建安装包。使用入口见[发布说明](docs/release.md)。
+- 所有 PR 的 CI 均按次批准：维护者在 PR 上添加 `run-ci` 标签，按改动路径执行检查。验证新提交时移除并重新添加标签；也可从 Actions 手动运行单项检查。操作入口见[贡献指南](CONTRIBUTING.md)。发布时在 `main` 手动触发版本提交的三项检查。推送与版本提交同名的 `vX.Y.Z` 标签触发 Publish Flutter Release，由 CI 从通过检查的标签提交构建安装包。使用入口见[发布说明](docs/release.md)。
 
 ## 编码与协作约定
 
