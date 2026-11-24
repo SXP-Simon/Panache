@@ -587,14 +587,27 @@ impl Panache {
             let reviewed_pages = draft.reviewed_pages()?;
             let mut unreviewed = Vec::new();
             let mut visibility_flags = 0;
+            let mut matching = 0;
+            let mut different = Vec::new();
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
             let format = input.format.unwrap_or_default();
             let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
                 writer, &draft, sections, format, cancel,
-                |pages, section, page| {
+                |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
-                        Some(flagged) => visibility_flags += usize::from(*flagged),
+                        Some(record) => {
+                            visibility_flags += usize::from(record.visibility_flag);
+                            if matches!(format, Format::Zip)
+                                && let Some(saved) = &record.pixel_sha256
+                            {
+                                if review::pixel_sha256(image) == *saved {
+                                    matching += 1;
+                                } else {
+                                    different.push(json!({"section":section,"page":page}));
+                                }
+                            }
+                        }
                         None => unreviewed.push(json!({"section":section,"page":page})),
                     }
                     if let Some(token) = &progress_token {
@@ -617,16 +630,31 @@ impl Panache {
             } else {
                 format!(" 缺少整页检查单的节内页码：{}。", serde_json::to_string(&unreviewed)?)
             };
-            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}\n\n`{}`", draft.revision, path.display());
-            Ok(reply(message, json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages,
-                "review": {
-                    "pages_with_evidence": reviewed,
-                    "pages_with_visibility_flags": visibility_flags,
-                    "global_text_ink_zero": zero_text_ink,
-                    "pages_without_visibility_evidence": unreviewed.len(),
-                    "unreviewed_pages": unreviewed,
+            let mut review = json!({
+                "pages_with_evidence": reviewed,
+                "pages_with_visibility_flags": visibility_flags,
+                "global_text_ink_zero": zero_text_ink,
+                "pages_without_visibility_evidence": unreviewed.len(),
+                "unreviewed_pages": unreviewed,
+            });
+            let mut pixel_warning = String::new();
+            if matches!(format, Format::Zip) {
+                let without_digest = reviewed - matching - different.len();
+                if !different.is_empty() {
+                    pixel_warning = format!(" ZIP 中这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
                 }
+                if without_digest > 0 {
+                    pixel_warning.push_str(&format!(" {without_digest} 页的检查单没有像素摘要，无法比对。"));
+                }
+                review["zip_pixels"] = json!({
+                    "pages_matching_latest_review": matching,
+                    "different_pages": different,
+                    "reviewed_pages_without_digest": without_digest,
+                });
+            }
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n`{}`", draft.revision, path.display());
+            Ok(reply(message, json!({
+                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review": review,
             })))
         }).await;
         tool_result(result)

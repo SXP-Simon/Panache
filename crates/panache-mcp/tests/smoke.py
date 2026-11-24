@@ -195,6 +195,33 @@ async def placement_pixels(client):
     assert "局部墨迹" in exported.content[0].text
 
 
+async def check_zip_review_pixels(params, root, latin):
+    # Only replace a test-owned named font. The revision and its receipt stay unchanged.
+    fonts = root / "zip-fonts"
+    fonts.mkdir()
+    font = fonts / "test.ttf"
+    shutil.copyfile(latin / "Handlee-Regular.ttf", font)
+    isolated = params.model_copy(update={"env": {
+        **params.env, "PANACHE_FONT_DIR": str(fonts), "PANACHE_MCP_HOME": str(root / "zip-home"),
+    }})
+    async with stdio_client(isolated) as streams, ClientSession(*streams) as client:
+        await client.initialize()
+        draft = (await call(client, "save_section", markdown="Hello 123", style={"font": font.name})).structuredContent
+        key = {"draft_id": draft["draft_id"], "revision": 1}
+        await call(client, "preview_handwriting", **key, view="review")
+        matched = (await call(client, "export_handwriting", **key, format="zip")).structuredContent
+        assert matched["review"]["zip_pixels"]["pages_matching_latest_review"] == 1
+        shutil.copyfile(latin / "IndieFlower-Regular.ttf", font)
+        changed = await call(client, "export_handwriting", **key, format="zip")
+        review = changed.structuredContent["review"]
+        assert review["pages_with_evidence"] == 1 and not review["unreviewed_pages"]
+        assert review["zip_pixels"] == {
+            "pages_matching_latest_review": 0, "different_pages": [{"section": 1, "page": 1}],
+            "reviewed_pages_without_digest": 0,
+        }
+        assert "不一致" in changed.content[0].text
+
+
 async def smoke(command, arguments, out):
     with TemporaryDirectory() as temp:
         personal = Path(temp) / "my-fonts"
@@ -210,6 +237,7 @@ async def smoke(command, arguments, out):
             cwd=temp,
             env={**os.environ, "PANACHE_MCP_HOME": temp, "PANACHE_USER_FONT_DIR": str(personal), "PATH": ""},
         )
+        await check_zip_review_pixels(params, Path(temp), latin)
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
             info = await client.initialize()
             assert info.serverInfo.name == "panache-mcp"
@@ -749,7 +777,9 @@ async def smoke(command, arguments, out):
                 blocked = await client.call_tool(name, arguments)
                 assert blocked.isError and "保留原有检查记录" in blocked.content[0].text
             assert png(await call(client, "preview_handwriting", **key, **remaining[0], view="image")) == original
-            assert (await call(client, "export_handwriting", **key)).structuredContent["review"] == archive["review"]
+            # PDF keeps the historical count but never claims ZIP/preview pixel equality.
+            pdf_review = (await call(client, "export_handwriting", **key)).structuredContent["review"]
+            assert pdf_review == {k: v for k, v in archive["review"].items() if k != "zip_pixels"}
             assert (await call(client, "read_section", **key, **remaining[0], view="review")).structuredContent["review_id"] is None
         limited = params.model_copy(update={"env": {**params.env, "PANACHE_MCP_MAX_HOME_BYTES": "1"}})
         async with stdio_client(limited) as streams, ClientSession(*streams) as client:

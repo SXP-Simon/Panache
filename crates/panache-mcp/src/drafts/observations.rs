@@ -4,6 +4,11 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+pub struct PageReview {
+    pub visibility_flag: bool,
+    pub pixel_sha256: Option<String>,
+}
+
 pub(super) fn initialize(db: &mut Connection) -> Result<()> {
     let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
     tx.execute_batch("
@@ -119,18 +124,24 @@ impl Snapshot<'_> {
         }))
     }
 
-    /// Latest full-page visibility flag for each measured page in this revision.
-    pub fn reviewed_pages(&self) -> Result<std::collections::HashMap<(u32, usize), bool>> {
+    /// Latest full-page observation for each measured page in this revision.
+    pub fn reviewed_pages(&self) -> Result<std::collections::HashMap<(u32, usize), PageReview>> {
         let db = self.drafts.connect()?;
         let mut statement = db.prepare(
             "SELECT section, page, COALESCE(json_extract(evidence,'$.visibility')
-                IN ('no_visible_change','very_low_contrast'), 0)
+                IN ('no_visible_change','very_low_contrast'), 0), pixel_sha256
              FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
              WHERE draft=? AND revision=? GROUP BY section,page)",
         )?;
         Ok(statement
             .query_map(params![self.id, self.revision], |row| {
-                Ok(((row.get(0)?, row.get::<_, u32>(1)? as usize), row.get(2)?))
+                Ok((
+                    (row.get(0)?, row.get::<_, u32>(1)? as usize),
+                    PageReview {
+                        visibility_flag: row.get(2)?,
+                        pixel_sha256: row.get(3)?,
+                    },
+                ))
             })?
             .collect::<rusqlite::Result<_>>()?)
     }
@@ -319,7 +330,10 @@ mod tests {
         assert_ne!(changed["review_id"], upgraded["review_id"]);
         assert_eq!(rev2.page_observation(1, 1)?, upgraded);
         assert_eq!(old.page_observation(1, 1)?, legacy);
-        assert_eq!(rev2.reviewed_pages()?, [((1, 1), true)].into());
+        let reviewed = rev2.reviewed_pages()?;
+        assert!(reviewed[&(1, 1)].visibility_flag);
+        assert_eq!(reviewed[&(1, 1)].pixel_sha256.as_deref(), Some("other-pixels"));
+        assert!(old.reviewed_pages()?[&(1, 1)].pixel_sha256.is_none());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;
         let comparison = rev3.compare_reviews(2, 1, 1, 0, 5)?;
