@@ -33,8 +33,13 @@ pub struct Style {
     pub font_size: u8,
     pub homework: bool,
     /// Keep this value to reproduce handwriting variations.
+    #[schemars(transform = remove_seed_default)]
     pub seed: u32,
 }
+fn remove_seed_default(schema: &mut schemars::Schema) {
+    schema.remove("default");
+}
+
 impl Default for Style {
     fn default() -> Self {
         Self {
@@ -293,4 +298,34 @@ pub struct ReviewFeedback {
     pub origin: FeedbackOrigin,
     /// Short, page-specific feedback, up to 320 characters.
     pub text: String,
+}
+
+#[cfg(test)]
+mod seed_schema_tests {
+    use super::Style;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn seed_schema_omits_random_default_without_changing_deserialization() {
+        let schemas: Vec<Value> = (0..4)
+            .map(|_| serde_json::to_value(schemars::schema_for!(Style)).unwrap())
+            .collect();
+        assert!(schemas.windows(2).all(|pair| pair[0] == pair[1]));
+        let schema = &schemas[0];
+        let seed = &schema["properties"]["seed"];
+        assert_eq!(seed["type"], "integer");
+        assert!(seed.get("default").is_none());
+        assert!(
+            !schema["required"]
+                .as_array()
+                .is_some_and(|fields| fields.contains(&json!("seed")))
+        );
+        assert_eq!(schema["properties"]["font_size"]["default"], 34);
+
+        let explicit: Style = serde_json::from_value(json!({"seed": 42})).unwrap();
+        assert_eq!(explicit.seed, 42);
+        assert_eq!(serde_json::to_value(&explicit).unwrap()["seed"], 42);
+        let omitted: Style = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(omitted.font_size, 34);
+    }
 }
