@@ -61,3 +61,4 @@ flutter:
         - asset: assets/fonts/PlayfairDisplay.ttf
   assets:
     - assets/branding/panache.png
+    - assets/support/wechat-tip.jpg

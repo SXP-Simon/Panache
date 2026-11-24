@@ -42,6 +42,8 @@ def prepare_gallery(assets):
 
 def prepare_assets(assets):
     shutil.copytree(SITE / "static", assets, dirs_exist_ok=True)
+    (assets / "support").mkdir(exist_ok=True)
+    shutil.copyfile(ROOT / "app/assets/support/wechat-tip.jpg", assets / "support/wechat-tip.jpg")
     shutil.copyfile(ROOT / "app/assets/branding/panache.png", assets / "app-icon.png")
     revisions = {name: hashlib.sha256((assets / name).read_bytes()).hexdigest()[:12]
                  for name in ("atelier.css", "appearance.js", "studio.js", "app-icon.png")}

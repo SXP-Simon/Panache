@@ -8,6 +8,7 @@ on:
       - "docs/assets/images/**"
       - "app/assets/fonts/PlayfairDisplay.ttf"
       - "app/assets/branding/panache.png"
+      - "app/assets/support/wechat-tip.jpg"
       - "assets/licenses/PlayfairDisplay-OFL.txt"
       - ".github/workflows/project-site.yml"
   workflow_dispatch:

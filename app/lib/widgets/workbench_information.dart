@@ -68,6 +68,37 @@ class WorkbenchInformation extends StatelessWidget {
                           icon: const Icon(Icons.bug_report_outlined),
                           label: Text(l.feedback),
                         ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog<void>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              scrollable: true,
+                              title: Text(l.supportAuthor),
+                              content: SizedBox(
+                                width: 288,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/support/wechat-tip.jpg',
+                                      semanticLabel: l.wechatTipCode,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(l.wechatTipHint),
+                                  ],
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(l.close),
+                                ),
+                              ],
+                            ),
+                          ),
+                          icon: const Icon(Icons.favorite_border),
+                          label: Text(l.supportAuthor),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
