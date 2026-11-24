@@ -115,7 +115,9 @@ pub struct Tune {
     /// Set to true only when the user wants to preserve manual glyph adjustments. Reject reflow that would stop applying them. Ink and camera changes can still be saved.
     #[serde(default)]
     pub preserve_local_adjustments: bool,
-    /// Replace the writing area on the saved paper, using 2..32 photo-space baselines. Pass [] to restore the original import calibration. Existing text is reflowed. Use the top and bottom writable lines even on unruled paper.
+    /// Replace the writing area on the saved paper with 2..32 photo-space baselines. Use the top and bottom writable lines even on unruled paper. Pass [] to restore the original import calibration. Existing text is reflowed.
+    /// Setting guides (including []) clears saved top_margin, bottom_margin, left_margin, right_margin, and text line_spacing unless those keys are included in changes in the same call.
+    /// If asked to keep overrides, resend only their approved saved values in that same changes map, not the whole effective layout. Omit those keys to inherit the paper's margins and spacing.
     pub paper_guides: Option<Vec<Guide>>,
     /// Import an absolute local TTF/OTF file into this draft. Its bytes are retained across restarts.
     pub font_path: Option<std::path::PathBuf>,
