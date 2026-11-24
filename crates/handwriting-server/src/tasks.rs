@@ -47,8 +47,16 @@ pub struct Runtime {
     pub task: Task,
     pub cancellation: Cancellation,
     pub sender: watch::Sender<Task>,
-    pub downloads: Arc<AtomicUsize>,
+    downloads: Arc<AtomicUsize>,
 }
+pub(super) struct DownloadLease(Arc<AtomicUsize>);
+
+impl Drop for DownloadLease {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 pub struct Store {
     db: Connection,
     pub tasks: BTreeMap<String, Runtime>,
@@ -192,6 +200,29 @@ impl Store {
         Some(
             serde_json::json!({"status":"success","task_id":id,"task_status":target.task_status,"task_stage":target.task_stage,"task_message":target.task_message,"task_progress":target.task_progress,"pages_completed":target.pages_completed,"created_at":target.created_at,"updated_at":target.updated_at,"error_message":target.error_message,"error_code":target.error_code,"queue_pending_count":pending,"queue_ahead_count":ahead,"processing_count":processing,"active_task_count":pending+processing}),
         )
+    }
+    pub(super) fn lease_result(&mut self, id: &str) -> Result<(Task, DownloadLease)> {
+        self.cleanup()?;
+        let runtime = self
+            .tasks
+            .get(id)
+            .ok_or_else(|| Error::new("task_not_found", "任务不存在"))?;
+        match runtime.task.task_status.as_str() {
+            "pending" | "processing" => return Err(Error::new("task_running", "任务仍在运行")),
+            "failed" => {
+                return Err(Error::new(
+                    "task_failed",
+                    runtime.task.error_message.clone().unwrap_or_default(),
+                ));
+            }
+            "cancelled" => return Err(Error::new("cancelled", "任务已取消")),
+            _ => (),
+        }
+        runtime.downloads.fetch_add(1, Ordering::AcqRel);
+        Ok((
+            runtime.task.clone(),
+            DownloadLease(runtime.downloads.clone()),
+        ))
     }
     pub fn cleanup(&mut self) -> Result<()> {
         let cutoff = now() - self.ttl;

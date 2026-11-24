@@ -1,5 +1,6 @@
 //! 2026-10-12：兼容 Flutter HTTP API 的独立 Rust 服务。
 mod access;
+mod download;
 mod render_job;
 mod tasks;
 use axum::{
@@ -9,12 +10,11 @@ use axum::{
         DefaultBodyLimit, FromRequest, Multipart, Path, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
-    http::{HeaderMap, HeaderValue, Request, StatusCode},
+    http::{HeaderMap, Request, StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use futures_util::Stream;
 use handwriting_core::{
     Error, Limits, Parameters, Result, document, imaging,
     local_fonts::{FontPage, FontSearch, LocalFonts},
@@ -22,17 +22,11 @@ use handwriting_core::{
 use std::{
     collections::HashMap,
     path::PathBuf,
-    pin::Pin,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
-    },
-    task::{Context, Poll},
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tasks::Store;
-use tokio::{io::AsyncRead, sync::Semaphore};
-use tokio_util::io::ReaderStream;
+use tokio::sync::Semaphore;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Clone)]
@@ -173,7 +167,10 @@ impl Server {
             .route("/pdfpageprocess", post(pdfpage))
             .route("/generate_handwriting", post(submit))
             .route("/generate_handwriting/task/{id}", get(status))
-            .route("/generate_handwriting/task/{id}/result", get(result))
+            .route(
+                "/generate_handwriting/task/{id}/result",
+                get(download::result),
+            )
             .route("/generate_handwriting/task/{id}/cancel", post(cancel))
             .route("/generate_handwriting/ws/{id}", get(websocket))
             .fallback(|| async { StatusCode::NOT_FOUND });
@@ -488,75 +485,6 @@ async fn cancel(
         })?;
     }
     Ok(Json(store.payload(&id).unwrap()))
-}
-struct Lease(Arc<AtomicUsize>);
-impl Drop for Lease {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::AcqRel);
-    }
-}
-struct Download<R> {
-    reader: ReaderStream<R>,
-    _lease: Lease,
-}
-impl<R: AsyncRead + Unpin> Stream for Download<R> {
-    type Item = std::result::Result<axum::body::Bytes, std::io::Error>;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.get_mut().reader).poll_next(cx)
-    }
-}
-async fn result(State(s): State<Server>, Path(id): Path<String>) -> ApiResult<Response> {
-    let (task, lease) = {
-        let mut store = s.0.store.lock().unwrap();
-        store.cleanup()?;
-        let runtime = store
-            .tasks
-            .get(&id)
-            .ok_or_else(|| Error::new("task_not_found", "任务不存在"))?;
-        match runtime.task.task_status.as_str() {
-            "pending" | "processing" => {
-                return Err(Error::new("task_running", "任务仍在运行").into());
-            }
-            "failed" => {
-                return Err(Error::new(
-                    "task_failed",
-                    runtime.task.error_message.clone().unwrap_or_default(),
-                )
-                .into());
-            }
-            "cancelled" => return Err(Error::new("cancelled", "任务已取消").into()),
-            _ => (),
-        }
-        runtime.downloads.fetch_add(1, Ordering::AcqRel);
-        (runtime.task.clone(), Lease(runtime.downloads.clone()))
-    };
-    let file = tokio::fs::File::open(
-        task.result_file
-            .ok_or_else(|| Error::new("storage_failed", "结果文件缺失"))?,
-    )
-    .await
-    .map_err(storage_error)?;
-    let mut response = Body::from_stream(Download {
-        reader: ReaderStream::new(file),
-        _lease: lease,
-    })
-    .into_response();
-    response.headers_mut().insert(
-        "content-type",
-        HeaderValue::from_str(
-            task.content_type
-                .as_deref()
-                .unwrap_or("application/octet-stream"),
-        )
-        .unwrap(),
-    );
-    if let Some(name) = task.filename {
-        response.headers_mut().insert(
-            "content-disposition",
-            HeaderValue::from_str(&format!("attachment; filename={name}")).unwrap(),
-        );
-    }
-    Ok(response)
 }
 async fn textfile(
     State(s): State<Server>,

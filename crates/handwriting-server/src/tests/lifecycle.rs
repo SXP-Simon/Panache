@@ -126,20 +126,52 @@ async fn persisted_results_survive_restart_and_download_lease_blocks_expiry() {
     drop(s);
     let s = Server::new(cfg).unwrap();
     assert_eq!(call(&s, &path).await.1, bytes);
-    let response = s
-        .router()
-        .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
-        .await
-        .unwrap();
+    let download = || {
+        s.router()
+            .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+    };
+    let first = download().await.unwrap();
+    let second = download().await.unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+    assert_eq!(second.status(), StatusCode::OK);
+    drop(first);
     {
         let mut store = s.0.store.lock().unwrap();
         store.ttl = 0.;
         store.cleanup().unwrap();
         assert!(store.tasks.contains_key(&id));
     }
-    drop(response);
+    let remaining = axum::body::to_bytes(second.into_body(), bytes.len())
+        .await
+        .unwrap();
+    assert_eq!(remaining.as_ref(), bytes.as_slice());
     s.0.store.lock().unwrap().cleanup().unwrap();
     assert_eq!(call(&s, &path).await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn missing_result_file_releases_download_lease() {
+    let (dir, s) = setup();
+    let id = "missing-file";
+    {
+        let mut store = s.0.store.lock().unwrap();
+        store.insert(id.into(), 1).unwrap();
+        store
+            .update(id, |task| {
+                task.task_status = "completed".into();
+                task.result_file = Some(dir.path().join("missing.png"));
+            })
+            .unwrap();
+    }
+    let path = format!("/api/generate_handwriting/task/{id}/result");
+    let (status, bytes) = call(&s, &path).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    let error: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(error["error_code"], "storage_failed");
+    let mut store = s.0.store.lock().unwrap();
+    store.ttl = 0.;
+    store.cleanup().unwrap();
+    assert!(!store.tasks.contains_key(id));
 }
 
 #[tokio::test]
