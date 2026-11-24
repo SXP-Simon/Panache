@@ -36,6 +36,7 @@ use tokio::sync::Semaphore;
 
 struct State {
     drafts: Drafts,
+    preserve_reviews: bool,
     engine: Mutex<Engine>,
     fonts: Vec<String>,
     local_fonts: LocalFonts,
@@ -240,21 +241,30 @@ impl Panache {
 impl ServerHandler for Panache {
     fn get_info(&self) -> rmcp::model::ServerConfig {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
+        let instructions = concat!(
+            "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
+            "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
+            "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
+            "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
+            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
+            "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page can be \"last\". For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+            "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
+            "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
+            "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
+            "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
+            "Inspect the edited appearance with view=image when no new check is requested. Use read_section(view=trajectory) to revisit actions and evidence."
+        );
+        let mode = if self.0.preserve_reviews {
+            "This connection preserves stored reviews. Use view=image to inspect and export_handwriting to print. "
+        } else {
+            ""
+        };
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new("panache-mcp", handwriting_core::app_version()))
-            .with_instructions(concat!(
-                "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
-                "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
-                "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
-                "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
-                "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-                "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page can be \"last\". For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
-                "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
-                "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
-                "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
-                "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
-                "Review the edited revision. Use read_section(view=trajectory) to revisit actions and evidence."
+            .with_server_info(Implementation::new(
+                "panache-mcp",
+                handwriting_core::app_version(),
             ))
+            .with_instructions(format!("{mode}{instructions}"))
     }
 }
 
@@ -326,7 +336,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. Map the intended area onto first/last writable baselines even on artwork or unruled paper. Ink-group changes preserve local glyph placement; after changing font, size or guides, inspect the new layout. Review the new revision before export."
+        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. Map the intended area onto first/last writable baselines even on artwork or unruled paper. Ink-group changes preserve local glyph placement; after changing font, size or guides, inspect the new layout. Use view=image to inspect the result when the user wants to preserve checks."
     )]
     async fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
         let state = self.0.clone();
@@ -474,6 +484,11 @@ impl Panache {
         description = "Attach a user's exact quote or your own model observation to a review_id. Does not advance the draft revision. Use read_section(view=review,review_id=...) to retrieve it."
     )]
     fn annotate_review(&self, Parameters(input): Parameters<ReviewFeedback>) -> CallToolResult {
+        if self.0.preserve_reviews {
+            return tool_result(Err(anyhow::anyhow!(
+                "此连接保留原有检查记录，无法添加评语。可用 read_section(view=review) 查阅原单。"
+            )));
+        }
         tool_result(
             self.0
                 .drafts
@@ -546,7 +561,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. To finish checking an export, pass each listed section/page to preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Review the intended revision, especially after moving glyphs or changing ink."
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request return the file and missing pages. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Use view=image to inspect the intended appearance without filing a check."
     )]
     async fn export_handwriting(
         &self,
@@ -589,9 +604,9 @@ impl Panache {
             let remaining = if unreviewed.is_empty() {
                 String::new()
             } else {
-                format!(" 依次复查以下节内页码：{}。仅复盘不会修改稿件；复盘后可直接交付下方原文件。", serde_json::to_string(&unreviewed)?)
+                format!(" 缺少整页检查单的节内页码：{}。", serde_json::to_string(&unreviewed)?)
             };
-            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}可用 preview_handwriting(view=review) 核对成品。{remaining}\n\n`{}`", draft.revision, path.display());
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}\n\n`{}`", draft.revision, path.display());
             Ok(reply(message, json!({
                 "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages,
                 "review": {
@@ -645,7 +660,14 @@ async fn main() -> Result<()> {
     let output = home.join("exports");
     fs::create_dir_all(&output)?;
     let drafts = Drafts::open(&home)?;
+    let preserve_reviews = match env::var_os("PANACHE_MCP_PRESERVE_REVIEWS").as_deref() {
+        None => false,
+        Some(value) if value == "0" => false,
+        Some(value) if value == "1" => true,
+        _ => anyhow::bail!("PANACHE_MCP_PRESERVE_REVIEWS must be 0 or 1"),
+    };
     let state = State {
+        preserve_reviews,
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
         local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes),

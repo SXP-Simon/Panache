@@ -731,6 +731,20 @@ async def smoke(command, arguments, out):
                 )
                 == adjusted
             )
+        protected = params.model_copy(update={"env": {**params.env, "PANACHE_MCP_PRESERVE_REVIEWS": "1"}})
+        async with stdio_client(protected) as streams, ClientSession(*streams) as client:
+            assert "preserves stored reviews" in (await client.initialize()).instructions
+            key = {"draft_id": doc, "revision": archive["revision"]}
+            for name, arguments in [
+                ("preview_handwriting", {**key, **remaining[0], "view": "review"}),
+                ("annotate_review", {**comparison_key, "review_id": reviewed_id,
+                                     "origin": "model_observation", "text": "must not be stored"}),
+            ]:
+                blocked = await client.call_tool(name, arguments)
+                assert blocked.isError and "保留原有检查记录" in blocked.content[0].text
+            assert png(await call(client, "preview_handwriting", **key, **remaining[0], view="image")) == original
+            assert (await call(client, "export_handwriting", **key)).structuredContent["review"] == archive["review"]
+            assert (await call(client, "read_section", **key, **remaining[0], view="review")).structuredContent["review_id"] is None
         limited = params.model_copy(update={"env": {**params.env, "PANACHE_MCP_MAX_HOME_BYTES": "1"}})
         async with stdio_client(limited) as streams, ClientSession(*streams) as client:
             await client.initialize()

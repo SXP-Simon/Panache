@@ -66,6 +66,8 @@ cargo build --locked --release -p panache-mcp
 | `annotate_review` | 将用户原话或模型观察挂到指定复盘 ID，保持稿件版本号。 |
 | `adjust_glyphs` | 先用 `preview_handwriting(view="layout")` 取编号和坐标，再按同一节、页和版本调整选中字形。 |
 
+若本次只改稿、打印和统计缺单页，可在客户端的 MCP 服务配置中设置 `PANACHE_MCP_PRESERVE_REVIEWS=1`。该连接仍可正常调参、看图和导出，完整检查单与评语会保留原样。
+
 例如用 `list_fonts(query="楷", source="system", limit=8)` 检索系统字体。把 `entries[].id` 用于建稿的 `style.font` 或调稿的 `changes.font`。随包字体继续接受原文件名。个人和系统字体会随稿保存，删除源文件后仍可预览历史版本。TTF、OTF 和 TTC/OTC 中带轮廓、单个字面大小不超过 32 MiB 的字体可供选择。
 
 桌面与 MCP 共享“我的字体”目录，`list_fonts` 的 `user_dir` 给出绝对路径。Windows 使用 `%LOCALAPPDATA%/Panache/fonts`，macOS 使用 `~/Library/Application Support/Panache/fonts`，Linux 使用 `$XDG_DATA_HOME/Panache/fonts`（默认 `~/.local/share/Panache/fonts`）。可通过 `PANACHE_USER_FONT_DIR` 指定绝对路径。把字体放入后调用 `list_fonts(source="user", refresh=true)`。
