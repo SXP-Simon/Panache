@@ -132,6 +132,7 @@ impl ServerHandler for Panache {
             .with_instructions(concat!(
                 "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
                 "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
+                "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
                 "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
                 "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
                 "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
@@ -148,7 +149,7 @@ impl ServerHandler for Panache {
 impl Panache {
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Discover handwriting settings by group. Omit group for an index; request one group before tuning."
+        description = "For less even handwriting, inspect group=variation; for requested occasional crossed-out mistakes, group=strike. Pass draft_id to read current values before tune_handwriting. Omit group for the index."
     )]
     fn describe_controls(&self, Parameters(input): Parameters<Describe>) -> CallToolResult {
         tool_result((|| {
@@ -243,7 +244,7 @@ impl Panache {
                 "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
                 "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
                 "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
-                "Honor an approved or delegated main font. A request for generally messier handwriting applies to the main font. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
+                "Keep an approved font. For a less regular hand inspect describe_controls(group=variation) and preview a small change. If the user wants occasional corrections, inspect group=strike. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
             );
             let mut data = json!({
                 "entries": page.fonts, "total": page.total,

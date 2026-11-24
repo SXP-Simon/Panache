@@ -131,6 +131,25 @@ async def mixed_script_sample(client):
     assert png(await call(client, "preview_handwriting", **key)) == primary
 
 
+async def handwriting_variation_sample(client):
+    markdown = "样品 A 的质量为 12.5 g。"
+    saved = (await call(client, "save_section", markdown=markdown, style={"seed": 17})).structuredContent
+    key = {"draft_id": saved["draft_id"]}
+    base = png(await call(client, "preview_handwriting", **key))
+    await call(client, "tune_handwriting", **key, expected_revision=1, changes={"perturb_theta_sigma": 0.07})
+    loose = png(await call(client, "preview_handwriting", **key))
+    assert loose != base
+    strike = (await call(client, "describe_controls", **key, group="strike")).structuredContent
+    assert strike["values"]["strikethrough_probability"] == 0
+    assert strike["controls"]["strikethrough_angle_sigma"]["unit"] == "deg"
+    # Force the optional effect for a deterministic positive control on a short line.
+    await call(client, "tune_handwriting", **key, expected_revision=2, changes={"strikethrough_probability": 1})
+    assert png(await call(client, "preview_handwriting", **key)) != loose
+    assert png(await call(client, "preview_handwriting", **key, revision=2)) == loose
+    source = (await call(client, "read_section", **key, view="source")).structuredContent
+    assert source["markdown"] == markdown
+
+
 async def placement_pixels(client):
     saved = (await call(client, "save_section", markdown="字", style={"seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
@@ -190,6 +209,7 @@ async def smoke(command, arguments, out):
             assert "outside the frame" in before_save and "wait before saving" in before_save
             assert "partial work was requested" in before_save
             assert "ask which field" in info.instructions
+            assert "group=variation" in info.instructions and "group=strike" in info.instructions
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
                 "annotate_review",
@@ -209,6 +229,10 @@ async def smoke(command, arguments, out):
             listed = await call(client, "list_fonts")
             guidance = listed.structuredContent["sample_guidance"]
             assert guidance in listed.content[0].text
+            for group, name in [("variation", "perturb_theta_sigma"), ("strike", "strikethrough_probability")]:
+                assert f"group={group}" in guidance
+                spec = (await call(client, "describe_controls", group=group)).structuredContent
+                assert spec["controls"][name]["description"]
             assert "志莽行书.ttf" in listed.structuredContent["fonts"]
             results = (await call(client, "list_fonts", source="user", query="localsample", limit=1)).structuredContent
             assert results["total"] == 1 and results["next_offset"] is None
@@ -310,6 +334,7 @@ async def smoke(command, arguments, out):
             )
             assert failed.isError
             await mixed_script_sample(client)
+            await handwriting_variation_sample(client)
             await placement_pixels(client)
             await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
