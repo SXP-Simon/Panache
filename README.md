@@ -55,3 +55,9 @@ Report bugs in [GitHub Issues](https://github.com/SXP-Simon/Panache/issues). For
 - Thanks to [HakimYu](https://github.com/HakimYu) for the Flutter and Rust migration, and to everyone who has [contributed to Panache](https://github.com/SXP-Simon/Panache/graphs/contributors).
 
 Friendship links: [LINUX DO](https://linux.do/)
+
+## Support Simon
+
+If you enjoy Panache, you can buy Simon a coffee. Open WeChat and scan the code below.
+
+<img src="app/assets/support/wechat-tip.jpg" alt="Simon’s WeChat tip code" width="320">

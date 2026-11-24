@@ -55,3 +55,9 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 - 感谢 [HakimYu](https://github.com/HakimYu) 完成 Flutter 与 Rust 迁移，也感谢每一位[为 Panache 作出贡献的人](https://github.com/SXP-Simon/Panache/graphs/contributors)。
 
 Friendship links: [LINUX DO](https://linux.do/)
+
+## 支持作者
+
+如果你喜欢 Panache，可以请 Simon 喝杯咖啡。打开微信，用「扫一扫」扫描下方赞赏码。
+
+<img src="app/assets/support/wechat-tip.jpg" alt="Simon 的微信赞赏码" width="320">
