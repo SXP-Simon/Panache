@@ -241,6 +241,8 @@ pub struct Nudge {
 pub struct Preview {
     /// In review, compare with an earlier revision. Omit region for stored, data-only evidence (offset/limit paginate edits). With region, render paired crops.
     pub compare_revision: Option<u32>,
+    /// Pin the earlier stored full-page check by ID. Requires view=review and compare_revision, without a region. The check must belong to that earlier revision, draft, section and page.
+    pub before_review_id: Option<String>,
     /// 3..32 vertices in native output image pixels, origin top left. Layout selects glyph centers. Review measures the polygon and shows its bounding crop.
     pub region: Option<Vec<[i32; 2]>>,
     /// With review, region and compare_revision, mark the original position of moved content. The crop covers both polygons; differences outside their union cover the rest of the page.

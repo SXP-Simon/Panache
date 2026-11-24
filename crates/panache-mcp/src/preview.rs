@@ -20,6 +20,15 @@ pub(super) async fn run(
     ctx: RequestContext<RoleServer>,
 ) -> Result<CallToolResult> {
     ensure!(
+        input.before_review_id.is_none()
+            || (input.view == Some(PreviewView::Review)
+                && input.compare_revision.is_some()
+                && input.region.is_none()
+                && input.previous_region.is_none()
+                && input.illustrations_only.is_none()),
+        "before_review_id requires an unfiltered view=review with compare_revision and no region"
+    );
+    ensure!(
         input.previous_region.is_none()
             || (input.view == Some(PreviewView::Review)
                 && input.region.is_some()
@@ -40,6 +49,7 @@ pub(super) async fn run(
             input.page.unwrap_or(1),
             u32::try_from(input.offset.unwrap_or(0))?,
             u32::try_from(input.limit.unwrap_or(20))?,
+            input.before_review_id.as_deref(),
         )?;
         return Ok(reply(data.to_string(), data));
     }

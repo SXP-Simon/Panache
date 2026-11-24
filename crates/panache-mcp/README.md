@@ -134,7 +134,9 @@ cargo build --locked --release -p panache-mcp
 
 该调用读取两版各自最近归档的该页复盘，返回测量、所引用的评语及其间全稿的编辑动作。差值为 v4 减 v3。先确认正文仍然可见，再结合每个区域的支持样本数解释偏差。全局墨色设置相同只说明参数一致，局部精修及肉眼观感还要另查。可用 `offset/limit` 翻阅编辑动作。某版缺复盘时，先查看所缺版本；算法不同、页面内容改变或尺寸不同时仅列两侧证据，保留比较限制。
 
-精确复查用 `read_section(view="review",draft_id=…,review_id=…)`，跨会话可用。要看图时再按版本取 `view="image"`。像素摘要用于核对重渲染结果，系统不为每次复盘归档整页图片。
+如果同一版本、同一页有多张检查单，且要以用户看过或点评过的那张为准，在上述调用中加上 `"before_review_id":"原检查单号"`。原单必须属于同一稿件、`compare_revision`、节和页；不匹配会报错，不会改用别的单。新版仍取该位置最近归档的检查单。
+
+精确复查用 `read_section(view="review",draft_id=…,review_id=…)`，跨会话可用。`before_review_id` 只选择保存的测量和评语，不还原图片，也不能和 `region` 一起用。按版本取 `view="image"` 或局部裁图时，输出按当时的运行环境生成，不能仅凭版本号认定与原单像素相同。像素摘要用于核对重渲染结果，系统不为每次复盘归档整页图片。
 
 使用 Windows 上的 Python 客户端脚本时，若只有终端显示的中文乱码，可以将该客户端的标准输出和终端设为 UTF-8（例如向 Python 进程传入 `PYTHONIOENCODING=utf-8`）。
 
@@ -150,4 +152,10 @@ uv run --script crates/panache-mcp/tests/smoke.py target/release/panache-mcp --o
 
 ```sh
 uv run --script crates/panache-mcp/tests/local_review_experiment.py target/release/panache-mcp --out output/local-review-pilot
+```
+
+内置字体同名替换后，检查单编号仍能锁定原测量记录。可用独立的 stdio 测试复现：
+
+```sh
+uv run --script crates/panache-mcp/tests/review_pin.py target/release/panache-mcp app/web/prepare-text-worker.js
 ```
