@@ -23,7 +23,8 @@ impl Engine {
         let changes = GlyphChanges::parse(input, &draft.style)?;
         let version = section.version;
         let mut req = self.fine_request(draft, section)?;
-        let (key, mut bounds) = fine_edit::inspect_page(&req, input.page, cancel)?;
+        let (key, mut bounds) = fine_edit::inspect_page(&req, input.page, cancel)
+            .map_err(|error| draft.page_error(input.section, error))?;
         bounds.retain(|g| changes.ids.contains(&g.id));
         let mut selected = BTreeMap::new();
         for glyph in &bounds {

@@ -119,8 +119,9 @@ pub struct Tune {
     /// Brief observable issue or user instruction that motivated this edit (max 320 characters).
     pub note: Option<String>,
     pub draft_id: String,
+    /// Current revision returned by list_drafts or the last edit.
     pub expected_revision: u32,
-    /// Sparse name/value patch from describe_controls. Null restores the original setting.
+    /// Pass controls under changes, e.g. {"perturb_theta_sigma":0.07}. Group objects from describe_controls also work inside changes. Null restores a control.
     #[serde(default)]
     pub changes: serde_json::Map<String, serde_json::Value>,
 }
@@ -142,10 +143,30 @@ pub enum ReadView {
     Source,
 }
 
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ReviewPage {
+    Number(u32),
+    Last(LastPage),
+}
+
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LastPage {
+    Last,
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Read {
-    /// With view=review, retrieve one immutable measurement and its attributed feedback.
+    /// With view=review, retrieve the most recently recorded full-page measurement at this one-based
+    /// page, or "last" to paginate the selected section at the same revision. With "last" or before_text,
+    /// specify the section containing the requested body in a multi-section draft. Omit review_id.
+    pub page: Option<ReviewPage>,
+    /// For a page review just before an addition: an exact, distinctive fragment of the added Markdown.
+    /// Uses the revision immediately before its unique introduction; repeated introductions are ambiguous. Omit revision.
+    pub before_text: Option<String>,
+    /// With view=review, retrieve one immutable measurement and its attributed feedback by ID instead of page.
     pub review_id: Option<String>,
     /// With trajectory, pass next_cursor to continue the same snapshot, including its filters. Omit offset.
     pub cursor: Option<String>,

@@ -11,6 +11,7 @@ pub(super) fn initialize(db: &mut Connection) -> Result<()> {
             seq INTEGER PRIMARY KEY, review_id TEXT NOT NULL UNIQUE,
             draft TEXT NOT NULL, revision INTEGER NOT NULL, section INTEGER NOT NULL, page INTEGER NOT NULL,
             algorithm TEXT, pixel_sha256 TEXT, content_sha256 TEXT, evidence TEXT NOT NULL,
+            filed_at_revision INTEGER,
             UNIQUE(draft,revision,section,page,algorithm,pixel_sha256)
         );
         CREATE INDEX IF NOT EXISTS reviews_by_page ON review_observations(draft,revision,section,page,seq);
@@ -18,6 +19,9 @@ pub(super) fn initialize(db: &mut Connection) -> Result<()> {
             review_id TEXT NOT NULL REFERENCES review_observations(review_id),
             origin TEXT NOT NULL, note TEXT NOT NULL, UNIQUE(review_id,origin,note)
         );")?;
+    if !tx.column_exists(None, "review_observations", "filed_at_revision")? {
+        tx.execute_batch("ALTER TABLE review_observations ADD COLUMN filed_at_revision INTEGER")?;
+    }
     if tx.table_exists(None, "page_reviews")? {
         // Older observations did not retain a pixel digest or measurement version.
         tx.execute_batch("INSERT INTO review_observations(review_id,draft,revision,section,page,evidence)
@@ -29,13 +33,13 @@ pub(super) fn initialize(db: &mut Connection) -> Result<()> {
 }
 
 fn by_id(db: &Connection, id: &str, draft: &Snapshot<'_>) -> Result<Value> {
-    let mut record=db.query_row("SELECT revision,section,page,algorithm,pixel_sha256,content_sha256,evidence
+    let mut record=db.query_row("SELECT revision,section,page,algorithm,pixel_sha256,content_sha256,evidence,filed_at_revision
         FROM review_observations WHERE draft=? AND review_id=? AND revision<=?",
         params![draft.id,id,draft.revision],|r|Ok(json!({
             "draft_id":draft.id,"review_id":id,"origin":"measurement","revision":r.get::<_,u32>(0)?,
             "section":r.get::<_,u32>(1)?,"page":r.get::<_,u32>(2)?,"algorithm":r.get::<_,Option<String>>(3)?,
             "pixel_sha256":r.get::<_,Option<String>>(4)?,"page_content_sha256":r.get::<_,Option<String>>(5)?,
-            "evidence":r.get::<_,String>(6)?,
+            "evidence":r.get::<_,String>(6)?, "filed_at_revision":r.get::<_,Option<u32>>(7)?,
         }))).optional()?.context("Unknown review in this draft and revision range")?;
     record["evidence"] = serde_json::from_str(
         record["evidence"]
@@ -56,6 +60,24 @@ fn by_id(db: &Connection, id: &str, draft: &Snapshot<'_>) -> Result<Value> {
     Ok(record)
 }
 
+fn page_record(
+    db: &Connection,
+    draft: &Snapshot<'_>,
+    revision: u32,
+    section: u32,
+    page: u32,
+) -> Result<Option<Value>> {
+    let id: Option<String> = db
+        .query_row(
+            "SELECT review_id FROM review_observations
+         WHERE draft=? AND revision=? AND section=? AND page=? ORDER BY seq DESC LIMIT 1",
+            params![draft.id, revision, section, page],
+            |row| row.get(0),
+        )
+        .optional()?;
+    id.map(|id| by_id(db, &id, draft)).transpose()
+}
+
 impl Snapshot<'_> {
     pub fn record_review(
         &self,
@@ -69,9 +91,9 @@ impl Snapshot<'_> {
         let page = u32::try_from(page)?;
         let mut db = self.drafts.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute("INSERT INTO review_observations(review_id,draft,revision,section,page,algorithm,pixel_sha256,content_sha256,evidence)
-            VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(draft,revision,section,page,algorithm,pixel_sha256) DO NOTHING",
-            params![Uuid::new_v4().to_string(),self.id,self.revision,section,page,algorithm,pixel,content,evidence.to_string()])?;
+        tx.execute("INSERT INTO review_observations(review_id,draft,revision,section,page,algorithm,pixel_sha256,content_sha256,evidence,filed_at_revision)
+            VALUES(?,?,?,?,?,?,?,?,?,(SELECT revision FROM drafts WHERE id=?)) ON CONFLICT(draft,revision,section,page,algorithm,pixel_sha256) DO NOTHING",
+            params![Uuid::new_v4().to_string(),self.id,self.revision,section,page,algorithm,pixel,content,evidence.to_string(),self.id])?;
         let id:String=tx.query_row("SELECT review_id FROM review_observations
             WHERE draft=? AND revision=? AND section=? AND page=? AND algorithm=? AND pixel_sha256=?",
             params![self.id,self.revision,section,page,algorithm,pixel],|r|r.get(0))?;
@@ -84,12 +106,33 @@ impl Snapshot<'_> {
         by_id(&self.drafts.connect()?, id, self)
     }
 
-    pub fn review_counts(&self) -> Result<(u32, u32)> {
-        Ok(self.drafts.connect()?.query_row("SELECT count(*),
-            count(CASE WHEN json_extract(evidence,'$.visibility') IN ('no_visible_change','very_low_contrast') THEN 1 END)
-            FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
-            WHERE draft=? AND revision=? GROUP BY section,page)",params![self.id,self.revision],
-            |r|Ok((r.get(0)?,r.get(1)?)))?)
+    pub fn page_observation(&self, section: u32, page: u32) -> Result<Value> {
+        ensure!(section > 0 && page > 0, "section and page start at 1");
+        let mut db = self.drafts.connect()?;
+        let tx = db.transaction()?;
+        let record = page_record(&tx, self, self.revision, section, page)?;
+        Ok(record.unwrap_or_else(|| {
+            json!({
+                "draft_id": self.id, "revision": self.revision, "section": section, "page": page,
+                "review_id": null, "status": "no_recorded_review",
+            })
+        }))
+    }
+
+    /// Latest full-page visibility flag for each measured page in this revision.
+    pub fn reviewed_pages(&self) -> Result<std::collections::HashMap<(u32, usize), bool>> {
+        let db = self.drafts.connect()?;
+        let mut statement = db.prepare(
+            "SELECT section, page, COALESCE(json_extract(evidence,'$.visibility')
+                IN ('no_visible_change','very_low_contrast'), 0)
+             FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
+             WHERE draft=? AND revision=? GROUP BY section,page)",
+        )?;
+        Ok(statement
+            .query_map(params![self.id, self.revision], |row| {
+                Ok(((row.get(0)?, row.get::<_, u32>(1)? as usize), row.get(2)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn compare_reviews(
@@ -110,19 +153,9 @@ impl Snapshot<'_> {
         );
         let mut db = self.drafts.connect()?;
         let tx = db.transaction()?;
-        let fetch = |rev: u32| -> Result<Option<Value>> {
-            let id: Option<String> = tx
-                .query_row(
-                    "SELECT review_id FROM review_observations
-                WHERE draft=? AND revision=? AND section=? AND page=? ORDER BY seq DESC LIMIT 1",
-                    params![self.id, rev, section, u32::try_from(page)?],
-                    |r| r.get(0),
-                )
-                .optional()?;
-            id.map(|v| by_id(&tx, &v, self)).transpose()
-        };
-        let previous = fetch(before)?;
-        let current = fetch(self.revision)?;
+        let page = u32::try_from(page)?;
+        let previous = page_record(&tx, self, before, section, page)?;
+        let current = page_record(&tx, self, self.revision, section, page)?;
         let mut stmt=tx.prepare("WITH actions(rev,action,section) AS (
             SELECT revision,'save_section',number FROM sections WHERE draft=?1
             UNION ALL SELECT revision,'tune_handwriting',NULL FROM settings WHERE draft=?1
@@ -252,10 +285,13 @@ mod tests {
                 && legacy["pixel_sha256"].is_null()
                 && legacy["page_content_sha256"].is_null()
         );
+        assert!(legacy["filed_at_revision"].is_null());
         assert_eq!(legacy["evidence"]["visibility"], "no_visible_change");
+        assert_eq!(old.page_observation(1, 1)?, legacy);
         let observation = json!({"visibility":"inspect_visually","photo_size":[400,500]});
         let rev2 = drafts.snapshot("d", Some(2))?;
         let first = rev2.record_review(1, 1, "a", "pixels", "content", &observation)?;
+        assert_eq!(first["filed_at_revision"], 3);
         for _ in 0..9 {
             assert_eq!(
                 rev2.record_review(1, 1, "a", "pixels", "content", &observation)?,
@@ -281,7 +317,9 @@ mod tests {
         )?;
         assert_ne!(first["review_id"], changed["review_id"]);
         assert_ne!(changed["review_id"], upgraded["review_id"]);
-        assert_eq!(rev2.review_counts()?, (1, 1));
+        assert_eq!(rev2.page_observation(1, 1)?, upgraded);
+        assert_eq!(old.page_observation(1, 1)?, legacy);
+        assert_eq!(rev2.reviewed_pages()?, [((1, 1), true)].into());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;
         let comparison = rev3.compare_reviews(2, 1, 1, 0, 5)?;
@@ -296,6 +334,20 @@ mod tests {
                 .unwrap()
                 .contains(&json!("unknown_algorithm"))
         );
+        drafts
+            .connect()?
+            .execute("UPDATE drafts SET revision=4 WHERE id='d'", [])?;
+        assert_eq!(
+            rev2.record_review(1, 1, "a", "pixels", "content", &observation)?,
+            first
+        );
+        // Reopening an existing digest from an older database must not date it retroactively.
+        drafts.connect()?.execute(
+            "UPDATE review_observations SET filed_at_revision=NULL WHERE review_id=?",
+            [changed["review_id"].as_str().unwrap()],
+        )?;
+        let changed = rev2.record_review(1, 1, "a", "other-pixels", "content", &observation)?;
+        assert!(changed["filed_at_revision"].is_null());
         for record in [first, changed, upgraded, legacy] {
             let reopened = Drafts::open(home.path())?;
             assert_eq!(

@@ -87,6 +87,11 @@ fn render(
         .pop()
         .context("Empty draft")?;
     let page = input.page.unwrap_or(1);
+    let max = Limits::default().max_pages;
+    ensure!(
+        (1..=max).contains(&page),
+        "Requested page {page} in section {number}. Page numbers start at 1 within each section (maximum {max})."
+    );
     if input.view == Some(PreviewView::Review) {
         ensure!(
             input.limit.is_none() && input.offset.is_none(),
@@ -103,6 +108,10 @@ fn render(
                 cancel,
             );
         }
+        ensure!(
+            !state.preserve_reviews,
+            "此连接保留原有检查记录。看成图请用 view=image，查原单请用 read_section(view=review)，打印请用 export_handwriting。"
+        );
         let baselines = engine.review_baselines(&draft, section.clone(), page, cancel)?;
         let (preview, _) = engine.preview(&draft, section, page, cancel)?;
         return review::page(&draft, number, page, &preview.png, &baselines, cancel);

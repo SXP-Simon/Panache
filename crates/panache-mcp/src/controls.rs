@@ -13,6 +13,33 @@ pub fn catalog() -> &'static Changes {
     })
 }
 
+/// Normalize catalog groups at the input boundary. A scalar control (e.g. ink)
+/// can share its name with a group; only an object selects the grouped syntax.
+pub fn flatten_patch(changes: Changes) -> Result<Changes> {
+    let mut patch = Changes::new();
+    for (key, value) in changes {
+        if let (Some(group), Value::Object(fields)) = (catalog().get(&key), &value) {
+            ensure!(!fields.is_empty(), "Empty control group {key}");
+            for (field, setting) in fields {
+                ensure!(
+                    group.get(field).is_some(),
+                    "Unknown control {field} in group {key}"
+                );
+                ensure!(
+                    patch.insert(field.clone(), setting.clone()).is_none(),
+                    "Duplicate control {field}"
+                );
+            }
+        } else {
+            ensure!(
+                patch.insert(key.clone(), value).is_none(),
+                "Duplicate control {key}"
+            );
+        }
+    }
+    Ok(patch)
+}
+
 pub fn merge(current: &Changes, patch: &Changes, fonts: &[String]) -> Result<Changes> {
     ensure!(!patch.is_empty(), "Supply at least one control");
     let mut next = current.clone();
