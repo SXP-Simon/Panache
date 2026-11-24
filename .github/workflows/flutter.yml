@@ -1,50 +1,13 @@
 name: Flutter UI
-run-name: >-
-  ${{ github.event_name == 'pull_request' && format('PR #{0} · base {1}', github.event.pull_request.number, github.event.pull_request.base.sha) || github.workflow }}
 
 permissions:
   contents: read
 
 on:
-  pull_request:
-    paths:
-      - "VERSION"
-      - "scripts/build-flutter-web.py"
-      - "scripts/build-text-worker.py"
-      - "scripts/tests/test_web_build_version.py"
-      - "scripts/build-flutter-desktop.py"
-      - "scripts/windows_launcher.py"
-      - "scripts/test-desktop-updater.ps1"
-      - "scripts/tests/test_desktop_release_version.py"
-      - "scripts/tests/test_windows_launcher.py"
-      - "app/**"
-      - "scripts/*release*.*"
-      - "scripts/tests/test-flutter-release.cjs"
-      - ".github/workflows/publish_flutter.yml"
-      - "vendor/**"
-      - "assets/pubspec.yaml"
-      - "LICENSE"
-      - "scripts/test-flutter-web.py"
-      - "scripts/tests/test_flutter_web_runner.py"
-      - ".github/scripts/markdown-update*.cjs"
-      - ".github/workflows/markdown-update.yml"
-      - ".github/workflows/flutter.yml"
-      - "!**/*.md"
-      - "assets/licenses/**"
-      - "assets/font_assets/**"
   workflow_dispatch:
 
 jobs:
-  markdown-update:
-    permissions:
-      actions: read
-      contents: read
-    uses: ./.github/workflows/markdown-update.yml
-    with:
-      workflow: flutter.yml
   desktop-updater:
-    needs: markdown-update
-    if: ${{ !cancelled() && needs.markdown-update.outputs.skip != 'true' }}
     name: Desktop updater (${{ matrix.os }})
     timeout-minutes: 20
     strategy:
@@ -97,8 +60,6 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p test_windows_launcher.py
 
   verify:
-    needs: markdown-update
-    if: ${{ !cancelled() && needs.markdown-update.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,8 +86,6 @@ jobs:
       - run: node --test scripts/tests/test-flutter-release.cjs
 
   browser-persistence:
-    needs: markdown-update
-    if: ${{ !cancelled() && needs.markdown-update.outputs.skip != 'true' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false

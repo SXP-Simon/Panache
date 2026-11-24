@@ -1,41 +1,10 @@
 name: Flutter Mobile
-run-name: >-
-  ${{ github.event_name == 'pull_request' && format('PR #{0} · base {1}', github.event.pull_request.number, github.event.pull_request.base.sha) || github.workflow }}
 permissions:
   contents: read
 on:
-  pull_request:
-    paths:
-      - "VERSION"
-      - "app/**"
-      - "scripts/*release*.*"
-      - "scripts/tests/test-flutter-release.cjs"
-      - ".github/workflows/publish_flutter.yml"
-      - "vendor/**"
-      - "crates/**"
-      - "Cargo.*"
-      - "assets/pubspec.yaml"
-      - "LICENSE"
-      - "scripts/build-mobile-engine.py"
-      - ".github/scripts/markdown-update*.cjs"
-      - ".github/workflows/markdown-update.yml"
-      - ".github/workflows/flutter_mobile.yml"
-      - "!**/*.md"
-      - "assets/licenses/**"
-      - "assets/font_assets/**"
-      - "crates/*/licenses/**"
   workflow_dispatch:
 jobs:
-  markdown-update:
-    permissions:
-      actions: read
-      contents: read
-    uses: ./.github/workflows/markdown-update.yml
-    with:
-      workflow: flutter_mobile.yml
   android:
-    needs: markdown-update
-    if: ${{ !cancelled() && needs.markdown-update.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Free space for Android, Rust and emulator builds

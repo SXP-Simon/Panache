@@ -16,6 +16,10 @@ Use Conventional Commits with a scope matching the affected directory. The commi
 
 ## Checks / 验证
 
+PR checks are opt-in for all authors, including maintainers. To approve a check for a branch in this repository, open **Actions**, select the relevant workflow, click **Run workflow**, and select the PR’s head branch. Each run covers the revision selected at dispatch. For a fork, the contributor can run the same workflow manually in their fork.
+
+所有 PR（包括维护者自己的 PR）均按需手动验证。在 **Actions** 选中所需检查，点 **Run workflow** 并选择 PR 的源分支。分支有新提交时，由维护者决定是否再次运行。来自 fork 的贡献者也可在自己的仓库手动运行相同检查。
+
 Run the checks for the part you changed, starting from the repository root. 从仓库根目录运行与改动相关的检查。
 
 **Flutter**
