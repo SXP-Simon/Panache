@@ -116,7 +116,9 @@ impl Drafts {
         let more = entries.len() > limit as usize;
         entries.truncate(limit as usize);
         let next_offset = page.offset.checked_add(limit).filter(|_| more);
-        let mut result = json!({"draft_id":page.draft_id,"revision":page.revision,"events":entries,"next_offset":next_offset});
+        let mut result = json!({"draft_id":page.draft_id,"revision":page.revision,"events":entries,"next_offset":next_offset,
+            "event_order":"reviewed_or_edited_revision_desc",
+            "order_note":"检查单和评语按受检稿件版本排列。要判断何时开单，请按 review_id 查原单的 filed_at_revision；旧单可能缺少这项记录。"});
         if let Some(offset) = next_offset {
             page.offset = offset;
             result["next_cursor"] = json!(URL_SAFE_NO_PAD.encode(serde_json::to_vec(&page)?));

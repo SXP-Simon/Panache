@@ -430,6 +430,10 @@ async def smoke(command, arguments, out):
             prior = await call(client, "read_section", draft_id=doc, view="review",
                                section=1, page="last", before_text="数学作业")
             assert prior.structuredContent["revision"] == 1 and prior.structuredContent["review_id"]
+            wrong_section = await client.call_tool("read_section", {
+                "draft_id": doc, "view": "review", "section": 2, "page": "last", "before_text": "数学作业",
+            })
+            assert wrong_section.isError and "section=1" in wrong_section.content[0].text
             by_page = await call(client, "read_section", **receipt_args, revision=1)
             assert by_page.structuredContent["review_id"] == prior.structuredContent["review_id"]
             assert "事后补验" in by_page.content[0].text
@@ -488,7 +492,9 @@ async def smoke(command, arguments, out):
             assert retrieved["filed_at_revision"] == 3 and "仍为第 3 版" in summary
             older = await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)
             assert json.loads(older.content[0].text) == retrieved == older.structuredContent
-            assert "revision=6, section=1, page=1" in older.content[1].text
+            assert older.content[1].text == summary and len(older.content) == 2
+            explicit = await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id, revision=6)
+            assert "revision=6, section=1, page=1" in explicit.content[2].text
             assert f"检查单号 {reviewed_id}" in receipt.content[0].text
             for args in (dict(**lookup, revision=3, section=2), dict(**gkey, view="review", page=1, revision=1)):
                 missing = (await call(client, "read_section", **args)).structuredContent

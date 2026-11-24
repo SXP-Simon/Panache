@@ -67,23 +67,15 @@ fn reply(message: String, metadata: serde_json::Value) -> CallToolResult {
     result
 }
 
-fn page_receipt(
-    draft: &drafts::Snapshot<'_>,
-    section: u32,
-    page: u32,
-    anchor: Option<(u32, u32)>,
-) -> Result<CallToolResult> {
-    let mut record = draft.page_observation(section, page)?;
-    record["latest_draft_revision"] = json!(draft.latest_revision);
-    if let Some((anchor_section, added_revision)) = anchor {
-        record["before_text_match"] =
-            json!({"section": anchor_section, "introduced_revision": added_revision});
-    }
-    let position = format!("第 {} 版 · 第 {section} 节第 {page} 页", draft.revision);
+fn add_receipt_summary(record: &mut serde_json::Value) -> String {
+    let position = format!(
+        "第 {} 版 · 第 {} 节第 {} 页",
+        record["revision"], record["section"], record["page"]
+    );
     let conclusion = match record["review_id"].as_str() {
         None => format!("{position}没有已存的整页检查单。是否曾在纸上看过，档案无法判断。"),
         Some(id) => match record["filed_at_revision"].as_u64() {
-            Some(filed) if filed == u64::from(draft.revision) => {
+            Some(filed) if Some(filed) == record["revision"].as_u64() => {
                 format!(
                     "{position}已存整页检查单，检查单号 {id}。首次入档时稿件仍为第 {filed} 版。"
                 )
@@ -97,6 +89,22 @@ fn page_receipt(
         },
     };
     record["receipt_summary"] = json!(conclusion);
+    conclusion
+}
+
+fn page_receipt(
+    draft: &drafts::Snapshot<'_>,
+    section: u32,
+    page: u32,
+    anchor: Option<(u32, u32)>,
+) -> Result<CallToolResult> {
+    let mut record = draft.page_observation(section, page)?;
+    record["latest_draft_revision"] = json!(draft.latest_revision);
+    if let Some((anchor_section, added_revision)) = anchor {
+        record["before_text_match"] =
+            json!({"section": anchor_section, "introduced_revision": added_revision});
+    }
+    let conclusion = add_receipt_summary(&mut record);
     let text = format!(
         "{conclusion}\n当前稿件第 {} 版。\n{record}",
         draft.latest_revision
@@ -161,20 +169,23 @@ impl Panache {
             "Supply page with section or before_text, or review_id alone"
         );
         let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
-        let data = draft.observation(
+        let mut data = draft.observation(
             input
                 .review_id
                 .as_deref()
                 .context("Supply review_id or page")?,
         )?;
+        let summary = add_receipt_summary(&mut data);
         let mut content_note = None;
-        if data["revision"].as_u64() != Some(u64::from(draft.revision)) {
+        if input.revision.is_some() && data["revision"].as_u64() != Some(u64::from(draft.revision))
+        {
             content_note = Some(ContentBlock::text(format!(
                 "此单属于第 {} 版。若要确认所查第 {} 版是否留有整页检查单，请用 read_section(view=review, revision={}, section={}, page={}) 查该版。",
                 data["revision"], draft.revision, draft.revision, data["section"], data["page"]
             )));
         }
         let mut result = reply(data.to_string(), data);
+        result.content.push(ContentBlock::text(summary));
         result.content.extend(content_note);
         Ok(result)
     }

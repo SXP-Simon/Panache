@@ -59,6 +59,19 @@ impl Snapshot<'_> {
     pub fn review_section(&self, requested: Option<u32>) -> Result<u32> {
         if let Some(section) = requested {
             ensure!(section > 0, "section starts at 1");
+            let exists: bool = self.drafts.connect()?.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sections WHERE draft=? AND number=? AND revision<=?)",
+                params![self.id, section, self.revision],
+                |row| row.get(0),
+            )?;
+            ensure!(
+                exists,
+                "第 {} 版还没有第 {section} 节。请保留所查版本和页码，按待查正文选择已有的节：{}",
+                self.revision,
+                self.drafts
+                    .review_section_choices(self.id, self.revision)?
+                    .join(" · ")
+            );
             return Ok(section);
         }
         let choices = self.drafts.review_section_choices(self.id, self.revision)?;
