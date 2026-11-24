@@ -112,6 +112,9 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
+    /// Set to true only when the user wants to preserve manual glyph adjustments. Reject reflow that would stop applying them. Ink and camera changes can still be saved.
+    #[serde(default)]
+    pub preserve_local_adjustments: bool,
     /// Replace the writing area on the saved paper, using 2..32 photo-space baselines. Pass [] to restore the original import calibration. Existing text is reflowed. Use the top and bottom writable lines even on unruled paper.
     pub paper_guides: Option<Vec<Guide>>,
     /// Import an absolute local TTF/OTF file into this draft. Its bytes are retained across restarts.

@@ -118,6 +118,8 @@ cargo build --locked --release -p panache-mcp
 
 如果字像贴在照片上，在照片整页复查的 `photo_appearance` 中取 `preview_arguments` 再调用一次 `preview_handwriting`。有页内文字基线样本时，这组参数会给出该版本一处字迹附近的原像素底纸和成品裁图；也可以自己圈选。对照邻近印字或横线的边缘清晰度、墨色深浅，再看字号与可写空间是否相称。用 `describe_controls` 指定稿件、版本和 `ink`、`layout` 或 `typography` 参数组可查当前值。正文的柔化和粗细以投影前纸面像素为单位，透明度用百分比。仅修改墨迹组参数时会保留已完成的单字移位和透视调整；更换字体、字号或参考线后应在新版本重新检查选区。改一版后，对同一选区加入 `compare_revision` 比较。只有文字结果的客户端可转述测量，请用户看图判断观感。
 
+需要保留手动移字时，在 `tune_handwriting` 顶层传入 `preserve_local_adjustments=true`。例如，稿件中仍有字形调整时，更改 `variation.perturb_theta_sigma` 会返回一个受影响的节号，稿件停留在原版本。只更改墨迹或相机元数据仍可保存。被拒绝后应保持 `true`。只有用户明确同意新布局不再应用这些手动调整时，才可传 `false`；旧版仍可回看。
+
 `tune_handwriting(font_path=…)` 会把本机 TTF/OTF 随稿保存。可用返回的字体标识在同一稿内切回该字体。墨迹组的 `transparent_background` 控制原尺寸 PNG 预览和 ZIP，PDF 保留纸张。透明稿复盘会把墨迹放回底纸，方便判断实际可读性。
 
 ### 比较两版，找回当时的依据
