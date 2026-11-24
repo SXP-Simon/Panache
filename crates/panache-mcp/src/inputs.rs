@@ -162,7 +162,7 @@ pub struct Read {
     /// page, or "last" to paginate the selected section at the same revision. Omit review_id.
     pub page: Option<ReviewPage>,
     /// For a page review just before an addition: an exact, distinctive fragment of the added Markdown.
-    /// Uses the revision before its first occurrence; must match only one section. Omit revision.
+    /// Uses the revision immediately before its unique introduction; repeated introductions are ambiguous. Omit revision.
     pub before_text: Option<String>,
     /// With view=review, retrieve one immutable measurement and its attributed feedback by ID instead of page.
     pub review_id: Option<String>,

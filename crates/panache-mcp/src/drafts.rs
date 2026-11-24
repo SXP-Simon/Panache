@@ -309,7 +309,7 @@ impl Drafts {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(json!({"drafts":entries,"offset":offset}))
     }
-    /// The first saved source containing a literal, provided it identifies a single section.
+    /// Find a single transition from absent to present across all versions of all sections.
     pub fn text_introduction(&self, id: &str, text: &str) -> Result<(u32, u32)> {
         ensure!(
             !text.trim().is_empty() && text.chars().count() <= 160,
@@ -317,8 +317,15 @@ impl Drafts {
         );
         let db = self.connect()?;
         let mut statement = db.prepare(
-            "SELECT number, min(revision) FROM sections
-             WHERE draft=? AND instr(source,?)>0 GROUP BY number LIMIT 2",
+            "WITH versions AS (
+                 SELECT number,revision,instr(source,?2)>0 AS present
+                 FROM sections WHERE draft=?1
+             ), changes AS (
+                 SELECT number,revision,present,
+                        lag(present,1,0) OVER (PARTITION BY number ORDER BY revision) AS previously_present
+                 FROM versions
+             )
+             SELECT number,revision FROM changes WHERE present AND NOT previously_present LIMIT 2",
         )?;
         let mut rows = statement.query(params![id, text])?;
         let first = rows.next()?.context(
@@ -328,7 +335,7 @@ impl Drafts {
         let revision = first.get(1)?;
         ensure!(
             rows.next()?.is_none(),
-            "before_text matches several sections. Use a more specific fragment or specify a revision."
+            "before_text was introduced more than once (possibly in different sections). Use a more specific fragment or specify a revision."
         );
         ensure!(
             revision > 1,

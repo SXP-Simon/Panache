@@ -198,8 +198,17 @@ async def historical_last_page(client, directory, call, path, guides):
     for override in ({"before_text": "初次测量"}, {"before_text": "缺少的段落"},
                      {"before_text": ""}, {"revision": 1}, {"section": 2}, {"page": "latest"}):
         assert (await client.call_tool("read_section", {**anchored, **override})).isError
-    await call(client, "save_section", **key, expected_revision=2, markdown="复测补录也写在此节。")
-    assert (await client.call_tool("read_section", anchored)).isError
+    # Retaining the fragment across edits is still the same introduction.
+    await call(client, "save_section", **key, expected_revision=2, section=1, markdown="复测补录：两行。")
+    numeric = {**anchored, "page": last}
+    assert (await call(client, "read_section", **numeric)).structuredContent["review_id"] == old["review_id"]
+    await call(client, "save_section", **key, expected_revision=3, section=1, markdown="新题目。")
+    await call(client, "save_section", **key, expected_revision=4, section=1, markdown="复测补录：新题目。")
+    assert (await client.call_tool("read_section", numeric)).isError
+    await call(client, "save_section", **key, expected_revision=5, markdown="另一节也写了新题目。")
+    assert (await client.call_tool("read_section", {**numeric, "before_text": "新题目"})).isError
+    explicit = {**select, "revision": 1, "page": last}
+    assert (await call(client, "read_section", **explicit)).structuredContent["review_id"] == old["review_id"]
 
 
 async def exercise(client, directory, call):
