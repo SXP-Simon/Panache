@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod list_tests;
 mod observations;
 mod trajectory;
 use anyhow::{Context, Result, ensure};
@@ -347,20 +349,46 @@ impl Drafts {
         }
         Ok(saved)
     }
-    pub fn list(&self, offset: u32) -> Result<Value> {
-        let db = self.connect()?;
-        let mut stmt = db.prepare(
-            "SELECT id,title,revision,sections FROM drafts ORDER BY rowid DESC LIMIT 20 OFFSET ?1",
-        )?;
-        let entries = stmt
-            .query_map([offset], |r| {
+    pub fn list(&self, input: &crate::List) -> Result<Value> {
+        ensure!(
+            input.offset.is_none() || input.before_draft_id.is_none(),
+            "Omit offset when using before_draft_id"
+        );
+        let offset = input.offset.unwrap_or(0);
+        let mut db = self.connect()?;
+        // Resolve the anchor and read its older neighbors from the same SQLite snapshot.
+        let tx = db.transaction()?;
+        let (query, value) = if let Some(id) = input.before_draft_id.as_deref() {
+            let rowid: i64 = tx
+                .query_row("SELECT rowid FROM drafts WHERE id=?1", [id], |r| r.get(0))
+                .optional()?
+                .context("Unknown before_draft_id")?;
+            (
+                "SELECT id,title,revision,sections FROM drafts WHERE rowid < ?1 ORDER BY rowid DESC LIMIT 21",
+                rowid,
+            )
+        } else {
+            (
+                "SELECT id,title,revision,sections FROM drafts ORDER BY rowid DESC LIMIT 21 OFFSET ?1",
+                i64::from(offset),
+            )
+        };
+        let mut stmt = tx.prepare(query)?;
+        let mut entries = stmt
+            .query_map([value], |r| {
                 Ok(json!({
                     "draft_id":r.get::<_,String>(0)?, "title":r.get::<_,String>(1)?,
                     "revision":r.get::<_,u32>(2)?, "sections":r.get::<_,u32>(3)?
                 }))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        Ok(json!({"drafts":entries,"offset":offset}))
+        let mut result = json!({"offset":offset});
+        if entries.len() > 20 {
+            entries.truncate(20);
+            result["next_before_draft_id"] = entries[19]["draft_id"].clone();
+        }
+        result["drafts"] = entries.into();
+        Ok(result)
     }
     // Bound the source prefix in SQLite, including when a section starts with an inline photo.
     fn review_section_choices(&self, id: &str, revision: u32) -> Result<Vec<String>> {
