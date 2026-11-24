@@ -118,16 +118,20 @@ impl Panache {
                 .map(|t| self.0.drafts.text_introduction(&input.draft_id, t))
                 .transpose()?;
             let revision = anchor.map(|(_, added)| added - 1).or(input.revision);
-            let section = input.section.unwrap_or(1);
-            ensure!(section > 0, "section starts at 1");
             return match page {
                 ReviewPage::Number(n) => {
                     let draft = self.0.drafts.snapshot(&input.draft_id, revision)?;
+                    let section = if anchor.is_some() {
+                        draft.review_section(input.section)?
+                    } else {
+                        input.section.unwrap_or(1)
+                    };
                     page_receipt(&draft, section, n, anchor)
                 }
                 ReviewPage::Last(_) => {
                     self.render(ctx, move |state, engine, cancel| {
                         let draft = state.drafts.snapshot(&input.draft_id, revision)?;
+                        let section = draft.review_section(input.section)?;
                         let source = state
                             .drafts
                             .sections(draft.id, draft.revision, Some(section))?

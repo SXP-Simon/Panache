@@ -159,7 +159,8 @@ pub enum LastPage {
 #[serde(deny_unknown_fields)]
 pub struct Read {
     /// With view=review, retrieve the most recently recorded full-page measurement at this one-based
-    /// page, or "last" to paginate the selected section at the same revision. Omit review_id.
+    /// page, or "last" to paginate the selected section at the same revision. With "last" or before_text,
+    /// specify the section containing the requested body in a multi-section draft. Omit review_id.
     pub page: Option<ReviewPage>,
     /// For a page review just before an addition: an exact, distinctive fragment of the added Markdown.
     /// Uses the revision immediately before its unique introduction; repeated introductions are ambiguous. Omit revision.

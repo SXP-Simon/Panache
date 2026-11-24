@@ -209,6 +209,7 @@ async def historical_last_page(client, directory, call, path, guides):
     options = ambiguous.content[0].text
     assert options.index("revision=1") < options.index("revision=4")
     assert "未确认时不要代选" in options and old["review_id"] not in options
+    assert "section=1" in options and "第 1 节加入" not in options
     await call(client, "save_section", **key, expected_revision=5, markdown="另一节也写了新题目和初次测量。")
     assert (await client.call_tool("read_section", {**numeric, "before_text": "新题目"})).isError
     await call(client, "save_section", **key, expected_revision=6, markdown="第三节：初次测量。")
@@ -217,6 +218,22 @@ async def historical_last_page(client, directory, call, path, guides):
     options = several.content[0].text
     assert "之前没有稿件" in options and "revision=5" in options
     assert "只列最早两次" in options and "revision=6" not in options
+    # A last-page or relative lookup must not silently use section one in a multi-section draft.
+    for args in ({**key, "view": "review", "page": "last", "revision": 6},
+                 {**key, "view": "review", "page": 1, "before_text": "第三节："}):
+        missing_section = await client.call_tool("read_section", args)
+        assert missing_section.isError and "section=2" in missing_section.content[0].text
+    image = base64.b64encode(path.read_bytes()).decode("ascii")
+    await call(client, "save_section", **key, expected_revision=7, markdown=f"![图](data:image/png;base64,{image})")
+    await call(client, "save_section", **key, expected_revision=8, markdown="第 5 节正文")
+    listing = await client.call_tool("read_section", {**key, "view": "review", "page": "last"})
+    assert listing.isError
+    text = listing.content[0].text
+    assert "section=4" in text and "其余节" in text and "section=5" not in text
+    assert "base64" not in text and image[:16] not in text
+    # An ordinary numbered page keeps the established first-section default.
+    direct = await call(client, "read_section", **key, view="review", revision=6, page=1)
+    assert direct.structuredContent["section"] == 1
     explicit = {**select, "revision": 1, "page": last}
     assert (await call(client, "read_section", **explicit)).structuredContent["review_id"] == old["review_id"]
 

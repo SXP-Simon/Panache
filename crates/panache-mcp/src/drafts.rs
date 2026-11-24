@@ -56,6 +56,21 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
+    pub fn review_section(&self, requested: Option<u32>) -> Result<u32> {
+        if let Some(section) = requested {
+            ensure!(section > 0, "section starts at 1");
+            return Ok(section);
+        }
+        let choices = self.drafts.review_section_choices(self.id, self.revision)?;
+        ensure!(
+            choices.len() == 1,
+            "请按待查的正文选择 section。第 {} 版可查的节：{}",
+            self.revision,
+            choices.join(" · ")
+        );
+        Ok(1)
+    }
+
     pub fn has_font(&self, handle: &str) -> Result<bool> {
         Ok(self.drafts.connect()?.query_row(
             "SELECT EXISTS(SELECT 1 FROM draft_fonts WHERE draft=? AND handle=?)",
@@ -309,6 +324,39 @@ impl Drafts {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(json!({"drafts":entries,"offset":offset}))
     }
+    // Bound the source prefix in SQLite, including when a section starts with an inline photo.
+    fn review_section_choices(&self, id: &str, revision: u32) -> Result<Vec<String>> {
+        let db = self.connect()?;
+        let mut stmt = db.prepare(
+            "SELECT number, substr(source,1,48) FROM sections JOIN (
+                SELECT number, max(revision) AS revision FROM sections
+                WHERE draft=?1 AND revision<=?2 GROUP BY number ORDER BY number LIMIT 5
+             ) USING(number,revision) WHERE draft=?1 ORDER BY number",
+        )?;
+        let mut choices = Vec::new();
+        let mut rows = stmt.query(params![id, revision])?;
+        while let Some(row) = rows.next()? {
+            if choices.len() == 4 {
+                choices.push("其余节可用 view=excerpt 查阅".to_owned());
+                break;
+            }
+            let number: u32 = row.get(0)?;
+            let prefix: String = row.get(1)?;
+            let before_image = prefix
+                .find("![")
+                .into_iter()
+                .chain(prefix.find("data:"))
+                .min()
+                .unwrap_or(prefix.len());
+            let text = prefix[..before_image]
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            choices.push(format!("section={number} {}", json!(text)));
+        }
+        Ok(choices)
+    }
+
     /// Find a single transition from absent to present across all versions of all sections.
     pub fn text_introduction(&self, id: &str, text: &str) -> Result<(u32, u32)> {
         ensure!(
@@ -340,15 +388,23 @@ impl Drafts {
             let mut message = String::from(
                 "这段原文有多个加入时点。请让用户确认是首次加入之前，还是后来再次加入之前；也可分别核对并逐版列出，未确认时不要代选。",
             );
+            let same_section = matches[0].0 == matches[1].0;
             for (number, added) in matches.iter().take(2) {
-                let choice = if *added == 1 {
-                    "这是初稿，之前没有稿件。".to_owned()
+                if same_section {
+                    message.push_str(&format!("\n第 {added} 版加入了这段原文。"));
                 } else {
-                    format!("要查加入前的稿件，传 revision={}。", added - 1)
-                };
-                message.push_str(&format!(
-                    "\n第 {added} 版第 {number} 节加入了这段原文。{choice}"
-                ));
+                    message.push_str(&format!("\n第 {added} 版在第 {number} 节加入了这段原文。"));
+                }
+                if *added == 1 {
+                    message.push_str("这是初稿，之前没有稿件。");
+                } else {
+                    let before = added - 1;
+                    let choices = self.review_section_choices(id, before)?;
+                    message.push_str(&format!(
+                        "加入前查 revision={before}；该版可查的正文：{}",
+                        choices.join(" · ")
+                    ));
+                }
             }
             if matches.len() > 2 {
                 message.push_str(
@@ -356,7 +412,7 @@ impl Drafts {
                 );
             }
             anyhow::bail!(
-                "{message}\n按明确版本查单时移除 before_text，保留原来待查的 section 和 page。"
+                "{message}\n所补文字只用来认版本。请按用户要查的正文选择 section，保留 page，移除 before_text 后按明确版本查单。"
             );
         }
         ensure!(
