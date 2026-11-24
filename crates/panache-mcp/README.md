@@ -72,6 +72,8 @@ cargo build --locked --release -p panache-mcp
 
 面向 AI 客户端的调用示例、披露边界和测量口径见[工具设计](tool-design.md)。
 
+查某版、某节、某一页当时留下的整页复盘，可用 `read_section(view="review", revision=3, section=2, page=1, draft_id=…)`。返回最近记录在这个位置的测量值、原检查单编号及注明来源的评语。该位置没有记录时返回 `status="no_recorded_review"`；这项查询不会生成页面，也不判断该页是否实际存在。已知检查单编号时仍可按 `review_id` 精确读取。
+
 长作业可以按题组或章节分次传入，每节从新页开始。需要连续排版的段落放在同一节，公式、表格、代码块也应完整放在一节内。追加时带上 `draft_id` 和上次返回的 `expected_revision`；修改已有节时再给出 `section`。另一位客户端抢先保存后，用 `read_section` 复核最新内容再提交。
 
 每次保存只转换这一节，Markdown 原文和整理结果存入本地 SQLite。预览某节第 N 页时，引擎从该节开头排到第 N 页，只编码选中的一页。进程内保留最近生成的四张预览，修改其他节仍可复用。预览和导出传相同的 `revision` 可锁定稿件。种子和样式随稿保存，复现时需使用相同字体和引擎。

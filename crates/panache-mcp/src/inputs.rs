@@ -145,7 +145,10 @@ pub enum ReadView {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Read {
-    /// With view=review, retrieve one immutable measurement and its attributed feedback.
+    /// With view=review, retrieve the most recently recorded full-page measurement at this one-based
+    /// page in the selected section (default 1) and exact revision (default latest). Omit review_id.
+    pub page: Option<u32>,
+    /// With view=review, retrieve one immutable measurement and its attributed feedback by ID instead of page.
     pub review_id: Option<String>,
     /// With trajectory, pass next_cursor to continue the same snapshot, including its filters. Omit offset.
     pub cursor: Option<String>,

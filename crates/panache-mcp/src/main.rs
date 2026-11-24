@@ -66,6 +66,48 @@ fn reply(message: String, metadata: serde_json::Value) -> CallToolResult {
     result
 }
 
+fn read_review(draft: &drafts::Snapshot<'_>, input: &Read) -> Result<CallToolResult> {
+    ensure!(
+        input.offset.is_none() && input.limit.is_none(),
+        "view=review does not use offset or limit"
+    );
+    if let Some(page) = input.page {
+        ensure!(input.review_id.is_none(), "Use page or review_id, not both");
+        let section = input.section.unwrap_or(1);
+        let mut record = draft.page_observation(section, page)?;
+        record["latest_draft_revision"] = json!(draft.latest_revision);
+        let receipt = match record["review_id"].as_str() {
+            Some(id) => format!("已存整页检查单 · 检查单号 {id}"),
+            None => "此版此页没有已存的整页检查单。其他版本的单据只证明当时的版本。".to_owned(),
+        };
+        let text = format!(
+            "第 {} 版 · 第 {section} 节第 {page} 页（当前稿件第 {} 版）\n{receipt}\n{}",
+            draft.revision, draft.latest_revision, record
+        );
+        return Ok(reply(text, record));
+    }
+    ensure!(
+        input.section.is_none(),
+        "Supply page with section, or review_id alone"
+    );
+    let data = draft.observation(
+        input
+            .review_id
+            .as_deref()
+            .context("Supply review_id or page")?,
+    )?;
+    let mut content_note = None;
+    if data["revision"].as_u64() != Some(u64::from(draft.revision)) {
+        content_note = Some(ContentBlock::text(format!(
+            "此单属于第 {} 版。若要确认所查第 {} 版是否留有整页检查单，请用 read_section(view=review, revision={}, section={}, page={}) 查该版。",
+            data["revision"], draft.revision, draft.revision, data["section"], data["page"]
+        )));
+    }
+    let mut result = reply(data.to_string(), data);
+    result.content.extend(content_note);
+    Ok(result)
+}
+
 fn tool_result(out: Result<CallToolResult>) -> CallToolResult {
     out.unwrap_or_else(|error| {
         CallToolResult::error(vec![ContentBlock::text(format!("{error:#}"))])
@@ -134,7 +176,7 @@ impl ServerHandler for Panache {
                 "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
                 "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
                 "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-                "For photos use preview_handwriting(view=review). Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+                "To check what was already recorded, use read_section(view=review, section, page) at the requested revision (omit revision for current). Use preview_handwriting(view=review) for a new photo inspection; it records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
                 "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
                 "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
                 "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
@@ -286,13 +328,17 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read view=trajectory for draft history, highest associated revision first. Filter by feedback_origin=user_quote and optionally section for verbatim quotes in events[].details.text with their revision and review_id. Use view=review with review_id for full measurements or other feedback on that review. Text views: summary, excerpt (default, image data omitted), or exact source."
+        description = "For a prior check of a particular sheet, start with view=review, section and page. Omit revision for the current draft, or specify the exact historical revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without rendering. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
     )]
     fn read_section(&self, Parameters(input): Parameters<Read>) -> CallToolResult {
         tool_result((|| {
             ensure!(
                 input.feedback_origin.is_none() || input.view == Some(ReadView::Trajectory),
                 "feedback_origin requires view=trajectory"
+            );
+            ensure!(
+                input.page.is_none() || input.view == Some(ReadView::Review),
+                "page requires view=review"
             );
             if input.view == Some(ReadView::Trajectory) {
                 ensure!(input.review_id.is_none(), "review_id requires view=review");
@@ -302,13 +348,7 @@ impl Panache {
             ensure!(input.cursor.is_none(), "cursor requires view=trajectory");
             let draft = self.0.drafts.snapshot(&input.draft_id, input.revision)?;
             if input.view == Some(ReadView::Review) {
-                ensure!(
-                    input.section.is_none() && input.offset.is_none() && input.limit.is_none(),
-                    "Exact review lookup uses draft_id and review_id"
-                );
-                let data =
-                    draft.observation(input.review_id.as_deref().context("Provide review_id")?)?;
-                return Ok(reply(data.to_string(), data));
+                return read_review(&draft, &input);
             }
             ensure!(input.review_id.is_none(), "review_id requires view=review");
             let mut result = self.0.drafts.review(
@@ -344,7 +384,7 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
+        description = "A full-page view=review renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,

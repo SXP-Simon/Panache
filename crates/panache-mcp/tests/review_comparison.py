@@ -278,6 +278,14 @@ async def exercise(client, directory, call):
         and bottom["limitation"] == "insufficient_ridge_support"
     )
     await tune(4, changes={"ink_opacity": 0})
+    inventory = assets()
+    for _ in range(2):
+        empty = await call(client, "read_section", **key, view="review", section=1, page=1)
+        assert empty.structuredContent["status"] == "no_recorded_review"
+        assert empty.structuredContent["revision"] == empty.structuredContent["latest_draft_revision"] == 5
+        assert empty.structuredContent["review_id"] is None
+        assert all(block.type == "text" for block in empty.content)
+    assert assets() == inventory
     assert "missing_after_review" in (await compare(4, 5))["comparison"]["limitations"]
     assert "photo_appearance" in await review(5)
     invisible = (await compare(4, 5))["comparison"]["delta"]

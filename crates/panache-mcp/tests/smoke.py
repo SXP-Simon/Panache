@@ -404,6 +404,20 @@ async def smoke(command, arguments, out):
             retrieved = (await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)).structuredContent
             assert retrieved["revision"] == 3 and retrieved["section"] == retrieved["page"] == 1
             assert retrieved["feedback"] == [{"origin":"user_quote","text":user_quote}]
+            lookup = dict(**comparison_key, view="review", page=1)
+            receipt = await call(client, "read_section", **lookup, revision=3)
+            assert receipt.structuredContent == {**retrieved, "latest_draft_revision": 6}
+            older = await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)
+            assert json.loads(older.content[0].text) == retrieved == older.structuredContent
+            assert "revision=6, section=1, page=1" in older.content[1].text
+            assert f"检查单号 {reviewed_id}" in receipt.content[0].text
+            for args in (dict(**lookup, revision=3, section=2), dict(**gkey, view="review", page=1, revision=1)):
+                missing = (await call(client, "read_section", **args)).structuredContent
+                assert missing["status"] == "no_recorded_review" and missing["review_id"] is None
+                assert missing["draft_id"] == args["draft_id"] and missing["revision"] == args["revision"]
+            for args in ({**lookup, "review_id": reviewed_id}, {**lookup, "view": "trajectory"},
+                         {**lookup, "page": 0}, {**lookup, "section": 0}, {**lookup, "limit": 1}):
+                assert (await client.call_tool("read_section", args)).isError
             assert (await call(client,"read_section",**comparison_key,view="summary")).structuredContent["revision"] == 6
             events = (await call(client,"read_section",**comparison_key,view="trajectory",limit=50)).structuredContent["events"]
             assert {e["origin"] for e in events} >= {"draft_edit","measurement","user_quote","model_observation"}

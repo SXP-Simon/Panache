@@ -44,6 +44,7 @@ fn concurrent_first_opens_share_a_complete_schema() -> Result<()> {
 }
 
 pub struct Snapshot<'a> {
+    pub latest_revision: u32,
     pub revision: u32,
     pub style: Style,
     pub controls: crate::controls::Changes,
@@ -339,6 +340,7 @@ impl Drafts {
             "SELECT layout FROM paper_layouts WHERE draft=? AND revision<=? ORDER BY revision DESC LIMIT 1",
             params![id,revision], |r| r.get(0)).optional()?;
         Ok(Snapshot {
+            latest_revision: latest,
             controls,
             settings_revision,
             layout_revision,
