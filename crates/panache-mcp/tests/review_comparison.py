@@ -166,10 +166,83 @@ async def check_filtered_history(client, call, draft_id):
         assert (await client.call_tool("read_section", {**key, **invalid})).isError
 
 
+async def historical_last_page(client, directory, call, path, guides):
+    saved = await call(client, "save_section", paper_path=str(path), paper_guides=guides,
+                       markdown="\n\n".join(f"初次测量第{i}行。" for i in range(20)))
+    key = {"draft_id": saved.structuredContent["draft_id"]}
+    exported = await call(client, "export_handwriting", **key, revision=1, format="zip")
+    last = exported.structuredContent["pages"]
+    assert last > 1
+    await call(client, "preview_handwriting", **key, revision=1, view="review", page=1)
+    await call(client, "save_section", **key, expected_revision=1, section=1,
+               markdown="复测补录：一行。")
+    current = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
+    select = {**key, "view": "review", "section": 1, "page": "last"}
+    assert (await call(client, "read_section", **select)).structuredContent["review_id"] == current["review_id"]
+    anchored = {**select, "before_text": "复测补录"}
+    with closing(sqlite3.connect(directory / "drafts.sqlite3")) as db:
+        sql = "SELECT seq,review_id FROM review_observations WHERE draft=? ORDER BY seq"
+        records = db.execute(sql, (key["draft_id"],)).fetchall()
+        for _ in range(2):
+            receipt = await call(client, "read_section", **anchored)
+            data = receipt.structuredContent
+            assert (data["revision"], data["section"], data["page"]) == (1, 1, last)
+            assert data["before_text_match"] == {"introduced_revision": 2, "section": 1}
+            assert data["review_id"] is None and data["status"] == "no_recorded_review"
+            assert all(part.type == "text" for part in receipt.content)
+        assert db.execute(sql, (key["draft_id"],)).fetchall() == records
+    old = (await call(client, "preview_handwriting", **key, revision=1, view="review", page=last)).structuredContent
+    receipt = await call(client, "read_section", **anchored)
+    assert receipt.structuredContent["review_id"] == old["review_id"]
+    assert "事后补验" in receipt.content[0].text
+    for override in ({"before_text": "初次测量"}, {"before_text": "缺少的段落"},
+                     {"before_text": ""}, {"revision": 1}, {"section": 2}, {"page": "latest"}):
+        assert (await client.call_tool("read_section", {**anchored, **override})).isError
+    # Retaining the fragment across edits is still the same introduction.
+    await call(client, "save_section", **key, expected_revision=2, section=1, markdown="复测补录：两行。")
+    numeric = {**anchored, "page": last}
+    assert (await call(client, "read_section", **numeric)).structuredContent["review_id"] == old["review_id"]
+    await call(client, "save_section", **key, expected_revision=3, section=1, markdown="新题目。")
+    await call(client, "save_section", **key, expected_revision=4, section=1, markdown="复测补录：新题目。")
+    ambiguous = await client.call_tool("read_section", numeric)
+    assert ambiguous.isError
+    options = ambiguous.content[0].text
+    assert options.index("revision=1") < options.index("revision=4")
+    assert "未确认时不要代选" in options and old["review_id"] not in options
+    assert "section=1" in options and "第 1 节加入" not in options
+    await call(client, "save_section", **key, expected_revision=5, markdown="另一节也写了新题目和初次测量。")
+    assert (await client.call_tool("read_section", {**numeric, "before_text": "新题目"})).isError
+    await call(client, "save_section", **key, expected_revision=6, markdown="第三节：初次测量。")
+    several = await client.call_tool("read_section", {**numeric, "before_text": "初次测量"})
+    assert several.isError
+    options = several.content[0].text
+    assert "之前没有稿件" in options and "revision=5" in options
+    assert "只列最早两次" in options and "revision=6" not in options
+    # A last-page or relative lookup must not silently use section one in a multi-section draft.
+    for args in ({**key, "view": "review", "page": "last", "revision": 6},
+                 {**key, "view": "review", "page": 1, "before_text": "第三节："}):
+        missing_section = await client.call_tool("read_section", args)
+        assert missing_section.isError and "section=2" in missing_section.content[0].text
+    image = base64.b64encode(path.read_bytes()).decode("ascii")
+    await call(client, "save_section", **key, expected_revision=7, markdown=f"![图](data:image/png;base64,{image})")
+    await call(client, "save_section", **key, expected_revision=8, markdown="第 5 节正文")
+    listing = await client.call_tool("read_section", {**key, "view": "review", "page": "last"})
+    assert listing.isError
+    text = listing.content[0].text
+    assert "section=4" in text and "其余节" in text and "section=5" not in text
+    assert "base64" not in text and image[:16] not in text
+    # An ordinary numbered page keeps the established first-section default.
+    direct = await call(client, "read_section", **key, view="review", revision=6, page=1)
+    assert direct.structuredContent["section"] == 1
+    explicit = {**select, "revision": 1, "page": last}
+    assert (await call(client, "read_section", **explicit)).structuredContent["review_id"] == old["review_id"]
+
+
 async def exercise(client, directory, call):
     await unruled_artwork(client, directory, call)
     path = directory / "slanted.png"
     guides = slanted_sheet(path)
+    await historical_last_page(client, directory, call, path, guides)
     shifted = [
         {
             **g,
@@ -278,6 +351,14 @@ async def exercise(client, directory, call):
         and bottom["limitation"] == "insufficient_ridge_support"
     )
     await tune(4, changes={"ink_opacity": 0})
+    inventory = assets()
+    for _ in range(2):
+        empty = await call(client, "read_section", **key, view="review", section=1, page=1)
+        assert empty.structuredContent["status"] == "no_recorded_review"
+        assert empty.structuredContent["revision"] == empty.structuredContent["latest_draft_revision"] == 5
+        assert empty.structuredContent["review_id"] is None
+        assert all(block.type == "text" for block in empty.content)
+    assert assets() == inventory
     assert "missing_after_review" in (await compare(4, 5))["comparison"]["limitations"]
     assert "photo_appearance" in await review(5)
     invisible = (await compare(4, 5))["comparison"]["delta"]

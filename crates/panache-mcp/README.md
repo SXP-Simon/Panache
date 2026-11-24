@@ -57,7 +57,7 @@ cargo build --locked --release -p panache-mcp
 | `list_drafts` | 找回本地稿件和最新版本。每批 20 条，可传 `offset`。 |
 | `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |
 | `preview_handwriting` | 默认返回首页 PNG。用 `section`、`page` 查看指定节中的一页，两者从 1 开始。 |
-| `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。 |
+| `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。导出结果的 `review.unreviewed_pages` 按打印顺序列出缺少整页复盘的 `section`、`page`。将这些坐标与导出的版本号传给 `preview_handwriting(view="review")` 可逐张补看。 |
 | `describe_controls` | 先列参数组，再按 `group` 查看单位、范围和枚举值。附上 `draft_id` 和 `revision` 可读取该版的实际值。 |
 | `tune_handwriting` | 可在原稿上更新参考线、导入本机字体，并一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
 | `storage_usage` | 查询目录和逐稿用量，以及当前预算。 |
@@ -71,6 +71,12 @@ cargo build --locked --release -p panache-mcp
 桌面与 MCP 共享“我的字体”目录，`list_fonts` 的 `user_dir` 给出绝对路径。Windows 使用 `%LOCALAPPDATA%/Panache/fonts`，macOS 使用 `~/Library/Application Support/Panache/fonts`，Linux 使用 `$XDG_DATA_HOME/Panache/fonts`（默认 `~/.local/share/Panache/fonts`）。可通过 `PANACHE_USER_FONT_DIR` 指定绝对路径。把字体放入后调用 `list_fonts(source="user", refresh=true)`。
 
 面向 AI 客户端的调用示例、披露边界和测量口径见[工具设计](tool-design.md)。
+
+查某版、某节、某一页当时留下的整页复盘，可用 `read_section(view="review", revision=3, section=2, page=1, draft_id=…)`。返回最近记录在这个位置的测量值、原检查单编号及注明来源的评语。该位置没有记录时返回 `status="no_recorded_review"`；直接按数字页码查单不会排版，也不判断该页是否实际存在。已知检查单编号时仍可按 `review_id` 精确读取。
+
+如果用户问“增加某段话以前，某一节最后那张验过吗”，把新增段落中独有的原文字串传给 `before_text`，目标节传 `section`，页码传 `page="last"`。服务端在该字串首次出现的前一版排出目标节的实际末页，只读取该位置的检查单。返回的 `before_text_match` 标明新增文字所在节和引入版本，顶层的 `revision`、`section`、`page` 标明查单位置。字串跨节重复或同节删后重加时，结果列出最早两个加入时点及对应的前一版。可查的正文节附有简短开头，便于区分补记所在节和实际要查的节。请用户选择，也可分版回答。按补记或末页查多节稿时需明确待查节号。无匹配或首次建稿就存在时，请核对原文或提供明确版本。末页定位会按该版字体和版式分页，不返回图片，也不会新增检查单。旧版可在事后补验，单据的版本号只表示受检稿件版本。
+
+预览的页码在每一节内从 1 开始。翻过一节末页时，错误信息给出这节的实际页数，以及所查版本中下一节的起始页；历史版本已到末节时会提示到此为止。
 
 长作业可以按题组或章节分次传入，每节从新页开始。需要连续排版的段落放在同一节，公式、表格、代码块也应完整放在一节内。追加时带上 `draft_id` 和上次返回的 `expected_revision`；修改已有节时再给出 `section`。另一位客户端抢先保存后，用 `read_section` 复核最新内容再提交。
 

@@ -56,6 +56,24 @@ fn by_id(db: &Connection, id: &str, draft: &Snapshot<'_>) -> Result<Value> {
     Ok(record)
 }
 
+fn page_record(
+    db: &Connection,
+    draft: &Snapshot<'_>,
+    revision: u32,
+    section: u32,
+    page: u32,
+) -> Result<Option<Value>> {
+    let id: Option<String> = db
+        .query_row(
+            "SELECT review_id FROM review_observations
+         WHERE draft=? AND revision=? AND section=? AND page=? ORDER BY seq DESC LIMIT 1",
+            params![draft.id, revision, section, page],
+            |row| row.get(0),
+        )
+        .optional()?;
+    id.map(|id| by_id(db, &id, draft)).transpose()
+}
+
 impl Snapshot<'_> {
     pub fn record_review(
         &self,
@@ -84,12 +102,33 @@ impl Snapshot<'_> {
         by_id(&self.drafts.connect()?, id, self)
     }
 
-    pub fn review_counts(&self) -> Result<(u32, u32)> {
-        Ok(self.drafts.connect()?.query_row("SELECT count(*),
-            count(CASE WHEN json_extract(evidence,'$.visibility') IN ('no_visible_change','very_low_contrast') THEN 1 END)
-            FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
-            WHERE draft=? AND revision=? GROUP BY section,page)",params![self.id,self.revision],
-            |r|Ok((r.get(0)?,r.get(1)?)))?)
+    pub fn page_observation(&self, section: u32, page: u32) -> Result<Value> {
+        ensure!(section > 0 && page > 0, "section and page start at 1");
+        let mut db = self.drafts.connect()?;
+        let tx = db.transaction()?;
+        let record = page_record(&tx, self, self.revision, section, page)?;
+        Ok(record.unwrap_or_else(|| {
+            json!({
+                "draft_id": self.id, "revision": self.revision, "section": section, "page": page,
+                "review_id": null, "status": "no_recorded_review",
+            })
+        }))
+    }
+
+    /// Latest full-page visibility flag for each measured page in this revision.
+    pub fn reviewed_pages(&self) -> Result<std::collections::HashMap<(u32, usize), bool>> {
+        let db = self.drafts.connect()?;
+        let mut statement = db.prepare(
+            "SELECT section, page, COALESCE(json_extract(evidence,'$.visibility')
+                IN ('no_visible_change','very_low_contrast'), 0)
+             FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
+             WHERE draft=? AND revision=? GROUP BY section,page)",
+        )?;
+        Ok(statement
+            .query_map(params![self.id, self.revision], |row| {
+                Ok(((row.get(0)?, row.get::<_, u32>(1)? as usize), row.get(2)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn compare_reviews(
@@ -110,19 +149,9 @@ impl Snapshot<'_> {
         );
         let mut db = self.drafts.connect()?;
         let tx = db.transaction()?;
-        let fetch = |rev: u32| -> Result<Option<Value>> {
-            let id: Option<String> = tx
-                .query_row(
-                    "SELECT review_id FROM review_observations
-                WHERE draft=? AND revision=? AND section=? AND page=? ORDER BY seq DESC LIMIT 1",
-                    params![self.id, rev, section, u32::try_from(page)?],
-                    |r| r.get(0),
-                )
-                .optional()?;
-            id.map(|v| by_id(&tx, &v, self)).transpose()
-        };
-        let previous = fetch(before)?;
-        let current = fetch(self.revision)?;
+        let page = u32::try_from(page)?;
+        let previous = page_record(&tx, self, before, section, page)?;
+        let current = page_record(&tx, self, self.revision, section, page)?;
         let mut stmt=tx.prepare("WITH actions(rev,action,section) AS (
             SELECT revision,'save_section',number FROM sections WHERE draft=?1
             UNION ALL SELECT revision,'tune_handwriting',NULL FROM settings WHERE draft=?1
@@ -253,6 +282,7 @@ mod tests {
                 && legacy["page_content_sha256"].is_null()
         );
         assert_eq!(legacy["evidence"]["visibility"], "no_visible_change");
+        assert_eq!(old.page_observation(1, 1)?, legacy);
         let observation = json!({"visibility":"inspect_visually","photo_size":[400,500]});
         let rev2 = drafts.snapshot("d", Some(2))?;
         let first = rev2.record_review(1, 1, "a", "pixels", "content", &observation)?;
@@ -281,7 +311,9 @@ mod tests {
         )?;
         assert_ne!(first["review_id"], changed["review_id"]);
         assert_ne!(changed["review_id"], upgraded["review_id"]);
-        assert_eq!(rev2.review_counts()?, (1, 1));
+        assert_eq!(rev2.page_observation(1, 1)?, upgraded);
+        assert_eq!(old.page_observation(1, 1)?, legacy);
+        assert_eq!(rev2.reviewed_pages()?, [((1, 1), true)].into());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;
         let comparison = rev3.compare_reviews(2, 1, 1, 0, 5)?;

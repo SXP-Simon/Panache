@@ -52,7 +52,7 @@ pub fn inspect_page(
         return Err(Error::new("invalid_parameter", "Invalid fine edit page"));
     }
     let mut geometry = None;
-    crate::render::render_pages(request, cancel, page, |i, _, ink| {
+    let pages = crate::render::render_pages(request, cancel, page, |i, _, ink| {
         if i + 1 == page
             && let Some(crate::render::PageInk::Fine(tiles)) = ink
         {
@@ -73,7 +73,12 @@ pub fn inspect_page(
     })?;
     Ok((
         document_key(&request.text, &request.params),
-        geometry.ok_or_else(|| Error::new("invalid_page", "Page not found"))?,
+        geometry.ok_or_else(|| {
+            Error::new(
+                "invalid_page",
+                format!("Page {page} not found; available page count: {pages}"),
+            )
+        })?,
     ))
 }
 

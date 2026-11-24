@@ -194,8 +194,15 @@ impl Engine {
                 }
                 Ok(())
             })?;
-        let png =
-            image.with_context(|| format!("Section has {pages} pages; requested {page_number}"))?;
+        let png = image.ok_or_else(|| {
+            draft.page_error(
+                n,
+                handwriting_core::Error::new(
+                    "invalid_page",
+                    format!("Section has {pages} pages; requested {page_number}"),
+                ),
+            )
+        })?;
         let preview = RenderedPreview {
             png,
             fine_edit: request.params.fine_edit,
@@ -244,6 +251,25 @@ impl Engine {
             None => handwriting_core::render::render_until_page(request, cancel, stop, emit),
         }
     }
+    pub fn page_count(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        cancel: &Cancellation,
+    ) -> Result<u32> {
+        let (_, edits) = draft.edits(&section)?;
+        // Projected photos are laid out in rectified paper space. Their final photo composite does not paginate.
+        let background = if draft.paper.as_ref().is_some_and(|p| p.projection.is_some()) {
+            None
+        } else {
+            draft.background()?
+        };
+        let req = self.request(draft, section, background, edits)?;
+        Ok(u32::try_from(handwriting_core::render::count_pages(
+            &req, cancel,
+        )?)?)
+    }
+
     fn fine_request(&mut self, draft: &Snapshot<'_>, section: Section) -> Result<RenderRequest> {
         let (_, edits) = draft.edits(&section)?;
         let projected = draft.paper.as_ref().is_some_and(|p| p.projection.is_some());
@@ -259,9 +285,11 @@ impl Engine {
         page: usize,
         cancel: &Cancellation,
     ) -> Result<crate::review::PageSample> {
+        let number = section.number;
         let source_revision = section.version;
         let req = self.fine_request(draft, section)?;
-        let (_, glyphs) = fine_edit::inspect_page(&req, page, cancel)?;
+        let (_, glyphs) = fine_edit::inspect_page(&req, page, cancel)
+            .map_err(|error| draft.page_error(number, error))?;
         let edits = req
             .params
             .fine_edits
@@ -319,7 +347,8 @@ impl Engine {
         let page = input.page.unwrap_or(1);
         let number = section.number;
         let req = self.fine_request(draft, section)?;
-        let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)?;
+        let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)
+            .map_err(|error| draft.page_error(number, error))?;
         if input.illustrations_only == Some(true) {
             bounds.retain(|g| g.illustration.is_some());
         }
@@ -418,7 +447,7 @@ impl Engine {
         sections: Vec<Section>,
         format: Format,
         cancel: &Cancellation,
-        mut progress: impl FnMut(usize),
+        mut on_page: impl FnMut(usize, u32, usize),
     ) -> Result<usize> {
         let mut count = 0;
         let mut background = draft.background()?;
@@ -428,15 +457,22 @@ impl Engine {
             for section in sections {
                 cancel.check()?;
                 let (_, edits) = draft.edits(&section)?;
+                let number = section.number;
                 let mut request = self.request(draft, section, background.take(), edits)?;
                 request.params.pdf_save = matches!(format, Format::Pdf);
                 request.limits.max_pages -= count;
-                Self::render_pages(&request, photo.as_ref(), cancel, usize::MAX, |_, page| {
-                    emit(count, &page)?;
-                    count += 1;
-                    progress(count);
-                    Ok(())
-                })?;
+                Self::render_pages(
+                    &request,
+                    photo.as_ref(),
+                    cancel,
+                    usize::MAX,
+                    |index, page| {
+                        emit(count, &page)?;
+                        count += 1;
+                        on_page(count, number, index + 1);
+                        Ok(())
+                    },
+                )?;
                 background = request.background.take();
             }
             cancel.check()?;

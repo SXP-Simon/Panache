@@ -73,11 +73,13 @@ async def review_workflow(client, key, guides, font_path):
     assert Path(same_pdf["path"]).read_bytes() == Path(pdf["path"]).read_bytes()
     await call(client, "tune_handwriting", **key, expected_revision=6, changes={"ink_opacity": 0})
     unreviewed = (await call(client, "export_handwriting", **key, format="zip")).structuredContent["review"]
+    assert unreviewed["unreviewed_pages"] == [{"section": 1, "page": 1}]
     assert unreviewed["pages_with_evidence"] == 0 and unreviewed["global_text_ink_zero"]
     invisible = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
     assert invisible["evidence"]["visibility"] == "no_visible_change"
     assert invisible["evidence"]["max_rgb_delta"] == 0
     flagged = (await call(client, "export_handwriting", **key, format="zip")).structuredContent["review"]
+    assert flagged["unreviewed_pages"] == []
     assert flagged["pages_with_evidence"] == 1 and flagged["pages_with_visibility_flags"] == 1
     recent = (await call(client, "read_section", **key, view="trajectory", limit=1)).structuredContent
     assert recent["next_offset"] == 1 and recent["events"][0]["details"]["visibility"] == "no_visible_change"
@@ -131,6 +133,25 @@ async def mixed_script_sample(client):
     assert png(await call(client, "preview_handwriting", **key)) == primary
 
 
+async def handwriting_variation_sample(client):
+    markdown = "样品 A 的质量为 12.5 g。"
+    saved = (await call(client, "save_section", markdown=markdown, style={"seed": 17})).structuredContent
+    key = {"draft_id": saved["draft_id"]}
+    base = png(await call(client, "preview_handwriting", **key))
+    await call(client, "tune_handwriting", **key, expected_revision=1, changes={"perturb_theta_sigma": 0.07})
+    loose = png(await call(client, "preview_handwriting", **key))
+    assert loose != base
+    strike = (await call(client, "describe_controls", **key, group="strike")).structuredContent
+    assert strike["values"]["strikethrough_probability"] == 0
+    assert strike["controls"]["strikethrough_angle_sigma"]["unit"] == "deg"
+    # Force the optional effect for a deterministic positive control on a short line.
+    await call(client, "tune_handwriting", **key, expected_revision=2, changes={"strikethrough_probability": 1})
+    assert png(await call(client, "preview_handwriting", **key)) != loose
+    assert png(await call(client, "preview_handwriting", **key, revision=2)) == loose
+    source = (await call(client, "read_section", **key, view="source")).structuredContent
+    assert source["markdown"] == markdown
+
+
 async def placement_pixels(client):
     saved = (await call(client, "save_section", markdown="字", style={"seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
@@ -164,6 +185,7 @@ async def placement_pixels(client):
     assert measured["difference"]["outside_union_changed_pixels"] == 0
     exported = await call(client, "export_handwriting", **key)
     assert exported.structuredContent["review"]["pages_without_visibility_evidence"] == 1
+    assert exported.structuredContent["review"]["unreviewed_pages"] == [{"section": 1, "page": 1}]
     assert "局部墨迹" in exported.content[0].text
 
 
@@ -190,6 +212,7 @@ async def smoke(command, arguments, out):
             assert "outside the frame" in before_save and "wait before saving" in before_save
             assert "partial work was requested" in before_save
             assert "ask which field" in info.instructions
+            assert "group=variation" in info.instructions and "group=strike" in info.instructions
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
                 "annotate_review",
@@ -209,6 +232,10 @@ async def smoke(command, arguments, out):
             listed = await call(client, "list_fonts")
             guidance = listed.structuredContent["sample_guidance"]
             assert guidance in listed.content[0].text
+            for group, name in [("variation", "perturb_theta_sigma"), ("strike", "strikethrough_probability")]:
+                assert f"group={group}" in guidance
+                spec = (await call(client, "describe_controls", group=group)).structuredContent
+                assert spec["controls"][name]["description"]
             assert "志莽行书.ttf" in listed.structuredContent["fonts"]
             results = (await call(client, "list_fonts", source="user", query="localsample", limit=1)).structuredContent
             assert results["total"] == 1 and results["next_offset"] is None
@@ -310,6 +337,7 @@ async def smoke(command, arguments, out):
             )
             assert failed.isError
             await mixed_script_sample(client)
+            await handwriting_variation_sample(client)
             await placement_pixels(client)
             await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
@@ -362,6 +390,9 @@ async def smoke(command, arguments, out):
                 client, "preview_handwriting", draft_id=doc, section=2, page=2
             )
             middle = png(later)
+            # Review a later sheet first. Earlier-revision and local evidence cannot fill gaps.
+            await call(client, "preview_handwriting", draft_id=doc, revision=1, view="review")
+            await call(client, "preview_handwriting", draft_id=doc, section=2, page=2, view="review")
             notifications = []
 
             async def progress(value, total, message=None):
@@ -377,7 +408,25 @@ async def smoke(command, arguments, out):
             assert notifications == list(range(1, archive["pages"] + 1))
             with ZipFile(archive["path"]) as z:
                 assert archive["pages"] == len(z.namelist()) >= 3
+                remaining = [{"section": 1, "page": 1}] + [
+                    {"section": 2, "page": page} for page in range(1, len(z.namelist())) if page != 2
+                ]
+                assert archive["review"]["unreviewed_pages"] == remaining
+                assert archive["review"]["pages_without_visibility_evidence"] == len(remaining)
+                assert archive["review"]["pages_with_evidence"] == 1
                 assert z.read("0.png") == original and z.read("2.png") == middle
+            # An export gap is a coordinate at the exported revision, even when the
+            # same section and page have a stored receipt on an earlier revision.
+            receipt_args = {"draft_id": doc, "view": "review", **remaining[0]}
+            gap = await call(client, "read_section", **receipt_args, revision=archive["revision"])
+            assert gap.structuredContent["status"] == "no_recorded_review"
+            assert "档案无法判断" in gap.content[0].text
+            prior = await call(client, "read_section", draft_id=doc, view="review",
+                               section=1, page="last", before_text="数学作业")
+            assert prior.structuredContent["revision"] == 1 and prior.structuredContent["review_id"]
+            repeated = await call(client, "export_handwriting", draft_id=doc,
+                                  revision=archive["revision"], format="zip")
+            assert repeated.structuredContent["review"] == archive["review"]
             conflict = await client.call_tool(
                 "save_section",
                 {"draft_id": doc, "expected_revision": 1, "markdown": "迟到的编辑"},
@@ -386,7 +435,23 @@ async def smoke(command, arguments, out):
             missing = await client.call_tool(
                 "preview_handwriting", {"draft_id": doc, "section": 1, "page": 2}
             )
-            assert missing.isError
+            assert missing.isError and "section=2, page=1" in missing.content[0].text
+            for view in ("layout", "review"):
+                missing = await client.call_tool("preview_handwriting", {
+                    "draft_id": doc, "section": 1, "page": 2, "view": view,
+                })
+                assert missing.isError
+                assert "available page count: 1" in missing.content[0].text
+                assert "section=2, page=1" in missing.content[0].text
+            historical = await client.call_tool("preview_handwriting", {
+                "draft_id": doc, "revision": 1, "page": 2, "view": "review",
+            })
+            assert historical.isError and "last section" in historical.content[0].text
+            assert "section=2" not in historical.content[0].text
+            zero = await client.call_tool("preview_handwriting", {
+                "draft_id": doc, "section": 2, "page": 0, "view": "layout",
+            })
+            assert zero.isError and "start at 1" in zero.content[0].text
             edited = await call(
                 client,
                 "save_section",
@@ -404,6 +469,20 @@ async def smoke(command, arguments, out):
             retrieved = (await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)).structuredContent
             assert retrieved["revision"] == 3 and retrieved["section"] == retrieved["page"] == 1
             assert retrieved["feedback"] == [{"origin":"user_quote","text":user_quote}]
+            lookup = dict(**comparison_key, view="review", page=1)
+            receipt = await call(client, "read_section", **lookup, revision=3)
+            assert receipt.structuredContent == {**retrieved, "latest_draft_revision": 6}
+            older = await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)
+            assert json.loads(older.content[0].text) == retrieved == older.structuredContent
+            assert "revision=6, section=1, page=1" in older.content[1].text
+            assert f"检查单号 {reviewed_id}" in receipt.content[0].text
+            for args in (dict(**lookup, revision=3, section=2), dict(**gkey, view="review", page=1, revision=1)):
+                missing = (await call(client, "read_section", **args)).structuredContent
+                assert missing["status"] == "no_recorded_review" and missing["review_id"] is None
+                assert missing["draft_id"] == args["draft_id"] and missing["revision"] == args["revision"]
+            for args in ({**lookup, "review_id": reviewed_id}, {**lookup, "view": "trajectory"},
+                         {**lookup, "page": 0}, {**lookup, "section": 0}, {**lookup, "limit": 1}):
+                assert (await client.call_tool("read_section", args)).isError
             assert (await call(client,"read_section",**comparison_key,view="summary")).structuredContent["revision"] == 6
             events = (await call(client,"read_section",**comparison_key,view="trajectory",limit=50)).structuredContent["events"]
             assert {e["origin"] for e in events} >= {"draft_edit","measurement","user_quote","model_observation"}

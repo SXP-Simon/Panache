@@ -42,14 +42,14 @@
     "word_spacing_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
     "perturb_x_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
     "perturb_y_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
-    "perturb_theta_sigma": {"type":"number","min":0,"max":3.14,"unit":"rad"},
+    "perturb_theta_sigma": {"type":"number","min":0,"max":3.14,"unit":"rad","description":"Variation in glyph tilt. For a slightly hurried hand keep the font and seed; try increasing the current value by 0.02 rad, then preview the same line and check digits, units and alignment. perturb_x_sigma and perturb_y_sigma vary position in paper-space pixels."},
     "ink_depth_sigma": {"type":"number","min":0,"max":255,"unit":"intensity"}
   },
   "strike": {
-    "strikethrough_probability": {"type":"number","min":0,"max":1,"unit":"probability"},
+    "strikethrough_probability": {"type":"number","min":0,"max":1,"unit":"probability","description":"For requested occasional corrections: randomly insert a crossed-out extra character before the intended text when monospaced=false. Try 0.005 for a sparse sample; a short page may have none. Compare the same line with only probability changed; confirm a visible crossed-out character before reporting one. Check reflow and numbers. For a looser hand alone, leave this unchanged. Exact placement on a chosen word is unsupported; Markdown ~~text~~ is stripped to text."},
     "strikethrough_width": {"type":"number","min":0,"max":100,"unit":"px"},
     "strikethrough_length_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
     "strikethrough_width_sigma": {"type":"number","min":0,"max":100,"unit":"px"},
-    "strikethrough_angle_sigma": {"type":"number","min":0,"max":3.14,"unit":"rad"}
+    "strikethrough_angle_sigma": {"type":"number","min":0,"max":3.14,"unit":"deg"}
   }
 }
