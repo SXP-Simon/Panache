@@ -78,16 +78,27 @@ fn page_receipt(
         record["before_text_match"] =
             json!({"section": anchor_section, "introduced_revision": added_revision});
     }
-    let receipt = match record["review_id"].as_str() {
-        Some(id) if anchor.is_some() || draft.revision < draft.latest_revision => format!(
-            "已存整页检查单 · 检查单号 {id}。此单属于所查版本；旧版可事后补验，开单与后续编辑的先后无法确定。"
-        ),
-        Some(id) => format!("已存整页检查单 · 检查单号 {id}"),
-        None => "此版此页没有已存的整页检查单。是否曾在纸上看过，档案无法判断。其他版本的单据只证明对应版本。".to_owned(),
+    let position = format!("第 {} 版 · 第 {section} 节第 {page} 页", draft.revision);
+    let conclusion = match record["review_id"].as_str() {
+        None => format!("{position}没有已存的整页检查单。是否曾在纸上看过，档案无法判断。"),
+        Some(id) => match record["filed_at_revision"].as_u64() {
+            Some(filed) if filed == u64::from(draft.revision) => {
+                format!(
+                    "{position}已存整页检查单，检查单号 {id}。首次入档时稿件仍为第 {filed} 版。"
+                )
+            }
+            Some(filed) => format!(
+                "{position}有一张事后补验的检查单，检查单号 {id}。首次入档时稿件已到第 {filed} 版，这张单无法证明改稿前已经验过。"
+            ),
+            None => format!(
+                "能否确认改稿前已验过？无法确认。{position}有旧单，检查单号 {id}。旧单未记录首次入档时的稿件版本，可能是事后补验。"
+            ),
+        },
     };
+    record["receipt_summary"] = json!(conclusion);
     let text = format!(
-        "第 {} 版 · 第 {section} 节第 {page} 页（当前稿件第 {} 版）\n{receipt}\n{}",
-        draft.revision, draft.latest_revision, record
+        "{conclusion}\n当前稿件第 {} 版。\n{record}",
+        draft.latest_revision
     );
     Ok(reply(text, record))
 }
@@ -389,7 +400,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "For a prior check of a particular sheet, use view=review, section and page. For “before adding [words]” pass before_text with a literal fragment of the addition; for the final sheet of that section pass page=\"last\". These select and paginate the same historical version in one lookup. Otherwise omit revision for current or set a revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without creating a check. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
+        description = "For a prior check of a particular sheet, use view=review, section and page. For “before adding [words]” pass before_text with a literal fragment of the addition; for the final sheet of that section pass page=\"last\". These select and paginate the same historical version in one lookup. For a single requested sheet cite its returned review_id and receipt_summary. Other revisions can have separate receipts for the same page. Otherwise omit revision for current or set a revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without creating a check. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
     )]
     async fn read_section(
         &self,

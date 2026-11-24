@@ -194,7 +194,9 @@ async def historical_last_page(client, directory, call, path, guides):
     old = (await call(client, "preview_handwriting", **key, revision=1, view="review", page=last)).structuredContent
     receipt = await call(client, "read_section", **anchored)
     assert receipt.structuredContent["review_id"] == old["review_id"]
-    assert "事后补验" in receipt.content[0].text
+    assert receipt.structuredContent["filed_at_revision"] == 2
+    assert "事后补验" in receipt.structuredContent["receipt_summary"]
+    assert receipt.content[0].text.startswith(receipt.structuredContent["receipt_summary"])
     for override in ({"before_text": "初次测量"}, {"before_text": "缺少的段落"},
                      {"before_text": ""}, {"revision": 1}, {"section": 2}, {"page": "latest"}):
         assert (await client.call_tool("read_section", {**anchored, **override})).isError

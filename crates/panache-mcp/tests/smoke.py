@@ -477,7 +477,9 @@ async def smoke(command, arguments, out):
             assert retrieved["feedback"] == [{"origin":"user_quote","text":user_quote}]
             lookup = dict(**comparison_key, view="review", page=1)
             receipt = await call(client, "read_section", **lookup, revision=3)
-            assert receipt.structuredContent == {**retrieved, "latest_draft_revision": 6}
+            summary = receipt.structuredContent["receipt_summary"]
+            assert receipt.structuredContent == {**retrieved, "latest_draft_revision": 6, "receipt_summary": summary}
+            assert retrieved["filed_at_revision"] == 3 and "仍为第 3 版" in summary
             older = await call(client, "read_section", **comparison_key, view="review", review_id=reviewed_id)
             assert json.loads(older.content[0].text) == retrieved == older.structuredContent
             assert "revision=6, section=1, page=1" in older.content[1].text
