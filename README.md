@@ -2,9 +2,7 @@
 
 [简体中文](README.zh-CN.md)
 
-| Light | Dark |
-| --- | --- |
-| [![The Iris, Celadon and Coral Rose workbenches in light mode](docs/assets/images/panache-themes-light-d13d5ad454b9.webp)](docs/assets/images/panache-themes-light-d13d5ad454b9.webp) | [![The same three themes and manuscript in dark mode](docs/assets/images/panache-themes-dark-138a044cb61a.webp)](docs/assets/images/panache-themes-dark-138a044cb61a.webp) |
+![Panache banner with a handwritten poem and the motto “May you find the courage to write what’s on your mind”](docs/assets/images/panache-poem-banner.png)
 
 ## Demo video
 
