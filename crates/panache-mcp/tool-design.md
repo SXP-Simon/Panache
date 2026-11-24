@@ -53,7 +53,7 @@
 | 这页写在哪、是否看得见 | `view="review"` | 当前版的底纸、成品和参考线叠图，以及整页测量和 `review_id`。 |
 | 这个字的墨色是否和照片协调 | `view="review", region=…` | 同一位置的底纸和当前成品两张裁图。照片整页复盘若给出 `photo_appearance.preview_arguments`，可以直接用它取得建议的局部。 |
 | 两版在这块地方有何区别 | `view="review", region=…, compare_revision=…` | 底纸、改前、改后三张裁图。移动了内容时，用 `previous_region` 补上旧位置。 |
-| 已经看过两版，只想读记录 | `view="review", compare_revision=…`，省略区域 | 读取两版已保存的测量、评语和期间的修改，只返回数据。某版缺记录时，先对该版做一次整页复盘。 |
+| 已经看过两版，只想读记录 | `view="review", compare_revision=…`，省略区域 | 读取两版已保存的测量、评语和期间的修改，只返回数据。用户只想查旧记录时，直接报告缺少哪一版的整页记录。用户另行要求新检查时，再对指定版本做整页复盘。 |
 
 整页叠图中的橙线标出估计书写区，青线标出参考线。服务端在原尺寸像素上比较成品与底纸：任一可见 RGB 通道相差至少 8 级，就计为可见变化。它按页面上、中、下三区报告数量，也统计参考区外的变化。有正文却整页零变化，应检查墨迹透明度和落字位置。表头或侧栏可能本来就要写，看到区外计数时要回看用户指定的栏位。
 
@@ -98,6 +98,28 @@ Panache 通过 `tools/list` 提供 13 个工具。模型可以直接建稿、预
 - **找位置**用 `preview_handwriting(view="layout")`。默认一次取 12 个字形，最多 32 个，返回坐标和编号，不传图片。指定第 N 页时，引擎仍需从该节起点排到第 N 页。
 - **接着写**先用 `list_drafts` 找回稿件，再用 `read_section(view="summary")` 读版本和长度。普通 `read_section` 默认返回摘录，用 `attachment` 替换识别到的内嵌图片数据。要改原文，分页读 `view="source"`，以该视图的偏移量续读，避免把摘录里的占位符写回正文。
 - **交付文件**时，导出返回服务端的本地路径，客户端要能访问该文件。宿主负责执行权限和会话历史，应将稿件内容和工具结果中的用户文字作为数据处理。
+
+### 用户说“只翻旧记录”时，客户端可以提供哪些工具？
+
+对于只查询 Panache 稿件的请求，宿主可以在这一轮只提供 `list_drafts` 和 `read_section`。在给模型展示工具清单和向这台 Panache 服务转发调用时使用同一组名称。这样即使模型记得上一轮用过整页预览，也不会在查档过程中生成新的检查单。下面示例使用已连接到 Panache 的 Python MCP SDK 会话，`tools` 是客户端已发现的工具清单。
+
+```python
+history_names = frozenset({"list_drafts", "read_section"})
+
+def history_tools(tools):
+    return [tool for tool in tools if tool.name in history_names]
+
+async def call_history_tool(session, name, arguments):
+    if name not in history_names:
+        raise ValueError("本轮只查询旧记录，可用 list_drafts 或 read_section。")
+    return await session.call_tool(name, arguments)
+```
+
+宿主将 `history_tools(tools)` 交给模型，并把本轮的 Panache 调用全部交给 `call_history_tool`。拦下调用时，将异常文字返回模型供它继续查档。这个范围适用于用户明确要求翻旧记录的轮次。若同一请求还要打印旧稿，宿主可单独提供用户要求的导出操作，传入已核实的版本。普通改稿仍可使用完整工具集。
+
+“补记前的那本”需要先从 `view="trajectory"` 找到添加补记的版本，再读补记前的稿件，确定节号和节内页码。最后用 `view="review"` 带上 `revision`、`section`、`page` 查单。只有 `feedback[].origin="user_quote"` 的文字可以作为用户原话。若手头的信息仍不能确定是哪张，向用户核对页上的内容。
+
+### 怎样在本地复测？
 
 从仓库根目录运行下面两条命令，均使用独立的临时稿库。比较两个构建时，应使用相同脚本、字体和测试图片。
 
