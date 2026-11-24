@@ -11,7 +11,3 @@ One blank sheet and three stanzas. Try a calligraphic hand, then compare the Iri
 ## [Finding paper for a manuscript](site:journal/paper-studies)
 
 Ruled and dotted exercise paper already have their own rhythm. Two backgrounds show how to align handwriting to the original page.
-
----
-
-If you enjoy these notes, you can buy Simon a coffee. [WeChat Pay](https://raw.githubusercontent.com/SXP-Simon/SXP-Simon/refs/heads/main/image/wechat-pay.jpg) · [Alipay](https://raw.githubusercontent.com/SXP-Simon/SXP-Simon/refs/heads/main/image/zhifubao-pay.jpg)

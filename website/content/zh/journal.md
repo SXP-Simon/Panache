@@ -11,7 +11,3 @@
 ## [给手稿找一张合适的纸](site:journal/paper-studies)
 
 校用纸上的横线和点线为书写划出了节奏。用两张底图看看，怎么让字落回原本的格子。
-
----
-
-喜欢这些手记的话，可以请 Simon 喝杯咖啡。[微信支付](https://raw.githubusercontent.com/SXP-Simon/SXP-Simon/refs/heads/main/image/wechat-pay.jpg) · [支付宝](https://raw.githubusercontent.com/SXP-Simon/SXP-Simon/refs/heads/main/image/zhifubao-pay.jpg)
