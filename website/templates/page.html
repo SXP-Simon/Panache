@@ -66,10 +66,12 @@
 <section class="support wrap" id="support" aria-labelledby="support-title">
   <h2 id="support-title">{{ 'Support Simon' if en else '支持作者' }}</h2>
   <p>{{ 'If you enjoy Panache, you can buy Simon a coffee.' if en else '如果你喜欢 Panache，可以请 Simon 喝杯咖啡。' }}</p>
-  <div class="support-links">
-    <a class="text-link" href="{{ asset('support/wechat-pay.jpg') }}">{{ 'WeChat Pay' if en else '微信支付' }} ↗</a>
-    <a class="text-link" href="{{ asset('support/zhifubao-pay.jpg') }}">{{ 'Alipay' if en else '支付宝' }} ↗</a>
-  </div>
+  <figure>
+    <a href="{{ asset('support/wechat-tip.jpg') }}">
+      <img src="{{ asset('support/wechat-tip.jpg') }}" width="1210" height="1210" loading="lazy" alt="{{ 'Open Simon’s WeChat tip code at full size' if en else '查看 Simon 的微信赞赏码原图' }}">
+    </a>
+    <figcaption>{{ 'Open WeChat and use Scan to scan this code.' if en else '打开微信，用「扫一扫」扫描赞赏码。' }}</figcaption>
+  </figure>
 </section>
 {% else %}
 <div class="wrap reading-layout">
