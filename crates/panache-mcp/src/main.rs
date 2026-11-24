@@ -79,7 +79,7 @@ fn page_receipt(
             json!({"section": anchor_section, "introduced_revision": added_revision});
     }
     let receipt = match record["review_id"].as_str() {
-        Some(id) if anchor.is_some() => format!(
+        Some(id) if anchor.is_some() || draft.revision < draft.latest_revision => format!(
             "已存整页检查单 · 检查单号 {id}。此单属于所查版本；旧版可事后补验，开单与后续编辑的先后无法确定。"
         ),
         Some(id) => format!("已存整页检查单 · 检查单号 {id}"),
@@ -237,7 +237,7 @@ impl ServerHandler for Panache {
                 "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
                 "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
                 "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-                "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page can be \"last\". For current checks omit revision. Use preview_handwriting(view=review) for a new photo inspection; it records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+                "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page can be \"last\". For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
                 "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
                 "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
                 "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
@@ -449,7 +449,7 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "A full-page view=review renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
+        description = "Use view=image to see the page without filing a check. A full-page view=review renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,

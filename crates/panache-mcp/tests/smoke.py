@@ -424,6 +424,12 @@ async def smoke(command, arguments, out):
             prior = await call(client, "read_section", draft_id=doc, view="review",
                                section=1, page="last", before_text="数学作业")
             assert prior.structuredContent["revision"] == 1 and prior.structuredContent["review_id"]
+            by_page = await call(client, "read_section", **receipt_args, revision=1)
+            assert by_page.structuredContent["review_id"] == prior.structuredContent["review_id"]
+            assert "事后补验" in by_page.content[0].text
+            appearance = await call(client, "preview_handwriting", draft_id=doc,
+                                    revision=archive["revision"], view="image", **remaining[0])
+            assert png(appearance) == original
             repeated = await call(client, "export_handwriting", draft_id=doc,
                                   revision=archive["revision"], format="zip")
             assert repeated.structuredContent["review"] == archive["review"]

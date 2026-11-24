@@ -117,7 +117,7 @@ async def call_history_tool(session, name, arguments):
     return await session.call_tool(name, arguments)
 ```
 
-宿主将 `history_tools(tools)` 交给模型，并把本轮的 Panache 调用全部交给 `call_history_tool`。拦下调用时，将异常文字返回模型供它继续查档。这个范围适用于用户明确要求翻旧记录的轮次。若同一请求还要打印旧稿，宿主可单独提供用户要求的导出操作，传入已核实的版本。普通改稿仍可使用完整工具集。
+宿主将 `history_tools(tools)` 交给模型，并把本轮的 Panache 调用全部交给 `call_history_tool`。拦下调用时，将异常文字返回模型供它继续查档。这个范围适用于用户明确要求翻旧记录的轮次。若同一请求还要打印旧稿，宿主可单独提供用户要求的导出操作，传入已核实的版本。用户要求改稿和打印、又要求保留检查记录原貌时，宿主可开放该轮需要的编辑和导出操作，并限制预览只转发 `view="image"`。导出结果已列出缺单页。普通改稿仍可使用完整工具集。
 
 已知补记原文时，可以用 `read_section(view="review", before_text="…", section=正文节号, page="last")` 直接查补记前正文末页的单据。若只知道大意，先从 `trajectory` 和 `source` 确认原文及待查的正文节。遇到重复加入时，按工具列出的修订分别核对，或请用户确认是哪一次。导出的 `review.unreviewed_pages` 使用节内页码，回查时带上同一次导出返回的 `revision`。查无存档时，无法据此判断用户是否在纸上看过。只有 `feedback[].origin="user_quote"` 的文字可以作为用户原话。
 
