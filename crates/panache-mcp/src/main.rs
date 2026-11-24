@@ -6,6 +6,7 @@ mod markdown;
 mod paper;
 mod placement;
 mod preview;
+mod replace_text;
 mod review;
 mod save;
 mod storage;
@@ -397,6 +398,16 @@ impl Panache {
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
+    }
+
+    #[tool(
+        description = "Replace one exact, unique whole plain-text paragraph in an existing section at its current revision, without resending its Markdown or inline images. Only standalone prose and supported embedded image blocks are accepted; cannot create or append, alter markup/attachments, or edit a section with saved glyph adjustments."
+    )]
+    async fn replace_section_text(
+        &self,
+        Parameters(input): Parameters<ReplaceText>,
+    ) -> CallToolResult {
+        tool_result(replace_text::run(self, input).await)
     }
 
     #[tool(

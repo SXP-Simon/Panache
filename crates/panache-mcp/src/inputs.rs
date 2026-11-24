@@ -101,6 +101,18 @@ pub struct Save {
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct ReplaceText {
+    pub draft_id: String,
+    pub expected_revision: u32,
+    pub section: u32,
+    /// Exact saved whole line, unique, 1..160 letters, digits or interior spaces.
+    pub old_text: String,
+    /// New plain line, 1..160 letters, digits or interior spaces.
+    pub new_text: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Describe {
     /// Optionally include this draft's effective values for the selected group.
     pub draft_id: Option<String>,
