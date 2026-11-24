@@ -119,8 +119,9 @@ pub struct Tune {
     /// Brief observable issue or user instruction that motivated this edit (max 320 characters).
     pub note: Option<String>,
     pub draft_id: String,
+    /// Current revision returned by list_drafts or the last edit.
     pub expected_revision: u32,
-    /// Sparse name/value patch from describe_controls. Null restores the original setting.
+    /// Pass controls under changes, e.g. {"perturb_theta_sigma":0.07}. Group objects from describe_controls also work inside changes. Null restores a control.
     #[serde(default)]
     pub changes: serde_json::Map<String, serde_json::Value>,
 }

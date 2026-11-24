@@ -138,7 +138,13 @@ async def handwriting_variation_sample(client):
     saved = (await call(client, "save_section", markdown=markdown, style={"seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
     base = png(await call(client, "preview_handwriting", **key))
-    await call(client, "tune_handwriting", **key, expected_revision=1, changes={"perturb_theta_sigma": 0.07})
+    for invalid in ({"variation": {"perturb_theta_sigma": 0.07}, "perturb_theta_sigma": 0.08},
+                    {"variation": {"strikethrough_probability": 0.1}}, {"variation": {}}):
+        rejected = await client.call_tool("tune_handwriting", {**key, "expected_revision": 1, "changes": invalid})
+        assert rejected.isError
+    tuned = await call(client, "tune_handwriting", **key, expected_revision=1,
+                       changes={"variation": {"perturb_theta_sigma": 0.07}})
+    assert tuned.structuredContent["controls"]["perturb_theta_sigma"] == 0.07
     loose = png(await call(client, "preview_handwriting", **key))
     assert loose != base
     strike = (await call(client, "describe_controls", **key, group="strike")).structuredContent

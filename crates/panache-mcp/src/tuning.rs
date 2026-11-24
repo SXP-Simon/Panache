@@ -4,7 +4,8 @@ use rmcp::model::CallToolResult;
 use serde_json::json;
 use std::fs;
 
-pub fn apply(state: &State, input: Tune) -> Result<CallToolResult> {
+pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
+    input.changes = controls::flatten_patch(input.changes)?;
     let mut draft = state
         .drafts
         .snapshot(&input.draft_id, Some(input.expected_revision))?;
