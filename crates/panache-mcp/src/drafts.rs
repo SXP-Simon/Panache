@@ -309,6 +309,34 @@ impl Drafts {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(json!({"drafts":entries,"offset":offset}))
     }
+    /// The first saved source containing a literal, provided it identifies a single section.
+    pub fn text_introduction(&self, id: &str, text: &str) -> Result<(u32, u32)> {
+        ensure!(
+            !text.trim().is_empty() && text.chars().count() <= 160,
+            "before_text needs 1..160 characters from the saved Markdown"
+        );
+        let db = self.connect()?;
+        let mut statement = db.prepare(
+            "SELECT number, min(revision) FROM sections
+             WHERE draft=? AND instr(source,?)>0 GROUP BY number LIMIT 2",
+        )?;
+        let mut rows = statement.query(params![id, text])?;
+        let first = rows.next()?.context(
+            "No section contains before_text. Read the source for a literal fragment or specify a revision."
+        )?;
+        let section = first.get(0)?;
+        let revision = first.get(1)?;
+        ensure!(
+            rows.next()?.is_none(),
+            "before_text matches several sections. Use a more specific fragment or specify a revision."
+        );
+        ensure!(
+            revision > 1,
+            "before_text already occurs in the first revision; no earlier draft exists."
+        );
+        Ok((section, revision))
+    }
+
     pub fn snapshot<'a>(&'a self, id: &'a str, requested: Option<u32>) -> Result<Snapshot<'a>> {
         let (latest, style, layout): (u32, String, Option<String>) = self
             .connect()?

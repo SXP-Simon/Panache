@@ -166,10 +166,47 @@ async def check_filtered_history(client, call, draft_id):
         assert (await client.call_tool("read_section", {**key, **invalid})).isError
 
 
+async def historical_last_page(client, directory, call, path, guides):
+    saved = await call(client, "save_section", paper_path=str(path), paper_guides=guides,
+                       markdown="\n\n".join(f"初次测量第{i}行。" for i in range(20)))
+    key = {"draft_id": saved.structuredContent["draft_id"]}
+    exported = await call(client, "export_handwriting", **key, revision=1, format="zip")
+    last = exported.structuredContent["pages"]
+    assert last > 1
+    await call(client, "preview_handwriting", **key, revision=1, view="review", page=1)
+    await call(client, "save_section", **key, expected_revision=1, section=1,
+               markdown="复测补录：一行。")
+    current = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
+    select = {**key, "view": "review", "section": 1, "page": "last"}
+    assert (await call(client, "read_section", **select)).structuredContent["review_id"] == current["review_id"]
+    anchored = {**select, "before_text": "复测补录"}
+    with closing(sqlite3.connect(directory / "drafts.sqlite3")) as db:
+        sql = "SELECT seq,review_id FROM review_observations WHERE draft=? ORDER BY seq"
+        records = db.execute(sql, (key["draft_id"],)).fetchall()
+        for _ in range(2):
+            receipt = await call(client, "read_section", **anchored)
+            data = receipt.structuredContent
+            assert (data["revision"], data["section"], data["page"]) == (1, 1, last)
+            assert data["before_text_match"] == {"introduced_revision": 2, "section": 1}
+            assert data["review_id"] is None and data["status"] == "no_recorded_review"
+            assert all(part.type == "text" for part in receipt.content)
+        assert db.execute(sql, (key["draft_id"],)).fetchall() == records
+    old = (await call(client, "preview_handwriting", **key, revision=1, view="review", page=last)).structuredContent
+    receipt = await call(client, "read_section", **anchored)
+    assert receipt.structuredContent["review_id"] == old["review_id"]
+    assert "事后补验" in receipt.content[0].text
+    for override in ({"before_text": "初次测量"}, {"before_text": "缺少的段落"},
+                     {"before_text": ""}, {"revision": 1}, {"section": 2}, {"page": "latest"}):
+        assert (await client.call_tool("read_section", {**anchored, **override})).isError
+    await call(client, "save_section", **key, expected_revision=2, markdown="复测补录也写在此节。")
+    assert (await client.call_tool("read_section", anchored)).isError
+
+
 async def exercise(client, directory, call):
     await unruled_artwork(client, directory, call)
     path = directory / "slanted.png"
     guides = slanted_sheet(path)
+    await historical_last_page(client, directory, call, path, guides)
     shifted = [
         {
             **g,

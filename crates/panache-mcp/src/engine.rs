@@ -244,6 +244,25 @@ impl Engine {
             None => handwriting_core::render::render_until_page(request, cancel, stop, emit),
         }
     }
+    pub fn page_count(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        cancel: &Cancellation,
+    ) -> Result<u32> {
+        let (_, edits) = draft.edits(&section)?;
+        // Projected photos are laid out in rectified paper space. Their final photo composite does not paginate.
+        let background = if draft.paper.as_ref().is_some_and(|p| p.projection.is_some()) {
+            None
+        } else {
+            draft.background()?
+        };
+        let req = self.request(draft, section, background, edits)?;
+        Ok(u32::try_from(handwriting_core::render::count_pages(
+            &req, cancel,
+        )?)?)
+    }
+
     fn fine_request(&mut self, draft: &Snapshot<'_>, section: Section) -> Result<RenderRequest> {
         let (_, edits) = draft.edits(&section)?;
         let projected = draft.paper.as_ref().is_some_and(|p| p.projection.is_some());

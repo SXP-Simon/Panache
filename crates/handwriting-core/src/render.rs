@@ -292,6 +292,11 @@ pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
     })
 }
 
+/// Run the normal pagination pass, discarding each page before compositing or encoding.
+pub fn count_pages(request: &RenderRequest, cancel: &Cancellation) -> Result<usize> {
+    render_pages(request, cancel, usize::MAX, |_, _, _| Ok(()))
+}
+
 pub(crate) fn render_pages(
     r: &RenderRequest,
     cancel: &Cancellation,
