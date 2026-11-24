@@ -114,72 +114,31 @@ String renderLatexNode(
   if (depth > 64) throw const FormatException('Math nesting limit');
   String child(GreenNode? v, [String? m]) =>
       renderLatexNode(v, depth + 1, m ?? mode);
-  String scripts(GreenNode? sub, GreenNode? sup) =>
-      '${sub == null ? '' : _script(child(sub), false)}${sup == null ? '' : _script(child(sup), true)}';
   if (n == null) return '';
   if (n is SymbolNode) return _symbol(n.symbol);
   if (n is EquationRowNode) return n.children.map(child).join();
   if (n is StyleNode) return _styled(n, child);
-  if (n is FracNode) {
-    if (n.barSize?.value == 0) {
-      throw const FormatException('Unwrapped binomial');
-    }
-    final a = child(n.numerator).trim(), b = child(n.denominator).trim();
-    return _fractions['$a/$b'] ?? '($a)/($b)';
-  }
-  if (n is SqrtNode) {
-    final index = n.index == null ? '' : _script(child(n.index), true);
-    if (index.startsWith('^')) {
-      throw const FormatException('Unsupported root index');
-    }
-    return '$index√(${child(n.base)})';
-  }
+  if (n is FracNode) return _fraction(n, child);
+  if (n is SqrtNode) return _root(n, child);
   if (n is MultiscriptsNode) return _multiscript(n, child);
   if (n is NaryOperatorNode) {
-    return '${_symbol(n.operator)}${scripts(n.lowerLimit, n.upperLimit)}${child(n.naryand)}';
+    return '${_symbol(n.operator)}${_scripts(n.lowerLimit, n.upperLimit, child)}${child(n.naryand)}';
   }
-  if (n is FunctionNode) {
-    final name = child(n.functionName), argument = child(n.argument);
-    final first = n.argument.children.firstOrNull;
-    final space =
-        argument.isEmpty ||
-            (first is! FracNode && RegExp(r'^[\s([{]').hasMatch(argument))
-        ? ''
-        : ' ';
-    return '$name$space$argument';
-  }
+  if (n is FunctionNode) return _function(n, child);
   if (n is AccentNode) return _accent(n, child);
-  if (n is AccentUnderNode) {
-    if (n.label != '¯' && n.label != '⏟') {
-      throw const FormatException('Unsupported under accent');
-    }
-    final base = child(n.base);
-    return n.label == '⏟' ? base : '${_group(base)}\u0332';
-  }
+  if (n is AccentUnderNode) return _underAccent(n, child);
   if (n is OverNode) {
     return '${_group(child(n.base))}${_script(child(n.above), true)}';
   }
-  if (n is UnderNode) {
-    final base = child(n.base);
-    return '${base == 'lim' ? base : _group(base)}${_script(child(n.below), false)}';
-  }
+  if (n is UnderNode) return _under(n, child);
   if (n is StretchyOpNode) {
-    return '${_symbol(n.symbol)}${scripts(n.below, n.above)}';
+    return '${_symbol(n.symbol)}${_scripts(n.below, n.above, child)}';
   }
   if (n is LeftRightNode) return _delimited(n, child);
   if (n is MatrixNode) return _matrix(n, mode, child);
   if (n is EquationArrayNode) return _equationArray(n, mode, child);
-  if (n is EnclosureNode) {
-    if (n.notation.isNotEmpty) {
-      throw const FormatException('Mathematical strike enclosure');
-    }
-    return child(n.base);
-  }
-  if (n is SpaceNode) {
-    if (n.alignerOrSpacer || n.width.value <= 0) return '';
-    if (n.fill) throw const FormatException('Rule');
-    return mode == 'cases' ? '  ' : ' ';
-  }
+  if (n is EnclosureNode) return _enclosure(n, child);
+  if (n is SpaceNode) return _space(n, mode);
   throw FormatException('Unsupported ${n.runtimeType}');
 }
 
@@ -197,6 +156,40 @@ String _styled(StyleNode n, _Child child) {
   return body;
 }
 
+String _fraction(FracNode n, _Child child) {
+  if (n.barSize?.value == 0) {
+    throw const FormatException('Unwrapped binomial');
+  }
+  final numerator = child(n.numerator).trim();
+  final denominator = child(n.denominator).trim();
+  return _fractions['$numerator/$denominator'] ?? '($numerator)/($denominator)';
+}
+
+String _root(SqrtNode n, _Child child) {
+  final index = n.index == null ? '' : _script(child(n.index), true);
+  if (index.startsWith('^')) {
+    throw const FormatException('Unsupported root index');
+  }
+  return '$index√(${child(n.base)})';
+}
+
+String _function(FunctionNode n, _Child child) {
+  final name = child(n.functionName);
+  final argument = child(n.argument);
+  if (argument.isEmpty) return name;
+  final first = n.argument.children.firstOrNull;
+  if (first is! FracNode && RegExp(r'^[\s([{]').hasMatch(argument)) {
+    return '$name$argument';
+  }
+  return '$name $argument';
+}
+
+String _scripts(GreenNode? sub, GreenNode? sup, _Child child) {
+  final lower = sub == null ? '' : _script(child(sub), false);
+  final upper = sup == null ? '' : _script(child(sup), true);
+  return '$lower$upper';
+}
+
 String _multiscript(MultiscriptsNode n, _Child child) {
   if (n.presub != null || n.presup != null) {
     throw const FormatException('Prescripts');
@@ -205,7 +198,7 @@ String _multiscript(MultiscriptsNode n, _Child child) {
   final ungrouped =
       _uprightLabel(n.base, base) ||
       RegExp(r'^(?:lim|max|min|det|sin|cos|tan|log|ln|[|]+)$').hasMatch(base);
-  return '${ungrouped ? base : _group(base)}${n.sub == null ? '' : _script(child(n.sub), false)}${n.sup == null ? '' : _script(child(n.sup), true)}';
+  return '${ungrouped ? base : _group(base)}${_scripts(n.sub, n.sup, child)}';
 }
 
 String _accent(AccentNode n, _Child child) {
@@ -226,6 +219,32 @@ String _accent(AccentNode n, _Child child) {
   if (mark == null) throw FormatException('Unsupported accent ${n.label}');
   final base = child(n.base);
   return mark.isEmpty ? base : '${_group(base)}$mark';
+}
+
+String _underAccent(AccentUnderNode n, _Child child) {
+  if (n.label != '¯' && n.label != '⏟') {
+    throw const FormatException('Unsupported under accent');
+  }
+  final base = child(n.base);
+  return n.label == '⏟' ? base : '${_group(base)}\u0332';
+}
+
+String _under(UnderNode n, _Child child) {
+  final base = child(n.base);
+  return '${base == 'lim' ? base : _group(base)}${_script(child(n.below), false)}';
+}
+
+String _enclosure(EnclosureNode n, _Child child) {
+  if (n.notation.isNotEmpty) {
+    throw const FormatException('Mathematical strike enclosure');
+  }
+  return child(n.base);
+}
+
+String _space(SpaceNode n, String mode) {
+  if (n.alignerOrSpacer || n.width.value <= 0) return '';
+  if (n.fill) throw const FormatException('Rule');
+  return mode == 'cases' ? '  ' : ' ';
 }
 
 String _delimited(LeftRightNode n, _Child child) {
