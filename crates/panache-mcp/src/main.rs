@@ -97,16 +97,35 @@ fn page_receipt(
     section: u32,
     page: u32,
     anchor: Option<(u32, u32)>,
+    repaginated_last: bool,
 ) -> Result<CallToolResult> {
-    let mut record = draft.page_observation(section, page)?;
+    let mut record = draft.page_observation(section, page, repaginated_last)?;
     record["latest_draft_revision"] = json!(draft.latest_revision);
     if let Some((anchor_section, added_revision)) = anchor {
         record["before_text_match"] =
             json!({"section": anchor_section, "introduced_revision": added_revision});
     }
-    let conclusion = add_receipt_summary(&mut record);
+    let mut conclusion = add_receipt_summary(&mut record);
+    let mut guidance = "";
+    if repaginated_last {
+        record["page_resolution"] = json!({
+            "source": "repaginated_current_environment",
+            "historical_last_page_confirmed": false,
+        });
+        conclusion =
+            format!("末页页码根据当前环境重新分页得出；档案不能证明这是当时的末页。\n{conclusion}");
+        record["receipt_summary"] = json!(conclusion);
+        guidance =
+            "\n若知道原页码，请对同一版同一节用数字 page 查单；知道原单号可直接用 review_id 查单。";
+        if record["other_recorded_reviews"]["entries"]
+            .as_array()
+            .is_some_and(|entries| !entries.is_empty())
+        {
+            guidance = "\n下列 other_recorded_reviews 是同一版同一节其他页的部分存档，不代表当时的末页。可用 read_section(view=review, draft_id, review_id) 查原单；知道原页码时也可按数字 page 查单。";
+        }
+    }
     let text = format!(
-        "{conclusion}\n当前稿件第 {} 版。\n{record}",
+        "{conclusion}\n当前稿件第 {} 版。{guidance}\n{record}",
         draft.latest_revision
     );
     Ok(reply(text, record))
@@ -146,7 +165,7 @@ impl Panache {
                     } else {
                         input.section.unwrap_or(1)
                     };
-                    page_receipt(&draft, section, n, anchor)
+                    page_receipt(&draft, section, n, anchor, false)
                 }
                 ReviewPage::Last(_) => {
                     self.render(ctx, move |state, engine, cancel| {
@@ -158,7 +177,7 @@ impl Panache {
                             .pop()
                             .context("Empty section")?;
                         let last = engine.page_count(&draft, source, cancel)?;
-                        page_receipt(&draft, section, last, anchor)
+                        page_receipt(&draft, section, last, anchor, true)
                     })
                     .await
                 }
@@ -258,7 +277,7 @@ impl ServerHandler for Panache {
             "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-            "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page can be \"last\". For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+            "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page=\"last\" repaginates with the current environment and does not prove the historical final page. For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
             "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
@@ -421,7 +440,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "For a prior check of a particular sheet, use view=review, section and page. For “before adding [words]” pass before_text with a literal fragment of the addition; for the final sheet of that section pass page=\"last\". These select and paginate the same historical version in one lookup. For a single requested sheet cite its returned review_id and receipt_summary. Other revisions can have separate receipts for the same page. Otherwise omit revision for current or set a revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without creating a check. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
+        description = "For a prior check of a particular sheet, use view=review, section and page. For “before adding [words]” pass before_text with a literal fragment of the addition; for the final sheet of that section pass page=\"last\". These select the requested revision and repaginate with the current environment, which does not confirm the historical final page. Cite the receipt for the resolved page only. On a miss, other_recorded_reviews can provide IDs for direct lookups, without proving which page was last. Other revisions can have separate receipts for the same page. Otherwise omit revision for current or set a revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without creating a check. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
     )]
     async fn read_section(
         &self,

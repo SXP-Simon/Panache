@@ -119,7 +119,7 @@ async def call_history_tool(session, name, arguments):
 
 宿主将 `history_tools(tools)` 交给模型，并把本轮的 Panache 调用全部交给 `call_history_tool`。拦下调用时，将异常文字返回模型供它继续查档。这个范围适用于用户明确要求翻旧记录的轮次。若同一请求还要打印旧稿，宿主可单独提供用户要求的导出操作，传入已核实的版本。用户要求改稿和打印、又要求保留检查记录原貌时，宿主可开放该轮需要的编辑和导出操作，并限制预览只转发 `view="image"`。导出结果已列出缺单页。标准 stdio 客户端也可单独启动一个设置了 `PANACHE_MCP_PRESERVE_REVIEWS=1` 的连接来处理这类轮次。它允许改稿、看成图、查原单和导出；写整页检查单或追加评语会在落库前返回可恢复的错误。这个设置作用于该服务进程，默认 0。
 
-已知补记原文时，可以用 `read_section(view="review", before_text="…", section=正文节号, page="last")` 直接查补记前正文末页的单据。若只知道大意，先从 `trajectory` 和 `source` 确认原文及待查的正文节。遇到重复加入时，按工具列出的修订分别核对，或请用户确认是哪一次。导出的 `review.unreviewed_pages` 使用节内页码，回查时带上同一次导出返回的 `revision`。查无存档时，无法据此判断用户是否在纸上看过。只有 `feedback[].origin="user_quote"` 的文字可以作为用户原话。
+已知补记原文时，可以用 `read_section(view="review", before_text="…", section=正文节号, page="last")` 按当前运行环境重新分页，再查补记前正文末页对应的检查单。返回的页码和查单结论不能证明它是当时的末页；缺单时列出的其他页单号也不代表末页。知道原单号请按 `review_id` 查单，知道原页码则按数字 `page` 查单。若只知道大意，先从 `trajectory` 和 `source` 确认原文及待查的正文节。遇到重复加入时，按工具列出的修订分别核对，或请用户确认是哪一次。导出的 `review.unreviewed_pages` 使用节内页码，回查时带上同一次导出返回的 `revision`。查无存档时，无法据此判断用户是否在纸上看过。只有 `feedback[].origin="user_quote"` 的文字可以作为用户原话。
 
 ### 怎样在本地复测？
 
