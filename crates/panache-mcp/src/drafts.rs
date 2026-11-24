@@ -55,6 +55,31 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
+    pub fn page_error(&self, section: u32, mut error: handwriting_core::Error) -> anyhow::Error {
+        if error.code != "invalid_page" {
+            return error.into();
+        }
+        let next = self.drafts.connect().and_then(|db| {
+            Ok(db.query_row(
+                "SELECT MIN(number) FROM sections WHERE draft=? AND number>? AND revision<=?",
+                params![self.id, section, self.revision],
+                |row| row.get::<_, Option<u32>>(0),
+            )?)
+        });
+        let hint = match next {
+            Ok(Some(next)) => {
+                format!("To continue after this section, use section={next}, page=1.")
+            }
+            Ok(None) => "This is the last section at this revision.".to_owned(),
+            Err(_) => "Check the available sections before continuing.".to_owned(),
+        };
+        error.message = format!(
+            "{} (revision {}, section {section}). Pages start at 1 within each section. {hint}",
+            error.message, self.revision
+        );
+        error.into()
+    }
+
     pub fn has_font(&self, handle: &str) -> Result<bool> {
         Ok(self.drafts.connect()?.query_row(
             "SELECT EXISTS(SELECT 1 FROM draft_fonts WHERE draft=? AND handle=?)",

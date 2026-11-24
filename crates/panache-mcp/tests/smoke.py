@@ -386,7 +386,23 @@ async def smoke(command, arguments, out):
             missing = await client.call_tool(
                 "preview_handwriting", {"draft_id": doc, "section": 1, "page": 2}
             )
-            assert missing.isError
+            assert missing.isError and "section=2, page=1" in missing.content[0].text
+            for view in ("layout", "review"):
+                missing = await client.call_tool("preview_handwriting", {
+                    "draft_id": doc, "section": 1, "page": 2, "view": view,
+                })
+                assert missing.isError
+                assert "available page count: 1" in missing.content[0].text
+                assert "section=2, page=1" in missing.content[0].text
+            historical = await client.call_tool("preview_handwriting", {
+                "draft_id": doc, "revision": 1, "page": 2, "view": "review",
+            })
+            assert historical.isError and "last section" in historical.content[0].text
+            assert "section=2" not in historical.content[0].text
+            zero = await client.call_tool("preview_handwriting", {
+                "draft_id": doc, "section": 2, "page": 0, "view": "layout",
+            })
+            assert zero.isError and "start at 1" in zero.content[0].text
             edited = await call(
                 client,
                 "save_section",

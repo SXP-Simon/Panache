@@ -194,8 +194,15 @@ impl Engine {
                 }
                 Ok(())
             })?;
-        let png =
-            image.with_context(|| format!("Section has {pages} pages; requested {page_number}"))?;
+        let png = image.ok_or_else(|| {
+            draft.page_error(
+                n,
+                handwriting_core::Error::new(
+                    "invalid_page",
+                    format!("Section has {pages} pages; requested {page_number}"),
+                ),
+            )
+        })?;
         let preview = RenderedPreview {
             png,
             fine_edit: request.params.fine_edit,
@@ -259,9 +266,11 @@ impl Engine {
         page: usize,
         cancel: &Cancellation,
     ) -> Result<crate::review::PageSample> {
+        let number = section.number;
         let source_revision = section.version;
         let req = self.fine_request(draft, section)?;
-        let (_, glyphs) = fine_edit::inspect_page(&req, page, cancel)?;
+        let (_, glyphs) = fine_edit::inspect_page(&req, page, cancel)
+            .map_err(|error| draft.page_error(number, error))?;
         let edits = req
             .params
             .fine_edits
@@ -319,7 +328,8 @@ impl Engine {
         let page = input.page.unwrap_or(1);
         let number = section.number;
         let req = self.fine_request(draft, section)?;
-        let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)?;
+        let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)
+            .map_err(|error| draft.page_error(number, error))?;
         if input.illustrations_only == Some(true) {
             bounds.retain(|g| g.illustration.is_some());
         }
