@@ -61,6 +61,12 @@ async def unruled_artwork(client, directory, call):
     ])
     whole = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
     appearance = whole["photo_appearance"]
+    guidance = appearance["ink_edge_guidance"]
+    assert all(term in guidance for term in (
+        "Keep the current ink", "visible native crop", "ink_softness",
+        "same region before and after", "fine strokes and contrast",
+        "dark shadow or faint ink alone", "Without images", "do not claim a visual judgment",
+    ))
     args = appearance["preview_arguments"]
     assert args["revision"] == 2 and args["draft_id"] == key["draft_id"]
     assert "ink_softness" in appearance["controls"]
