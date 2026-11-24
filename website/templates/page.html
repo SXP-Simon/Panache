@@ -1,3 +1,4 @@
+{% set demo_poster = 'panache-poem-banner.png' -%}
 <!doctype html>
 <html lang="{{ 'en' if en else 'zh-CN' }}">
 <head>
@@ -6,8 +7,7 @@
   <meta name="description" content="{{ 'Handwritten pages, studio notes and a practical guide to Panache.' if en else 'Panache 手写工坊。读开发手记，选字体和纸张，把文字、公式和表格排成手稿。' }}">
   {% if not key %}
   {% set home_url = 'https://heliannuits.me/Panache/' %}
-  {% set banner = 'panache-poem-banner.png' %}
-  {% set banner_url = home_url ~ 'assets/' ~ banner %}
+  {% set banner_url = home_url ~ 'assets/' ~ demo_poster %}
   {% set banner_alt = 'Panache · Handwritten poem with the motto “May you find the courage to write what’s on your mind”' if en else 'Panache 手写诗稿：予你勇气，写你所想' %}
   <meta property="og:type" content="website">
   <meta property="og:title" content="Panache · {{ 'Handwriting studio' if en else '手写工坊' }}">
@@ -43,15 +43,18 @@
 <main id="main">
 {% if not key %}
 <section class="hero wrap">
-<h1><img src="{{ asset(banner) }}" width="1920" height="1080" fetchpriority="high" alt="{{ banner_alt }}"></h1>
+<div class="hero-copy">
+<h1>{{ 'Handwriting generator' if en else '手写体生成器' }}</h1>
 <div class="actions">
   <a class="button" href="{{ repo }}/releases/latest">{{ 'Download Panache' if en else '下载 Panache' }} <span>↓</span></a>
   <a class="button button-secondary" href="{{ local('desktop') }}">{{ 'Mirror download guide' if en else '镜像下载指南' }}</a>
   <a class="text-link" href="{{ local('guide/getting-started') }}">{{ 'Write your first page' if en else '写下第一页' }} ↗</a>
 </div>
+</div>
+<img class="app-mark" src="{{ asset('app-icon.png') }}" width="512" height="512" alt="{{ 'Panache app icon' if en else 'Panache 应用图标' }}">
 </section>
 <section class="journal-band"><div class="wrap journal-feature">
-{% for path,picture in [('journal/ink-on-paper','panache-promo-f7d5275f09afde.webp'),('journal/iris-and-ink','poem.webp')] %}
+{% for path,picture in [('journal/ink-on-paper',demo_poster),('journal/iris-and-ink','poem.webp')] %}
 <a href="{{ local(path) }}"><div class="paper-thumb"><img src="{{ asset(picture) }}" loading="lazy" alt=""></div><h2>{{ titles[path] }}</h2></a>
 {% endfor %}
 </div></section>
@@ -68,7 +71,7 @@
 <article>
 <h1>{{ titles[key] }}</h1>
 {% if key=='journal/ink-on-paper' %}
-<video class="journal-film" controls playsinline preload="none" width="1920" height="1080" poster="{{ asset('panache-promo-f7d5275f09afde.webp') }}" aria-label="{{ 'Putting words on paper · Panache demo' if en else '让文字落在纸上 · Panache 展示视频' }}">
+<video class="journal-film" controls playsinline preload="none" width="1920" height="1080" poster="{{ asset(demo_poster) }}" aria-label="{{ 'Putting words on paper · Panache demo' if en else '让文字落在纸上 · Panache 展示视频' }}">
   <source src="{{ asset('panache-promo-6757a4fb253766.mp4') }}" type="video/mp4">
   <a href="{{ asset('panache-promo-6757a4fb253766.mp4') }}">{{ 'Download the film' if en else '下载视频' }}</a>
 </video>

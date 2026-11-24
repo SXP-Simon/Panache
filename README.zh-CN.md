@@ -2,13 +2,15 @@
 
 [English](README.md)
 
-![Panache 手写诗稿与标语「予你勇气，写你所想」](docs/assets/images/panache-poem-banner.png)
+| 浅色 | 深色 |
+| --- | --- |
+| [![浅色模式下的鸢尾、青瓷和珊瑚玫瑰工作台](docs/assets/images/panache-themes-light-d13d5ad454b9.webp)](docs/assets/images/panache-themes-light-d13d5ad454b9.webp) | [![深色模式下相同的三套主题和手稿](docs/assets/images/panache-themes-dark-138a044cb61a.webp)](docs/assets/images/panache-themes-dark-138a044cb61a.webp) |
 
 ## 展示视频
 
 [▶ 播放《让文字落在纸上》（72 秒）](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
-[![播放 Panache 横屏展示视频](website/static/panache-promo-f7d5275f09afde.webp)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
+[![播放 Panache 横屏展示视频](docs/assets/images/panache-poem-banner.png)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
 ## 手写工作台
 

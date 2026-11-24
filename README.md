@@ -2,13 +2,15 @@
 
 [简体中文](README.zh-CN.md)
 
-![Panache banner with a handwritten poem and the motto “May you find the courage to write what’s on your mind”](docs/assets/images/panache-poem-banner.png)
+| Light | Dark |
+| --- | --- |
+| [![The Iris, Celadon and Coral Rose workbenches in light mode](docs/assets/images/panache-themes-light-d13d5ad454b9.webp)](docs/assets/images/panache-themes-light-d13d5ad454b9.webp) | [![The same three themes and manuscript in dark mode](docs/assets/images/panache-themes-dark-138a044cb61a.webp)](docs/assets/images/panache-themes-dark-138a044cb61a.webp) |
 
 ## Demo video
 
 [▶ Watch the Panache demo (72 seconds, in Chinese)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
-[![Play the Panache demo](website/static/panache-promo-f7d5275f09afde.webp)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
+[![Play the Panache demo](docs/assets/images/panache-poem-banner.png)](https://heliannuits.me/Panache/assets/panache-promo-6757a4fb253766.mp4)
 
 ## The workbench
 
