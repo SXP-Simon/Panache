@@ -224,7 +224,7 @@ pub struct Nudge {
     pub scale: Option<u8>,
     /// Clockwise rotation in degrees, -45..45 (engine coordinates).
     pub angle: Option<i8>,
-    /// Ink opacity in percent, 0..100.
+    /// For text glyphs, a local multiplier of the draft-wide ink opacity, 0..100 percent. 100 adds no fading, 0 hides the glyph. This cannot exceed the global opacity.
     pub opacity: Option<u8>,
     /// Stroke weight delta in pixels, -2..2, in 0.1 px steps.
     pub thickness: Option<f64>,
