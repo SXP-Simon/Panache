@@ -325,18 +325,40 @@ impl Drafts {
                         lag(present,1,0) OVER (PARTITION BY number ORDER BY revision) AS previously_present
                  FROM versions
              )
-             SELECT number,revision FROM changes WHERE present AND NOT previously_present LIMIT 2",
+             SELECT number,revision FROM changes WHERE present AND NOT previously_present
+             ORDER BY revision,number LIMIT 3",
         )?;
-        let mut rows = statement.query(params![id, text])?;
-        let first = rows.next()?.context(
+        let matches = statement
+            .query_map(params![id, text], |row| {
+                Ok((row.get::<_, u32>(0)?, row.get::<_, u32>(1)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let &(section, revision) = matches.first().context(
             "No section contains before_text. Read the source for a literal fragment or specify a revision."
         )?;
-        let section = first.get(0)?;
-        let revision = first.get(1)?;
-        ensure!(
-            rows.next()?.is_none(),
-            "before_text was introduced more than once (possibly in different sections). Use a more specific fragment or specify a revision."
-        );
+        if matches.len() > 1 {
+            let mut message = String::from(
+                "这段原文有多个加入时点。请让用户确认是首次加入之前，还是后来再次加入之前；也可分别核对并逐版列出，未确认时不要代选。",
+            );
+            for (number, added) in matches.iter().take(2) {
+                let choice = if *added == 1 {
+                    "这是初稿，之前没有稿件。".to_owned()
+                } else {
+                    format!("要查加入前的稿件，传 revision={}。", added - 1)
+                };
+                message.push_str(&format!(
+                    "\n第 {added} 版第 {number} 节加入了这段原文。{choice}"
+                ));
+            }
+            if matches.len() > 2 {
+                message.push_str(
+                    "\n这里只列最早两次，另有加入时点。可通过 trajectory 和 source 核对。",
+                );
+            }
+            anyhow::bail!(
+                "{message}\n按明确版本查单时移除 before_text，保留原来待查的 section 和 page。"
+            );
+        }
         ensure!(
             revision > 1,
             "before_text already occurs in the first revision; no earlier draft exists."

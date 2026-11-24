@@ -204,9 +204,19 @@ async def historical_last_page(client, directory, call, path, guides):
     assert (await call(client, "read_section", **numeric)).structuredContent["review_id"] == old["review_id"]
     await call(client, "save_section", **key, expected_revision=3, section=1, markdown="新题目。")
     await call(client, "save_section", **key, expected_revision=4, section=1, markdown="复测补录：新题目。")
-    assert (await client.call_tool("read_section", numeric)).isError
-    await call(client, "save_section", **key, expected_revision=5, markdown="另一节也写了新题目。")
+    ambiguous = await client.call_tool("read_section", numeric)
+    assert ambiguous.isError
+    options = ambiguous.content[0].text
+    assert options.index("revision=1") < options.index("revision=4")
+    assert "未确认时不要代选" in options and old["review_id"] not in options
+    await call(client, "save_section", **key, expected_revision=5, markdown="另一节也写了新题目和初次测量。")
     assert (await client.call_tool("read_section", {**numeric, "before_text": "新题目"})).isError
+    await call(client, "save_section", **key, expected_revision=6, markdown="第三节：初次测量。")
+    several = await client.call_tool("read_section", {**numeric, "before_text": "初次测量"})
+    assert several.isError
+    options = several.content[0].text
+    assert "之前没有稿件" in options and "revision=5" in options
+    assert "只列最早两次" in options and "revision=6" not in options
     explicit = {**select, "revision": 1, "page": last}
     assert (await call(client, "read_section", **explicit)).structuredContent["review_id"] == old["review_id"]
 
