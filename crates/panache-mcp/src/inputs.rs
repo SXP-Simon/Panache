@@ -249,6 +249,10 @@ pub struct Preview {
     pub illustrations_only: Option<bool>,
     /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     pub view: Option<PreviewView>,
+    /// For image (the default): render the page again instead of reusing its cached PNG,
+    /// e.g. after replacing a configured font file. Does not change the draft or file a review.
+    #[serde(default)]
+    pub fresh: bool,
     /// Layout mode: start index and number of glyphs (default 12, max 32).
     pub offset: Option<usize>,
     pub limit: Option<usize>,
