@@ -650,12 +650,13 @@ fn asset(key: &str, beside: &Path, name: &str, source: &str) -> PathBuf {
 async fn main() -> Result<()> {
     let exe = env::current_exe()?;
     let beside = exe.parent().context("Missing executable directory")?;
-    let engine = Engine::new(asset(
+    let font_dir = asset(
         "PANACHE_FONT_DIR",
         beside,
         "font_assets",
         "assets/font_assets",
-    ))?;
+    );
+    let engine = Engine::new(font_dir.clone())?;
     let worker=asset("PANACHE_MARKDOWN_WORKER",beside,"prepare-text-worker.js","app/web/prepare-text-worker.js")
         .canonicalize().context("Build the Markdown worker with python scripts/build-text-worker.py, or set PANACHE_MARKDOWN_WORKER")?;
     let home = env::var_os("PANACHE_MCP_HOME")
@@ -681,7 +682,8 @@ async fn main() -> Result<()> {
         preserve_reviews,
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
-        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes),
+        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes)
+            .with_bundled_dir(font_dir),
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
         worker: fs::read_to_string(worker)?.into(),
