@@ -368,7 +368,15 @@ impl Panache {
         annotations(read_only_hint = true, open_world_hint = false),
         description = "Search bundled, personal and system fonts by name/source. Results are paged. Use an entry ID in save_section style.font or tune_handwriting changes.font; user and system faces are saved with the draft."
     )]
-    async fn list_fonts(&self, Parameters(query): Parameters<FontSearch>) -> CallToolResult {
+    async fn list_fonts(&self, Parameters(input): Parameters<FontList>) -> CallToolResult {
+        let include_sample_guidance = input.include_sample_guidance.unwrap_or(true);
+        let query = FontSearch {
+            query: input.query,
+            source: input.source,
+            offset: input.offset,
+            limit: input.limit,
+            refresh: input.refresh,
+        };
         let state = self.0.clone();
         let result = async {
             let page = tokio::task::spawn_blocking(move || state.local_fonts.search(&query)).await??;
@@ -384,9 +392,15 @@ impl Panache {
                 "entries": page.fonts, "total": page.total,
                 "next_offset": page.next_offset, "user_dir": page.user_dir
             });
-            let message = format!("{data}\n\n{guidance}");
+            let message = if include_sample_guidance {
+                format!("{data}\n\n{guidance}")
+            } else {
+                data.to_string()
+            };
             data["fonts"] = json!(names);
-            data["sample_guidance"] = json!(guidance);
+            if include_sample_guidance {
+                data["sample_guidance"] = json!(guidance);
+            }
             Ok(reply(message, data))
         }.await;
         tool_result(result)
