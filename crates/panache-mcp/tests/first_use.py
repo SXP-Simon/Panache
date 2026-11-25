@@ -10,7 +10,6 @@ import io
 import json
 import os
 import random
-import shutil
 import sqlite3
 import subprocess
 from contextlib import closing
@@ -18,7 +17,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -147,23 +146,38 @@ async def run(args, home):
         old_pdf = await generate("print-v1-control", key, 1, "pdf", request_bytes=False)
         assert digest(old_pdf) != digest(pdf)
 
-        # A client staged the synthetic form on the server. Do not use a user's laptop path.
+        # Retry the same request after the client places the photo on the server.
         photo = home / "worksheet.png"
         before = tables(home)
-        missing = await client.call_tool("save_section", {"markdown": TEXT, "paper_path": str(photo)})
-        assert missing.isError and tables(home) == before
+        request = {"markdown": TEXT, "style": style, "paper_path": str(photo)}
+        assert not photo.exists()
+        missing = await client.call_tool("save_section", request)
+        assert missing.isError and "paper_path" in missing.content[0].text
+        assert tables(home) == before
+        report["calls"].append({"tool": "save_section", "args": request, "error": missing.content[0].text})
         report["missing_photo_rejected_without_change"] = True
-        shutil.copyfile(HERE / "fixtures/ruled.png", photo)
-        saved = await invoke("save_section", markdown=TEXT, style=style, paper_path=str(photo))
+        with Image.open(HERE / "fixtures/ruled.png") as ruled:
+            sheet = ruled.convert("RGB")
+        font = ImageFont.truetype(str(HERE.parents[2] / "assets/font_assets/霞鹜文楷.ttf"), 23)
+        name_box = (200, 0, 397, 40)
+        blank_header = sheet.crop(name_box)
+        ImageDraw.Draw(sheet).text((205, 6), "姓名：林禾", font=font, fill=(43, 52, 68))
+        assert ImageChops.difference(sheet.crop(name_box), blank_header).getbbox()
+        sheet.save(photo)
+        saved = await invoke("save_section", **request)
+        assert saved.structuredContent["revision"] == 1
         key = saved.structuredContent["draft_id"]
         paper = await sample("worksheet-v1", key, 1)
-        with Image.open(photo) as original:
-            assert paper.size == original.size
-            delta = ImageChops.difference(paper.convert("RGB"), original.convert("RGB"))
-            total = paper.width * paper.height
-            unchanged = sum(n for n, rgb in delta.getcolors(total) if rgb == (0, 0, 0))
-            assert total * 0.95 < unchanged < total
-            report["worksheet_pixels"] = {"total": total, "unchanged": unchanged}
+        assert paper.size == sheet.size
+        delta = ImageChops.difference(paper.convert("RGB"), sheet)
+        total = paper.width * paper.height
+        unchanged = sum(n for n, rgb in delta.getcolors(total) if rgb == (0, 0, 0))
+        assert total * 0.95 < unchanged < total
+        name_delta = ImageChops.difference(paper.crop(name_box), sheet.crop(name_box).convert("RGBA"))
+        name_changed = sum(n for n, rgba in name_delta.getcolors(total) if any(rgba))
+        assert name_changed == 0
+        report["worksheet_pixels"] = {"total": total, "unchanged": unchanged, "name_box": name_box,
+                                      "name_changed": name_changed, "tables_checked": len(before)}
         archive = await generate("worksheet-v1", key, 1, "zip")
         with ZipFile(io.BytesIO(archive)) as z:
             assert z.namelist() == ["0.png"] and png_image(z.read("0.png")).tobytes() == paper.tobytes()
@@ -180,8 +194,9 @@ async def run(args, home):
         if not args.baseline:
             # Incompressible synthetic paper exercises the real oversized export path.
             noise = random.Random(31).randbytes(640 * 640 * 3)
-            Image.frombytes("RGB", (640, 640), noise).save(photo)
-            key = (await invoke("save_section", markdown=TEXT, style=style, paper_path=str(photo))).structuredContent["draft_id"]
+            oversize_photo = home / "oversize.png"
+            Image.frombytes("RGB", (640, 640), noise).save(oversize_photo)
+            key = (await invoke("save_section", markdown=TEXT, style=style, paper_path=str(oversize_photo))).structuredContent["draft_id"]
             await generate("oversize", key, 1, "zip", oversize=True)
         assert not tables(home)["review_observations"]
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
