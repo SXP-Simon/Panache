@@ -112,7 +112,12 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
-    /// Replace the writing area on the saved paper, using 2..32 photo-space baselines. Pass [] to restore the original import calibration. Existing text is reflowed. Use the top and bottom writable lines even on unruled paper.
+    /// Set to true only when the user wants to preserve manual glyph adjustments. Reject reflow that would stop applying them. Ink and camera changes can still be saved.
+    #[serde(default)]
+    pub preserve_local_adjustments: bool,
+    /// Replace the writing area on the saved paper with 2..32 photo-space baselines. Use the top and bottom writable lines even on unruled paper. Pass [] to restore the original import calibration. Existing text is reflowed.
+    /// Setting guides (including []) clears saved top_margin, bottom_margin, left_margin, right_margin, and text line_spacing unless those keys are included in changes in the same call.
+    /// To keep specific overrides, resend only their approved saved values in changes; omit them to inherit from the paper. Restoring those numbers still reflows hand-placed text. If its placement must stay, also set preserve_local_adjustments=true. If refused, leave the draft as it is.
     pub paper_guides: Option<Vec<Guide>>,
     /// Import an absolute local TTF/OTF file into this draft. Its bytes are retained across restarts.
     pub font_path: Option<std::path::PathBuf>,

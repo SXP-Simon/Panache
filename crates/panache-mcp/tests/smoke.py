@@ -95,7 +95,17 @@ async def review_workflow(client, key, guides, font_path):
     geometry = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
     for actual, target in zip(geometry["glyphs"][0]["current_photo_quad"], quad, strict=True):
         assert max(abs(a-b) for a,b in zip(actual,target,strict=True)) < 1.1
-    await call(client, "tune_handwriting", **key, expected_revision=8, paper_guides=[])
+    # Keeping the numeric layout cannot carry hand-placed glyphs across a guide reset.
+    controls = (await call(client, "describe_controls", **key, group="layout")).structuredContent["values"]
+    reset = dict(**key, expected_revision=8, paper_guides=[])
+    protected = await client.call_tool("tune_handwriting", {
+        **reset, "preserve_local_adjustments": True,
+        "changes": {name: controls[name] for name in ("line_spacing", "left_margin")},
+    })
+    assert protected.isError and "section 1 of revision 8" in protected.content[0].text
+    current = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
+    assert current["glyphs"][0]["current_photo_quad"] == geometry["glyphs"][0]["current_photo_quad"]
+    await call(client, "tune_handwriting", **reset)
     restored = (await call(client, "read_section", **key, view="summary")).structuredContent["paper"]
     original = (await call(client, "read_section", **key, revision=1, view="summary")).structuredContent["paper"]
     assert restored == original
@@ -143,7 +153,7 @@ async def handwriting_variation_sample(client):
         rejected = await client.call_tool("tune_handwriting", {**key, "expected_revision": 1, "changes": invalid})
         assert rejected.isError
     tuned = await call(client, "tune_handwriting", **key, expected_revision=1,
-                       changes={"variation": {"perturb_theta_sigma": 0.07}})
+                       preserve_local_adjustments=True, changes={"variation": {"perturb_theta_sigma": 0.07}})
     assert tuned.structuredContent["controls"]["perturb_theta_sigma"] == 0.07
     loose = png(await call(client, "preview_handwriting", **key))
     assert loose != base
@@ -638,8 +648,20 @@ async def smoke(command, arguments, out):
             ).structuredContent
             with ZipFile(exported_fine["path"]) as pages:
                 assert pages.read("0.png") == adjusted
+            blocked = await client.call_tool("tune_handwriting", {
+                "draft_id": paper_id, "expected_revision": 3, "preserve_local_adjustments": True,
+                "changes": {"variation": {"perturb_theta_sigma": 0.07}},
+            })
+            assert blocked.isError
+            assert blocked.content[0].text == (
+                "Reflow would stop applying local glyph adjustments in section 1 of revision 3. "
+                "This request saved no new revision. Keep preserve_local_adjustments=true. "
+                "Only if the user explicitly agrees to lose those adjustments in the new layout "
+                "may you use preserve_local_adjustments=false."
+            )
             camera_change = await call(client, "tune_handwriting", draft_id=paper_id,
-                                       expected_revision=3, changes={"camera_model": "Test Camera", "camera_iso": 200})
+                                       expected_revision=3, preserve_local_adjustments=True,
+                                       changes={"camera_model": "Test Camera", "camera_iso": 200})
             assert camera_change.structuredContent["fine_layout"] == "preserved"
             tagged = png(await call(client, "preview_handwriting", draft_id=paper_id))
             assert b"eXIf" in tagged and b"Test Camera" in tagged and tagged != adjusted
@@ -657,7 +679,7 @@ async def smoke(command, arguments, out):
             prior_ink = {key: tuned["controls"].get(key) for key in ink_settings}
             for rev, patch in [(5, ink_settings), (6, prior_ink)]:
                 ink_change = await call(client, "tune_handwriting", draft_id=paper_id,
-                                        expected_revision=rev, changes=patch)
+                                        expected_revision=rev, changes=patch, preserve_local_adjustments=True)
                 assert ink_change.structuredContent["fine_layout"] == "preserved"
                 glyph = (await call(client, "preview_handwriting", **probe)).structuredContent["glyphs"][0]
                 assert glyph["current_photo_quad"] == again["current_photo_quad"]
@@ -729,6 +751,9 @@ async def smoke(command, arguments, out):
                 await call(client, "preview_handwriting", **probe)
             ).structuredContent
             assert all("adjustment" not in g for g in refreshed["glyphs"])
+            reflow = await call(client, "tune_handwriting", draft_id=paper_id, expected_revision=8,
+                                changes={"perturb_theta_sigma": 0.07}, preserve_local_adjustments=True)
+            assert reflow.structuredContent["revision"] == 9
             assert (
                 png(
                     await call(

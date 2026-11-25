@@ -347,7 +347,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. Map the intended area onto first/last writable baselines even on artwork or unruled paper. Ink-group changes preserve local glyph placement; after changing font, size or guides, inspect the new layout. Use view=image to inspect the result when the user wants to preserve checks."
+        description = "Revise a draft's controls, font_path or paper_guides. If the user wants earlier hand-placed text kept in place, pass preserve_local_adjustments=true on this call. Ink-only changes keep placement. Map the writing area onto the first/last writable baselines even on artwork or unruled paper. After a font, size or guide change, inspect the new layout. Use view=image to inspect without filing a check."
     )]
     async fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
         let state = self.0.clone();

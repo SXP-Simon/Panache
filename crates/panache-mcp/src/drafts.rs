@@ -10,6 +10,8 @@ use uuid::Uuid;
 use crate::Style;
 use crate::paper::{ImportedPaper, PaperLayout};
 
+const REVISION_CONFLICT: &str = "Revision conflict; read the latest revision before retrying";
+
 pub struct Drafts(PathBuf);
 
 #[cfg(test)]
@@ -41,6 +43,30 @@ fn concurrent_first_opens_share_a_complete_schema() -> Result<()> {
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+#[test]
+fn glyph_edit_committed_after_preflight_wins_the_revision() -> Result<()> {
+    let home = tempfile::tempdir()?;
+    let drafts = Drafts::open(home.path())?;
+    let save = serde_json::from_value(json!({"markdown":"字"}))?;
+    let saved = drafts.save(&save, "字", Some(&Style::default()), None, None)?;
+    let draft = drafts.snapshot(saved["draft_id"].as_str().unwrap(), Some(1))?;
+    draft.require_unadjusted_layout()?;
+
+    // Commit another writer's glyph edit between the guard and the settings write.
+    let edits = serde_json::from_value(json!({"key":"test","glyphs":[
+        {"id":0,"dx":12,"dy":0,"scale":100,"angle":0,"opacity":100,"color":null}
+    ]}))?;
+    assert_eq!(draft.store_edits(1, 1, &edits, &Value::Null)?, 2);
+    let result = drafts.tune(&draft, &draft.controls, false, None, None, &Value::Null);
+    assert_eq!(result.unwrap_err().to_string(), REVISION_CONFLICT);
+    let current = drafts.snapshot(draft.id, None)?;
+    assert_eq!(current.revision, 2);
+    assert_eq!(current.settings_revision, 0);
+    assert!(current.require_unadjusted_layout().is_err());
+    Ok(())
 }
 
 pub struct Snapshot<'a> {
@@ -142,6 +168,31 @@ impl Snapshot<'_> {
             Some((rev, json)) => Ok((rev, Some(serde_json::from_str(&json)?))),
             None => Ok((0, None)),
         }
+    }
+
+    pub fn require_unadjusted_layout(&self) -> Result<()> {
+        ensure!(self.revision == self.latest_revision, "{REVISION_CONFLICT}");
+        // This query reads immutable history. Drafts::advance rejects a write racing the preflight.
+        let section: Option<u32> = self
+            .drafts
+            .connect()?
+            .query_row(
+                "SELECT e.section FROM glyph_edits e
+                 WHERE e.draft=?1 AND e.settings_revision=?2 AND e.revision<=?3
+                   AND e.source_revision=(SELECT MAX(s.revision) FROM sections s
+                       WHERE s.draft=e.draft AND s.number=e.section AND s.revision<=?3)
+                 LIMIT 1",
+                params![self.id, self.layout_revision, self.revision],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(section) = section {
+            anyhow::bail!(
+                "Reflow would stop applying local glyph adjustments in section {section} of revision {}. This request saved no new revision. Keep preserve_local_adjustments=true. Only if the user explicitly agrees to lose those adjustments in the new layout may you use preserve_local_adjustments=false.",
+                self.revision
+            );
+        }
+        Ok(())
     }
 
     pub fn store_edits(
@@ -554,7 +605,7 @@ impl Drafts {
                 "UPDATE drafts SET revision=?1 WHERE id=?2 AND revision=?3",
                 params![next, id, expected]
             )? == 1,
-            "Revision conflict; read the latest revision before retrying"
+            "{REVISION_CONFLICT}"
         );
         Ok(next)
     }
