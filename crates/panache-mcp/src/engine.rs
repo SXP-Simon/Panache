@@ -12,6 +12,11 @@ use crate::{
 use handwriting_core::fine_edit::{self, Adjustment, Adjustments};
 use serde_json::{Value, json};
 
+fn glyph_source<'a>(text: &'a [u16], glyph: &fine_edit::GlyphBounds) -> Option<&'a [u16]> {
+    let [start, end] = glyph.source_utf16?;
+    text.get(start as usize..end as usize)
+}
+
 // Coordinates relative to the original tile center, transformed in paint order.
 fn glyph_point(
     g: &fine_edit::GlyphBounds,
@@ -408,9 +413,7 @@ impl Engine {
                             json!([project(x, g.baseline), project(x + w, g.baseline)]);
                     }
                 }
-                if let Some([a, b]) = g.source_utf16
-                    && let Some(chars) = utf16.get(a as usize..b as usize)
-                {
+                if let Some(chars) = glyph_source(&utf16, g) {
                     row["text"] = json!(
                         String::from_utf16_lossy(chars)
                             .chars()

@@ -109,7 +109,7 @@ cargo build --locked --release -p panache-mcp
 1. 表格、无横线纸和画作均可排字。用户已指定位置或委托选位时，直接按意图排版。落字区有歧义时，简短问“要写在哪个栏，哪些地方留白？”若必填区域在画外，或失焦、遮挡、透视已使它无法定位，建稿前指出具体缺哪一块，请用户补拍该区域或确认只填可见部分。已明确要求只写正文时，直接填写可定位的正文区。
 2. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。整页复查图长边最多 900 像素，像素坐标以返回的 `photo_size` 为准。检查有字区域的横线、页眉、页边和需要保留的图案。
 3. 调用 `tune_handwriting(draft_id, expected_revision, paper_guides, note)` 在原照片上重排全文。至少给两条参考线，每条提供行号与左右端点。无横线纸也可以指定想写入的区域。传空数组恢复建稿时的校准。旧版本仍可回看；改写书写区域会重置冲突的边距覆盖，重新排版后需重新选字。
-4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和相同版本交给 `adjust_glyphs`。`place_center` 将一组字移到指定照片位置；`target_quad` 按左上、右上、右下、左下四角放置所选字块，替换该组已有几何调整。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
+4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和这次布局返回的版本交给 `adjust_glyphs`。用户点名要改哪几个字时，按 `ids` 的顺序传 `expected_texts`，例如 `ids=[4,6], expected_texts=["春","雨"]`。任一编号对应的文字不符，整批都不保存；版本冲突时重新查布局并定位。相同的字出现多次时，用上下文或位置区分。纯位置选区和旧客户端可以省略文字核对。`place_center` 将一组字移到指定照片位置；`target_quad` 按左上、右上、右下、左下四角放置所选字块，替换该组已有几何调整。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
 5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。有下一页时，把 `next_cursor` 作为下一次调用的 `cursor`。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
 
 要核对局部改动，用 `preview_handwriting(view="review", region=…, revision=新版本, compare_revision=旧版本)` 查看同一区域的底纸、改前和改后图。移动字块时还可用 `previous_region` 圈出旧位置。需要保护的文字或页眉可单独圈选复查。区域使用原尺寸成品像素。[局部坐标与测量示例](tool-design.md#局部改动的复查)

@@ -220,11 +220,14 @@ pub struct Nudge {
     /// Optional short user feedback or observable reason to retain with this revision.
     pub note: Option<String>,
     pub draft_id: String,
+    /// Use the revision returned by the layout that supplied these IDs. On conflict, read the latest layout and locate the intended text again.
     pub expected_revision: u32,
     pub section: u32,
     pub page: usize,
     /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
     pub ids: Vec<u32>,
+    /// For a named text target, send its intended glyph text in ids order (one exact string per ID). A mismatch rejects the whole edit. For repeated text, use nearby words or position to select the occurrence.
+    pub expected_texts: Option<Vec<String>>,
     /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
     pub place_center: Option<[u32; 2]>,
     /// Image destinations of the original block's TL,TR,BR,BL corners, in that order (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Replaces prior geometry; use separately from other geometry changes.

@@ -168,6 +168,44 @@ async def handwriting_variation_sample(client):
     assert source["markdown"] == markdown
 
 
+async def glyph_target_text(client):
+    saved = (await call(client, "save_section", markdown="春 雨", style={"seed": 42})).structuredContent
+    key = {"draft_id": saved["draft_id"], "section": 1, "page": 1}
+
+    async def layout():
+        return (await call(client, "preview_handwriting", **key, view="layout")).structuredContent
+
+    before = await layout()
+    old_spring = next(g["id"] for g in before["glyphs"] if g["text"] == "春")
+    await call(client, "save_section", draft_id=key["draft_id"], section=1,
+               expected_revision=before["revision"], markdown="明 日 春 雨")
+    current = await layout()
+    ids = {g["text"]: g["id"] for g in current["glyphs"]}
+    assert ids["明"] == old_spring and ids["春"] != old_spring
+
+    for revision, targets, words, reason in (
+        (before["revision"], [old_spring], ["春"], "Revision conflict"),
+        (current["revision"], [ids["雨"], old_spring], ["雨", "春"], "Glyph text mismatch"),
+        (current["revision"], [ids["春"], ids["雨"]], ["春"], "one nonempty expected text"),
+        (current["revision"], [ids["春"]], [""], "one nonempty expected text"),
+    ):
+        failed = await client.call_tool("adjust_glyphs", {
+            **key, "expected_revision": revision, "ids": targets,
+            "expected_texts": words, "color": "#cc1833",
+        })
+        assert failed.isError and reason in failed.content[0].text, failed.content
+    unchanged = await layout()
+    assert unchanged["revision"] == current["revision"] and unchanged["glyphs"] == current["glyphs"]
+
+    # Request order differs from page order. Each string must match its own ID.
+    await call(client, "adjust_glyphs", **key, expected_revision=current["revision"],
+               ids=[ids["雨"], ids["春"]], expected_texts=["雨", "春"], color="#cc1833")
+    after = await layout()
+    assert after["revision"] == current["revision"] + 1
+    assert [g["text"] for g in after["glyphs"]
+            if g.get("adjustment", {}).get("color") == [204, 24, 51]] == ["春", "雨"]
+
+
 async def placement_pixels(client):
     saved = (await call(client, "save_section", markdown="字", style={"seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
@@ -355,6 +393,7 @@ async def smoke(command, arguments, out):
             await mixed_script_sample(client)
             await handwriting_variation_sample(client)
             await placement_pixels(client)
+            await glyph_target_text(client)
             await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
