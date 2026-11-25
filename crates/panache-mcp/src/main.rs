@@ -438,7 +438,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" finds that historical section’s last sheet. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown). When paging through one source revision, pass the revision returned by the first source page on every subsequent page together with its next_offset."
+        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" finds that historical section’s last sheet. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown). When paging through one source revision, pass the revision returned by the first source page on every subsequent page together with its next_offset. For a complete copy start at offset 0, reuse each next_read as the entire argument object, and verify continuous coverage through the final page."
     )]
     async fn read_section(
         &self,
@@ -482,6 +482,26 @@ impl Panache {
             }
             if input.view == Some(ReadView::Summary) {
                 return Ok(reply(result.to_string(), result));
+            }
+            if input.view == Some(ReadView::Source) {
+                let mut header = format!(
+                    "第 {} 版 · 第 {} 节 · 偏移 {}（从 0 计）· 本次返回 {} 字 · 全节 {} 字 · 后续剩余 {} 字",
+                    draft.revision, result["section"], result["offset"], result["returned_chars"],
+                    result["total_chars"], result["remaining_chars"]
+                );
+                if input.revision.is_none() && input.offset.unwrap_or(0) > 0 {
+                    let warning = "本次续读未指定版号，可能与前一段串版。归档时请用首段返回的 revision 重读本段。";
+                    result["pagination_warning"] = json!(warning);
+                    header.push_str("。");
+                    header.push_str(warning);
+                }
+                if result["next_read"].is_null() {
+                    header.push_str(" 已到节末；确认取全须从头连续读取同一版。");
+                } else {
+                    header.push_str(&format!(" 下一次 read_section 参数：{}", result["next_read"]));
+                }
+                let text = format!("{header}\n\n{}", result["markdown"].as_str().unwrap_or_default());
+                return Ok(reply(text, result));
             }
             let message = format!(
                 "稿件 `{}` · 版本 {} · 第 {} 节 · 从第 {} 个字符起（共 {} 个）\n\n{}",
