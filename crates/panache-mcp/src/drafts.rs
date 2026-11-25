@@ -172,8 +172,13 @@ impl Snapshot<'_> {
         }
     }
 
-    pub fn require_unadjusted_layout(&self) -> Result<()> {
+    pub fn require_current_revision(&self) -> Result<()> {
         ensure!(self.revision == self.latest_revision, "{REVISION_CONFLICT}");
+        Ok(())
+    }
+
+    pub fn require_unadjusted_layout(&self) -> Result<()> {
+        self.require_current_revision()?;
         // This query reads immutable history. Drafts::advance rejects a write racing the preflight.
         let section: Option<u32> = self
             .drafts
