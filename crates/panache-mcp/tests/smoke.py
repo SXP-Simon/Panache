@@ -120,6 +120,49 @@ async def review_workflow(client, key, guides, font_path):
     return transparent, default, uploaded
 
 
+async def source_pagination(client):
+    # Both revisions have the same Unicode length. Neither length nor reaching EOF
+    # can establish that all returned slices belong to the same source.
+    old = ("甲🙂e\u0301乙" * 1704)[:-1]
+    new = old.replace("甲", "丙")
+    assert len(old) == len(new) == 8519
+    draft = (await call(client, "save_section", markdown="封面")).structuredContent["draft_id"]
+    await call(client, "save_section", draft_id=draft, expected_revision=1, markdown=old)
+    await call(client, "save_section", draft_id=draft, expected_revision=2, markdown="附录")
+    args = {"draft_id": draft, "section": 2, "view": "source", "limit": 4000}
+    pieces = []
+    for offset, returned, remaining in [(0, 4000, 4519), (4000, 4000, 519), (8000, 519, 0)]:
+        result = await call(client, "read_section", **args)
+        page = result.structuredContent
+        assert (page["revision"], page["offset"], page["total_chars"]) == (3, offset, len(old))
+        assert page["section_revision"] == 2
+        assert (page["returned_chars"], page["remaining_chars"]) == (returned, remaining)
+        assert page["markdown"] == old[offset:offset + returned]
+        assert "pagination_warning" not in page
+        assert f"后续剩余 {remaining} 字" in result.content[0].text
+        pieces.append(page["markdown"])
+        if offset == 0:
+            await call(client, "save_section", draft_id=draft, expected_revision=3, section=2, markdown=new)
+        if remaining:
+            args = page["next_read"]
+            assert args == {"draft_id": draft, "view": "source", "section": 2, "revision": 3,
+                            "offset": page["next_offset"], "limit": 4000}
+            assert json.loads(result.content[0].text.split("下一次 read_section 参数：")[1]
+                              .split("\n", 1)[0]) == args
+        else:
+            assert page["next_read"] is None and page["next_offset"] is None
+    assert "".join(pieces) == old
+    for offset, size in [(4519, 4000), (8000, 519), (8519, 0), (9000, 0)]:
+        tail = (await call(client, "read_section", draft_id=draft, section=2, view="source",
+                           offset=offset, limit=4000)).structuredContent
+        assert tail["revision"] == 4 and tail["markdown"] == new[offset:]
+        assert "revision" in tail["pagination_warning"]
+        assert (tail["returned_chars"], tail["remaining_chars"], tail["next_read"]) == (size, 0, None)
+    for view in ("summary", "excerpt"):
+        other = (await call(client, "read_section", draft_id=draft, section=2, view=view)).structuredContent
+        assert "next_read" not in other and "remaining_chars" not in other
+
+
 async def mixed_script_sample(client):
     saved = (await call(client, "save_section", markdown="样品 A 的质量为 12.5 g。",
                         style={"font": "李国夫手写体.ttf", "seed": 17})).structuredContent
@@ -390,6 +433,7 @@ async def smoke(command, arguments, out):
                 "save_section", {"markdown": "missing", "paper_path": str(paper_path)}
             )
             assert failed.isError
+            await source_pagination(client)
             await mixed_script_sample(client)
             await handwriting_variation_sample(client)
             await placement_pixels(client)

@@ -686,7 +686,18 @@ impl Drafts {
         result["markdown"] = json!(excerpt);
         result["offset"] = json!(offset);
         result["total_chars"] = json!(len);
-        result["next_offset"] = json!(offset.checked_add(limit).filter(|n| *n < len));
+        let next_offset = offset.checked_add(limit).filter(|n| *n < len);
+        result["next_offset"] = json!(next_offset);
+        if view == crate::ReadView::Source {
+            let available = len.saturating_sub(offset);
+            let returned = available.min(limit);
+            result["returned_chars"] = json!(returned);
+            result["remaining_chars"] = json!(available - returned);
+            result["next_read"] = json!(next_offset.map(|next| json!({
+                "view": "source", "draft_id": id, "revision": rev, "section": number,
+                "offset": next, "limit": limit
+            })));
+        }
         Ok(result)
     }
     pub fn sections(&self, id: &str, rev: u32, number: Option<u32>) -> Result<Vec<Section>> {
