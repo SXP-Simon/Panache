@@ -307,10 +307,10 @@ pub fn page(
         metadata["next_step"] = json!(next);
         if draft.paper.is_some() {
             let mut appearance = json!({
-                "inspect":"Compare the strokes with nearby photographed marks for edge softness, contrast and size, and with the available writing space for letter size. Baseline offsets only measure placement. If images are unavailable, ask the user to inspect the crop before judging appearance.",
-                "ink_edge_guidance":"Keep the current ink if it already looks suitable or the user wants it unchanged. If the user reports overly sharp edges, or a visible native crop shows strokes sharper than comparable nearby photographed marks, inspect the ink controls and consider a small increase in ink_softness. Compare the same region before and after, including fine strokes and contrast; keep the original if the result is worse or uncertain. A dark shadow or faint ink alone is not evidence that softness is needed. Without images, ask the user to inspect the crop; do not claim a visual judgment.",
+                "inspect":"Compare contrast and size with photographed marks. Check letter size against writing space. Baselines measure placement only. Without images, ask the user to inspect the crop.",
+                "ink_edge_guidance":"Keep ink if requested or suitable. Only try slightly more ink_softness if the user reports overly sharp strokes or a native crop shows sharper stroke edges than comparable nearby marks. Shadow or faint ink alone is insufficient.",
                 "controls":"describe_controls with draft_id, revision and group: ink (ink #RRGGBB, ink_opacity %, ink_softness and ink_thickness in paper-space px); layout (font_size in paper-space px); typography (font).",
-                "after_edit":"Review the edited revision. Use the same region with compare_revision for paper/before/after crops. If text reflowed onto different pages, inspect each revision separately."
+                "after_edit":"Use compare_revision for paper/before/after crops of the same region. Check fine strokes and contrast; keep the original if worse or unsure. After page reflow inspect each revision separately."
             });
             if let Some(region) = detail_region(baselines, (w, h), params.font_size) {
                 appearance["preview_arguments"] = json!({
