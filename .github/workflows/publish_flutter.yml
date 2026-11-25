@@ -59,7 +59,7 @@ jobs:
         include:
           - os: windows-latest
             platform: windows-x64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux-x64
           - os: macos-15
             platform: macos-arm64
@@ -87,6 +87,8 @@ jobs:
         with:
           toolchain: "1.94.1"
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.5"
@@ -107,6 +109,15 @@ jobs:
           BINARY="$(python -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$BINARY")"
           cd app
           flutter test test/desktop_backend_test.dart --dart-define="DESKTOP_BACKEND_EXECUTABLE=$BINARY" --dart-define="EXPECTED_APP_VERSION=$HANDWRITING_BUILD_VERSION"
+      - name: Smoke-test the Linux archive on the build baseline
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          unpacked="$(mktemp -d)"
+          tar -xzf target/desktop-package/linux/*.tar.gz -C "$unpacked"
+          python -m pip install "mcp>=1.12,<2" Pillow
+          python crates/panache-mcp/tests/smoke.py "$unpacked/Panache/backend/panache-mcp"
       - name: Stage Flutter-prefixed archive and provenance
         shell: bash
         env:

@@ -31,6 +31,8 @@ git push origin refs/tags/v1.18.1
 
 安装包包括 Windows x64、Linux x64、macOS arm64 和已配置正式签名时的 Android arm64-v8a / x86_64。历史 Release 和已有下载链接继续保留。旧 Web/Electron 源码可以在 `backup` 查看。
 
+Linux x64 桌面 CI 与标签发布固定使用 Ubuntu 24.04（glibc 2.39）构建，避免随 runner 默认镜像升级而抬高系统要求。标签发布会解开待分发的 tar.gz，用随包 MCP 运行预览和导出测试。
+
 桌面构建可通过 `scripts/build-flutter-desktop.py --version <版本> --build-number <构建号>`
 注入版本；普通开发不需要这些参数。`HANDWRITING_BUILD_VERSION` 同时决定 Rust
 后端/FFI 的构建版本，打包的后台 `VERSION` 文件与 Flutter 应用版本保持一致。
