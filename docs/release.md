@@ -52,3 +52,15 @@ release-mode 调试仍可使用调试签名，调试签名包不能作为正式�
 macOS 桌面包使用 ad-hoc 签名，未配置 Apple Developer ID 或公证；首次使用时
 可能需要在系统隐私与安全性设置中允许打开。iOS 需要分发证书与 provisioning，
 未配置时不发布不可安装的 IPA。
+
+## 在本地检查 Linux 包的 glibc 版本需求
+
+解开最终归档后，把包含 `backend/` 的 `Panache` 目录交给脚本，并明确指定要验证的 glibc 上限。例如，在 Debian 13 上验证 2.41 可运行以下命令。
+
+```sh
+python3 scripts/check-linux-glibc.py /path/to/Panache --max-glibc 2.41
+```
+
+脚本使用 GNU `readelf` 读取包内 ELF 的版本需求。退出码 0 表示所有读到的数字 GLIBC 需求都在上限内，1 表示至少一个文件超界，2 表示参数有误，3 表示包或版本信息无法检查，4 表示缺少必需的 Rust 后端，5 表示找不到 `readelf`。无法换算成数字的 GLIBC 需求也会报错。检查通过后，仍需在目标系统上启动桌面程序，验证图形库和真实工具调用。
+
+v1.21.0 官方 Linux x64 包以 2.41 为上限时，12 个 ELF 中有两个后端要求 `GLIBC_2.43`。在 Debian 13 从同一提交重建这两个后端后，同一个检查有 0 个文件超界。2.41 仅为这次对照使用的上限。
