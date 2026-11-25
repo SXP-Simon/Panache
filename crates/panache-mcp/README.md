@@ -128,6 +128,8 @@ cargo build --locked --release -p panache-mcp
 
 如果字像贴在照片上，在照片整页复查的 `photo_appearance` 中取 `preview_arguments` 再调用一次 `preview_handwriting`。有页内文字基线样本时，这组参数会给出该版本一处字迹附近的原像素底纸和成品裁图；也可以自己圈选。对照邻近印字或横线的边缘清晰度、墨色深浅，再看字号与可写空间是否相称。用 `describe_controls` 指定稿件、版本和 `ink`、`layout` 或 `typography` 参数组可查当前值。正文的柔化和粗细以投影前纸面像素为单位，透明度用百分比。仅修改墨迹组参数时会保留已完成的单字移位和透视调整；更换字体、字号或参考线后应在新版本重新检查选区。改一版后，对同一选区加入 `compare_revision` 比较。只有文字结果的客户端可转述测量，请用户看图判断观感。
 
+客户端已知目标值时，可在 `tune_handwriting` 中同时传 `changes={"perturb_theta_sigma":0.07}` 和 `readback_variation=["perturb_theta_sigma"]`。成功回执的 `effective_changes` 给出写入前后的有效值，可省去写前、写后各一次查询。最多点名本次提交的两个 `variation` 控件。提交 `null` 时读回继承值，有效值相同的键会省略。若要根据旧值决定改多少，仍应先用 `describe_controls` 读取该稿当前版本的值。
+
 需要保留手动移字时，在 `tune_handwriting` 顶层传入 `preserve_local_adjustments=true`。例如，稿件中仍有字形调整时，更改 `variation.perturb_theta_sigma` 会返回一个受影响的节号，稿件停留在原版本。只更改墨迹或相机元数据仍可保存。被拒绝后应保持 `true`。只有用户明确同意新布局不再应用这些手动调整时，才可传 `false`；旧版仍可回看。
 
 例如，先前已确认行距 56、左边距 67，后来要求恢复导入时的参考线并保留这两个数值。在同一次调用中传 `paper_guides=[]` 和 `changes={"line_spacing":56,"left_margin":67}`；想让文字重新跟随底纸时，省略相应数值。如果之前摆好的字也必须留在原位，再传 `preserve_local_adjustments=true`。补回行距和边距仍会触发重排；若保护生效，整次请求停在原版本。

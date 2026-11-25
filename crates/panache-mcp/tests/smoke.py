@@ -19,6 +19,7 @@ from PIL import Image
 
 import coursework_form
 import review_comparison
+from first_use import tables
 from mcp_client import call
 
 from mcp import ClientSession, StdioServerParameters
@@ -143,7 +144,7 @@ async def mixed_script_sample(client):
     assert png(await call(client, "preview_handwriting", **key)) == primary
 
 
-async def handwriting_variation_sample(client):
+async def handwriting_variation_sample(client, home):
     markdown = "样品 A 的质量为 12.5 g。"
     saved = (await call(client, "save_section", markdown=markdown, style={"seed": 17})).structuredContent
     key = {"draft_id": saved["draft_id"]}
@@ -155,6 +156,7 @@ async def handwriting_variation_sample(client):
     tuned = await call(client, "tune_handwriting", **key, expected_revision=1,
                        preserve_local_adjustments=True, changes={"variation": {"perturb_theta_sigma": 0.07}})
     assert tuned.structuredContent["controls"]["perturb_theta_sigma"] == 0.07
+    assert "effective_changes" not in tuned.structuredContent
     loose = png(await call(client, "preview_handwriting", **key))
     assert loose != base
     strike = (await call(client, "describe_controls", **key, group="strike")).structuredContent
@@ -166,6 +168,45 @@ async def handwriting_variation_sample(client):
     assert png(await call(client, "preview_handwriting", **key, revision=2)) == loose
     source = (await call(client, "read_section", **key, view="source")).structuredContent
     assert source["markdown"] == markdown
+
+    async def values(revision):
+        response = await call(client, "describe_controls", **key, revision=revision, group="variation")
+        return response.structuredContent["values"]
+
+    tilt, shift = "perturb_theta_sigma", "perturb_x_sigma"
+    before = await values(3)
+    one = await call(client, "tune_handwriting", **key, expected_revision=3,
+                     changes={tilt: 0.09}, readback_variation=[tilt])
+    after = await values(4)
+    assert after[tilt] > before[tilt]
+    assert one.structuredContent["effective_changes"] == {tilt: {"before": before[tilt], "after": after[tilt]}}
+
+    two = await call(client, "tune_handwriting", **key, expected_revision=4,
+                     changes={tilt: None, shift: 1.5}, readback_variation=[tilt, shift])
+    reset = await values(5)
+    assert reset[tilt] == (await values(1))[tilt] and reset[shift] == 1.5
+    assert two.structuredContent["effective_changes"] == {
+        k: {"before": after[k], "after": reset[k]} for k in (tilt, shift)
+    }
+
+    proposed = {tilt: 0.11, shift: 2, "ink_depth_sigma": 9}
+    unchanged = tables(home)
+    for revision, keys, changes, error in (
+        (4, [tilt], proposed, "Revision conflict"),
+        (5, [shift], {tilt: 0.11}, "readback_variation"),
+        (5, ["font_size"], {"font_size": 36}, "readback_variation"),
+        (5, list(proposed), proposed, "readback_variation"),
+    ):
+        rejected = await client.call_tool("tune_handwriting", {
+            **key, "expected_revision": revision, "changes": changes, "readback_variation": keys,
+        })
+        assert rejected.isError and error in rejected.content[0].text
+        assert tables(home) == unchanged
+
+    # Saving an explicit override at the inherited value does not change the effective value.
+    equal = await call(client, "tune_handwriting", **key, expected_revision=5,
+                       changes={tilt: reset[tilt]}, readback_variation=[tilt])
+    assert equal.structuredContent["effective_changes"] == {}
 
 
 async def placement_pixels(client):
@@ -353,7 +394,7 @@ async def smoke(command, arguments, out):
             )
             assert failed.isError
             await mixed_script_sample(client)
-            await handwriting_variation_sample(client)
+            await handwriting_variation_sample(client, Path(temp))
             await placement_pixels(client)
             await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
