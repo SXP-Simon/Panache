@@ -120,6 +120,8 @@ cargo build --locked --release -p panache-mcp
 
 需要保留手动移字时，在 `tune_handwriting` 顶层传入 `preserve_local_adjustments=true`。例如，稿件中仍有字形调整时，更改 `variation.perturb_theta_sigma` 会返回一个受影响的节号，稿件停留在原版本。只更改墨迹或相机元数据仍可保存。被拒绝后应保持 `true`。只有用户明确同意新布局不再应用这些手动调整时，才可传 `false`；旧版仍可回看。
 
+例如，先前已确认行距 56、左边距 67，后来要求恢复导入时的参考线并保留这两个数值。在同一次调用中传 `paper_guides=[]` 和 `changes={"line_spacing":56,"left_margin":67}`；想让文字重新跟随底纸时，省略相应数值。如果之前摆好的字也必须留在原位，再传 `preserve_local_adjustments=true`。补回行距和边距仍会触发重排；若保护生效，整次请求停在原版本。
+
 `tune_handwriting(font_path=…)` 会把本机 TTF/OTF 随稿保存。可用返回的字体标识在同一稿内切回该字体。墨迹组的 `transparent_background` 控制原尺寸 PNG 预览和 ZIP，PDF 保留纸张。透明稿复盘会把墨迹放回底纸，方便判断实际可读性。
 
 ### 比较两版，找回当时的依据

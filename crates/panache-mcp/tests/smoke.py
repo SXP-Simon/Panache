@@ -95,7 +95,17 @@ async def review_workflow(client, key, guides, font_path):
     geometry = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
     for actual, target in zip(geometry["glyphs"][0]["current_photo_quad"], quad, strict=True):
         assert max(abs(a-b) for a,b in zip(actual,target,strict=True)) < 1.1
-    await call(client, "tune_handwriting", **key, expected_revision=8, paper_guides=[])
+    # Keeping the numeric layout cannot carry hand-placed glyphs across a guide reset.
+    controls = (await call(client, "describe_controls", **key, group="layout")).structuredContent["values"]
+    reset = dict(**key, expected_revision=8, paper_guides=[])
+    protected = await client.call_tool("tune_handwriting", {
+        **reset, "preserve_local_adjustments": True,
+        "changes": {name: controls[name] for name in ("line_spacing", "left_margin")},
+    })
+    assert protected.isError and "section 1 of revision 8" in protected.content[0].text
+    current = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
+    assert current["glyphs"][0]["current_photo_quad"] == geometry["glyphs"][0]["current_photo_quad"]
+    await call(client, "tune_handwriting", **reset)
     restored = (await call(client, "read_section", **key, view="summary")).structuredContent["paper"]
     original = (await call(client, "read_section", **key, revision=1, view="summary")).structuredContent["paper"]
     assert restored == original
