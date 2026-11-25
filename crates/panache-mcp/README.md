@@ -58,7 +58,7 @@ cargo build --locked --release -p panache-mcp
 | `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |
 | `preview_handwriting` | 默认返回首页 PNG。用 `section`、`page` 查看指定节中的一页，两者从 1 开始。 |
 | `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。导出结果的 `review.unreviewed_pages` 按打印顺序列出缺少整页复盘的 `section`、`page`。将这些坐标与导出的版本号传给 `preview_handwriting(view="review")` 可逐张补看。 |
-| `describe_controls` | 调参时可将参数直接放在 `changes` 内，也可写成 `{"changes":{"variation":{"perturb_theta_sigma":0.07}}}`。先列参数组，再按 `group` 查看单位、范围和枚举值。附上 `draft_id` 和 `revision` 可读取该版的实际值。 |
+| `describe_controls` | 调参时可将参数直接放在 `changes` 内，也可写成 `{"changes":{"variation":{"perturb_theta_sigma":0.07}}}`。传 `{}` 列出参数组；只传 `group` 查看参数、单位、范围和枚举值。传 `group` 和 `draft_id` 读取当前保存版的实际值，另带 `revision` 可查指定版。行距和页面几何查 `layout`；底纸参考线校准不在该组。 |
 | `tune_handwriting` | 可在原稿上更新参考线、导入本机字体，并一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
 | `storage_usage` | 查询目录和逐稿用量，以及当前预算。 |
 | `plan_cleanup` | 按稿列出废弃临时文件和受保护的已交付导出。 |
