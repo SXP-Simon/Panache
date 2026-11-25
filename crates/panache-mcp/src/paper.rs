@@ -156,7 +156,7 @@ impl ImportedPaper {
     ) -> Result<Self> {
         ensure!(
             path.is_absolute() && path.is_file(),
-            "paper_path must be an absolute path to a local image file"
+            "paper_path must be an absolute path to an image file readable on the computer running Panache. A chat attachment or URL alone is not a file path. If the client cannot transfer the photo to that computer, explain this instead of guessing a path."
         );
         let limits = Limits::default();
         let file = File::open(path).context("Cannot open paper image")?;
