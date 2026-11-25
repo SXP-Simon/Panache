@@ -283,7 +283,7 @@ impl ServerHandler for Panache {
 impl Panache {
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Call describe_controls({}) to list group names. Pass group alone for its fields, units, ranges and choices. Pass group and draft_id for the saved draft's effective values; add revision to read an older version. Use group=layout for line spacing and page geometry, not paper guide calibration. For less even handwriting inspect group=variation; for requested occasional crossed-out mistakes inspect group=strike."
+        description = "Call describe_controls({}) to list group names. Pass group alone for its fields, units, ranges and choices. Pass group and draft_id for effective values from the latest saved revision, or include revision to select a version. Use group=layout for text line spacing and page geometry. Use paper_guides to calibrate physical lines on imported paper. Use group=variation for less even handwriting and group=strike for requested occasional crossed-out mistakes. When English letters or digits need separate tuning, use group=typography with draft_id to check the saved font, scale and digit settings before changing them."
     )]
     fn describe_controls(&self, Parameters(input): Parameters<Describe>) -> CallToolResult {
         tool_result((|| {
