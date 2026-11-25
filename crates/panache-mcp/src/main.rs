@@ -1,4 +1,5 @@
 mod controls;
+mod delivery;
 mod drafts;
 mod engine;
 mod inputs;
@@ -253,6 +254,9 @@ impl ServerHandler for Panache {
     fn get_info(&self) -> rmcp::model::ServerConfig {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         let instructions = concat!(
+            "When someone only asks for handwriting help, use the text or photo already supplied. If the outcome is unclear, offer only relevant examples: a printable page, writing on their own sheet, or just the ink to paste elsewhere. Ask one short question, inviting them to paste missing text in the same turn. Skip this choice for a clear request. ",
+            "Ask for missing text or an accessible photo only when needed. For a photo attachment use a client transfer to the server, or suggest running Panache on the computer with the photo. ",
+            "For an undecided layout show one page with view=image. Invite a concrete change such as larger writing or lighter ink. After feedback show the revised page and export the version the user chose. ",
             "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
             "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
             "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
@@ -572,7 +576,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request return the file and missing pages. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Use view=image to inspect the intended appearance without filing a check."
+        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request return the file and missing pages. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. The path is on the server computer. If the client supports attachments, request include_file and use the embedded file to offer the user a download. Claim delivery only when the client makes the file available to the user. Use view=image to inspect the intended appearance without filing a check."
     )]
     async fn export_handwriting(
         &self,
@@ -590,7 +594,7 @@ impl Panache {
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
             let format = input.format.unwrap_or_default();
-            let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
+            let (path, pages, file) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
                 writer, &draft, sections, format, cancel,
                 |pages, section, page| {
                     match reviewed_pages.get(&(section, page)) {
@@ -617,8 +621,8 @@ impl Panache {
             } else {
                 format!(" 缺少整页检查单的节内页码：{}。", serde_json::to_string(&unreviewed)?)
             };
-            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}\n\n`{}`", draft.revision, path.display());
-            Ok(reply(message, json!({
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}\n\n运行 Panache 的电脑上的文件：`{}`", draft.revision, path.display());
+            let mut result = reply(message, json!({
                 "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages,
                 "review": {
                     "pages_with_evidence": reviewed,
@@ -627,7 +631,11 @@ impl Panache {
                     "pages_without_visibility_evidence": unreviewed.len(),
                     "unreviewed_pages": unreviewed,
                 }
-            })))
+            }));
+            if input.include_file {
+                delivery::include_file(&mut result, file, &path, format);
+            }
+            Ok(result)
         }).await;
         tool_result(result)
     }

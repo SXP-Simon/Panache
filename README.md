@@ -28,7 +28,7 @@ The Windows, macOS, and Linux desktop packages include a local MCP server. Open 
 
 > Write my notes and the process diagram on this photo of my stationery. Show me the first page, then export the whole draft as a PDF.
 
-For the photo, give the client a file path accessible on the computer running Panache. A client that passes images to its model can inspect the finished page and review a selected area. In a text-only client, ask for the measurements and open the exported PDF locally to judge the appearance. [MCP tools and configuration](crates/panache-mcp/README.md)
+You can also start with just text. Paste a passage and say whether you want a printable page, writing on a photo of your worksheet, or transparent ink to paste elsewhere. For a photo, the client needs a way to make it available on the computer running Panache. [MCP tools and configuration](crates/panache-mcp/README.md)
 
 | Process state diagram | Resource allocation table |
 | --- | --- |
