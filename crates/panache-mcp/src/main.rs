@@ -258,12 +258,12 @@ impl ServerHandler for Panache {
             "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-            "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page can be \"last\". For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+            "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Follow photo_appearance.preview_arguments for a native detail crop. ",
             "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
-            "Inspect the edited appearance with view=image when no new check is requested. Use read_section(view=trajectory) to revisit actions and evidence."
+            "Inspect appearance with view=image; revisit actions with read_section(view=trajectory)."
         );
         let mode = if self.0.preserve_reviews {
             "This connection preserves stored reviews. Use view=image to inspect and export_handwriting to print. "
@@ -283,7 +283,7 @@ impl ServerHandler for Panache {
 impl Panache {
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Call describe_controls({}) to list group names. Pass group alone for its fields, units, ranges and choices. Pass group and draft_id for effective values from the latest saved revision, or include revision to select a version. Use group=layout for text line spacing and page geometry. Use paper_guides to calibrate physical lines on imported paper. Use group=variation for less even handwriting and group=strike for requested occasional crossed-out mistakes. When English letters or digits need separate tuning, use group=typography with draft_id to check the saved font, scale and digit settings before changing them."
+        description = "List groups with {}. Pass group for fields, units, ranges and choices; add draft_id for effective values (optional revision). Use layout for text spacing and geometry, paper_guides for stationery lines, variation for loose writing, strike for occasional crossed-out mistakes and typography for Latin font, scale and digits."
     )]
     fn describe_controls(&self, Parameters(input): Parameters<Describe>) -> CallToolResult {
         tool_result((|| {
@@ -421,7 +421,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "For a prior check of a particular sheet, use view=review, section and page. For “before adding [words]” pass before_text with a literal fragment of the addition; for the final sheet of that section pass page=\"last\". These select and paginate the same historical version in one lookup. For a single requested sheet cite its returned review_id and receipt_summary. Other revisions can have separate receipts for the same page. Otherwise omit revision for current or set a revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without creating a check. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
+        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" finds that historical section’s last sheet. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown)."
     )]
     async fn read_section(
         &self,
@@ -572,7 +572,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request return the file and missing pages. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Use view=image to inspect the intended appearance without filing a check."
+        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. Text-only clients can open the PDF locally."
     )]
     async fn export_handwriting(
         &self,
