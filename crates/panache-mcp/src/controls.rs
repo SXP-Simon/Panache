@@ -75,6 +75,10 @@ pub fn merge(current: &Changes, patch: &Changes, fonts: &[String]) -> Result<Cha
             _ => false,
         };
         ensure!(valid, "Invalid {name}; expected {spec}");
+        // Keep the stored JSON representation when a numeric override is unchanged.
+        if spec["type"] == "number" && current.get(name).and_then(Value::as_f64) == value.as_f64() {
+            continue;
+        }
         next.insert(name.clone(), value.clone());
     }
     Ok(next)
@@ -164,4 +168,52 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
         ));
     params.validate(w, h, &Limits::default())?;
     Ok(params)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn equivalent_numbers_keep_the_stored_representation() -> Result<()> {
+        for (old, new) in [(json!(4), json!(4.0)), (json!(4.0), json!(4))] {
+            let current = Changes::from_iter([("word_spacing".into(), old.clone())]);
+            let patch = Changes::from_iter([
+                ("word_spacing".into(), new),
+                ("ink_opacity".into(), json!(77)),
+            ]);
+            let merged = merge(&current, &patch, &[])?;
+            assert_eq!(merged["word_spacing"], old);
+            assert_eq!(merged["ink_opacity"], 77);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn numeric_overrides_can_be_pinned_changed_and_cleared() -> Result<()> {
+        let mut current = Changes::new();
+        for value in [json!(1), json!(1.25), Value::Null] {
+            let patch = Changes::from_iter([("word_spacing".into(), value.clone())]);
+            current = merge(&current, &patch, &[])?;
+            assert_eq!(
+                current.get("word_spacing"),
+                (!value.is_null()).then_some(&value)
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn equal_values_still_require_a_valid_patch() {
+        for (name, old, new) in [
+            ("ink_opacity", json!(77), json!(77.0)),
+            ("word_spacing", json!(4), json!("4")),
+            ("word_spacing", json!(10001), json!(10001.0)),
+            ("ink_thickness", json!(0.25), json!(0.25)),
+        ] {
+            let current = Changes::from_iter([(name.into(), old)]);
+            let patch = Changes::from_iter([(name.into(), new)]);
+            assert!(merge(&current, &patch, &[]).is_err());
+        }
+    }
 }
