@@ -105,9 +105,9 @@ pub struct ReplaceText {
     pub draft_id: String,
     pub expected_revision: u32,
     pub section: u32,
-    /// Exact saved whole line, unique, 1..160 letters, digits or interior spaces.
+    /// Exact whole line, 1–160 characters. A second occurrence anywhere in the section source, even within another line, is ambiguous.
     pub old_text: String,
-    /// New plain line, 1..160 letters, digits or interior spaces.
+    /// Different replacement line, 1–160 characters. Use only letters (including Han characters), digits and interior ASCII spaces.
     pub new_text: String,
 }
 

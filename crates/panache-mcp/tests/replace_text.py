@@ -94,7 +94,19 @@ async def regression(binary, fonts, worker):
             duplicate = (await call("save_section", markdown="WORD\n\nOTHER WORD")).structuredContent
             await reject_unchanged({"draft_id": duplicate["draft_id"], "section": 1,
                                     "expected_revision": 1, "old_text": "WORD", "new_text": "OTHER"}, "ambiguous")
-            print("Exact paragraphs, inline image data and pixels, and nonmutating stale/duplicate controls verified.")
+
+            for markdown, expected_error in [
+                ("踏青真好。\n\n春天", "Unsupported markup"),
+                ("春天\n\n初春天气", "ambiguous"),
+            ]:
+                draft = (await call("save_section", markdown=markdown)).structuredContent
+                await reject_unchanged(
+                    {"draft_id": draft["draft_id"], "section": 1, "expected_revision": draft["revision"],
+                     "old_text": "春天", "new_text": "秋天"},
+                    expected_error,
+                )
+            print("Verified whole-line replacement, inline image preservation, and unchanged SQLite rows "
+                  "after stale, ambiguous, and punctuated-section rejections.")
 
 
 if __name__ == "__main__":

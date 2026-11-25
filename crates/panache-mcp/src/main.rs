@@ -401,7 +401,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Replace one exact, unique whole plain-text paragraph in an existing section at its current revision, without resending its Markdown or inline images. Only standalone prose and supported embedded image blocks are accepted; cannot create or append, alter markup/attachments, or edit a section with saved glyph adjustments."
+        description = "Replace one whole line in an existing section at its current revision without resending Markdown or inline images. The entire section must consist of blank-line-separated blocks: single lines of letters (including Han characters), digits and interior ASCII spaces, or validated standalone embedded images. Saved glyph adjustments in this section prevent replacement."
     )]
     async fn replace_section_text(
         &self,
