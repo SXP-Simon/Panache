@@ -509,7 +509,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually."
+        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually. An ID is local to the exact layout revision, section and page that returned it. After an intervening edit, read the latest layout and resolve the intended glyph again; do not reuse old IDs by changing only expected_revision."
     )]
     async fn adjust_glyphs(
         &self,
