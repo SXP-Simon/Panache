@@ -606,7 +606,12 @@ async def smoke(command, arguments, out):
                 "changes": {"ink_opacity": 55, "ink": "#665577", "word_spacing": 2},
             }
             tuned = (await call(client, "tune_handwriting", **tuning)).structuredContent
-            assert tuned["revision"] == 2
+            assert tuned["revision"] == 2 and tuned["changed"] is True
+            equal = {**tuning, "expected_revision": 2, "changes": {"word_spacing": 2.0}}
+            same = (await call(client, "tune_handwriting", **equal)).structuredContent
+            assert same["revision"] == 2 and same["changed"] is False
+            assert same["controls"] == tuned["controls"] and same["fine_layout"] == "preserved"
+            assert (await client.call_tool("tune_handwriting", {**equal, "changes": {}})).isError
             assert (await client.call_tool("tune_handwriting", tuning)).isError
             assert (
                 png(await call(client, "preview_handwriting", draft_id=paper_id))
@@ -661,6 +666,8 @@ async def smoke(command, arguments, out):
             assert (await call(client, "adjust_glyphs", **fine)).structuredContent[
                 "revision"
             ] == 3
+            stale_noop = await client.call_tool("tune_handwriting", equal)
+            assert stale_noop.isError and "Revision conflict" in stale_noop.content[0].text
             adjusted = png(await call(client, "preview_handwriting", draft_id=paper_id))
             assert (
                 adjusted != before
