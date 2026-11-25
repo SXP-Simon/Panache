@@ -99,6 +99,10 @@ async def run(args, home):
             status = sc.get("file_transfer", {}).get("status")
             if opt and not oversize:
                 assert status == "included" and len(blobs) == 1
+                assert any(
+                    b.type == "text" and "在答复中原样贴出" in b.text and "没有这项确认" in b.text
+                    for b in res.content
+                )
                 assert blobs[0].mimeType == {"pdf":"application/pdf", "zip":"application/zip"}[fmt]
                 # The simulated client can use only the reply for this copy.
                 data = base64.b64decode(blobs[0].blob, validate=True)

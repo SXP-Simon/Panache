@@ -36,7 +36,7 @@ pub(super) fn include_file(result: &mut CallToolResult, file: File, path: &Path,
             result.content.push(ContentBlock::resource(resource));
             (
                 "included",
-                "文件内容已传给客户端。请由客户端提供可打开的附件。",
+                "文件内容已写入工具回复。聊天客户端给出用户可用的下载链接时，在答复中原样贴出；只有聊天客户端确认附件已展示且未提供链接时，才请用户打开附件。没有这项确认时，请告知文件已导出，并用纯文本给出运行 Panache 的电脑上的取件路径。",
             )
         }
         Ok(None) => (
