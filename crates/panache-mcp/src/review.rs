@@ -307,10 +307,10 @@ pub fn page(
         metadata["next_step"] = json!(next);
         if draft.paper.is_some() {
             let mut appearance = json!({
-                "inspect":"Compare contrast and size with photographed marks. Check letter size against writing space. Baselines measure placement only. Without images, ask the user to inspect the crop.",
-                "ink_edge_guidance":"Keep ink if requested or suitable. Only try slightly more ink_softness if the user reports overly sharp strokes or a native crop shows sharper stroke edges than comparable nearby marks. Shadow or faint ink alone is insufficient.",
+                "inspect":"Compare contrast and size with photographed marks. Check letter size against writing space. Baselines measure placement only. Without images, credit the user's observations; ask the user to inspect the crop if visual evidence is needed.",
+                "ink_edge_guidance":"Keep ink if requested or suitable. Only soften if the user reports overly sharp strokes or a native crop shows sharper stroke edges than comparable nearby marks. Shadow or faint ink alone is insufficient. For selected words or lines, get their glyph IDs from layout and use adjust_glyphs softness. For the whole draft, use tune_handwriting ink_softness. Start small.",
                 "controls":"describe_controls with draft_id, revision and group: ink (ink #RRGGBB, ink_opacity %, ink_softness and ink_thickness in paper-space px); layout (font_size in paper-space px); typography (font).",
-                "after_edit":"Use compare_revision for paper/before/after crops of the same region. Check fine strokes and contrast; keep the original if worse or unsure. After page reflow inspect each revision separately."
+                "after_edit":"Use compare_revision for paper/before/after crops of the same region. Also compare any area the user explicitly asked to preserve. Check fine strokes and contrast; keep the original if worse or unsure. After page reflow inspect each revision separately."
             });
             if let Some(region) = detail_region(baselines, (w, h), params.font_size) {
                 appearance["preview_arguments"] = json!({

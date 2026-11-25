@@ -73,11 +73,15 @@ async def unruled_artwork(client, directory, call):
     guidance = appearance["ink_edge_guidance"]
     assert sum(part.text.count(guidance) for part in receipt.content if part.type == "text") == 1
     assert all(term in guidance for term in (
-        "Keep ink if requested or suitable", "Only try slightly more ink_softness",
+        "Keep ink if requested or suitable",
         "user reports overly sharp strokes", "native crop", "sharper stroke edges",
         "comparable nearby marks", "Shadow or faint ink alone is insufficient",
+        "get their glyph IDs from layout", "adjust_glyphs softness",
+        "For the whole draft, use tune_handwriting ink_softness",
     ))
     assert "ask the user to inspect the crop" in appearance["inspect"]
+    assert "credit the user's observations" in appearance["inspect"]
+    assert "compare any area the user explicitly asked to preserve" in appearance["after_edit"]
     assert all(term in appearance["after_edit"] for term in (
         "compare_revision", "same region", "fine strokes and contrast", "keep the original if worse or unsure",
     ))
