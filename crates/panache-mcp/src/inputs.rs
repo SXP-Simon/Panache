@@ -1,7 +1,23 @@
 use anyhow::{Result, ensure};
+use handwriting_core::local_fonts::FontSource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Default, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct FontList {
+    /// Case-insensitive substring of the face, localized family or filename.
+    pub query: String,
+    pub source: Option<FontSource>,
+    pub offset: usize,
+    /// Number of faces to return (default 20, maximum 100).
+    pub limit: Option<usize>,
+    /// Rescan after adding, removing or installing fonts.
+    pub refresh: bool,
+    /// Set false only to look up an already approved font or its ID when no new style choice is needed. Omit or set true for samples and style choices, even with an exact-name query.
+    pub include_sample_guidance: Option<bool>,
+}
 
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -141,7 +157,10 @@ pub struct Tune {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct List {
+    /// Rows to skip in creation order. Omit with before_draft_id. The response echoes this skip count (default 0).
     pub offset: Option<u32>,
+    /// For the next page, pass the exact next_before_draft_id returned by list_drafts.
+    pub before_draft_id: Option<String>,
 }
 
 #[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
@@ -239,7 +258,7 @@ pub struct Nudge {
     pub scale: Option<u8>,
     /// Clockwise rotation in degrees, -45..45 (engine coordinates).
     pub angle: Option<i8>,
-    /// Ink opacity in percent, 0..100.
+    /// For text glyphs, a local multiplier of the draft-wide ink opacity, 0..100 percent. 100 adds no fading, 0 hides the glyph. This cannot exceed the global opacity.
     pub opacity: Option<u8>,
     /// Stroke weight delta in pixels, -2..2, in 0.1 px steps.
     pub thickness: Option<f64>,

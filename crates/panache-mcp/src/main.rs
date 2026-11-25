@@ -368,7 +368,15 @@ impl Panache {
         annotations(read_only_hint = true, open_world_hint = false),
         description = "Search bundled, personal and system fonts by name/source. Results are paged. Use an entry ID in save_section style.font or tune_handwriting changes.font; user and system faces are saved with the draft."
     )]
-    async fn list_fonts(&self, Parameters(query): Parameters<FontSearch>) -> CallToolResult {
+    async fn list_fonts(&self, Parameters(input): Parameters<FontList>) -> CallToolResult {
+        let include_sample_guidance = input.include_sample_guidance.unwrap_or(true);
+        let query = FontSearch {
+            query: input.query,
+            source: input.source,
+            offset: input.offset,
+            limit: input.limit,
+            refresh: input.refresh,
+        };
         let state = self.0.clone();
         let result = async {
             let page = tokio::task::spawn_blocking(move || state.local_fonts.search(&query)).await??;
@@ -384,9 +392,15 @@ impl Panache {
                 "entries": page.fonts, "total": page.total,
                 "next_offset": page.next_offset, "user_dir": page.user_dir
             });
-            let message = format!("{data}\n\n{guidance}");
+            let message = if include_sample_guidance {
+                format!("{data}\n\n{guidance}")
+            } else {
+                data.to_string()
+            };
             data["fonts"] = json!(names);
-            data["sample_guidance"] = json!(guidance);
+            if include_sample_guidance {
+                data["sample_guidance"] = json!(guidance);
+            }
             Ok(reply(message, data))
         }.await;
         tool_result(result)
@@ -401,10 +415,10 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first."
+        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
     )]
     fn list_drafts(&self, Parameters(input): Parameters<List>) -> CallToolResult {
-        tool_result(self.0.drafts.list(input.offset.unwrap_or(0)).map(|result| {
+        tool_result(self.0.drafts.list(&input).map(|result| {
             let mut lines = vec!["## 本地稿件".to_owned()];
             for row in result["drafts"].as_array().into_iter().flatten() {
                 lines.push(format!(
@@ -415,13 +429,16 @@ impl Panache {
                     row["sections"]
                 ));
             }
+            if let Some(id) = result["next_before_draft_id"].as_str() {
+                lines.push(format!("下一页：`before_draft_id=\"{id}\"`"));
+            }
             reply(lines.join("\n"), result)
         }))
     }
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" finds that historical section’s last sheet. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown)."
+        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" finds that historical section’s last sheet. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown). When paging through one source revision, pass the revision returned by the first source page on every subsequent page together with its next_offset."
     )]
     async fn read_section(
         &self,
@@ -650,12 +667,13 @@ fn asset(key: &str, beside: &Path, name: &str, source: &str) -> PathBuf {
 async fn main() -> Result<()> {
     let exe = env::current_exe()?;
     let beside = exe.parent().context("Missing executable directory")?;
-    let engine = Engine::new(asset(
+    let font_dir = asset(
         "PANACHE_FONT_DIR",
         beside,
         "font_assets",
         "assets/font_assets",
-    ))?;
+    );
+    let engine = Engine::new(font_dir.clone())?;
     let worker=asset("PANACHE_MARKDOWN_WORKER",beside,"prepare-text-worker.js","app/web/prepare-text-worker.js")
         .canonicalize().context("Build the Markdown worker with python scripts/build-text-worker.py, or set PANACHE_MARKDOWN_WORKER")?;
     let home = env::var_os("PANACHE_MCP_HOME")
@@ -681,7 +699,8 @@ async fn main() -> Result<()> {
         preserve_reviews,
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
-        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes),
+        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes)
+            .with_bundled_dir(font_dir),
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
         worker: fs::read_to_string(worker)?.into(),
