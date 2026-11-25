@@ -401,10 +401,10 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first."
+        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
     )]
     fn list_drafts(&self, Parameters(input): Parameters<List>) -> CallToolResult {
-        tool_result(self.0.drafts.list(input.offset.unwrap_or(0)).map(|result| {
+        tool_result(self.0.drafts.list(&input).map(|result| {
             let mut lines = vec!["## 本地稿件".to_owned()];
             for row in result["drafts"].as_array().into_iter().flatten() {
                 lines.push(format!(
@@ -414,6 +414,9 @@ impl Panache {
                     row["revision"],
                     row["sections"]
                 ));
+            }
+            if let Some(id) = result["next_before_draft_id"].as_str() {
+                lines.push(format!("下一页：`before_draft_id=\"{id}\"`"));
             }
             reply(lines.join("\n"), result)
         }))

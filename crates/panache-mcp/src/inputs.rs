@@ -141,7 +141,10 @@ pub struct Tune {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct List {
+    /// Rows to skip in creation order. Omit with before_draft_id. The response echoes this skip count (default 0).
     pub offset: Option<u32>,
+    /// For the next page, pass the exact next_before_draft_id returned by list_drafts.
+    pub before_draft_id: Option<String>,
 }
 
 #[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
