@@ -44,7 +44,9 @@
 
 局部 `shape` 也在纸面投影之前生效。比如 `{"shear_degrees":4,"top_width_percent":94}` 会让字底向右倾，字顶略窄；设回 0 度和 100% 就还原。字号、行距和边距同样按纸面像素指定，可以在一次修改里一起调整。
 
-**如果要改的是插图**，给布局预览加上 `illustrations_only=true`。同一个 `illustration_id` 下，`illustration` 是框线、箭头等主体，`illustration_detail` 是能单独选中的笔迹。要把某个标签写粗一点，可对它的 ID 用 `adjust_glyphs(thickness=0.5)`；还可调 `softness`、`opacity` 或 `color`。粗细与柔化以 0.1 px 为步长，归零恢复原效果，颜色用 `inherit` 恢复。每次最多选 32 个 ID。标签若与框线连成一片，工具只能把这片笔迹作为整体处理。
+**如果要改的是位图插图**，给布局预览加上 `illustrations_only=true`。同一个 `illustration_id` 下，`illustration` 是框线、箭头等主体，`illustration_detail` 是能单独选中的笔迹。要把某个标签写粗一点，可对它的 ID 用 `adjust_glyphs(thickness=0.5)`；还可调 `softness`、`opacity` 或 `color`。粗细与柔化以 0.1 px 为步长，归零恢复原效果，颜色用 `inherit` 恢复。每次最多选 32 个 ID。标签若与框线连成一片，工具只能把这片笔迹作为整体处理。
+
+生成的 `circuitikz` 电路图不属于这个筛选范围。先看当前版本的页面图像，再在同一版本和页请求 `view="layout"`，用 `region` 圈住电路图的中心，不传 `illustrations_only`。布局中的电路图是一个整体 ID；移动整图可用这个 ID，改标签文字则编辑该节的 Markdown。
 
 ## 排好了，怎样验收？
 
