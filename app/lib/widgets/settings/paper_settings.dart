@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/settings.dart';
 import '../../models/upload.dart';
+import '../../utils/paper_exif.dart';
 import '../paper_style_picker.dart';
 import 'settings_fields.dart';
 
@@ -75,7 +76,7 @@ List<Widget> paperSettings(
         (value) => settings.transparentBackground = value,
         icon: Icons.texture,
       ),
-      if (background != null) _paperCamera(l, fields),
+      if (background != null) _paperCamera(l, fields, background),
     ], collapsible: false),
     settingsGroup('dimensions', l.paperSizeAndMargins, Icons.space_bar, [
       fields.parameterGrid(
@@ -90,38 +91,53 @@ List<Widget> paperSettings(
   ];
 }
 
-Widget _paperCamera(AppLocalizations l, SettingsFields fields) => ExpansionTile(
-  title: Text(l.paperCamera),
-  children: [
-    Text(l.paperCameraHint),
-    for (final field in [
-      ('camera_make', l.cameraMake),
-      ('camera_model', l.cameraModel),
-      ('camera_lens', l.cameraLens),
-      ('camera_iso', 'ISO'),
-    ])
-      TextFormField(
-        // Keep the field's scroll offset separate from the tile's expanded state.
-        key: PageStorageKey('${field.$1}-${fields.settingsRevision}'),
-        initialValue: fields.settings.camera[field.$1] ?? '',
-        enabled: !fields.locked,
-        maxLength: field.$1 == 'camera_iso' ? 5 : 96,
-        keyboardType: field.$1 == 'camera_iso'
-            ? TextInputType.number
-            : TextInputType.text,
-        decoration: InputDecoration(labelText: field.$2),
-        autovalidateMode: AutovalidateMode.onUserInteraction,
-        validator: (value) => Settings.validCameraValue(field.$1, value ?? '')
-            ? null
-            : l.cameraValueHint,
-        onChanged: (s) {
-          if (s.isEmpty) {
-            fields.settings.camera.remove(field.$1);
-          } else {
-            fields.settings.camera[field.$1] = s;
-          }
-          fields.onEdited();
-        },
-      ),
-  ],
-);
+Widget _paperCamera(AppLocalizations l, SettingsFields fields, Upload paper) {
+  final photo = paperCameraFields(paper.bytes);
+  final labels = [
+    ('camera_make', l.cameraMake),
+    ('camera_model', l.cameraModel),
+    ('camera_lens', l.cameraLens),
+    ('camera_iso', 'ISO'),
+  ];
+  final details = [
+    for (final (key, label) in labels)
+      if (photo[key] case final value?) '$label · $value',
+  ];
+  final title = Text(l.paperCamera);
+  final subtitle = Text(
+    details.isEmpty
+        ? l.paperCameraEmpty
+        : l.paperCameraFromPhoto(details.join('\n')),
+  );
+  return ExpansionTile(
+    title: title,
+    subtitle: subtitle,
+    children: [
+      Text(l.paperCameraHint),
+      for (final field in labels)
+        TextFormField(
+          // Keep the field's scroll offset separate from the tile's expanded state.
+          key: PageStorageKey('${field.$1}-${fields.settingsRevision}'),
+          initialValue: fields.settings.camera[field.$1] ?? '',
+          enabled: !fields.locked,
+          maxLength: field.$1 == 'camera_iso' ? 5 : 96,
+          keyboardType: field.$1 == 'camera_iso'
+              ? TextInputType.number
+              : TextInputType.text,
+          decoration: InputDecoration(labelText: field.$2),
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          validator: (value) => Settings.validCameraValue(field.$1, value ?? '')
+              ? null
+              : l.cameraValueHint,
+          onChanged: (s) {
+            if (s.isEmpty) {
+              fields.settings.camera.remove(field.$1);
+            } else {
+              fields.settings.camera[field.$1] = s;
+            }
+            fields.onEdited();
+          },
+        ),
+    ],
+  );
+}
