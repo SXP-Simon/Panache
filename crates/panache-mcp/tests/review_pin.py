@@ -155,8 +155,20 @@ async def main(args, home):
         assert "before_review_id" in schema["properties"]
         assert "before_review_id" not in schema.get("required", [])
         if args.baseline:
-            schema["properties"].pop("before_review_id")
-            assert schema == legacy_schema
+            assert schema["properties"].pop("before_review_id") == {
+                "description": "Pin the earlier stored full-page check by ID. Requires view=review and "
+                               "compare_revision, without a region. The check must belong to that "
+                               "earlier revision, draft, section and page.",
+                "type": ["string", "null"],
+            }
+            assert legacy_schema["properties"]["illustrations_only"].pop("description") == (
+                "In layout view, only return illustration outlines and isolated details."
+            )
+            assert schema["properties"]["illustrations_only"].pop("description") == (
+                "In layout view, only return raster illustration outlines and isolated details. "
+                "Omit for generated circuitikz: its labels and lines are one glyph."
+            )
+            assert json.dumps(schema, sort_keys=True) == json.dumps(legacy_schema, sort_keys=True)
         default = snapshot(await call(client, "preview_handwriting", **request))
         assert default == legacy == snapshot(await call(
             client, "preview_handwriting", **request, before_review_id=None
