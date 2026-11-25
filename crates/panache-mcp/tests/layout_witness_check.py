@@ -15,33 +15,17 @@ import argparse
 import asyncio
 import hashlib
 import json
-import os
-import sqlite3
-from contextlib import asynccontextmanager, closing
 from importlib.metadata import version
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp_client import clone_home, isolated_session, open_db
 
 OLD, NEW = "春 雨 Z", "明 日 春 雨 Z"
 STYLE = {"seed": 42, "font": "青叶手写体.ttf"}
 INK = [204, 24, 51]
 OLD_IDS = [[0, "春"], [2, "雨"], [4, "Z"]]
 NEW_IDS = [[0, "明"], [2, "日"], [4, "春"], [6, "雨"], [8, "Z"]]
-
-
-@asynccontextmanager
-async def session(binary, home):
-    env = {k: str(Path(os.environ[k]).resolve()) for k in
-           ("PANACHE_FONT_DIR", "PANACHE_MARKDOWN_WORKER") if k in os.environ}
-    env.update(dict.fromkeys(("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME"), str(home)))
-    env.update(PANACHE_MCP_HOME=str(home), PANACHE_USER_FONT_DIR=str(home / "fonts"))
-    params = StdioServerParameters(command=str(binary), cwd=str(home), env=env)
-    async with stdio_client(params) as streams, ClientSession(*streams) as client:
-        await client.initialize()
-        yield client
 
 
 def ok(result):
@@ -52,10 +36,6 @@ def ok(result):
 
 def positions(layout):
     return [[g["id"], g["text"], g["bounds"]] for g in layout["glyphs"]]
-
-
-def open_db(home):
-    return closing(sqlite3.connect((home / "drafts.sqlite3").as_uri() + "?mode=ro", uri=True))
 
 
 def snapshot(home):
@@ -110,7 +90,7 @@ class Witness:
 
 
 async def seed(binary, home):
-    async with session(binary, home) as c:
+    async with isolated_session(binary, home) as (c, _):
         async def call(tool, **args):
             return ok(await c.call_tool(tool, args))
 
@@ -152,7 +132,7 @@ CASES = [
 async def replay(binary, home, key, case, frozen, fixture):
     name, slices, ids, overrides, want, colors = case
     witness, calls = Witness(), []
-    async with session(binary, home) as c:
+    async with isolated_session(binary, home) as (c, _):
         before = snapshot(home)
         for revision, offset, limit in slices:
             args = dict(key, view="layout", offset=offset, limit=limit)
@@ -208,10 +188,7 @@ async def run(binary):
         frozen = snapshot(root)
         arms = []
         for i, case in enumerate(CASES):
-            home = root / str(i)
-            home.mkdir()
-            with open_db(root) as src, closing(sqlite3.connect(home / "drafts.sqlite3")) as dst:
-                src.backup(dst)
+            home = clone_home(root, str(i))
             arms.append(await replay(binary, home, key, case, frozen, fixture))
     passed = frozen["revision"] == 3 and all(a["pass"] for a in arms)
     print(json.dumps({"kind": "glyph_layout_witness", "binary_sha256": digest, "mcp_sdk": version("mcp"),
