@@ -8,6 +8,21 @@ import 'package:handwriting_app/utils/ink_effects.dart';
 import 'package:handwriting_app/utils/paper_exif.dart';
 
 void main() {
+  test('reads the four primary camera fields without image decoding', () {
+    // Big-endian TIFF with an Exif sub-IFD, from an independently encoded PNG.
+    final tiff = base64Decode(
+      'TU0AKgAAAAgAAwEPAAIAAAAIAAAAMgEQAAIAAAAKAAAAOodpAAQAAAABAAAARAAAAABFeGFtcGxlAENhbWVyYSAwMQAAAognAAMAAAABAKAAAKQ0AAIAAAAGAAAAYgAAAAAyNCBtbQA=',
+    );
+    expect(paperCameraFields(tiff), {
+      'camera_make': 'Example',
+      'camera_model': 'Camera 01',
+      'camera_lens': '24 mm',
+      'camera_iso': '160',
+    });
+    expect(paperCameraFields(Uint8List.sublistView(tiff, 0, 12)), isEmpty);
+    expect(paperCameraFields(Uint8List(0)), isEmpty);
+  });
+
   test('camera input survives a preset and an older preset clears it', () {
     final settings = Settings()
       ..camera.addAll({'camera_model': 'Test phone', 'camera_iso': '320'});
