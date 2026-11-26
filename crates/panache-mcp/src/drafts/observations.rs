@@ -192,6 +192,7 @@ impl Snapshot<'_> {
         page: usize,
         offset: u32,
         limit: u32,
+        before_review_id: Option<&str>,
     ) -> Result<Value> {
         ensure!(
             before > 0 && before < self.revision,
@@ -204,7 +205,18 @@ impl Snapshot<'_> {
         let mut db = self.drafts.connect()?;
         let tx = db.transaction()?;
         let page = u32::try_from(page)?;
-        let previous = page_record(&tx, self, before, section, page)?;
+        let previous = if let Some(id) = before_review_id {
+            let record = by_id(&tx, id, self).context("Cannot resolve before_review_id")?;
+            ensure!(
+                record["revision"].as_u64() == Some(u64::from(before))
+                    && record["section"].as_u64() == Some(u64::from(section))
+                    && record["page"].as_u64() == Some(u64::from(page)),
+                "before_review_id must match compare_revision, section and page in this draft"
+            );
+            Some(record)
+        } else {
+            page_record(&tx, self, before, section, page)?
+        };
         let current = page_record(&tx, self, self.revision, section, page)?;
         let mut stmt=tx.prepare("WITH actions(rev,action,section) AS (
             SELECT revision,'save_section',number FROM sections WHERE draft=?1
@@ -378,17 +390,25 @@ mod tests {
         assert!(old.reviewed_pages()?[&(1, 1)].pixel_sha256.is_none());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;
-        let comparison = rev3.compare_reviews(2, 1, 1, 0, 5)?;
+        let comparison = rev3.compare_reviews(2, 1, 1, 0, 5, None)?;
         assert_eq!(
             comparison["comparison"]["limitations"],
             json!(["different_algorithms"])
         );
         assert!(comparison["comparison"]["delta"].is_null());
+        let pinned = rev3.compare_reviews(2, 1, 1, 0, 5, first["review_id"].as_str())?;
+        assert_eq!(pinned["before"]["review_id"], first["review_id"]);
+        assert_eq!(pinned["comparison"]["limitations"], json!([]));
+        let legacy_comparison = rev3.compare_reviews(1, 1, 1, 0, 5, None)?;
         assert!(
-            rev3.compare_reviews(1, 1, 1, 0, 5)?["comparison"]["limitations"]
+            legacy_comparison["comparison"]["limitations"]
                 .as_array()
                 .unwrap()
                 .contains(&json!("unknown_algorithm"))
+        );
+        assert_eq!(
+            rev3.compare_reviews(1, 1, 1, 0, 5, Some(&legacy_id))?,
+            legacy_comparison
         );
         drafts
             .connect()?
