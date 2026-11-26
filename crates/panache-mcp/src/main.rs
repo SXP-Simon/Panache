@@ -6,6 +6,7 @@ mod markdown;
 mod paper;
 mod placement;
 mod preview;
+mod replace_text;
 mod review;
 mod save;
 mod storage;
@@ -407,10 +408,20 @@ impl Panache {
     }
 
     #[tool(
-        description = "Save Markdown without rendering. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
+        description = "Save Markdown without rendering. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
+    }
+
+    #[tool(
+        description = "Replace one whole line in an existing section at its current revision without resending Markdown or inline images. The entire section must consist of blank-line-separated blocks: single lines of letters (including Han characters), digits and interior ASCII spaces, or validated standalone embedded images. Try this first even when formatting is uncertain. On refusal follow the returned recovery instructions."
+    )]
+    async fn replace_section_text(
+        &self,
+        Parameters(input): Parameters<ReplaceText>,
+    ) -> CallToolResult {
+        tool_result(replace_text::run(self, input).await)
     }
 
     #[tool(

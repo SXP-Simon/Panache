@@ -333,6 +333,68 @@ impl Drafts {
         paper: Option<&ImportedPaper>,
         font: Option<&[u8]>,
     ) -> Result<Value> {
+        self.save_scoped(input, prepared, new_style, paper, font, false)
+    }
+
+    pub fn plain_replacement_source(&self, input: &crate::ReplaceText) -> Result<(String, String)> {
+        let mut db = self.connect()?;
+        let tx = db.transaction()?;
+        let current: u32 = tx
+            .query_row(
+                "SELECT revision FROM drafts WHERE id=?1",
+                [&input.draft_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .context("Unknown draft")?;
+        ensure!(
+            current == input.expected_revision,
+            "Draft is at revision {current}. Review it before updating."
+        );
+        let (section_revision, source, prepared): (u32, String, String) = tx
+            .query_row(
+                "SELECT revision,source,prepared FROM sections WHERE draft=?1 AND number=?2
+                 AND revision<=?3 ORDER BY revision DESC LIMIT 1",
+                params![input.draft_id, input.section, current],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?
+            .context("Choose an existing section; replacement cannot append")?;
+        let fine: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM glyph_edits
+             WHERE draft=?1 AND section=?2 AND source_revision=?3)",
+            params![input.draft_id, input.section, section_revision],
+            |r| r.get(0),
+        )?;
+        ensure!(
+            !fine,
+            "Section has saved glyph adjustments. Nothing was saved. A whole-section save would not carry those positions into the new revision. Leave this version intact unless the user explicitly accepts losing these positions. Tell them the text is unchanged and offer to keep this layout or re-layout and preview. After explicit acceptance, read the complete source of this section at the agreed revision, then use save_section with that expected_revision and preview_handwriting(view=image). Do not retry this shortcut to discard placements. If you cannot reproduce the original safely, including any inline images, stop and explain before saving."
+        );
+        Ok((source, prepared))
+    }
+
+    pub fn save_plain_replacement(&self, input: &crate::Save, prepared: &str) -> Result<Value> {
+        self.save_scoped(input, prepared, None, None, None, true)
+    }
+
+    fn save_scoped(
+        &self,
+        input: &crate::Save,
+        prepared: &str,
+        new_style: Option<&Style>,
+        paper: Option<&ImportedPaper>,
+        font: Option<&[u8]>,
+        existing_only: bool,
+    ) -> Result<Value> {
+        if existing_only {
+            ensure!(
+                input.draft_id.is_some()
+                    && input.expected_revision.is_some()
+                    && input.section.is_some(),
+                "Use an existing draft and section for replacement"
+            );
+        }
+
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let id = input
@@ -374,6 +436,18 @@ impl Drafts {
             "Draft is at revision {rev}. Review it before updating."
         );
         let number = input.section.unwrap_or(count + 1);
+        if existing_only {
+            let exists: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sections WHERE draft=?1 AND number=?2 AND revision<=?3)",
+                params![id, number, rev],
+                |r| r.get(0),
+            )?;
+            ensure!(
+                exists,
+                "Choose an existing section; replacement cannot append"
+            );
+        }
+
         ensure!(
             (1..=count + 1).contains(&number),
             "Choose an existing section or append the next one"

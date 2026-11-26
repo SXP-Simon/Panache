@@ -280,6 +280,7 @@ async def smoke(command, arguments, out):
                 "list_drafts",
                 "save_section",
                 "read_section",
+                "replace_section_text",
                 "preview_handwriting",
                 "export_handwriting",
             }

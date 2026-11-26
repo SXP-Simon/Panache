@@ -122,6 +122,21 @@ pub struct Save {
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct ReplaceText {
+    pub draft_id: String,
+    pub expected_revision: u32,
+    pub section: u32,
+    /// Exact whole line (normally 1–160 characters). A second occurrence anywhere in the section source, even within another line, is ambiguous.
+    pub old_text: String,
+    /// Different whole line. Normally use 1–160 letters (including Han characters), digits or interior ASCII spaces.
+    pub new_text: String,
+    /// Set true on a suggested retry for a long line or ordinary punctuation. Uses stored source and preserves image data.
+    #[serde(default)]
+    pub retry_plain: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Describe {
     /// Pass with group to read this saved draft's effective values.
     pub draft_id: Option<String>,
