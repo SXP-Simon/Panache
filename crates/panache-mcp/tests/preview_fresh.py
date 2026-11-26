@@ -9,6 +9,7 @@ import base64
 import io
 import os
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -64,7 +65,8 @@ async def reject(client, key, expected, **options):
 
 
 def saved_rows(home):
-    with sqlite3.connect((home / "drafts.sqlite3").as_uri() + "?mode=ro", uri=True) as db:
+    uri = (home / "drafts.sqlite3").as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as db:
         return tuple(db.iterdump())
 
 
