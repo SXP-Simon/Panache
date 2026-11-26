@@ -141,6 +141,15 @@ fn rgb_delta(a: Rgba<u8>, b: Rgba<u8>) -> u16 {
         .unwrap()
 }
 
+pub fn pixel_sha256(image: &RgbaImage) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    hash.update(image.width().to_le_bytes());
+    hash.update(image.height().to_le_bytes());
+    hash.update(image.as_raw());
+    format!("{:x}", hash.finalize())
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
@@ -151,12 +160,7 @@ pub fn page(
 ) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
     let mut finished = decode_page(png)?;
-    use sha2::{Digest, Sha256};
-    let mut hash = Sha256::new();
-    hash.update(finished.width().to_le_bytes());
-    hash.update(finished.height().to_le_bytes());
-    hash.update(finished.as_raw());
-    let pixel_digest = format!("{:x}", hash.finalize());
+    let pixel_digest = pixel_sha256(&finished);
     let baselines = &sample.baselines;
     let paper = reference_paper(draft, finished.dimensions(), &params)?;
     let (w, h) = paper.dimensions();
@@ -307,9 +311,10 @@ pub fn page(
         metadata["next_step"] = json!(next);
         if draft.paper.is_some() {
             let mut appearance = json!({
-                "inspect":"Compare the strokes with nearby photographed marks for edge softness, contrast and size, and with the available writing space for letter size. Baseline offsets only measure placement. If images are unavailable, ask the user to inspect the crop before judging appearance.",
+                "inspect":"Compare contrast and size with photographed marks. Check letter size against writing space. Baselines measure placement only. Without images, credit the user's observations; ask the user to inspect the crop if visual evidence is needed.",
+                "ink_edge_guidance":"Keep ink if requested or suitable. Only soften if the user reports overly sharp strokes or a native crop shows sharper stroke edges than comparable nearby marks. Shadow or faint ink alone is insufficient. For selected words or lines, get their glyph IDs from layout and use adjust_glyphs softness. For the whole draft, use tune_handwriting ink_softness. Start small.",
                 "controls":"describe_controls with draft_id, revision and group: ink (ink #RRGGBB, ink_opacity %, ink_softness and ink_thickness in paper-space px); layout (font_size in paper-space px); typography (font).",
-                "after_edit":"Review the edited revision. Use the same region with compare_revision for paper/before/after crops. If text reflowed onto different pages, inspect each revision separately."
+                "after_edit":"Use compare_revision for paper/before/after crops of the same region. Also compare any area the user explicitly asked to preserve. Check fine strokes and contrast; keep the original if worse or unsure. After page reflow inspect each revision separately."
             });
             if let Some(region) = detail_region(baselines, (w, h), params.font_size) {
                 appearance["preview_arguments"] = json!({

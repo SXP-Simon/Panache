@@ -4,7 +4,13 @@ use fontdb::{Database, Source};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, env, fs, path::PathBuf, sync::Mutex};
+use std::{
+    collections::HashSet,
+    env, fs,
+    io::{Read, Seek, SeekFrom},
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 use write_fonts::{FontBuilder, read::FontRef, types::Tag};
 
 #[derive(
@@ -60,6 +66,7 @@ struct Index {
 
 pub struct LocalFonts {
     bundled: Vec<String>,
+    bundled_dir: Option<PathBuf>,
     user_dir: Option<PathBuf>,
     max_bytes: usize,
     index: Mutex<Option<Index>>,
@@ -137,14 +144,57 @@ fn display_name(data: &[u8], idx: u32) -> Option<String> {
     }
 }
 
+// Bundled entries keep the filenames used by the renderer. Read only the directory
+// and name table, not CJK outlines; unusual or unreadable files still match by filename.
+fn bundled_families(path: &Path) -> Option<Vec<String>> {
+    if !fs::symlink_metadata(path).ok()?.is_file() {
+        return None;
+    }
+    let mut file = fs::File::open(path).ok()?;
+    let mut header = Vec::new();
+    (&mut file).take(4096).read_to_end(&mut header).ok()?;
+    let face = ttf_parser::RawFace::parse(&header, 0).ok()?;
+    let name = face
+        .table_records
+        .into_iter()
+        .find(|r| r.tag == ttf_parser::Tag::from_bytes(b"name"))?;
+    if name.length > 64 * 1024 {
+        return None;
+    }
+    file.seek(SeekFrom::Start(u64::from(name.offset))).ok()?;
+    let mut data = vec![0; name.length as usize];
+    file.read_exact(&mut data).ok()?;
+    let names = ttf_parser::name::Table::parse(&data)?.names;
+    Some(
+        names
+            .into_iter()
+            .filter(|n| {
+                matches!(
+                    n.name_id,
+                    ttf_parser::name_id::FAMILY | ttf_parser::name_id::TYPOGRAPHIC_FAMILY
+                ) && n.is_unicode()
+                    && n.name.len() <= 512
+            })
+            .take(64)
+            .filter_map(|n| n.to_string())
+            .collect(),
+    )
+}
+
 impl LocalFonts {
     pub fn new(bundled: Vec<String>, max_bytes: usize) -> Self {
         Self {
             bundled,
+            bundled_dir: None,
             user_dir: user_dir(),
             max_bytes,
             index: Mutex::new(None),
         }
+    }
+
+    pub fn with_bundled_dir(mut self, dir: PathBuf) -> Self {
+        self.bundled_dir = Some(dir);
+        self
     }
 
     fn open_user_dir(&self) -> std::result::Result<PathBuf, String> {
@@ -179,7 +229,20 @@ impl LocalFonts {
                     filename: name.clone(),
                     source: FontSource::Bundled,
                 },
-                keywords: name.to_lowercase(),
+                keywords: {
+                    let mut keywords = name.to_lowercase();
+                    if let Some(families) = self
+                        .bundled_dir
+                        .as_ref()
+                        .and_then(|dir| bundled_families(&dir.join(name)))
+                    {
+                        for family in families {
+                            keywords.push(' ');
+                            keywords.push_str(&family.to_lowercase());
+                        }
+                    }
+                    keywords
+                },
                 face: None,
             })
             .collect::<Vec<_>>();

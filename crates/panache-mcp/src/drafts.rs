@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod list_tests;
 mod observations;
 mod trajectory;
 use anyhow::{Context, Result, ensure};
@@ -9,6 +11,8 @@ use uuid::Uuid;
 
 use crate::Style;
 use crate::paper::{ImportedPaper, PaperLayout};
+
+const REVISION_CONFLICT: &str = "Revision conflict; read the latest revision before retrying";
 
 pub struct Drafts(PathBuf);
 
@@ -41,6 +45,30 @@ fn concurrent_first_opens_share_a_complete_schema() -> Result<()> {
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+#[test]
+fn glyph_edit_committed_after_preflight_wins_the_revision() -> Result<()> {
+    let home = tempfile::tempdir()?;
+    let drafts = Drafts::open(home.path())?;
+    let save = serde_json::from_value(json!({"markdown":"字"}))?;
+    let saved = drafts.save(&save, "字", Some(&Style::default()), None, None)?;
+    let draft = drafts.snapshot(saved["draft_id"].as_str().unwrap(), Some(1))?;
+    draft.require_unadjusted_layout()?;
+
+    // Commit another writer's glyph edit between the guard and the settings write.
+    let edits = serde_json::from_value(json!({"key":"test","glyphs":[
+        {"id":0,"dx":12,"dy":0,"scale":100,"angle":0,"opacity":100,"color":null}
+    ]}))?;
+    assert_eq!(draft.store_edits(1, 1, &edits, &Value::Null)?, 2);
+    let result = drafts.tune(&draft, &draft.controls, false, None, None, &Value::Null);
+    assert_eq!(result.unwrap_err().to_string(), REVISION_CONFLICT);
+    let current = drafts.snapshot(draft.id, None)?;
+    assert_eq!(current.revision, 2);
+    assert_eq!(current.settings_revision, 0);
+    assert!(current.require_unadjusted_layout().is_err());
+    Ok(())
 }
 
 pub struct Snapshot<'a> {
@@ -142,6 +170,36 @@ impl Snapshot<'_> {
             Some((rev, json)) => Ok((rev, Some(serde_json::from_str(&json)?))),
             None => Ok((0, None)),
         }
+    }
+
+    pub fn require_current_revision(&self) -> Result<()> {
+        ensure!(self.revision == self.latest_revision, "{REVISION_CONFLICT}");
+        Ok(())
+    }
+
+    pub fn require_unadjusted_layout(&self) -> Result<()> {
+        self.require_current_revision()?;
+        // This query reads immutable history. Drafts::advance rejects a write racing the preflight.
+        let section: Option<u32> = self
+            .drafts
+            .connect()?
+            .query_row(
+                "SELECT e.section FROM glyph_edits e
+                 WHERE e.draft=?1 AND e.settings_revision=?2 AND e.revision<=?3
+                   AND e.source_revision=(SELECT MAX(s.revision) FROM sections s
+                       WHERE s.draft=e.draft AND s.number=e.section AND s.revision<=?3)
+                 LIMIT 1",
+                params![self.id, self.layout_revision, self.revision],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(section) = section {
+            anyhow::bail!(
+                "Reflow would stop applying local glyph adjustments in section {section} of revision {}. This request saved no new revision. Keep preserve_local_adjustments=true. Only if the user explicitly agrees to lose those adjustments in the new layout may you use preserve_local_adjustments=false.",
+                self.revision
+            );
+        }
+        Ok(())
     }
 
     pub fn store_edits(
@@ -275,6 +333,68 @@ impl Drafts {
         paper: Option<&ImportedPaper>,
         font: Option<&[u8]>,
     ) -> Result<Value> {
+        self.save_scoped(input, prepared, new_style, paper, font, false)
+    }
+
+    pub fn plain_replacement_source(&self, input: &crate::ReplaceText) -> Result<(String, String)> {
+        let mut db = self.connect()?;
+        let tx = db.transaction()?;
+        let current: u32 = tx
+            .query_row(
+                "SELECT revision FROM drafts WHERE id=?1",
+                [&input.draft_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .context("Unknown draft")?;
+        ensure!(
+            current == input.expected_revision,
+            "Draft is at revision {current}. Review it before updating."
+        );
+        let (section_revision, source, prepared): (u32, String, String) = tx
+            .query_row(
+                "SELECT revision,source,prepared FROM sections WHERE draft=?1 AND number=?2
+                 AND revision<=?3 ORDER BY revision DESC LIMIT 1",
+                params![input.draft_id, input.section, current],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?
+            .context("Choose an existing section; replacement cannot append")?;
+        let fine: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM glyph_edits
+             WHERE draft=?1 AND section=?2 AND source_revision=?3)",
+            params![input.draft_id, input.section, section_revision],
+            |r| r.get(0),
+        )?;
+        ensure!(
+            !fine,
+            "Section has saved glyph adjustments. Nothing was saved. A whole-section save would not carry those positions into the new revision. Leave this version intact unless the user explicitly accepts losing these positions. Tell them the text is unchanged and offer to keep this layout or re-layout and preview. After explicit acceptance, read the complete source of this section at the agreed revision, then use save_section with that expected_revision and preview_handwriting(view=image). Do not retry this shortcut to discard placements. If you cannot reproduce the original safely, including any inline images, stop and explain before saving."
+        );
+        Ok((source, prepared))
+    }
+
+    pub fn save_plain_replacement(&self, input: &crate::Save, prepared: &str) -> Result<Value> {
+        self.save_scoped(input, prepared, None, None, None, true)
+    }
+
+    fn save_scoped(
+        &self,
+        input: &crate::Save,
+        prepared: &str,
+        new_style: Option<&Style>,
+        paper: Option<&ImportedPaper>,
+        font: Option<&[u8]>,
+        existing_only: bool,
+    ) -> Result<Value> {
+        if existing_only {
+            ensure!(
+                input.draft_id.is_some()
+                    && input.expected_revision.is_some()
+                    && input.section.is_some(),
+                "Use an existing draft and section for replacement"
+            );
+        }
+
         let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let id = input
@@ -316,6 +436,18 @@ impl Drafts {
             "Draft is at revision {rev}. Review it before updating."
         );
         let number = input.section.unwrap_or(count + 1);
+        if existing_only {
+            let exists: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sections WHERE draft=?1 AND number=?2 AND revision<=?3)",
+                params![id, number, rev],
+                |r| r.get(0),
+            )?;
+            ensure!(
+                exists,
+                "Choose an existing section; replacement cannot append"
+            );
+        }
+
         ensure!(
             (1..=count + 1).contains(&number),
             "Choose an existing section or append the next one"
@@ -347,20 +479,46 @@ impl Drafts {
         }
         Ok(saved)
     }
-    pub fn list(&self, offset: u32) -> Result<Value> {
-        let db = self.connect()?;
-        let mut stmt = db.prepare(
-            "SELECT id,title,revision,sections FROM drafts ORDER BY rowid DESC LIMIT 20 OFFSET ?1",
-        )?;
-        let entries = stmt
-            .query_map([offset], |r| {
+    pub fn list(&self, input: &crate::List) -> Result<Value> {
+        ensure!(
+            input.offset.is_none() || input.before_draft_id.is_none(),
+            "Omit offset when using before_draft_id"
+        );
+        let offset = input.offset.unwrap_or(0);
+        let mut db = self.connect()?;
+        // Resolve the anchor and read its older neighbors from the same SQLite snapshot.
+        let tx = db.transaction()?;
+        let (query, value) = if let Some(id) = input.before_draft_id.as_deref() {
+            let rowid: i64 = tx
+                .query_row("SELECT rowid FROM drafts WHERE id=?1", [id], |r| r.get(0))
+                .optional()?
+                .context("Unknown before_draft_id")?;
+            (
+                "SELECT id,title,revision,sections FROM drafts WHERE rowid < ?1 ORDER BY rowid DESC LIMIT 21",
+                rowid,
+            )
+        } else {
+            (
+                "SELECT id,title,revision,sections FROM drafts ORDER BY rowid DESC LIMIT 21 OFFSET ?1",
+                i64::from(offset),
+            )
+        };
+        let mut stmt = tx.prepare(query)?;
+        let mut entries = stmt
+            .query_map([value], |r| {
                 Ok(json!({
                     "draft_id":r.get::<_,String>(0)?, "title":r.get::<_,String>(1)?,
                     "revision":r.get::<_,u32>(2)?, "sections":r.get::<_,u32>(3)?
                 }))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        Ok(json!({"drafts":entries,"offset":offset}))
+        let mut result = json!({"offset":offset});
+        if entries.len() > 20 {
+            entries.truncate(20);
+            result["next_before_draft_id"] = entries[19]["draft_id"].clone();
+        }
+        result["drafts"] = entries.into();
+        Ok(result)
     }
     // Bound the source prefix in SQLite, including when a section starts with an inline photo.
     fn review_section_choices(&self, id: &str, revision: u32) -> Result<Vec<String>> {
@@ -554,7 +712,7 @@ impl Drafts {
                 "UPDATE drafts SET revision=?1 WHERE id=?2 AND revision=?3",
                 params![next, id, expected]
             )? == 1,
-            "Revision conflict; read the latest revision before retrying"
+            "{REVISION_CONFLICT}"
         );
         Ok(next)
     }

@@ -6,6 +6,7 @@ mod markdown;
 mod paper;
 mod placement;
 mod preview;
+mod replace_text;
 mod review;
 mod save;
 mod storage;
@@ -277,12 +278,12 @@ impl ServerHandler for Panache {
             "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-            "For old checks before a passage was added, use read_section(view=review, before_text=literal from that addition, section, page); page=\"last\" repaginates with the current environment and does not prove the historical final page. For current checks omit revision. If the user asks to see or print without a new check, use view=image for the appearance and export_handwriting for the file and missing pages. A full-page preview_handwriting(view=review) records a check. Follow photo_appearance.preview_arguments for a native detail crop when available. ",
+            "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
             "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
-            "Inspect the edited appearance with view=image when no new check is requested. Use read_section(view=trajectory) to revisit actions and evidence."
+            "Inspect appearance with view=image; revisit actions with read_section(view=trajectory)."
         );
         let mode = if self.0.preserve_reviews {
             "This connection preserves stored reviews. Use view=image to inspect and export_handwriting to print. "
@@ -302,7 +303,7 @@ impl ServerHandler for Panache {
 impl Panache {
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "For less even handwriting, inspect group=variation; for requested occasional crossed-out mistakes, group=strike. Pass draft_id to read current values before tune_handwriting. Omit group for the index."
+        description = "List groups with {}. Pass group for fields, units, ranges and choices; add draft_id for effective values (optional revision). Use layout for text spacing and geometry, paper_guides for stationery lines, variation for loose writing, strike for occasional crossed-out mistakes and typography for Latin font, scale and digits."
     )]
     fn describe_controls(&self, Parameters(input): Parameters<Describe>) -> CallToolResult {
         tool_result((|| {
@@ -366,7 +367,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Revise a draft: change controls, import a local font_path, or replace paper_guides on its saved image. Map the intended area onto first/last writable baselines even on artwork or unruled paper. Ink-group changes preserve local glyph placement; after changing font, size or guides, inspect the new layout. Use view=image to inspect the result when the user wants to preserve checks."
+        description = "Revise a draft's controls, font_path or paper_guides. If the user wants earlier hand-placed text kept in place, pass preserve_local_adjustments=true on this call. Ink-only changes keep placement. Map the writing area onto the first/last writable baselines even on artwork or unruled paper. After a font, size or guide change, inspect the new layout. Use view=image to inspect without filing a check."
     )]
     async fn tune_handwriting(&self, Parameters(input): Parameters<Tune>) -> CallToolResult {
         let state = self.0.clone();
@@ -387,7 +388,15 @@ impl Panache {
         annotations(read_only_hint = true, open_world_hint = false),
         description = "Search bundled, personal and system fonts by name/source. Results are paged. Use an entry ID in save_section style.font or tune_handwriting changes.font; user and system faces are saved with the draft."
     )]
-    async fn list_fonts(&self, Parameters(query): Parameters<FontSearch>) -> CallToolResult {
+    async fn list_fonts(&self, Parameters(input): Parameters<FontList>) -> CallToolResult {
+        let include_sample_guidance = input.include_sample_guidance.unwrap_or(true);
+        let query = FontSearch {
+            query: input.query,
+            source: input.source,
+            offset: input.offset,
+            limit: input.limit,
+            refresh: input.refresh,
+        };
         let state = self.0.clone();
         let result = async {
             let page = tokio::task::spawn_blocking(move || state.local_fonts.search(&query)).await??;
@@ -403,27 +412,43 @@ impl Panache {
                 "entries": page.fonts, "total": page.total,
                 "next_offset": page.next_offset, "user_dir": page.user_dir
             });
-            let message = format!("{data}\n\n{guidance}");
+            let message = if include_sample_guidance {
+                format!("{data}\n\n{guidance}")
+            } else {
+                data.to_string()
+            };
             data["fonts"] = json!(names);
-            data["sample_guidance"] = json!(guidance);
+            if include_sample_guidance {
+                data["sample_guidance"] = json!(guidance);
+            }
             Ok(reply(message, data))
         }.await;
         tool_result(result)
     }
 
     #[tool(
-        description = "Save Markdown without rendering. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
+        description = "Save Markdown without rendering. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
     }
 
     #[tool(
+        description = "Replace one whole line in an existing section at its current revision without resending Markdown or inline images. The entire section must consist of blank-line-separated blocks: single lines of letters (including Han characters), digits and interior ASCII spaces, or validated standalone embedded images. Try this first even when formatting is uncertain. On refusal follow the returned recovery instructions."
+    )]
+    async fn replace_section_text(
+        &self,
+        Parameters(input): Parameters<ReplaceText>,
+    ) -> CallToolResult {
+        tool_result(replace_text::run(self, input).await)
+    }
+
+    #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first."
+        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
     )]
     fn list_drafts(&self, Parameters(input): Parameters<List>) -> CallToolResult {
-        tool_result(self.0.drafts.list(input.offset.unwrap_or(0)).map(|result| {
+        tool_result(self.0.drafts.list(&input).map(|result| {
             let mut lines = vec!["## 本地稿件".to_owned()];
             for row in result["drafts"].as_array().into_iter().flatten() {
                 lines.push(format!(
@@ -434,13 +459,16 @@ impl Panache {
                     row["sections"]
                 ));
             }
+            if let Some(id) = result["next_before_draft_id"].as_str() {
+                lines.push(format!("下一页：`before_draft_id=\"{id}\"`"));
+            }
             reply(lines.join("\n"), result)
         }))
     }
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "For a prior check of a particular sheet, use view=review, section and page. For “before adding [words]” pass before_text with a literal fragment of the addition; for the final sheet of that section pass page=\"last\". These select the requested revision and repaginate with the current environment, which does not confirm the historical final page. Cite the receipt for the resolved page only. On a miss, other_recorded_reviews can provide IDs for direct lookups, without proving which page was last. Other revisions can have separate receipts for the same page. Otherwise omit revision for current or set a revision. The check receipt number (检查单号) is review_id. Read its saved measurements and attributed feedback, or no_recorded_review, without creating a check. A known review_id retrieves that record. Use view=trajectory to identify revisions from edits or search across versions: older events remain in the results. Filter by section and feedback_origin=user_quote for verbatim events[].details.text. Text views: summary, excerpt (default, image data omitted), source (exact Markdown)."
+        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" repaginates the old revision with the current environment. It cannot confirm the original last page. On a miss use IDs in other_recorded_reviews to read known checks. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown). When paging through one source revision, pass the revision returned by the first source page on every subsequent page together with its next_offset."
     )]
     async fn read_section(
         &self,
@@ -500,7 +528,7 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "Use view=image to see the page without filing a check. A full-page view=review renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers, illustrations_only for diagrams. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
+        description = "Use view=image to see the page without filing a check. A full-page view=review renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision alone it reads stored data, review IDs, intervening edits and limitations. With region it renders labeled local crops in native image coordinates and measures visible changes; add compare_revision for paired before/after, and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. illustrations_only selects raster illustrations, not generated circuitikz. Locate a circuit on the current image, then query its region at the same revision without that filter for the whole diagram ID. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,
@@ -528,7 +556,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually."
+        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually. An ID is local to the exact layout revision, section and page that returned it. After an intervening edit, read the latest layout and resolve the intended glyph again; do not reuse old IDs by changing only expected_revision."
     )]
     async fn adjust_glyphs(
         &self,
@@ -591,7 +619,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export the complete saved revision, in section order, to a local PDF (default) or ZIP of page PNGs. Returns the path, page count and review.unreviewed_pages in print order. For a print-and-report request return the file and missing pages. Only if a new check is requested, use preview_handwriting(view=review) at the exported revision. For ink-only PNG pages, set transparent_background=true with tune_handwriting (ink group) and export ZIP. PDF always includes paper. Text-only clients can give the user the PDF path for visual inspection. Use view=image to inspect the intended appearance without filing a check."
+        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
     )]
     async fn export_handwriting(
         &self,
@@ -606,14 +634,27 @@ impl Panache {
             let reviewed_pages = draft.reviewed_pages()?;
             let mut unreviewed = Vec::new();
             let mut visibility_flags = 0;
+            let mut matching = 0;
+            let mut different = Vec::new();
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
             let format = input.format.unwrap_or_default();
             let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
                 writer, &draft, sections, format, cancel,
-                |pages, section, page| {
+                |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
-                        Some(flagged) => visibility_flags += usize::from(*flagged),
+                        Some(record) => {
+                            visibility_flags += usize::from(record.visibility_flag);
+                            if matches!(format, Format::Zip)
+                                && let Some(saved) = &record.pixel_sha256
+                            {
+                                if review::pixel_sha256(image) == *saved {
+                                    matching += 1;
+                                } else {
+                                    different.push(json!({"section":section,"page":page}));
+                                }
+                            }
+                        }
                         None => unreviewed.push(json!({"section":section,"page":page})),
                     }
                     if let Some(token) = &progress_token {
@@ -636,16 +677,31 @@ impl Panache {
             } else {
                 format!(" 缺少整页检查单的节内页码：{}。", serde_json::to_string(&unreviewed)?)
             };
-            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}\n\n`{}`", draft.revision, path.display());
-            Ok(reply(message, json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages,
-                "review": {
-                    "pages_with_evidence": reviewed,
-                    "pages_with_visibility_flags": visibility_flags,
-                    "global_text_ink_zero": zero_text_ink,
-                    "pages_without_visibility_evidence": unreviewed.len(),
-                    "unreviewed_pages": unreviewed,
+            let mut review = json!({
+                "pages_with_evidence": reviewed,
+                "pages_with_visibility_flags": visibility_flags,
+                "global_text_ink_zero": zero_text_ink,
+                "pages_without_visibility_evidence": unreviewed.len(),
+                "unreviewed_pages": unreviewed,
+            });
+            let mut pixel_warning = String::new();
+            if matches!(format, Format::Zip) {
+                let without_digest = reviewed - matching - different.len();
+                if !different.is_empty() {
+                    pixel_warning = format!(" ZIP 中这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
                 }
+                if without_digest > 0 {
+                    pixel_warning.push_str(&format!(" {without_digest} 页的检查单没有像素摘要，无法比对。"));
+                }
+                review["zip_pixels"] = json!({
+                    "pages_matching_latest_review": matching,
+                    "different_pages": different,
+                    "reviewed_pages_without_digest": without_digest,
+                });
+            }
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n`{}`", draft.revision, path.display());
+            Ok(reply(message, json!({
+                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review": review,
             })))
         }).await;
         tool_result(result)
@@ -669,12 +725,13 @@ fn asset(key: &str, beside: &Path, name: &str, source: &str) -> PathBuf {
 async fn main() -> Result<()> {
     let exe = env::current_exe()?;
     let beside = exe.parent().context("Missing executable directory")?;
-    let engine = Engine::new(asset(
+    let font_dir = asset(
         "PANACHE_FONT_DIR",
         beside,
         "font_assets",
         "assets/font_assets",
-    ))?;
+    );
+    let engine = Engine::new(font_dir.clone())?;
     let worker=asset("PANACHE_MARKDOWN_WORKER",beside,"prepare-text-worker.js","app/web/prepare-text-worker.js")
         .canonicalize().context("Build the Markdown worker with python scripts/build-text-worker.py, or set PANACHE_MARKDOWN_WORKER")?;
     let home = env::var_os("PANACHE_MCP_HOME")
@@ -700,7 +757,8 @@ async fn main() -> Result<()> {
         preserve_reviews,
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
-        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes),
+        local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes)
+            .with_bundled_dir(font_dir),
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
         worker: fs::read_to_string(worker)?.into(),

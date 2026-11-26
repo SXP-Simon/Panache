@@ -2,6 +2,7 @@
 
 import base64
 import io
+import json
 import sqlite3
 import struct
 import zlib
@@ -42,6 +43,12 @@ def slanted_sheet(path):
     ]
 
 
+def assert_no_photo_guidance(receipt):
+    texts = [part.text for part in receipt.content if part.type == "text"]
+    for text in [json.dumps(receipt.structuredContent), *texts]:
+        assert "photo_appearance" not in text and "ink_edge_guidance" not in text
+
+
 async def unruled_artwork(client, directory, call):
     path = directory / "unruled.png"
     paper = Image.new("RGB", (1100, 640), "#eee5d8")
@@ -59,14 +66,30 @@ async def unruled_artwork(client, directory, call):
         {"row": 0, "left": [100, 180], "right": [650, 170]},
         {"row": 5, "left": [70, 450], "right": [700, 440]},
     ])
-    whole = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
+    receipt = await call(client, "preview_handwriting", **key, view="review")
+    whole = receipt.structuredContent
     appearance = whole["photo_appearance"]
+    assert json.loads(receipt.content[0].text.splitlines()[0])["photo_appearance"] == appearance
+    guidance = appearance["ink_edge_guidance"]
+    assert sum(part.text.count(guidance) for part in receipt.content if part.type == "text") == 1
+    assert all(term in guidance for term in (
+        "Keep ink if requested or suitable",
+        "user reports overly sharp strokes", "native crop", "sharper stroke edges",
+        "comparable nearby marks", "Shadow or faint ink alone is insufficient",
+        "get their glyph IDs from layout", "adjust_glyphs softness",
+        "For the whole draft, use tune_handwriting ink_softness",
+    ))
+    assert "ask the user to inspect the crop" in appearance["inspect"]
+    assert "credit the user's observations" in appearance["inspect"]
+    assert "compare any area the user explicitly asked to preserve" in appearance["after_edit"]
+    assert all(term in appearance["after_edit"] for term in (
+        "compare_revision", "same region", "fine strokes and contrast", "keep the original if worse or unsure",
+    ))
     args = appearance["preview_arguments"]
     assert args["revision"] == 2 and args["draft_id"] == key["draft_id"]
     assert "ink_softness" in appearance["controls"]
-    archived = await call(client, "read_section", **key, view="review", review_id=whole["review_id"])
-    assert "photo_appearance" not in archived.structuredContent["evidence"]
     crop = await call(client, "preview_handwriting", **args)
+    assert_no_photo_guidance(crop)
     x, y, w, h = crop.structuredContent["crop_bounds"]
     assert crop.structuredContent["crop_image_size"] == [w, h] and max(w, h) <= 900
     assert crop.structuredContent["after"]["region"]["ink_pixels"] > 0
@@ -99,6 +122,17 @@ async def unruled_artwork(client, directory, call):
         else:
             assert ImageStat.Stat(new_delta).sum[0] < ImageStat.Stat(old_delta).sum[0]
         finished = after
+
+    # The stored revision now predates all three edits. A separate connection observes any commit.
+    with closing(sqlite3.connect(directory / "drafts.sqlite3")) as db:
+        version = db.execute("PRAGMA data_version").fetchone()
+        archived = await call(client, "read_section", **key, view="review", review_id=whole["review_id"])
+        assert db.execute("PRAGMA data_version").fetchone() == version
+    record = archived.structuredContent
+    assert record["review_id"] == whole["review_id"] and record["revision"] == 2
+    assert record["evidence"] == whole["evidence"]
+    assert all(item.type == "text" for item in archived.content)
+    assert_no_photo_guidance(archived)
 
 
 async def check_filtered_history(client, call, draft_id):
@@ -388,7 +422,7 @@ async def exercise(client, directory, call):
     preset = (await call(client, "save_section", markdown="字", style={"seed": 13})).structuredContent
     preset_id = preset["draft_id"]
     plain = await call(client, "preview_handwriting", draft_id=preset_id, view="review")
-    assert "photo_appearance" not in plain.structuredContent
+    assert_no_photo_guidance(plain)
     await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=1, changes={"paper": "grid"})
     await incompatible(preset_id, 1, 2, "different_reference_paper")
     await call(client, "tune_handwriting", draft_id=preset_id, expected_revision=2, changes={"width": 800})

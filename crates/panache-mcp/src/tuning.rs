@@ -95,10 +95,18 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
             }
         }
     }
-    ensure!(
-        changes != draft.controls || input.paper_guides.is_some(),
-        "No control values changed"
-    );
+    if input.paper_guides.is_none() && changes == draft.controls {
+        ensure!(
+            !patch.is_empty(),
+            "Supply controls, font_path or paper_guides"
+        );
+        draft.require_current_revision()?;
+        return Ok(reply(
+            format!("Controls already match revision {}.", draft.revision),
+            json!({"draft_id":draft.id,"revision":draft.revision,"changed":false,"paper":null,
+                "controls":changes,"fine_layout":"preserved"}),
+        ));
+    }
     controls::parameters(&draft, 1, &changes)?;
     let preserve_layout = changes.keys().chain(draft.controls.keys()).all(|key| {
         controls::catalog()["ink"].get(key).is_some()
@@ -108,6 +116,9 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
     let paper = input.paper_guides.as_ref().and(draft.paper.as_ref());
     let details = json!({"changes":input.changes,"font":font.as_ref().map(|(name,_)|name),"paper_guides":input.paper_guides,"note":input.note});
     let preserve_layout = preserve_layout && paper.is_none();
+    if input.preserve_local_adjustments && !preserve_layout {
+        draft.require_unadjusted_layout()?;
+    }
     let _budget = font
         .as_ref()
         .map(|(_, bytes)| state.storage.import(bytes.len()))
@@ -122,6 +133,6 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
     )?;
     Ok(reply(
         format!("Saved revision {next}."),
-        json!({"draft_id":draft.id,"revision":next,"paper":paper.map(|p|p.summary()),"controls":changes,"fine_layout":if preserve_layout { "preserved" } else { "inspect_again" }}),
+        json!({"draft_id":draft.id,"revision":next,"changed":true,"paper":paper.map(|p|p.summary()),"controls":changes,"fine_layout":if preserve_layout { "preserved" } else { "inspect_again" }}),
     ))
 }
