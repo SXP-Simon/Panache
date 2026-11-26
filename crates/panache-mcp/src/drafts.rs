@@ -310,7 +310,7 @@ impl Drafts {
         )?;
         ensure!(
             !fine,
-            "Section has saved glyph adjustments; use an explicitly reviewed edit workflow"
+            "Section has saved glyph adjustments. Nothing was saved. A whole-section save would not carry those positions into the new revision. Leave this version intact unless the user explicitly accepts losing these positions. Tell them the text is unchanged and offer to keep this layout or re-layout and preview. After explicit acceptance, read the complete source of this section at the agreed revision, then use save_section with that expected_revision and preview_handwriting(view=image). Do not retry this shortcut to discard placements. If you cannot reproduce the original safely, including any inline images, stop and explain before saving."
         );
         Ok((source, prepared))
     }

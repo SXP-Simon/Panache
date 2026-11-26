@@ -3,9 +3,10 @@ use anyhow::{Context, Result, ensure};
 use handwriting_core::{Limits, text};
 use rmcp::model::CallToolResult;
 
+const RETRY_PLAIN: &str = "Nothing was saved. Retry replace_section_text with the same arguments plus retry_plain=true. The server will check the complete stored section and keep inline images verbatim.";
+const KEEP_SOURCE: &str = "Nothing was saved. Leave the draft intact if the requested change or preservation of the remaining content cannot be verified.";
+
 pub(super) async fn run(server: &Panache, input: ReplaceText) -> Result<CallToolResult> {
-    validate_operand(&input.old_text)?;
-    validate_operand(&input.new_text)?;
     ensure!(input.old_text != input.new_text, "Replacement is unchanged");
     ensure!(
         input.section > 0 && input.expected_revision > 0,
@@ -16,6 +17,8 @@ pub(super) async fn run(server: &Panache, input: ReplaceText) -> Result<CallTool
     let saved = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         let (source, prepared) = state.drafts.plain_replacement_source(&input)?;
+        validate_operand(&input.old_text, input.retry_plain)?;
+        validate_operand(&input.new_text, input.retry_plain)?;
         let limits = Limits::default();
         ensure!(
             source.chars().count() <= limits.max_text_chars
@@ -23,7 +26,7 @@ pub(super) async fn run(server: &Panache, input: ReplaceText) -> Result<CallTool
             "Section too long"
         );
         let new_source = replace_standalone_line(&source, &input.old_text, &input.new_text)?;
-        let raw_images = simple_document(&source)?;
+        let raw_images = simple_document(&source, input.retry_plain)?;
         ensure!(
             new_source.chars().count() <= limits.max_text_chars,
             "Section too long"
@@ -36,7 +39,7 @@ pub(super) async fn run(server: &Panache, input: ReplaceText) -> Result<CallTool
             updated == expected
                 && raw_images == images(text::parse(&prepared))
                 && raw_images == images(text::parse(&updated)),
-            "Cannot prove only the requested plain line changed"
+            "Cannot prove only the requested plain line changed. {KEEP_SOURCE}"
         );
         let update = Save {
             paper_path: None,
@@ -61,34 +64,43 @@ pub(super) async fn run(server: &Panache, input: ReplaceText) -> Result<CallTool
     ))
 }
 
-fn plain_line(line: &str) -> bool {
+fn plain_line(line: &str, with_punctuation: bool) -> bool {
     !line.is_empty()
         && !line.starts_with(' ')
         && !line.ends_with(' ')
-        && line.chars().all(|c| c.is_alphanumeric() || c == ' ')
+        && line.chars().all(|c| {
+            c.is_alphanumeric()
+                || c == ' '
+                || (with_punctuation && "，。！？；：、（）“”‘’,.!?;:()".contains(c))
+        })
 }
 
-fn validate_operand(line: &str) -> Result<()> {
+fn validate_operand(line: &str, retry: bool) -> Result<()> {
+    let length = line.chars().count();
     ensure!(
-        plain_line(line) && line.chars().count() <= 160,
-        "Supply 1..160 letters, digits or interior spaces for a whole plain-text paragraph"
+        plain_line(line, true) && length <= Limits::default().max_text_chars,
+        "Use a single plain-text paragraph. {KEEP_SOURCE}"
+    );
+    ensure!(
+        retry || (length <= 160 && plain_line(line, false)),
+        "{RETRY_PLAIN}"
     );
     Ok(())
 }
 
 fn replace_standalone_line(document: &str, old: &str, new: &str) -> Result<String> {
-    let first = document.find(old).context("No exact source match")?;
+    let first = document.find(old).context("No exact source match. Read the specified source revision to locate the intended text before editing.")?;
     let end = first + old.len();
     let step = old.chars().next().context("Empty search text")?.len_utf8();
     // Start just after the first scalar, so overlapped candidate spans still count.
     ensure!(
         !document[first + step..].contains(old),
-        "Source match is ambiguous"
+        "Source match is ambiguous. Leave the draft unchanged and ask which occurrence the user means if their request does not identify it."
     );
     ensure!(
         (first == 0 || document.as_bytes()[first - 1] == b'\n')
             && (end == document.len() || document.as_bytes()[end] == b'\n'),
-        "Match is not a whole plain-text line"
+        "Match is not a whole plain-text line. Read the source at this revision and identify the complete paragraph before retrying."
     );
     let mut output = String::with_capacity(document.len() - old.len() + new.len());
     output.push_str(&document[..first]);
@@ -109,7 +121,7 @@ fn images(nodes: Vec<text::Node>) -> Vec<(String, String)> {
 
 // This opt-in operation accepts only an intentionally small source grammar;
 // it is not an alternate parser for arbitrary Markdown.
-fn simple_document(source: &str) -> Result<Vec<(String, String)>> {
+fn simple_document(source: &str, retry: bool) -> Result<Vec<(String, String)>> {
     let mut result = Vec::new();
     let mut previous = false;
     for line in source.split('\n') {
@@ -119,15 +131,19 @@ fn simple_document(source: &str) -> Result<Vec<(String, String)>> {
         }
         ensure!(
             !previous,
-            "Only standalone one-line paragraphs are supported"
+            "Only standalone one-line paragraphs are supported. {KEEP_SOURCE}"
         );
         previous = true;
-        if plain_line(line) {
+        if plain_line(line, true) {
+            ensure!(
+                retry || plain_line(line, false),
+                "Unsupported markup in plain text. {RETRY_PLAIN}"
+            );
             continue;
         }
         ensure!(
             line.starts_with("!["),
-            "Unsupported markup near the replacement"
+            "Unsupported markup near the replacement. {KEEP_SOURCE}"
         );
         let mut nodes = text::parse(line).into_iter();
         let Some(text::Node::Image { alt, data }) = nodes.next() else {
@@ -169,14 +185,16 @@ mod tests {
 
     #[test]
     fn only_standalone_prose_and_real_inline_data() {
-        assert!(simple_document("Alpha\n\n![图](data:image/png;base64,AAAA)\n\nBeta").is_ok());
+        assert!(
+            simple_document("Alpha\n\n![图](data:image/png;base64,AAAA)\n\nBeta", false).is_ok()
+        );
         for unsupported in [
             "Alpha\nBeta",
             "Alpha\n\n```\nBeta\n```",
             "Alpha\n\n![p](local.png)",
             "https://example.test\n\nBeta",
         ] {
-            assert!(simple_document(unsupported).is_err(), "{unsupported}");
+            assert!(simple_document(unsupported, true).is_err(), "{unsupported}");
         }
     }
 }

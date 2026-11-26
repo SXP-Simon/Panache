@@ -64,6 +64,7 @@ async def regression(binary, fonts, worker):
                 assert result.isError and expected_error in result.content[0].text, result.content
                 with read_only(home) as db:
                     assert list(db.iterdump()) == before
+                return result.content[0].text
 
             old, new = "AFTER COPPER 715", "AFTER SILVER 715"
             picture = inline_picture()
@@ -105,8 +106,39 @@ async def regression(binary, fonts, worker):
                      "old_text": "春天", "new_text": "秋天"},
                     expected_error,
                 )
-            print("Verified whole-line replacement, inline image preservation, and unchanged SQLite rows "
-                  "after stale, ambiguous, and punctuated-section rejections.")
+            punctuated = f"Lab notes.\n\n{picture}\n\nSample 715"
+            draft = (await call("save_section", markdown=punctuated)).structuredContent
+            target = {"draft_id": draft["draft_id"], "section": 1}
+            edit = {**target, "expected_revision": 1, "old_text": "Sample 715", "new_text": "Sample 716"}
+            guidance = await reject_unchanged(edit, "Unsupported markup")
+            assert "retry_plain=true" in guidance
+            await call("replace_section_text", **edit, retry_plain=True)
+            saved = (await call("read_section", **target, revision=2, view="source", limit=4000)).structuredContent
+            assert saved["markdown"] == punctuated.replace("Sample 715", "Sample 716")
+            long_line = "甲" * 161 + "。"
+            long_edit = {**target, "expected_revision": 2, "old_text": "Sample 716", "new_text": long_line}
+            await reject_unchanged(long_edit, "retry_plain=true")
+            await call("replace_section_text", **long_edit, retry_plain=True)
+            saved = (await call("read_section", **target, revision=3, view="source", limit=4000)).structuredContent
+            assert saved["markdown"] == punctuated.replace("Sample 715", long_line)
+            await reject_unchanged(edit | {"retry_plain": True}, "revision")
+
+            protected = (await call("save_section", markdown="Signature\n\nSample 715")).structuredContent
+            target = {"draft_id": protected["draft_id"], "section": 1}
+            layout = (await call("preview_handwriting", **target, view="layout", page=1)).structuredContent
+            await call("adjust_glyphs", **target, expected_revision=1, page=1,
+                       ids=[layout["glyphs"][0]["id"]], dx=20)
+            # The placement warning takes priority over the syntax retry.
+            warning = await reject_unchanged({**target, "expected_revision": 2, "old_text": "Sample 715",
+                                              "new_text": "Sample 716."}, "saved glyph adjustments")
+            assert "Leave this version intact" in warning and "retry_plain=true" not in warning
+            await reject_unchanged({**target, "expected_revision": 2, "old_text": "Sample 715",
+                                    "new_text": "Sample 716.", "retry_plain": True}, "saved glyph adjustments")
+            unsupported = (await call("save_section", markdown="# Notes\n\nSample 715")).structuredContent
+            await reject_unchanged(edit | {"draft_id": unsupported["draft_id"], "retry_plain": True},
+                                   "Unsupported markup")
+            print("Verified exact edits and image preservation, punctuation and long-line retries, "
+                  "and unchanged drafts after protected, ambiguous, unsupported and stale requests.")
 
 
 if __name__ == "__main__":
