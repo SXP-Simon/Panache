@@ -353,7 +353,45 @@ impl Engine {
                 )
             })
             .collect();
+        // Use edited geometry on this page. Raster details belong to the parent illustration.
+        let illustration_and_text = glyphs
+            .iter()
+            .find(|g| g.illustration == Some(g.id))
+            .and_then(|g| {
+                let position = |g: &fine_edit::GlyphBounds, offset| {
+                    crate::review::photo_point(
+                        draft,
+                        glyph_point(g, edits.get(&g.id).copied(), offset),
+                    )
+                };
+                let hw = f64::from(g.bounds[2]) / 2.;
+                let hh = f64::from(g.bounds[3]) / 2.;
+                let corners =
+                    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(|uv| position(g, uv));
+                let bounds = |axis: usize| {
+                    corners
+                        .iter()
+                        .map(|p| p[axis])
+                        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), x| {
+                            (lo.min(x), hi.max(x))
+                        })
+                };
+                let (left, right) = bounds(0);
+                let (top, bottom) = bounds(1);
+                let candidates = glyphs.iter().filter(|v| v.illustration.is_none());
+                let near = candidates.map(|v| position(v, [0., 0.])).min_by(|a, b| {
+                    let distance = |p: &[f32; 2]| {
+                        (p[0] - p[0].clamp(left, right)).hypot(p[1] - p[1].clamp(top, bottom))
+                    };
+                    distance(a).total_cmp(&distance(b))
+                })?;
+                Some([
+                    [left.min(near[0]), top.min(near[1])],
+                    [right.max(near[0]), bottom.max(near[1])],
+                ])
+            });
         Ok(crate::review::PageSample {
+            illustration_and_text,
             baselines,
             content_sha256: format!("{:x}", membership.finalize()),
         })

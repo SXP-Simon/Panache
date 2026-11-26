@@ -166,11 +166,17 @@ fn image(
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let number = section.number;
+    let contains_inline_image = section.text.contains("](data:image/");
     let (preview, cached) = engine.preview_with_refresh(draft, section, page, fresh, cancel)?;
-    let mut result = reply(
-        format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision),
-        json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached}),
-    );
+    let mut message = format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision);
+    let mut data = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached});
+    if contains_inline_image {
+        let hint = "如果当前页既有手绘图又有文字，在判断笔迹一致前，用 view=review 加 region 框住一段图线和旁边的字，同倍率比较粗细和墨色。同页看图与字只传当前版，省略 compare_revision。看不清时说明还不能判断。";
+        message.push('\n');
+        message.push_str(hint);
+        data["illustration_inspection"] = json!(hint);
+    }
+    let mut result = reply(message, data);
     result
         .content
         .push(ContentBlock::image(preview.png, "image/png"));
