@@ -104,6 +104,8 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 整稿上限为整理后 10 万字、200 页。完整导出只在调用导出工具时执行；客户端可以取消，提供进度令牌时可看到已完成页数。ZIP 逐页写盘，PDF 在内存中组装压缩页面后写盘。结果成功后才移入 `exports/`。稿件及历史持续保存在 `PANACHE_MCP_HOME`；Windows 默认是 `%LOCALAPPDATA%/Panache/mcp`，其他系统默认是 `$XDG_DATA_HOME/Panache/mcp` 或 `~/.local/share/Panache/mcp`。
 
+想在聊天里拿到文件时，能处理 MCP 内嵌文件的客户端可在导出时传 `include_file=true`，把收到的 PDF 或 ZIP 作为附件显示给用户。512 KiB 以内的完整文件可以随回复传送。更大的文件仍在运行 Panache 的电脑上；两端共用磁盘时可直接打开返回的路径。聊天客户端给出用户可打开的下载链接时，直接把原链接交给用户；确认已展示附件但没有链接时，告诉用户在聊天附件中取件。`file_transfer.status=included` 表示工具回复带有文件内容。纯文字窗口或尚无客户端确认时，说明文件已导出，并按本机路径给出取件位置；这个路径和内嵌资源 URI 都不能当作下载链接。
+
 ## 容量与清理
 
 用 `storage_usage` 查询数据目录内常规文件的长度、数据库及其 WAL/SHM 大小、导出目录和所在卷剩余字节。可传 `draft_id` 查看一稿的正文历史、底纸、字体、逐页证据、评语等内容字节数。文件长度、SQLite 内容长度和磁盘分配量口径不同。跨稿复用同一字体的文件目前仍按稿保存。

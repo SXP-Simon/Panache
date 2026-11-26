@@ -321,6 +321,10 @@ pub struct Export {
     pub revision: Option<u32>,
     /// PDF includes the paper. ZIP contains page PNGs and respects the transparent_background ink control.
     pub format: Option<Format>,
+    /// Include the exported bytes as an embedded MCP resource for clients that can offer attachments.
+    /// Up to 512 KiB before base64 encoding. Larger files stay available at the returned server path.
+    #[serde(default)]
+    pub include_file: bool,
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema, PartialEq, serde::Serialize)]
