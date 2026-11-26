@@ -98,16 +98,35 @@ fn page_receipt(
     section: u32,
     page: u32,
     anchor: Option<(u32, u32)>,
+    repaginated_last: bool,
 ) -> Result<CallToolResult> {
-    let mut record = draft.page_observation(section, page)?;
+    let mut record = draft.page_observation(section, page, repaginated_last)?;
     record["latest_draft_revision"] = json!(draft.latest_revision);
     if let Some((anchor_section, added_revision)) = anchor {
         record["before_text_match"] =
             json!({"section": anchor_section, "introduced_revision": added_revision});
     }
-    let conclusion = add_receipt_summary(&mut record);
+    let mut conclusion = add_receipt_summary(&mut record);
+    let mut guidance = "";
+    if repaginated_last {
+        record["page_resolution"] = json!({
+            "source": "repaginated_current_environment",
+            "historical_last_page_confirmed": false,
+        });
+        conclusion =
+            format!("末页页码根据当前环境重新分页得出；档案不能证明这是当时的末页。\n{conclusion}");
+        record["receipt_summary"] = json!(conclusion);
+        guidance =
+            "\n若知道原页码，请对同一版同一节用数字 page 查单；知道原单号可直接用 review_id 查单。";
+        if record["other_recorded_reviews"]["entries"]
+            .as_array()
+            .is_some_and(|entries| !entries.is_empty())
+        {
+            guidance = "\n下列 other_recorded_reviews 是同一版同一节其他页的部分存档，不代表当时的末页。可用 read_section(view=review, draft_id, review_id) 查原单；知道原页码时也可按数字 page 查单。";
+        }
+    }
     let text = format!(
-        "{conclusion}\n当前稿件第 {} 版。\n{record}",
+        "{conclusion}\n当前稿件第 {} 版。{guidance}\n{record}",
         draft.latest_revision
     );
     Ok(reply(text, record))
@@ -147,7 +166,7 @@ impl Panache {
                     } else {
                         input.section.unwrap_or(1)
                     };
-                    page_receipt(&draft, section, n, anchor)
+                    page_receipt(&draft, section, n, anchor, false)
                 }
                 ReviewPage::Last(_) => {
                     self.render(ctx, move |state, engine, cancel| {
@@ -159,7 +178,7 @@ impl Panache {
                             .pop()
                             .context("Empty section")?;
                         let last = engine.page_count(&draft, source, cancel)?;
-                        page_receipt(&draft, section, last, anchor)
+                        page_receipt(&draft, section, last, anchor, true)
                     })
                     .await
                 }
@@ -259,7 +278,7 @@ impl ServerHandler for Panache {
             "For looser, less uniform homework or lab handwriting (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For an undecided homework or lab-report style, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. ",
-            "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Follow photo_appearance.preview_arguments for a native detail crop. ",
+            "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
             "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
@@ -449,7 +468,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" finds that historical section’s last sheet. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown). When paging through one source revision, pass the revision returned by the first source page on every subsequent page together with its next_offset."
+        description = "Read saved checks without filing one: view=review with review_id (检查单号), or section and page at a revision (default: current). For a check before added text, pass its literal before_text and section; page=\"last\" repaginates the old revision with the current environment. It cannot confirm the original last page. On a miss use IDs in other_recorded_reviews to read known checks. Cite review_id and receipt_summary or report no_recorded_review. Stored measurements and feedback belong to that version. Use view=trajectory for edits and evidence across versions; filter section and feedback_origin=user_quote for events[].details.text. Text views: excerpt (default, omits image data), summary, source (exact Markdown). When paging through one source revision, pass the revision returned by the first source page on every subsequent page together with its next_offset."
     )]
     async fn read_section(
         &self,

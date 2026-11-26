@@ -111,17 +111,56 @@ impl Snapshot<'_> {
         by_id(&self.drafts.connect()?, id, self)
     }
 
-    pub fn page_observation(&self, section: u32, page: u32) -> Result<Value> {
+    pub fn page_observation(
+        &self,
+        section: u32,
+        page: u32,
+        include_other_pages: bool,
+    ) -> Result<Value> {
         ensure!(section > 0 && page > 0, "section and page start at 1");
         let mut db = self.drafts.connect()?;
         let tx = db.transaction()?;
-        let record = page_record(&tx, self, self.revision, section, page)?;
-        Ok(record.unwrap_or_else(|| {
-            json!({
-                "draft_id": self.id, "revision": self.revision, "section": section, "page": page,
-                "review_id": null, "status": "no_recorded_review",
-            })
-        }))
+        if let Some(record) = page_record(&tx, self, self.revision, section, page)? {
+            return Ok(record);
+        }
+        let mut missing = json!({
+            "draft_id": self.id, "revision": self.revision, "section": section, "page": page,
+            "review_id": null, "status": "no_recorded_review",
+        });
+        if include_other_pages {
+            // Seek once per distinct page through reviews_by_page. Repeated measurements
+            // of one page cannot crowd out the next page, and the sixth is only a sentinel.
+            let mut seek = tx.prepare(
+                "SELECT page,review_id,filed_at_revision FROM review_observations
+                WHERE draft=? AND revision=? AND section=? AND page<?
+                ORDER BY page DESC,seq DESC LIMIT 1",
+            )?;
+            let mut upper = i64::from(u32::MAX) + 1;
+            let mut entries = Vec::new();
+            let mut truncated = false;
+            for _ in 0..6 {
+                let row = seek
+                    .query_row(params![self.id, self.revision, section, upper], |r| {
+                        Ok((
+                            r.get::<_, u32>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, Option<u32>>(2)?,
+                        ))
+                    })
+                    .optional()?;
+                let Some((ordinal, id, filed)) = row else {
+                    break;
+                };
+                if entries.len() == 5 {
+                    truncated = true;
+                    break;
+                }
+                entries.push(json!({"page":ordinal,"review_id":id,"filed_at_revision":filed}));
+                upper = i64::from(ordinal);
+            }
+            missing["other_recorded_reviews"] = json!({"entries":entries,"truncated":truncated});
+        }
+        Ok(missing)
     }
 
     /// Latest full-page observation for each measured page in this revision.
@@ -298,7 +337,7 @@ mod tests {
         );
         assert!(legacy["filed_at_revision"].is_null());
         assert_eq!(legacy["evidence"]["visibility"], "no_visible_change");
-        assert_eq!(old.page_observation(1, 1)?, legacy);
+        assert_eq!(old.page_observation(1, 1, false)?, legacy);
         let observation = json!({"visibility":"inspect_visually","photo_size":[400,500]});
         let rev2 = drafts.snapshot("d", Some(2))?;
         let first = rev2.record_review(1, 1, "a", "pixels", "content", &observation)?;
@@ -328,8 +367,8 @@ mod tests {
         )?;
         assert_ne!(first["review_id"], changed["review_id"]);
         assert_ne!(changed["review_id"], upgraded["review_id"]);
-        assert_eq!(rev2.page_observation(1, 1)?, upgraded);
-        assert_eq!(old.page_observation(1, 1)?, legacy);
+        assert_eq!(rev2.page_observation(1, 1, false)?, upgraded);
+        assert_eq!(old.page_observation(1, 1, false)?, legacy);
         let reviewed = rev2.reviewed_pages()?;
         assert!(reviewed[&(1, 1)].visibility_flag);
         assert_eq!(
