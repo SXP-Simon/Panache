@@ -67,7 +67,7 @@ cargo build --locked --release -p panache-mcp
 | `list_drafts` | 找回本地稿件和最新版本。每批 20 条，可传 `offset`。 |
 | `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |
 | `preview_handwriting` | 默认返回首页 PNG。用 `section`、`page` 查看指定节中的一页，两者从 1 开始。 |
-| `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。导出结果的 `review.unreviewed_pages` 按打印顺序列出缺少整页复盘的 `section`、`page`。只要求导出并列出缺单页时，直接转述回执。用户要求补验时，再按导出的版本和坐标调用 `preview_handwriting(view="review")` 建单。 |
+| `export_handwriting` | 按节顺序导出整份稿件，返回绝对路径、版本和实际页数。格式可选 `pdf` 或 `zip`，ZIP 从 `0.png` 开始编号。导出结果的 `review.unreviewed_pages` 按打印顺序列出缺少整页复盘的 `section`、`page`。只要求导出并列出缺单页时，直接转述回执。用户要求补验时，再按导出的版本和坐标调用 `preview_handwriting(view="review")` 建单。仅 ZIP 返回 `review.zip_pixels`，与该版各页最近一次整页检查单比对：`pages_matching_latest_review` 计相同页数，`different_pages` 列出像素不同的节内页码，`reviewed_pages_without_digest` 计有单但无摘要的页数。无单的页不参与比对；这些数字不表示用户已看过成品。 |
 | `describe_controls` | 调参时可将参数直接放在 `changes` 内，也可写成 `{"changes":{"variation":{"perturb_theta_sigma":0.07}}}`。传 `{}` 列出参数组；只传 `group` 查看参数、单位、范围和枚举值。传 `group` 和 `draft_id` 读取当前保存版的实际值，另带 `revision` 可查指定版。行距和页面几何查 `layout`；底纸参考线校准不在该组。 |
 | `tune_handwriting` | 可在原稿上更新参考线、导入本机字体，并一次提交多项全稿参数，如 `{"ink_opacity":85,"word_spacing":2}`。`null` 恢复建稿时的设置。 |
 | `storage_usage` | 查询目录和逐稿用量，以及当前预算。 |

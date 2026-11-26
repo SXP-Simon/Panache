@@ -470,7 +470,7 @@ impl Engine {
         sections: Vec<Section>,
         format: Format,
         cancel: &Cancellation,
-        mut on_page: impl FnMut(usize, u32, usize),
+        mut on_page: impl FnMut(usize, u32, usize, &image::RgbaImage),
     ) -> Result<usize> {
         let mut count = 0;
         let mut background = draft.background()?;
@@ -492,7 +492,7 @@ impl Engine {
                     |index, page| {
                         emit(count, &page)?;
                         count += 1;
-                        on_page(count, number, index + 1);
+                        on_page(count, number, index + 1, &page);
                         Ok(())
                     },
                 )?;

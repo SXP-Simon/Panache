@@ -141,6 +141,15 @@ fn rgb_delta(a: Rgba<u8>, b: Rgba<u8>) -> u16 {
         .unwrap()
 }
 
+pub fn pixel_sha256(image: &RgbaImage) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    hash.update(image.width().to_le_bytes());
+    hash.update(image.height().to_le_bytes());
+    hash.update(image.as_raw());
+    format!("{:x}", hash.finalize())
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
@@ -151,12 +160,7 @@ pub fn page(
 ) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
     let mut finished = decode_page(png)?;
-    use sha2::{Digest, Sha256};
-    let mut hash = Sha256::new();
-    hash.update(finished.width().to_le_bytes());
-    hash.update(finished.height().to_le_bytes());
-    hash.update(finished.as_raw());
-    let pixel_digest = format!("{:x}", hash.finalize());
+    let pixel_digest = pixel_sha256(&finished);
     let baselines = &sample.baselines;
     let paper = reference_paper(draft, finished.dimensions(), &params)?;
     let (w, h) = paper.dimensions();
