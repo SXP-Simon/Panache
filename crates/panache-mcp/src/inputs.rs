@@ -103,7 +103,9 @@ pub struct Save {
     /// Optional absolute local image path for a new draft. Imports and aligns the paper once.
     /// Use with the default plain preset. All revisions share the saved image.
     pub paper_path: Option<std::path::PathBuf>,
-    /// With paper_path: photo (default) preserves camera perspective; flatten aligns the background.
+    /// When asked to write on the supplied sheet, pass its original file as paper_path and use photo (default).
+    /// Keep the header, rulings and perspective even for PDF export. Use flatten for a requested straightened sheet;
+    /// recreate a blank template only when requested.
     pub paper_mode: Option<PaperMode>,
     /// Optional photo-space baselines overriding auto detection on import. Give 2..32 guides, first row 0, last row the last writable line; intermediate guides refine the fit.
     pub paper_guides: Option<Vec<Guide>>,
