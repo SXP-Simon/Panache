@@ -80,6 +80,8 @@ impl Parser {
             "cdot" => "·",
             "times" => "×",
             "pm" => "±",
+            "le" | "leq" => "≤",
+            "ge" | "geq" => "≥",
             "infty" => "∞",
             "angle" => "∠",
             "circ" => "°",
