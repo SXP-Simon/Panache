@@ -12,6 +12,11 @@ use crate::{
 use handwriting_core::fine_edit::{self, Adjustment, Adjustments};
 use serde_json::{Value, json};
 
+fn glyph_source<'a>(text: &'a [u16], glyph: &fine_edit::GlyphBounds) -> Option<&'a [u16]> {
+    let [start, end] = glyph.source_utf16?;
+    text.get(start as usize..end as usize)
+}
+
 // Coordinates relative to the original tile center, transformed in paint order.
 fn glyph_point(
     g: &fine_edit::GlyphBounds,
@@ -168,19 +173,34 @@ impl Engine {
         page_number: usize,
         cancel: &Cancellation,
     ) -> Result<(RenderedPreview, bool)> {
+        self.preview_with_refresh(draft, section, page_number, false, cancel)
+    }
+    pub fn preview_with_refresh(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        page_number: usize,
+        fresh: bool,
+        cancel: &Cancellation,
+    ) -> Result<(RenderedPreview, bool)> {
         let (n, v) = (section.number, section.version);
         ensure!(
             (1..=Limits::default().max_pages).contains(&page_number),
             "Invalid page number"
         );
         let (edit_revision, edits) = draft.edits(&section)?;
-        if let Some(hit) = self.cache.iter().find(|p| {
+        let cached = self.cache.iter().position(|p| {
             p.draft == draft.id
                 && p.settings == draft.settings_revision
                 && p.edits == edit_revision
                 && (p.section, p.version, p.page) == (n, v, page_number)
-        }) {
-            return Ok((hit.preview.clone(), true));
+        });
+        if let Some(index) = cached {
+            if !fresh {
+                return Ok((self.cache[index].preview.clone(), true));
+            }
+            // Leave no stale page on failure. A success restores this FIFO slot.
+            self.cache.remove(index);
         }
         let mut background = draft.background()?;
         let camera = draft.camera(background.as_deref())?;
@@ -207,10 +227,7 @@ impl Engine {
             png,
             fine_edit: request.params.fine_edit,
         };
-        if self.cache.len() == 4 {
-            self.cache.pop_front();
-        }
-        self.cache.push_back(CachedPage {
+        let entry = CachedPage {
             draft: draft.id.to_owned(),
             section: n,
             version: v,
@@ -218,7 +235,15 @@ impl Engine {
             edits: edit_revision,
             page: page_number,
             preview: preview.clone(),
-        });
+        };
+        if let Some(index) = cached {
+            self.cache.insert(index, entry);
+        } else {
+            if self.cache.len() == 4 {
+                self.cache.pop_front();
+            }
+            self.cache.push_back(entry);
+        }
         Ok((preview, false))
     }
     fn photo<'a>(
@@ -408,9 +433,7 @@ impl Engine {
                             json!([project(x, g.baseline), project(x + w, g.baseline)]);
                     }
                 }
-                if let Some([a, b]) = g.source_utf16
-                    && let Some(chars) = utf16.get(a as usize..b as usize)
-                {
+                if let Some(chars) = glyph_source(&utf16, g) {
                     row["text"] = json!(
                         String::from_utf16_lossy(chars)
                             .chars()

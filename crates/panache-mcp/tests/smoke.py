@@ -95,7 +95,17 @@ async def review_workflow(client, key, guides, font_path):
     geometry = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
     for actual, target in zip(geometry["glyphs"][0]["current_photo_quad"], quad, strict=True):
         assert max(abs(a-b) for a,b in zip(actual,target,strict=True)) < 1.1
-    await call(client, "tune_handwriting", **key, expected_revision=8, paper_guides=[])
+    # Keeping the numeric layout cannot carry hand-placed glyphs across a guide reset.
+    controls = (await call(client, "describe_controls", **key, group="layout")).structuredContent["values"]
+    reset = dict(**key, expected_revision=8, paper_guides=[])
+    protected = await client.call_tool("tune_handwriting", {
+        **reset, "preserve_local_adjustments": True,
+        "changes": {name: controls[name] for name in ("line_spacing", "left_margin")},
+    })
+    assert protected.isError and "section 1 of revision 8" in protected.content[0].text
+    current = (await call(client, "preview_handwriting", **key, view="layout", limit=1)).structuredContent
+    assert current["glyphs"][0]["current_photo_quad"] == geometry["glyphs"][0]["current_photo_quad"]
+    await call(client, "tune_handwriting", **reset)
     restored = (await call(client, "read_section", **key, view="summary")).structuredContent["paper"]
     original = (await call(client, "read_section", **key, revision=1, view="summary")).structuredContent["paper"]
     assert restored == original
@@ -143,7 +153,7 @@ async def handwriting_variation_sample(client):
         rejected = await client.call_tool("tune_handwriting", {**key, "expected_revision": 1, "changes": invalid})
         assert rejected.isError
     tuned = await call(client, "tune_handwriting", **key, expected_revision=1,
-                       changes={"variation": {"perturb_theta_sigma": 0.07}})
+                       preserve_local_adjustments=True, changes={"variation": {"perturb_theta_sigma": 0.07}})
     assert tuned.structuredContent["controls"]["perturb_theta_sigma"] == 0.07
     loose = png(await call(client, "preview_handwriting", **key))
     assert loose != base
@@ -156,6 +166,44 @@ async def handwriting_variation_sample(client):
     assert png(await call(client, "preview_handwriting", **key, revision=2)) == loose
     source = (await call(client, "read_section", **key, view="source")).structuredContent
     assert source["markdown"] == markdown
+
+
+async def glyph_target_text(client):
+    saved = (await call(client, "save_section", markdown="春 雨", style={"seed": 42})).structuredContent
+    key = {"draft_id": saved["draft_id"], "section": 1, "page": 1}
+
+    async def layout():
+        return (await call(client, "preview_handwriting", **key, view="layout")).structuredContent
+
+    before = await layout()
+    old_spring = next(g["id"] for g in before["glyphs"] if g["text"] == "春")
+    await call(client, "save_section", draft_id=key["draft_id"], section=1,
+               expected_revision=before["revision"], markdown="明 日 春 雨")
+    current = await layout()
+    ids = {g["text"]: g["id"] for g in current["glyphs"]}
+    assert ids["明"] == old_spring and ids["春"] != old_spring
+
+    for revision, targets, words, reason in (
+        (before["revision"], [old_spring], ["春"], "Revision conflict"),
+        (current["revision"], [ids["雨"], old_spring], ["雨", "春"], "Glyph text mismatch"),
+        (current["revision"], [ids["春"], ids["雨"]], ["春"], "one nonempty expected text"),
+        (current["revision"], [ids["春"]], [""], "one nonempty expected text"),
+    ):
+        failed = await client.call_tool("adjust_glyphs", {
+            **key, "expected_revision": revision, "ids": targets,
+            "expected_texts": words, "color": "#cc1833",
+        })
+        assert failed.isError and reason in failed.content[0].text, failed.content
+    unchanged = await layout()
+    assert unchanged["revision"] == current["revision"] and unchanged["glyphs"] == current["glyphs"]
+
+    # Request order differs from page order. Each string must match its own ID.
+    await call(client, "adjust_glyphs", **key, expected_revision=current["revision"],
+               ids=[ids["雨"], ids["春"]], expected_texts=["雨", "春"], color="#cc1833")
+    after = await layout()
+    assert after["revision"] == current["revision"] + 1
+    assert [g["text"] for g in after["glyphs"]
+            if g.get("adjustment", {}).get("color") == [204, 24, 51]] == ["春", "雨"]
 
 
 async def placement_pixels(client):
@@ -260,6 +308,7 @@ async def smoke(command, arguments, out):
                 "list_drafts",
                 "save_section",
                 "read_section",
+                "replace_section_text",
                 "preview_handwriting",
                 "export_handwriting",
             }
@@ -373,6 +422,7 @@ async def smoke(command, arguments, out):
             await mixed_script_sample(client)
             await handwriting_variation_sample(client)
             await placement_pixels(client)
+            await glyph_target_text(client)
             await coursework_form.exercise(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
@@ -585,7 +635,12 @@ async def smoke(command, arguments, out):
                 "changes": {"ink_opacity": 55, "ink": "#665577", "word_spacing": 2},
             }
             tuned = (await call(client, "tune_handwriting", **tuning)).structuredContent
-            assert tuned["revision"] == 2
+            assert tuned["revision"] == 2 and tuned["changed"] is True
+            equal = {**tuning, "expected_revision": 2, "changes": {"word_spacing": 2.0}}
+            same = (await call(client, "tune_handwriting", **equal)).structuredContent
+            assert same["revision"] == 2 and same["changed"] is False
+            assert same["controls"] == tuned["controls"] and same["fine_layout"] == "preserved"
+            assert (await client.call_tool("tune_handwriting", {**equal, "changes": {}})).isError
             assert (await client.call_tool("tune_handwriting", tuning)).isError
             assert (
                 png(await call(client, "preview_handwriting", draft_id=paper_id))
@@ -640,6 +695,8 @@ async def smoke(command, arguments, out):
             assert (await call(client, "adjust_glyphs", **fine)).structuredContent[
                 "revision"
             ] == 3
+            stale_noop = await client.call_tool("tune_handwriting", equal)
+            assert stale_noop.isError and "Revision conflict" in stale_noop.content[0].text
             adjusted = png(await call(client, "preview_handwriting", draft_id=paper_id))
             assert (
                 adjusted != before
@@ -666,8 +723,20 @@ async def smoke(command, arguments, out):
             ).structuredContent
             with ZipFile(exported_fine["path"]) as pages:
                 assert pages.read("0.png") == adjusted
+            blocked = await client.call_tool("tune_handwriting", {
+                "draft_id": paper_id, "expected_revision": 3, "preserve_local_adjustments": True,
+                "changes": {"variation": {"perturb_theta_sigma": 0.07}},
+            })
+            assert blocked.isError
+            assert blocked.content[0].text == (
+                "Reflow would stop applying local glyph adjustments in section 1 of revision 3. "
+                "This request saved no new revision. Keep preserve_local_adjustments=true. "
+                "Only if the user explicitly agrees to lose those adjustments in the new layout "
+                "may you use preserve_local_adjustments=false."
+            )
             camera_change = await call(client, "tune_handwriting", draft_id=paper_id,
-                                       expected_revision=3, changes={"camera_model": "Test Camera", "camera_iso": 200})
+                                       expected_revision=3, preserve_local_adjustments=True,
+                                       changes={"camera_model": "Test Camera", "camera_iso": 200})
             assert camera_change.structuredContent["fine_layout"] == "preserved"
             tagged = png(await call(client, "preview_handwriting", draft_id=paper_id))
             assert b"eXIf" in tagged and b"Test Camera" in tagged and tagged != adjusted
@@ -685,7 +754,7 @@ async def smoke(command, arguments, out):
             prior_ink = {key: tuned["controls"].get(key) for key in ink_settings}
             for rev, patch in [(5, ink_settings), (6, prior_ink)]:
                 ink_change = await call(client, "tune_handwriting", draft_id=paper_id,
-                                        expected_revision=rev, changes=patch)
+                                        expected_revision=rev, changes=patch, preserve_local_adjustments=True)
                 assert ink_change.structuredContent["fine_layout"] == "preserved"
                 glyph = (await call(client, "preview_handwriting", **probe)).structuredContent["glyphs"][0]
                 assert glyph["current_photo_quad"] == again["current_photo_quad"]
@@ -757,6 +826,9 @@ async def smoke(command, arguments, out):
                 await call(client, "preview_handwriting", **probe)
             ).structuredContent
             assert all("adjustment" not in g for g in refreshed["glyphs"])
+            reflow = await call(client, "tune_handwriting", draft_id=paper_id, expected_revision=8,
+                                changes={"perturb_theta_sigma": 0.07}, preserve_local_adjustments=True)
+            assert reflow.structuredContent["revision"] == 9
             assert (
                 png(
                     await call(

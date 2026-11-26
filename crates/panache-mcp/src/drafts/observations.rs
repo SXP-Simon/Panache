@@ -332,7 +332,10 @@ mod tests {
         assert_eq!(old.page_observation(1, 1)?, legacy);
         let reviewed = rev2.reviewed_pages()?;
         assert!(reviewed[&(1, 1)].visibility_flag);
-        assert_eq!(reviewed[&(1, 1)].pixel_sha256.as_deref(), Some("other-pixels"));
+        assert_eq!(
+            reviewed[&(1, 1)].pixel_sha256.as_deref(),
+            Some("other-pixels")
+        );
         assert!(old.reviewed_pages()?[&(1, 1)].pixel_sha256.is_none());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;

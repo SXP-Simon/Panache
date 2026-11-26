@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart' show getCrc32;
+import 'package:image/image.dart' as img;
+
+import '../models/settings.dart';
 
 /// Attach the engine's filtered TIFF payload to a freshly encoded Flutter PNG.
 Uint8List withPaperExif(Uint8List png, Uint8List? exif) {
@@ -99,3 +102,39 @@ bool _hasExifPrefix(ByteData data, int start, int end) =>
     end - start >= 6 &&
     data.getUint32(start) == 0x45786966 &&
     data.getUint16(start + 4) == 0;
+
+final _cameraFields = Expando<Map<String, String>>();
+
+/// Read only the four device fields used by paper settings. Uploaded byte
+/// buffers are replaced on a new selection; avoid parsing on each form edit.
+Map<String, String> paperCameraFields(Uint8List bytes) =>
+    _cameraFields[bytes] ??= _readCameraFields(bytes);
+
+Map<String, String> _readCameraFields(Uint8List bytes) {
+  final source = paperExifSource(bytes);
+  if (source == null || source.length < 8) return const {};
+  final img.ExifData exif;
+  try {
+    exif = img.ExifData.fromInputBuffer(img.InputBuffer(source));
+  } on RangeError {
+    // A broken TIFF offset or an empty thumbnail tag must not break settings.
+    return const {};
+  }
+  final fields = <String, String>{};
+  void label(String key, img.IfdValue? entry) {
+    if (entry is img.IfdValueAscii &&
+        entry.value.isNotEmpty &&
+        Settings.validCameraValue(key, entry.value)) {
+      fields[key] = entry.value;
+    }
+  }
+
+  label('camera_make', exif.imageIfd[0x010f]);
+  label('camera_model', exif.imageIfd[0x0110]);
+  label('camera_lens', exif.exifIfd[0xa434]);
+  final iso = exif.exifIfd[0x8827];
+  if (iso is img.IfdValueShort && iso.length == 1 && iso.toInt() > 0) {
+    fields['camera_iso'] = iso.toInt().toString();
+  }
+  return Map.unmodifiable(fields);
+}

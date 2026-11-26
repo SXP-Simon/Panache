@@ -11,6 +11,7 @@ import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/models/settings.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
+import 'package:handwriting_app/utils/paper_exif.dart';
 import 'package:handwriting_app/widgets/workbench_settings.dart';
 
 class MobileTestApi extends HandwritingApi {
@@ -322,13 +323,25 @@ void main() {
       await scrollTo(lastMargin, 180);
       expect(lastMargin.hitTestable(), findsOneWidget);
 
+      final plain = (await workspace.api.preview('paper')).first;
+      final modelOnly = base64Decode('SUkqAAgAAAABABABAgAEAAAAQUJDAAAAAAA=');
       workspace.background = Upload(
         'paper.png',
-        (await workspace.api.preview('paper')).first,
+        withPaperExif(plain, modelOnly),
       );
       workspace.emit();
       await tester.pumpAndSettle();
       await scrollTo(camera, -180);
+      expect(find.textContaining('ABC'), findsOneWidget);
+      expect(workspace.settings.camera, isEmpty);
+      expect(find.widgetWithText(TextFormField, 'ISO'), findsNothing);
+
+      workspace.background = Upload('paper.png', plain);
+      workspace.emit();
+      await tester.pumpAndSettle();
+      await scrollTo(camera, -180);
+      expect(find.textContaining('ABC'), findsNothing);
+      expect(find.text(l.paperCameraEmpty), findsOneWidget);
       await tester.tap(camera);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
