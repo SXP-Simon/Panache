@@ -600,7 +600,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. Text-only clients can open the PDF locally."
+        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
     )]
     async fn export_handwriting(
         &self,
