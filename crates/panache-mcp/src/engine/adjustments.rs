@@ -1,4 +1,4 @@
-use super::{Engine, glyph_point};
+use super::{Engine, glyph_point, glyph_source};
 use crate::{
     Nudge, Shape, Style,
     drafts::{Section, Snapshot},
@@ -34,6 +34,18 @@ impl Engine {
             selected.len() == changes.ids.len(),
             "Glyph not on this page; inspect its layout first"
         );
+        if let Some(texts) = &input.expected_texts {
+            let utf16: Vec<_> = req.text.encode_utf16().collect();
+            for (id, expected) in input.ids.iter().zip(texts) {
+                let glyph = selected[id];
+                ensure!(
+                    glyph.illustration.is_none()
+                        && glyph_source(&utf16, glyph)
+                            .is_some_and(|s| expected.encode_utf16().eq(s.iter().copied())),
+                    "Glyph text mismatch at ID {id}; read the latest layout and locate the intended text before retrying"
+                );
+            }
+        }
         let mut edits: BTreeMap<_, _> = req
             .params
             .fine_edits
@@ -87,6 +99,12 @@ impl<'a> GlyphChanges<'a> {
             !ids.is_empty() && ids.len() == input.ids.len() && ids.len() <= 32,
             "Choose 1..32 distinct glyph IDs"
         );
+        if let Some(texts) = &input.expected_texts {
+            ensure!(
+                texts.len() == input.ids.len() && texts.iter().all(|text| !text.is_empty()),
+                "Supply one nonempty expected text per glyph ID, in the same order"
+            );
+        }
         ensure!(
             input.target_quad.is_some()
                 || input.place_center.is_some()

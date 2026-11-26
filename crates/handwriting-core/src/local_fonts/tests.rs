@@ -135,3 +135,44 @@ fn unavailable_personal_directory_keeps_other_sources_usable() {
         );
     }
 }
+
+#[test]
+fn bundled_family_changes_on_rescan_without_changing_the_catalog_id() {
+    let dir = tempdir().unwrap();
+    let filename = "sample.ttf";
+    let path = dir.path().join(filename);
+    let catalog = LocalFonts {
+        user_dir: None,
+        ..LocalFonts::new(vec![filename.to_owned()], 110_000)
+            .with_bundled_dir(dir.path().to_owned())
+    };
+    let scan = || *catalog.index.lock().unwrap() = Some(catalog.scan(|_| {}));
+    let search = |query: &str| {
+        catalog
+            .search(&FontSearch {
+                query: query.into(),
+                source: Some(FontSource::Bundled),
+                ..Default::default()
+            })
+            .unwrap()
+    };
+    fs::write(&path, HANDLEE).unwrap();
+    scan();
+    let page = search("hAnDlEe");
+    assert_eq!(page.total, 1);
+    let entry = &page.fonts[0];
+    assert_eq!(
+        (&*entry.id, &*entry.name, &*entry.filename),
+        (filename, filename, filename)
+    );
+    fs::write(&path, INDIE).unwrap();
+    assert_eq!(search("handlee").total, 1);
+    scan();
+    assert_eq!(search("handlee").total, 0);
+    assert_eq!(search("indie flower").fonts[0].id, filename);
+
+    fs::write(&path, b"not an OpenType font").unwrap();
+    scan();
+    assert_eq!(search("indie flower").total, 0);
+    assert_eq!(search("SAMPLE").fonts[0].id, filename);
+}

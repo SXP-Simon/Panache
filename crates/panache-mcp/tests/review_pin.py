@@ -161,13 +161,6 @@ async def main(args, home):
                                "earlier revision, draft, section and page.",
                 "type": ["string", "null"],
             }
-            assert legacy_schema["properties"]["illustrations_only"].pop("description") == (
-                "In layout view, only return illustration outlines and isolated details."
-            )
-            assert schema["properties"]["illustrations_only"].pop("description") == (
-                "In layout view, only return raster illustration outlines and isolated details. "
-                "Omit for generated circuitikz: its labels and lines are one glyph."
-            )
             assert json.dumps(schema, sort_keys=True) == json.dumps(legacy_schema, sort_keys=True)
         default = snapshot(await call(client, "preview_handwriting", **request))
         assert default == legacy == snapshot(await call(
@@ -204,6 +197,7 @@ async def main(args, home):
         assert page1["next_offset"] == 1 and page2["next_offset"] is None
 
         bad = [
+            ({"fresh": True}, "fresh=true requires view=image"),
             ({"region": polygon}, "unfiltered"),
             ({"previous_region": polygon}, "unfiltered"),
             ({"view": "image"}, "unfiltered"),

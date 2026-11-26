@@ -1,7 +1,23 @@
 use anyhow::{Result, ensure};
+use handwriting_core::local_fonts::FontSource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Default, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct FontList {
+    /// Case-insensitive substring of the face, localized family or filename.
+    pub query: String,
+    pub source: Option<FontSource>,
+    pub offset: usize,
+    /// Number of faces to return (default 20, maximum 100).
+    pub limit: Option<usize>,
+    /// Rescan after adding, removing or installing fonts.
+    pub refresh: bool,
+    /// Set false only to look up an already approved font or its ID when no new style choice is needed. Omit or set true for samples and style choices, even with an exact-name query.
+    pub include_sample_guidance: Option<bool>,
+}
 
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -33,8 +49,13 @@ pub struct Style {
     pub font_size: u8,
     pub homework: bool,
     /// Keep this value to reproduce handwriting variations.
+    #[schemars(transform = remove_seed_default)]
     pub seed: u32,
 }
+fn remove_seed_default(schema: &mut schemars::Schema) {
+    schema.remove("default");
+}
+
 impl Default for Style {
     fn default() -> Self {
         Self {
@@ -101,18 +122,40 @@ pub struct Save {
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct ReplaceText {
+    pub draft_id: String,
+    pub expected_revision: u32,
+    pub section: u32,
+    /// Exact whole line (normally 1–160 characters). A second occurrence anywhere in the section source, even within another line, is ambiguous.
+    pub old_text: String,
+    /// Different whole line. Normally use 1–160 letters (including Han characters), digits or interior ASCII spaces.
+    pub new_text: String,
+    /// Set true on a suggested retry for a long line or ordinary punctuation. Uses stored source and preserves image data.
+    #[serde(default)]
+    pub retry_plain: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Describe {
-    /// Optionally include this draft's effective values for the selected group.
+    /// Pass with group to read this saved draft's effective values.
     pub draft_id: Option<String>,
+    /// Requires draft_id and group. Omit to read the latest saved revision.
     pub revision: Option<u32>,
-    /// Omit for group names. Supply a group to get field names, units and ranges.
+    /// Use {} to list group names, or group alone for its fields, units, ranges and choices.
+    /// Use "layout" for line spacing and page geometry, not paper guide calibration.
     pub group: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
-    /// Replace the writing area on the saved paper, using 2..32 photo-space baselines. Pass [] to restore the original import calibration. Existing text is reflowed. Use the top and bottom writable lines even on unruled paper.
+    /// Set to true only when the user wants to preserve manual glyph adjustments. Reject reflow that would stop applying them. Ink and camera changes can still be saved.
+    #[serde(default)]
+    pub preserve_local_adjustments: bool,
+    /// Replace the writing area on the saved paper with 2..32 photo-space baselines. Use the top and bottom writable lines even on unruled paper. Pass [] to restore the original import calibration. Existing text is reflowed.
+    /// Setting guides (including []) clears saved top_margin, bottom_margin, left_margin, right_margin, and text line_spacing unless those keys are included in changes in the same call.
+    /// To keep specific overrides, resend only their approved saved values in changes; omit them to inherit from the paper. Restoring those numbers still reflows hand-placed text. If its placement must stay, also set preserve_local_adjustments=true. If refused, leave the draft as it is.
     pub paper_guides: Option<Vec<Guide>>,
     /// Import an absolute local TTF/OTF file into this draft. Its bytes are retained across restarts.
     pub font_path: Option<std::path::PathBuf>,
@@ -129,7 +172,10 @@ pub struct Tune {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct List {
+    /// Rows to skip in creation order. Omit with before_draft_id. The response echoes this skip count (default 0).
     pub offset: Option<u32>,
+    /// For the next page, pass the exact next_before_draft_id returned by list_drafts.
+    pub before_draft_id: Option<String>,
 }
 
 #[derive(Clone, Copy, Default, Deserialize, JsonSchema, PartialEq)]
@@ -208,11 +254,14 @@ pub struct Nudge {
     /// Optional short user feedback or observable reason to retain with this revision.
     pub note: Option<String>,
     pub draft_id: String,
+    /// Use the revision returned by the layout that supplied these IDs. On conflict, read the latest layout and locate the intended text again.
     pub expected_revision: u32,
     pub section: u32,
     pub page: usize,
     /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
     pub ids: Vec<u32>,
+    /// For a named text target, send its intended glyph text in ids order (one exact string per ID). A mismatch rejects the whole edit. For repeated text, use nearby words or position to select the occurrence.
+    pub expected_texts: Option<Vec<String>>,
     /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
     pub place_center: Option<[u32; 2]>,
     /// Image destinations of the original block's TL,TR,BR,BL corners, in that order (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Replaces prior geometry; use separately from other geometry changes.
@@ -224,7 +273,7 @@ pub struct Nudge {
     pub scale: Option<u8>,
     /// Clockwise rotation in degrees, -45..45 (engine coordinates).
     pub angle: Option<i8>,
-    /// Ink opacity in percent, 0..100.
+    /// For text glyphs, a local multiplier of the draft-wide ink opacity, 0..100 percent. 100 adds no fading, 0 hides the glyph. This cannot exceed the global opacity.
     pub opacity: Option<u8>,
     /// Stroke weight delta in pixels, -2..2, in 0.1 px steps.
     pub thickness: Option<f64>,
@@ -251,6 +300,10 @@ pub struct Preview {
     pub illustrations_only: Option<bool>,
     /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     pub view: Option<PreviewView>,
+    /// For image (the default): render the page again instead of reusing its cached PNG,
+    /// e.g. after replacing a configured font file. Does not change the draft or file a review.
+    #[serde(default)]
+    pub fresh: bool,
     /// Layout mode: start index and number of glyphs (default 12, max 32).
     pub offset: Option<usize>,
     pub limit: Option<usize>,
@@ -295,4 +348,34 @@ pub struct ReviewFeedback {
     pub origin: FeedbackOrigin,
     /// Short, page-specific feedback, up to 320 characters.
     pub text: String,
+}
+
+#[cfg(test)]
+mod seed_schema_tests {
+    use super::Style;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn seed_schema_omits_random_default_without_changing_deserialization() {
+        let schemas: Vec<Value> = (0..4)
+            .map(|_| serde_json::to_value(schemars::schema_for!(Style)).unwrap())
+            .collect();
+        assert!(schemas.windows(2).all(|pair| pair[0] == pair[1]));
+        let schema = &schemas[0];
+        let seed = &schema["properties"]["seed"];
+        assert_eq!(seed["type"], "integer");
+        assert!(seed.get("default").is_none());
+        assert!(
+            !schema["required"]
+                .as_array()
+                .is_some_and(|fields| fields.contains(&json!("seed")))
+        );
+        assert_eq!(schema["properties"]["font_size"]["default"], 34);
+
+        let explicit: Style = serde_json::from_value(json!({"seed": 42})).unwrap();
+        assert_eq!(explicit.seed, 42);
+        assert_eq!(serde_json::to_value(&explicit).unwrap()["seed"], 42);
+        let omitted: Style = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(omitted.font_size, 34);
+    }
 }

@@ -17,9 +17,12 @@ from mcp.client.stdio import stdio_client
 from mcp_client import call
 
 
+def json_size(value):
+    return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode())
+
+
 def size(result):
-    wire = result.model_dump(mode="json", by_alias=True, exclude_unset=True)
-    return len(json.dumps(wire, ensure_ascii=False, separators=(",", ":")).encode())
+    return json_size(result.model_dump(mode="json", by_alias=True, exclude_unset=True))
 
 
 async def run(command):
@@ -35,9 +38,8 @@ async def run(command):
             tools = await c.list_tools()
             names = {t.name for t in tools.tools}
             metrics = {"tools": len(names), "tools_list_bytes": size(tools)}
-            data = base64.b64encode(
-                (Path(__file__).parent / "fixtures" / "ruled.png").read_bytes()
-            ).decode()
+            paper = Path(__file__).resolve().parent / "fixtures" / "ruled.png"
+            data = base64.b64encode(paper.read_bytes()).decode()
             md = "排版试稿\n![纸张](data:image/png;base64," + data + ")\n复查结尾。"
             draft = (
                 await call(
@@ -81,6 +83,26 @@ async def run(command):
                 metrics["layout_image_blocks"] = sum(
                     b.type == "image" for b in layout.content
                 )
+            if "annotate_review" in names:
+                plain = await call(c, "preview_handwriting", **key, view="review")
+                metrics["plain_review_bytes"] = size(plain)
+                photo = await call(
+                    c, "save_section", markdown="春风又绿江南岸。", paper_path=str(paper),
+                    style={"font": "志莽行书.ttf", "seed": 42},
+                )
+                photo_id = photo.structuredContent["draft_id"]
+                review = await call(
+                    c, "preview_handwriting", draft_id=photo_id, revision=1, view="review",
+                )
+                metrics["photo_review_bytes"] = size(review)
+                if "photo_appearance" in review.structuredContent:
+                    metrics["photo_appearance_bytes"] = json_size(review.structuredContent["photo_appearance"])
+                await call(c, "save_section", draft_id=photo_id, expected_revision=1, markdown="第二节")
+                archive = await call(
+                    c, "read_section", draft_id=photo_id, view="review",
+                    review_id=review.structuredContent["review_id"],
+                )
+                metrics["archived_photo_review_bytes"] = size(archive)
             print(json.dumps(metrics, ensure_ascii=False))
 
 

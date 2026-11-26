@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-15]
+        os: [ubuntu-24.04, windows-latest, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +41,8 @@ jobs:
         with:
           toolchain: "1.94.1"
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.5"
