@@ -173,19 +173,34 @@ impl Engine {
         page_number: usize,
         cancel: &Cancellation,
     ) -> Result<(RenderedPreview, bool)> {
+        self.preview_with_refresh(draft, section, page_number, false, cancel)
+    }
+    pub fn preview_with_refresh(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        page_number: usize,
+        fresh: bool,
+        cancel: &Cancellation,
+    ) -> Result<(RenderedPreview, bool)> {
         let (n, v) = (section.number, section.version);
         ensure!(
             (1..=Limits::default().max_pages).contains(&page_number),
             "Invalid page number"
         );
         let (edit_revision, edits) = draft.edits(&section)?;
-        if let Some(hit) = self.cache.iter().find(|p| {
+        let cached = self.cache.iter().position(|p| {
             p.draft == draft.id
                 && p.settings == draft.settings_revision
                 && p.edits == edit_revision
                 && (p.section, p.version, p.page) == (n, v, page_number)
-        }) {
-            return Ok((hit.preview.clone(), true));
+        });
+        if let Some(index) = cached {
+            if !fresh {
+                return Ok((self.cache[index].preview.clone(), true));
+            }
+            // Leave no stale page on failure. A success restores this FIFO slot.
+            self.cache.remove(index);
         }
         let mut background = draft.background()?;
         let camera = draft.camera(background.as_deref())?;
@@ -212,10 +227,7 @@ impl Engine {
             png,
             fine_edit: request.params.fine_edit,
         };
-        if self.cache.len() == 4 {
-            self.cache.pop_front();
-        }
-        self.cache.push_back(CachedPage {
+        let entry = CachedPage {
             draft: draft.id.to_owned(),
             section: n,
             version: v,
@@ -223,7 +235,15 @@ impl Engine {
             edits: edit_revision,
             page: page_number,
             preview: preview.clone(),
-        });
+        };
+        if let Some(index) = cached {
+            self.cache.insert(index, entry);
+        } else {
+            if self.cache.len() == 4 {
+                self.cache.pop_front();
+            }
+            self.cache.push_back(entry);
+        }
         Ok((preview, false))
     }
     fn photo<'a>(

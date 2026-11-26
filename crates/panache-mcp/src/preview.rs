@@ -20,6 +20,10 @@ pub(super) async fn run(
     ctx: RequestContext<RoleServer>,
 ) -> Result<CallToolResult> {
     ensure!(
+        !input.fresh || matches!(input.view, None | Some(PreviewView::Image)),
+        "fresh=true requires view=image (or no view)"
+    );
+    ensure!(
         input.previous_region.is_none()
             || (input.view == Some(PreviewView::Review)
                 && input.region.is_some()
@@ -124,7 +128,7 @@ fn render(
         input.offset.is_none() && input.limit.is_none(),
         "offset and limit require view=layout"
     );
-    image(engine, &draft, section, page, cancel)
+    image(engine, &draft, section, page, input.fresh, cancel)
 }
 
 fn paper(draft: &Snapshot<'_>) -> Result<CallToolResult> {
@@ -148,10 +152,11 @@ fn image(
     draft: &Snapshot<'_>,
     section: Section,
     page: usize,
+    fresh: bool,
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let number = section.number;
-    let (preview, cached) = engine.preview(draft, section, page, cancel)?;
+    let (preview, cached) = engine.preview_with_refresh(draft, section, page, fresh, cancel)?;
     let mut result = reply(
         format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision),
         json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached}),
