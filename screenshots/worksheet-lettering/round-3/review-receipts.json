@@ -1,0 +1,367 @@
+{
+  "previous": {
+    "revision": 24,
+    "method": "Original paper: smaller of the two local light-to-dark edge drops on paired dark strokes, supported on parallel profiles. Added writing: median of each sampled text box’s 90th percentile paper-minus-output visible luma drop (changed pixels >=8). Scale 0–255. Profiles can revisit a single printed rule. The paper sample favors marks within one local glyph height, then uses the native context crop if support is sparse. The numeric difference flag requires added writing to exceed the paper P75 by at least 24 luma levels and by a factor of 1.35. Mark type, lighting and intended pen color affect the comparison.",
+    "samples": [
+      {
+        "role": "first_written_row",
+        "region": [
+          [
+            827,
+            185
+          ],
+          [
+            1064,
+            185
+          ],
+          [
+            1064,
+            310
+          ],
+          [
+            827,
+            310
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 2276,
+          "median_glyph_p90_luma_drop": 133,
+          "sampled_glyphs": 5
+        },
+        "paper_marks": {
+          "median_luma_drop": 31,
+          "median_sample_point": [
+            1054,
+            255
+          ],
+          "p25_luma_drop": 23,
+          "p75_luma_drop": 72,
+          "sampled_profiles": 33,
+          "supported": true,
+          "supported_tracks": 16,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 102,
+        "clearly_above_paper_p75": true,
+        "status": "mixed_paper_marks"
+      },
+      {
+        "role": "following_written_row",
+        "region": [
+          [
+            815,
+            227
+          ],
+          [
+            1023,
+            227
+          ],
+          [
+            1023,
+            351
+          ],
+          [
+            815,
+            351
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 2536,
+          "median_glyph_p90_luma_drop": 132,
+          "sampled_glyphs": 7
+        },
+        "paper_marks": {
+          "median_luma_drop": 24,
+          "median_sample_point": [
+            976,
+            261
+          ],
+          "p25_luma_drop": 23,
+          "p75_luma_drop": 26,
+          "sampled_profiles": 32,
+          "supported": true,
+          "supported_tracks": 16,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 108,
+        "clearly_above_paper_p75": true,
+        "status": "writing_darker_than_sampled_marks"
+      },
+      {
+        "role": "middle_writing",
+        "region": [
+          [
+            377,
+            843
+          ],
+          [
+            594,
+            843
+          ],
+          [
+            594,
+            950
+          ],
+          [
+            377,
+            950
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 1969,
+          "median_glyph_p90_luma_drop": 114,
+          "sampled_glyphs": 11
+        },
+        "paper_marks": {
+          "median_luma_drop": 107,
+          "median_sample_point": [
+            532,
+            914
+          ],
+          "p25_luma_drop": 105,
+          "p75_luma_drop": 110,
+          "sampled_profiles": 15,
+          "supported": true,
+          "supported_tracks": 15,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 7,
+        "clearly_above_paper_p75": false,
+        "status": "inspect_local_contrast"
+      },
+      {
+        "role": "lower_writing",
+        "region": [
+          [
+            306,
+            1288
+          ],
+          [
+            546,
+            1288
+          ],
+          [
+            546,
+            1412
+          ],
+          [
+            306,
+            1412
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 3064,
+          "median_glyph_p90_luma_drop": 111,
+          "sampled_glyphs": 5
+        },
+        "paper_marks": {
+          "median_luma_drop": 100,
+          "median_sample_point": [
+            433,
+            1367
+          ],
+          "p25_luma_drop": 98,
+          "p75_luma_drop": 102,
+          "sampled_profiles": 16,
+          "supported": true,
+          "supported_tracks": 16,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 11,
+        "clearly_above_paper_p75": false,
+        "status": "inspect_local_contrast"
+      }
+    ]
+  },
+  "corrected": {
+    "revision": 33,
+    "method": "Original paper: smaller of the two local light-to-dark edge drops on paired dark strokes, supported on parallel profiles. Added writing: median of each sampled text box’s 90th percentile paper-minus-output visible luma drop (changed pixels >=8). Scale 0–255. Profiles can revisit a single printed rule. The paper sample favors marks within one local glyph height, then uses the native context crop if support is sparse. The numeric difference flag requires added writing to exceed the paper P75 by at least 24 luma levels and by a factor of 1.35. Mark type, lighting and intended pen color affect the comparison.",
+    "samples": [
+      {
+        "role": "first_written_row",
+        "region": [
+          [
+            827,
+            185
+          ],
+          [
+            1064,
+            185
+          ],
+          [
+            1064,
+            310
+          ],
+          [
+            827,
+            310
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 2157,
+          "median_glyph_p90_luma_drop": 79,
+          "sampled_glyphs": 5
+        },
+        "paper_marks": {
+          "median_luma_drop": 31,
+          "median_sample_point": [
+            1054,
+            255
+          ],
+          "p25_luma_drop": 23,
+          "p75_luma_drop": 72,
+          "sampled_profiles": 33,
+          "supported": true,
+          "supported_tracks": 16,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 48,
+        "clearly_above_paper_p75": false,
+        "status": "mixed_paper_marks"
+      },
+      {
+        "role": "following_written_row",
+        "region": [
+          [
+            815,
+            227
+          ],
+          [
+            1023,
+            227
+          ],
+          [
+            1023,
+            351
+          ],
+          [
+            815,
+            351
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 2331,
+          "median_glyph_p90_luma_drop": 84,
+          "sampled_glyphs": 7
+        },
+        "paper_marks": {
+          "median_luma_drop": 24,
+          "median_sample_point": [
+            976,
+            261
+          ],
+          "p25_luma_drop": 23,
+          "p75_luma_drop": 26,
+          "sampled_profiles": 32,
+          "supported": true,
+          "supported_tracks": 16,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 60,
+        "clearly_above_paper_p75": true,
+        "status": "writing_darker_than_sampled_marks"
+      },
+      {
+        "role": "middle_writing",
+        "region": [
+          [
+            377,
+            843
+          ],
+          [
+            594,
+            843
+          ],
+          [
+            594,
+            950
+          ],
+          [
+            377,
+            950
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 1969,
+          "median_glyph_p90_luma_drop": 114,
+          "sampled_glyphs": 11
+        },
+        "paper_marks": {
+          "median_luma_drop": 107,
+          "median_sample_point": [
+            532,
+            914
+          ],
+          "p25_luma_drop": 105,
+          "p75_luma_drop": 110,
+          "sampled_profiles": 15,
+          "supported": true,
+          "supported_tracks": 15,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 7,
+        "clearly_above_paper_p75": false,
+        "status": "inspect_local_contrast"
+      },
+      {
+        "role": "lower_writing",
+        "region": [
+          [
+            306,
+            1288
+          ],
+          [
+            546,
+            1288
+          ],
+          [
+            546,
+            1412
+          ],
+          [
+            306,
+            1412
+          ]
+        ],
+        "added_writing": {
+          "changed_pixel_samples": 3064,
+          "median_glyph_p90_luma_drop": 111,
+          "sampled_glyphs": 5
+        },
+        "paper_marks": {
+          "median_luma_drop": 100,
+          "median_sample_point": [
+            433,
+            1367
+          ],
+          "p25_luma_drop": 98,
+          "p75_luma_drop": 102,
+          "sampled_profiles": 16,
+          "supported": true,
+          "supported_tracks": 16,
+          "within_one_glyph_height": true
+        },
+        "writing_minus_paper_median": 11,
+        "clearly_above_paper_p75": false,
+        "status": "inspect_local_contrast"
+      }
+    ]
+  },
+  "reference_thumbnail": {
+    "source_size": [
+      1440,
+      1920
+    ],
+    "shown_size": [
+      580,
+      773
+    ],
+    "same_pixels_as_pillow_thumbnail": true,
+    "native_header_crop_xyxy": [
+      416,
+      133,
+      806,
+      304
+    ]
+  }
+}

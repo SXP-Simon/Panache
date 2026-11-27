@@ -1,0 +1,1239 @@
+{
+  "revision": 33,
+  "chart_id": 349,
+  "chart_adjustment": {
+    "angle": 0,
+    "color": null,
+    "dx": 469,
+    "dy": -582,
+    "id": 349,
+    "opacity": 100,
+    "opacity_ramp": [
+      [
+        0,
+        68
+      ],
+      [
+        60,
+        100
+      ]
+    ],
+    "scale": 100,
+    "softness": 1,
+    "thickness": 0
+  },
+  "binary_sha256": "5dc715c240b22baf6c3bd096d334ce1a658827b74725b45983338b8dab6a5efc",
+  "exports": {
+    "clear": {
+      "sigma_native_px": 0.0,
+      "rgb_sha256": "651503c5bf98032d33a3cee7d7e79361a4903af600e29d6dc2e507e0d1723900",
+      "dimensions": [
+        1440,
+        1920
+      ],
+      "native_preview_rgb_sha256": "651503c5bf98032d33a3cee7d7e79361a4903af600e29d6dc2e507e0d1723900",
+      "fresh": true,
+      "export_zip_pages": 1,
+      "preview_crop_checks": [
+        {
+          "xyxy_exclusive": [
+            208,
+            122,
+            1100,
+            406
+          ],
+          "rgb_sha256": "2c784e2ce7d43f07e5b5a5631be4f95e9ef920e7af71bad131737aa53e044978"
+        },
+        {
+          "xyxy_exclusive": [
+            215,
+            420,
+            588,
+            637
+          ],
+          "rgb_sha256": "83a01e02303530ca10630b7293ab427e8c1c058d0471449c0321033aef1ac183"
+        },
+        {
+          "xyxy_exclusive": [
+            705,
+            330,
+            1175,
+            610
+          ],
+          "rgb_sha256": "54117b43c51bd2fb2d35858d4cee333f0165e19fc20d459d319f3b3a41fe91b6"
+        }
+      ]
+    },
+    "mild": {
+      "sigma_native_px": 0.6,
+      "rgb_sha256": "f5c5f54c5ed8ab62ed65a57d8712af1352368526dc199633d21be284ec939321",
+      "dimensions": [
+        1440,
+        1920
+      ],
+      "native_preview_rgb_sha256": "f5c5f54c5ed8ab62ed65a57d8712af1352368526dc199633d21be284ec939321",
+      "fresh": true,
+      "export_zip_pages": 1,
+      "preview_crop_checks": [
+        {
+          "xyxy_exclusive": [
+            208,
+            122,
+            1100,
+            406
+          ],
+          "rgb_sha256": "8edca1aca393d42dcb3b75d036b181375eeb2e3e71229a24dcb1f06d921fb07c"
+        },
+        {
+          "xyxy_exclusive": [
+            215,
+            420,
+            588,
+            637
+          ],
+          "rgb_sha256": "56095abe5433caad99e337e6e7c041290fd8575ae5dc0f1d464a4f58f2bac69b"
+        },
+        {
+          "xyxy_exclusive": [
+            705,
+            330,
+            1175,
+            610
+          ],
+          "rgb_sha256": "ab3dcab9fab134db3d08ff63d9d70263e34ac21daeb484a21b80bab81f41ea23"
+        }
+      ]
+    },
+    "soft": {
+      "sigma_native_px": 1.0,
+      "rgb_sha256": "aeb2b96be36c2a33c9f3967c669f09352cf7e205971a2429b6be855def1ee7e1",
+      "dimensions": [
+        1440,
+        1920
+      ],
+      "native_preview_rgb_sha256": "aeb2b96be36c2a33c9f3967c669f09352cf7e205971a2429b6be855def1ee7e1",
+      "fresh": true,
+      "export_zip_pages": 1,
+      "preview_crop_checks": [
+        {
+          "xyxy_exclusive": [
+            208,
+            122,
+            1100,
+            406
+          ],
+          "rgb_sha256": "04e19f65f910da726f0a7c121423297cd21e23a47eb597620692640618993f5a"
+        },
+        {
+          "xyxy_exclusive": [
+            215,
+            420,
+            588,
+            637
+          ],
+          "rgb_sha256": "8690e60026251c83d980f4382fdeead5f8d972cd67b92529609959c1ddb280b2"
+        },
+        {
+          "xyxy_exclusive": [
+            705,
+            330,
+            1175,
+            610
+          ],
+          "rgb_sha256": "7df695b8d42f720eb7d6e98d202252c4579e33a52e78241fa7704657b0335aec"
+        }
+      ]
+    }
+  },
+  "prior_v24_sha256": "ceb1d577c95cd53956298593f21026122d69b829c1b34316979abbc0a9d678ad",
+  "before_chart_ramp_sha256": "2ce396adfdc6ea009523045e37980d636d57478fa6da22a0a7b3144a82d999f6",
+  "ramp_masks": {
+    "method": "On fixed node rectangles take original-paper minus each render at v24-supported darkened ink pixels (drop >18), excluding existing printed-rule cores (21px vertical paper median minus paper >=12). Median per-pixel post-ramp / v24 darkening estimates the photographic outcome, including antialiasing and quantization. Native coordinates.",
+    "changed_bbox_xyxy_exclusive_after_ramp": [
+      727,
+      361,
+      1164,
+      571
+    ],
+    "changed_pixels_after_ramp": 12491
+  },
+  "field_samples": {
+    "作业标题": {
+      "boxes": [
+        [
+          415,
+          268,
+          452,
+          300
+        ],
+        [
+          452,
+          265,
+          495,
+          299
+        ],
+        [
+          495,
+          262,
+          536,
+          298
+        ],
+        [
+          538,
+          264,
+          576,
+          292
+        ],
+        [
+          569,
+          254,
+          615,
+          293
+        ],
+        [
+          613,
+          255,
+          657,
+          289
+        ],
+        [
+          686,
+          251,
+          726,
+          282
+        ],
+        [
+          725,
+          251,
+          767,
+          281
+        ],
+        [
+          767,
+          242,
+          808,
+          274
+        ],
+        [
+          807,
+          236,
+          852,
+          276
+        ],
+        [
+          851,
+          238,
+          892,
+          269
+        ],
+        [
+          889,
+          235,
+          927,
+          269
+        ],
+        [
+          922,
+          231,
+          967,
+          267
+        ],
+        [
+          962,
+          229,
+          1002,
+          264
+        ],
+        [
+          996,
+          225,
+          1040,
+          261
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 81.0,
+          "p90_drop": 136.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 5198,
+          "p50_rendered_luma": 125.0
+        },
+        "clear": {
+          "p50_drop": 48.0,
+          "p90_drop": 80.0,
+          "median_darkening_ratio": 0.5906,
+          "pixels": 5198,
+          "p50_rendered_luma": 158.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 46.0,
+          "p90_drop": 71.0,
+          "median_darkening_ratio": 0.5655,
+          "pixels": 5198,
+          "p50_rendered_luma": 160.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 42.0,
+          "p90_drop": 63.0,
+          "median_darkening_ratio": 0.5197,
+          "pixels": 5198,
+          "p50_rendered_luma": 164.0
+        }
+      }
+    },
+    "控制流图小标题": {
+      "boxes": [
+        [
+          763,
+          282,
+          806,
+          316
+        ],
+        [
+          801,
+          280,
+          843,
+          315
+        ],
+        [
+          839,
+          278,
+          882,
+          310
+        ],
+        [
+          886,
+          270,
+          922,
+          309
+        ],
+        [
+          915,
+          272,
+          937,
+          308
+        ],
+        [
+          926,
+          275,
+          953,
+          303
+        ],
+        [
+          944,
+          274,
+          966,
+          300
+        ],
+        [
+          959,
+          271,
+          988,
+          302
+        ],
+        [
+          975,
+          269,
+          999,
+          305
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 80.0,
+          "p90_drop": 133.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 2364,
+          "p50_rendered_luma": 125.0
+        },
+        "clear": {
+          "p50_drop": 51.0,
+          "p90_drop": 84.0,
+          "median_darkening_ratio": 0.6308,
+          "pixels": 2364,
+          "p50_rendered_luma": 154.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 49.0,
+          "p90_drop": 73.0,
+          "median_darkening_ratio": 0.607,
+          "pixels": 2364,
+          "p50_rendered_luma": 157.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 45.0,
+          "p90_drop": 64.0,
+          "median_darkening_ratio": 0.5597,
+          "pixels": 2364,
+          "p50_rendered_luma": 160.0
+        }
+      }
+    },
+    "代码(1)": {
+      "boxes": [
+        [
+          260,
+          362,
+          283,
+          399
+        ],
+        [
+          275,
+          363,
+          289,
+          391
+        ],
+        [
+          282,
+          360,
+          303,
+          397
+        ],
+        [
+          313,
+          356,
+          329,
+          389
+        ],
+        [
+          330,
+          367,
+          352,
+          385
+        ],
+        [
+          355,
+          358,
+          369,
+          386
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 76.0,
+          "p90_drop": 132.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 551,
+          "p50_rendered_luma": 131.0
+        },
+        "clear": {
+          "p50_drop": 52.0,
+          "p90_drop": 90.0,
+          "median_darkening_ratio": 0.6818,
+          "pixels": 551,
+          "p50_rendered_luma": 155.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 50.0,
+          "p90_drop": 78.0,
+          "median_darkening_ratio": 0.6522,
+          "pixels": 551,
+          "p50_rendered_luma": 157.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 45.0,
+          "p90_drop": 65.0,
+          "median_darkening_ratio": 0.593,
+          "pixels": 551,
+          "p50_rendered_luma": 161.0
+        }
+      }
+    },
+    "代码(3)": {
+      "boxes": [
+        [
+          246,
+          456,
+          270,
+          494
+        ],
+        [
+          261,
+          456,
+          286,
+          486
+        ],
+        [
+          276,
+          451,
+          298,
+          489
+        ],
+        [
+          315,
+          452,
+          331,
+          482
+        ],
+        [
+          320,
+          451,
+          340,
+          480
+        ],
+        [
+          345,
+          449,
+          361,
+          478
+        ],
+        [
+          362,
+          453,
+          389,
+          478
+        ],
+        [
+          392,
+          447,
+          407,
+          477
+        ],
+        [
+          401,
+          443,
+          426,
+          474
+        ],
+        [
+          428,
+          450,
+          453,
+          478
+        ],
+        [
+          447,
+          448,
+          471,
+          473
+        ],
+        [
+          463,
+          443,
+          484,
+          471
+        ],
+        [
+          479,
+          445,
+          503,
+          469
+        ],
+        [
+          509,
+          437,
+          531,
+          469
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 78.0,
+          "p90_drop": 130.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1888,
+          "p50_rendered_luma": 128.0
+        },
+        "clear": {
+          "p50_drop": 63.0,
+          "p90_drop": 106.0,
+          "median_darkening_ratio": 0.8101,
+          "pixels": 1888,
+          "p50_rendered_luma": 142.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 60.0,
+          "p90_drop": 91.0,
+          "median_darkening_ratio": 0.7793,
+          "pixels": 1888,
+          "p50_rendered_luma": 145.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 55.0,
+          "p90_drop": 76.0,
+          "median_darkening_ratio": 0.7143,
+          "pixels": 1888,
+          "p50_rendered_luma": 149.0
+        }
+      }
+    },
+    "代码(6)": {
+      "boxes": [
+        [
+          222,
+          604,
+          247,
+          645
+        ],
+        [
+          238,
+          606,
+          261,
+          638
+        ],
+        [
+          251,
+          602,
+          275,
+          642
+        ],
+        [
+          288,
+          608,
+          310,
+          633
+        ],
+        [
+          316,
+          608,
+          342,
+          630
+        ],
+        [
+          345,
+          603,
+          368,
+          630
+        ],
+        [
+          365,
+          601,
+          394,
+          626
+        ],
+        [
+          396,
+          596,
+          412,
+          629
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 70.5,
+          "p90_drop": 129.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 988,
+          "p50_rendered_luma": 132.5
+        },
+        "clear": {
+          "p50_drop": 70.5,
+          "p90_drop": 129.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 988,
+          "p50_rendered_luma": 132.5
+        },
+        "sigma_0.6": {
+          "p50_drop": 69.5,
+          "p90_drop": 111.0,
+          "median_darkening_ratio": 0.9654,
+          "pixels": 988,
+          "p50_rendered_luma": 134.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 65.0,
+          "p90_drop": 93.0,
+          "median_darkening_ratio": 0.8877,
+          "pixels": 988,
+          "p50_rendered_luma": 139.0
+        }
+      }
+    },
+    "代码(9)": {
+      "boxes": [
+        [
+          198,
+          768,
+          223,
+          811
+        ],
+        [
+          213,
+          771,
+          238,
+          805
+        ],
+        [
+          226,
+          769,
+          248,
+          812
+        ],
+        [
+          259,
+          774,
+          286,
+          802
+        ],
+        [
+          279,
+          774,
+          305,
+          801
+        ],
+        [
+          300,
+          767,
+          315,
+          802
+        ],
+        [
+          305,
+          768,
+          329,
+          800
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 73.0,
+          "p90_drop": 127.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1091,
+          "p50_rendered_luma": 129.0
+        },
+        "clear": {
+          "p50_drop": 73.0,
+          "p90_drop": 127.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1091,
+          "p50_rendered_luma": 129.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 70.0,
+          "p90_drop": 110.0,
+          "median_darkening_ratio": 0.962,
+          "pixels": 1091,
+          "p50_rendered_luma": 130.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 66.0,
+          "p90_drop": 95.0,
+          "median_darkening_ratio": 0.8923,
+          "pixels": 1091,
+          "p50_rendered_luma": 135.0
+        }
+      }
+    },
+    "基本块入口正文": {
+      "boxes": [
+        [
+          187,
+          895,
+          233,
+          934
+        ],
+        [
+          235,
+          896,
+          269,
+          923
+        ],
+        [
+          266,
+          890,
+          310,
+          933
+        ],
+        [
+          309,
+          886,
+          360,
+          929
+        ],
+        [
+          361,
+          880,
+          400,
+          926
+        ],
+        [
+          401,
+          885,
+          417,
+          918
+        ],
+        [
+          407,
+          901,
+          427,
+          918
+        ],
+        [
+          421,
+          880,
+          447,
+          917
+        ],
+        [
+          438,
+          901,
+          459,
+          918
+        ],
+        [
+          453,
+          879,
+          480,
+          914
+        ],
+        [
+          471,
+          899,
+          491,
+          915
+        ],
+        [
+          482,
+          875,
+          506,
+          911
+        ],
+        [
+          498,
+          895,
+          518,
+          912
+        ],
+        [
+          510,
+          876,
+          533,
+          910
+        ],
+        [
+          526,
+          895,
+          546,
+          911
+        ],
+        [
+          540,
+          873,
+          561,
+          908
+        ],
+        [
+          552,
+          893,
+          570,
+          911
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 73.0,
+          "p90_drop": 124.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 3274,
+          "p50_rendered_luma": 122.0
+        },
+        "clear": {
+          "p50_drop": 73.0,
+          "p90_drop": 124.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 3274,
+          "p50_rendered_luma": 122.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 70.0,
+          "p90_drop": 110.0,
+          "median_darkening_ratio": 0.9689,
+          "pixels": 3274,
+          "p50_rendered_luma": 125.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 66.0,
+          "p90_drop": 96.0,
+          "median_darkening_ratio": 0.9071,
+          "pixels": 3274,
+          "p50_rendered_luma": 130.0
+        }
+      }
+    },
+    "B1": {
+      "boxes": [
+        [
+          817,
+          351,
+          873,
+          406
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 79.0,
+          "p90_drop": 126.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 733,
+          "p50_rendered_luma": 126.0
+        },
+        "clear": {
+          "p50_drop": 56.0,
+          "p90_drop": 89.0,
+          "median_darkening_ratio": 0.7094,
+          "pixels": 733,
+          "p50_rendered_luma": 149.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 54.0,
+          "p90_drop": 78.80000000000007,
+          "median_darkening_ratio": 0.6829,
+          "pixels": 733,
+          "p50_rendered_luma": 151.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 50.0,
+          "p90_drop": 66.0,
+          "median_darkening_ratio": 0.6279,
+          "pixels": 733,
+          "p50_rendered_luma": 155.0
+        }
+      }
+    },
+    "B2": {
+      "boxes": [
+        [
+          817,
+          429,
+          885,
+          475
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 82.0,
+          "p90_drop": 125.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1094,
+          "p50_rendered_luma": 121.0
+        },
+        "clear": {
+          "p50_drop": 68.0,
+          "p90_drop": 106.0,
+          "median_darkening_ratio": 0.8306,
+          "pixels": 1094,
+          "p50_rendered_luma": 135.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 66.0,
+          "p90_drop": 92.0,
+          "median_darkening_ratio": 0.8,
+          "pixels": 1094,
+          "p50_rendered_luma": 137.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 60.0,
+          "p90_drop": 79.0,
+          "median_darkening_ratio": 0.7413,
+          "pixels": 1094,
+          "p50_rendered_luma": 142.0
+        }
+      }
+    },
+    "B3": {
+      "boxes": [
+        [
+          818,
+          506,
+          885,
+          552
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 80.0,
+          "p90_drop": 124.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1146,
+          "p50_rendered_luma": 122.5
+        },
+        "clear": {
+          "p50_drop": 75.5,
+          "p90_drop": 119.0,
+          "median_darkening_ratio": 0.9429,
+          "pixels": 1146,
+          "p50_rendered_luma": 127.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 74.0,
+          "p90_drop": 104.0,
+          "median_darkening_ratio": 0.9035,
+          "pixels": 1146,
+          "p50_rendered_luma": 129.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 68.0,
+          "p90_drop": 88.0,
+          "median_darkening_ratio": 0.8442,
+          "pixels": 1146,
+          "p50_rendered_luma": 134.0
+        }
+      }
+    },
+    "B4": {
+      "boxes": [
+        [
+          818,
+          590,
+          887,
+          640
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 80.0,
+          "p90_drop": 122.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1166,
+          "p50_rendered_luma": 120.0
+        },
+        "clear": {
+          "p50_drop": 80.0,
+          "p90_drop": 122.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1166,
+          "p50_rendered_luma": 120.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 77.5,
+          "p90_drop": 109.0,
+          "median_darkening_ratio": 0.9657,
+          "pixels": 1166,
+          "p50_rendered_luma": 122.5
+        },
+        "sigma_1.0": {
+          "p50_drop": 71.0,
+          "p90_drop": 92.5,
+          "median_darkening_ratio": 0.9039,
+          "pixels": 1166,
+          "p50_rendered_luma": 128.0
+        }
+      }
+    },
+    "B5": {
+      "boxes": [
+        [
+          817,
+          676,
+          891,
+          725
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 78.0,
+          "p90_drop": 120.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1102,
+          "p50_rendered_luma": 119.0
+        },
+        "clear": {
+          "p50_drop": 78.0,
+          "p90_drop": 120.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1102,
+          "p50_rendered_luma": 119.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 76.0,
+          "p90_drop": 108.0,
+          "median_darkening_ratio": 0.9717,
+          "pixels": 1102,
+          "p50_rendered_luma": 122.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 71.0,
+          "p90_drop": 93.0,
+          "median_darkening_ratio": 0.92,
+          "pixels": 1102,
+          "p50_rendered_luma": 126.0
+        }
+      }
+    },
+    "B6": {
+      "boxes": [
+        [
+          1101,
+          419,
+          1168,
+          465
+        ]
+      ],
+      "states": {
+        "v24": {
+          "p50_drop": 81.0,
+          "p90_drop": 125.0,
+          "median_darkening_ratio": 1.0,
+          "pixels": 1008,
+          "p50_rendered_luma": 121.0
+        },
+        "clear": {
+          "p50_drop": 68.0,
+          "p90_drop": 106.0,
+          "median_darkening_ratio": 0.8333,
+          "pixels": 1008,
+          "p50_rendered_luma": 135.0
+        },
+        "sigma_0.6": {
+          "p50_drop": 65.0,
+          "p90_drop": 92.0,
+          "median_darkening_ratio": 0.8037,
+          "pixels": 1008,
+          "p50_rendered_luma": 138.0
+        },
+        "sigma_1.0": {
+          "p50_drop": 60.0,
+          "p90_drop": 78.0,
+          "median_darkening_ratio": 0.7451,
+          "pixels": 1008,
+          "p50_rendered_luma": 142.5
+        }
+      }
+    }
+  },
+  "comparison_scope": {
+    "before": "v24",
+    "after": "opacity-corrected sharp export (sigma=0)",
+    "original_rgb_sha256": "ceb1d577c95cd53956298593f21026122d69b829c1b34316979abbc0a9d678ad",
+    "corrected_rgb_sha256": "651503c5bf98032d33a3cee7d7e79361a4903af600e29d6dc2e507e0d1723900",
+    "native_changed_pixels": 36109,
+    "protected_regions": {
+      "native chart bottom including B4→B5 and loop return": {
+        "xyxy_exclusive": [
+          685,
+          605,
+          1220,
+          760
+        ],
+        "pixels": 82925,
+        "identical_rgb_sha256": "f8d638468dfcd6ab1435ce69e91d3372cc5f7a35dd77bdf57c5b4737b8d9026c"
+      },
+      "all page below transition": {
+        "xyxy_exclusive": [
+          0,
+          605,
+          1440,
+          1920
+        ],
+        "pixels": 1893600,
+        "identical_rgb_sha256": "e120f2fb5859dadaa56d11a3c0159554f1ee5edbeb7c4eec3ee9d813c44c8c5f"
+      },
+      "original printed header above handwriting": {
+        "xyxy_exclusive": [
+          0,
+          0,
+          1440,
+          224
+        ],
+        "pixels": 322560,
+        "identical_rgb_sha256": "ffbf855406eb8da11fd3de0109b877796a4401779f2f3a45f117623fbb37f27d"
+      }
+    },
+    "changed_bbox_xyxy_exclusive": [
+      235,
+      229,
+      1164,
+      586
+    ]
+  },
+  "blur_comparison_method": "Ordinary output and each blurred output are paired with the empty original paper passed through the same MCP full-page export filter in a disposable zero-ink revision; native size confirmed. The empty sigma=0 rendered page exactly matched the stored original paper. Opacity preservation hashes refer to the sharp result, before the optional full-page filter.",
+  "text_only_trials": {
+    "range_and_units": "0..100% multiplier, integer. Each glyph had multiplier 100 before these edits.",
+    "unchanged_global_opacity_percent": 100,
+    "forks": {
+      "mild": {
+        "source_revision": 24,
+        "result_revision": 32,
+        "revision_scope": "independent SQLite backup of the same v24",
+        "rgb_sha256": "5bfe32a077b26681c794b020f4c63083d840804200a7ac026db93965a52c82e4",
+        "groups": [
+          [
+            "作业标题",
+            73
+          ],
+          [
+            "三地址代码小标题",
+            77
+          ],
+          [
+            "控制流图小标题",
+            77
+          ],
+          [
+            "代码(1)",
+            81
+          ],
+          [
+            "代码(2)",
+            85
+          ],
+          [
+            "代码(3)",
+            89
+          ],
+          [
+            "代码(4)",
+            94
+          ],
+          [
+            "代码(5)",
+            98
+          ]
+        ]
+      },
+      "strong": {
+        "source_revision": 24,
+        "result_revision": 32,
+        "revision_scope": "independent SQLite backup of the same v24",
+        "rgb_sha256": "2ce396adfdc6ea009523045e37980d636d57478fa6da22a0a7b3144a82d999f6",
+        "groups": [
+          [
+            "作业标题",
+            59
+          ],
+          [
+            "三地址代码小标题",
+            63
+          ],
+          [
+            "控制流图小标题",
+            63
+          ],
+          [
+            "代码(1)",
+            68
+          ],
+          [
+            "代码(2)",
+            74
+          ],
+          [
+            "代码(3)",
+            81
+          ],
+          [
+            "代码(4)",
+            89
+          ],
+          [
+            "代码(5)",
+            96
+          ]
+        ]
+      }
+    }
+  },
+  "selected_result": {
+    "sharp": "worksheet-round-3-clear.png",
+    "soft": "worksheet-round-3-soft.png",
+    "selected_sigma_px": 0.6,
+    "alternative_sigma_px": 1.0,
+    "native_dimensions": [
+      1440,
+      1920
+    ],
+    "trial_selection": "strong text-only trial followed by the native CFG ramp in revision 33. Both delivered images use the same revision. Only the optional whole-output Gaussian differs."
+  }
+}
