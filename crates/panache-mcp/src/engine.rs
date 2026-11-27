@@ -378,7 +378,7 @@ impl Engine {
             let edit = edits.get(&g.id).copied();
             let is_drawing = g.illustration == Some(g.id) || g.is_native_diagram;
             if !(g.is_text || is_drawing && drawing.is_none())
-                || edit.is_some_and(|v| v.opacity == 0)
+                || edit.is_some_and(|v| v.hides_ink())
             {
                 continue;
             }

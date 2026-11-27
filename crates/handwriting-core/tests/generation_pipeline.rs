@@ -443,6 +443,7 @@ fn fine_edit_moves_one_homework_character_and_exports_the_same_pages() {
             scale: 115,
             angle: 12,
             opacity: 83,
+            opacity_ramp: None,
             color: Some([167, 12, 36]),
             thickness: 7,
             warp: Some([1., 0., 0., 0., 1., 0., 0.004, 0.]),

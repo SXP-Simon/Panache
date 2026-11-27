@@ -7,7 +7,7 @@ use crate::{
 use anyhow::{Context, Result, ensure};
 use handwriting_core::{
     Cancellation, Parameters,
-    fine_edit::{self, Adjustment, Adjustments, GlyphBounds},
+    fine_edit::{self, Adjustment, Adjustments, GlyphBounds, OpacityRamp},
 };
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
@@ -63,6 +63,7 @@ impl Engine {
                 scale: 100,
                 angle: 0,
                 opacity: 100,
+                opacity_ramp: None,
                 color: None,
                 thickness: 0,
                 softness: 0,
@@ -83,7 +84,7 @@ impl Engine {
                 key,
                 glyphs: edits.into_values().collect(),
             },
-            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
+            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"opacity_ramp":input.opacity_ramp,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
         )?;
         Ok((next, placement))
     }
@@ -119,6 +120,7 @@ impl<'a> GlyphChanges<'a> {
                 || input.scale.is_some()
                 || input.angle.is_some()
                 || input.opacity.is_some()
+                || input.opacity_ramp.is_some()
                 || input.shape.is_some()
                 || input.thickness.is_some()
                 || input.softness.is_some()
@@ -147,6 +149,12 @@ impl<'a> GlyphChanges<'a> {
         };
         let thickness = input.thickness.map(delta).transpose()?;
         let softness = input.softness.map(delta).transpose()?;
+        ensure!(
+            input
+                .opacity_ramp
+                .is_none_or(|pair| OpacityRamp(pair).valid()),
+            "opacity_ramp requires two [height %, opacity %] anchors in 0..100 with increasing heights"
+        );
         let color = input
             .color
             .as_ref()
@@ -192,6 +200,9 @@ impl<'a> GlyphChanges<'a> {
         e.angle = input.angle.unwrap_or(e.angle);
         e.scale = input.scale.unwrap_or(e.scale);
         e.opacity = input.opacity.unwrap_or(e.opacity);
+        if let Some(pair) = input.opacity_ramp {
+            e.opacity_ramp = (pair[0][1] != 100 || pair[1][1] != 100).then_some(OpacityRamp(pair));
+        }
         e.thickness = self.thickness.unwrap_or(e.thickness);
         e.softness = self.softness.unwrap_or(e.softness);
         if let Some(c) = self.color {

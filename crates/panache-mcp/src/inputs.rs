@@ -362,6 +362,11 @@ pub struct Nudge {
     pub angle: Option<i8>,
     /// For text glyphs, a local multiplier of the draft-wide ink opacity, 0..100 percent. 100 adds no fading, 0 hides the glyph. This cannot exceed the global opacity.
     pub opacity: Option<u8>,
+    /// Optional gradual fade within each selected glyph or diagram. Two [height %, opacity multiplier %]
+    /// anchors in the unrotated glyph, top to bottom. Both coordinates are 0..100; heights must increase.
+    /// Values extend beyond the ends. Example [[0,65],[60,100]] preserves the bottom 40%.
+    /// Multiplies opacity. Pass [[0,100],[100,100]] to clear.
+    pub opacity_ramp: Option<[[u8; 2]; 2]>,
     /// Stroke weight delta in pixels, -2..2, in 0.1 px steps.
     pub thickness: Option<f64>,
     /// Edge softness delta in pixels, -2..2, in 0.1 px steps.

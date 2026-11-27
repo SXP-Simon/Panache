@@ -70,3 +70,21 @@ async def verify(client):
     await call(client, "tune_handwriting", **key, expected_revision=2, changes={"font_size": 40})
     enlarged = await chart_crop(3)
     assert enlarged.width > 1.3 * restyled.width and enlarged.height > 1.3 * restyled.height
+
+    layout = (await call(client, "preview_handwriting", **key, revision=3, view="layout")).structuredContent
+    chart_id = layout["glyphs"][1]["id"]
+    target = dict(**key, section=1, page=1, ids=[chart_id])
+    # Use the same fine layout on both sides so the only changing property is the ink ramp.
+    await call(client, "adjust_glyphs", **target, expected_revision=3, opacity=100)
+    fixed = await chart_crop(4)
+    bad = await client.call_tool("adjust_glyphs", {**target, "expected_revision":4, "opacity_ramp":[[60,70],[20,100]]})
+    assert bad.isError
+    await call(client, "adjust_glyphs", **target, expected_revision=4, opacity_ramp=[[0,40],[50,100]])
+    faded = await chart_crop(5)
+    upper = (0, 0, fixed.width, fixed.height // 3)
+    lower = (0, fixed.height * 2 // 3, fixed.width, fixed.height)
+    assert sum(faded.crop(upper).getdata()) > sum(fixed.crop(upper).getdata())
+    assert faded.crop(lower).tobytes() == fixed.crop(lower).tobytes()
+    await call(client, "adjust_glyphs", **target, expected_revision=5, opacity_ramp=[[0,100],[100,100]])
+    assert (await chart_crop(6)).tobytes() == fixed.tobytes()
+    assert (await chart_crop(5)).tobytes() == faded.tobytes()
