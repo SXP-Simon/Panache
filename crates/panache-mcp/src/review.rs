@@ -336,7 +336,7 @@ pub fn page(
         }
         if let Some(ink) = checks.ink {
             metadata["illustration_ink_check"] = ink.guidance(&arguments,
-                "At native size compare a diagram label and nearby writing, then compare a straight frame or arrow shaft with a letter stem. Inspect letterforms, size, width, edge softness and darkness. The regions measure added ink against the saved paper. Different coverage, overlapping marks, color and paper lighting can affect the readings. Inspect thickness and darkness in the crops. If only the diagram needs changing, adjust its source or pen settings. Use each preview call as given for one revision; omit compare_revision.");
+                "At native size compare a diagram label and nearby writing, then compare a straight frame or arrow shaft with a letter stem. Inspect letterforms, size, width, edge softness and darkness. The regions measure added ink against the saved paper. Different coverage, overlapping marks, color and paper lighting can affect the readings. Inspect thickness and darkness in the crops. If a crop misses a frame, arrow or identifiable nearby letters, move or expand the region to include comparable marks at native scale. On ruled paper trace each arrow to its head and check that it remains distinct from the ruling. If only the diagram needs changing, adjust its source or pen settings. Use each preview call as given for one revision; omit compare_revision.");
         }
         if draft.paper.is_some() {
             let mut appearance = json!({

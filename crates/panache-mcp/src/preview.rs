@@ -201,7 +201,7 @@ fn image(
     let mut message = format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision);
     let mut data = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached});
     if contains_drawing {
-        let hint = "如果当前页既有手绘图又有文字，在判断笔迹一致前，用 view=review 加 region 框住一段图线和旁边的字，同倍率比较粗细和墨色。先对照节点和分支标签与正文的字形、字号，再看箭杆和框线是否接近文字的主笔画。缩放整图会连同标签一起缩放。同页看图与字只传当前版，省略 compare_revision。看不清时说明还不能判断。";
+        let hint = "如果当前页既有手绘图又有文字，在判断笔迹一致前，用 view=review 加 region 框住一段图线和旁边的字，同倍率比较粗细和墨色。先对照节点和分支标签与正文的字形、字号，再看箭杆和框线是否接近文字的主笔画。在横线纸上沿箭杆追到箭头。图线与纸线重合时，优先平移整图或调整节点间距，缩放整图会连同标签一起缩放。同页看图与字只传当前版，省略 compare_revision。看不清时说明还不能判断。";
         message.push('\n');
         message.push_str(hint);
         data["illustration_inspection"] = json!(hint);
