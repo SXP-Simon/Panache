@@ -1,0 +1,394 @@
+{
+  "paper_corner_order": "TL TR BR BL, pixels from source crop",
+  "paper_corners": [
+    [
+      51.38023376464844,
+      412.54705810546875
+    ],
+    [
+      806.4254150390625,
+      65.14952850341797
+    ],
+    [
+      1351.71142578125,
+      1122.803955078125
+    ],
+    [
+      557.717041015625,
+      1517.319091796875
+    ]
+  ],
+  "source_photo": "https://www.pexels.com/photo/empty-paper-sheet-on-wooden-table-4207708/",
+  "input_sha256": "ba541151e40bb112080b8c47cbc06969e858dfb171c1cc15130b79f91be36cc6",
+  "worksheet_sha256": "e6ad81acfdbfd37e99228b8be48167fb815dc2c7933cae33d9c3b97bcf9cc2e8",
+  "export": {
+    "revision": 4,
+    "pages": 1,
+    "member": "0.png",
+    "match_delivery_bytes": true
+  },
+  "import": {
+    "alignment": "unverified",
+    "ruled": false,
+    "outside_darkened_pixels": 7717,
+    "all_darkened_pixels": 25136
+  },
+  "final_guides": [
+    {
+      "row": 0,
+      "left": [
+        149,
+        474
+      ],
+      "right": [
+        799,
+        174
+      ]
+    },
+    {
+      "row": 28,
+      "left": [
+        590,
+        1431
+      ],
+      "right": [
+        1268,
+        1097
+      ]
+    }
+  ],
+  "width_ratio": {
+    "guides_ratio": 1.055753112307201,
+    "paper_ratio_at_guide_depths": 1.0576741490255206
+  },
+  "body": {
+    "代码 B3": {
+      "n": 15,
+      "width": 514,
+      "measured": -24.75,
+      "ref": -25.04,
+      "resid": 0.29,
+      "rms_baseline_noise_px": 2.23
+    },
+    "真假后继说明": {
+      "n": 17,
+      "width": 619,
+      "measured": -25.52,
+      "ref": -25.83,
+      "resid": 0.31,
+      "rms_baseline_noise_px": 1.85
+    },
+    "结论末行": {
+      "n": 19,
+      "width": 586,
+      "measured": -25.89,
+      "ref": -26.16,
+      "resid": 0.27,
+      "rms_baseline_noise_px": 2.85
+    }
+  },
+  "chart": {
+    "B6、B2、B3 同一排的两段横线": {
+      "rectified_xy": [
+        [
+          171.0,
+          641.4782984378216
+        ],
+        [
+          430.0,
+          641.7161334232321
+        ]
+      ],
+      "samples": 163,
+      "measured": -25.49,
+      "ref": -25.54,
+      "resid": 0.05
+    },
+    "B3 到 B5 的竖线": {
+      "rectified_xy": [
+        [
+          494.3699367088605,
+          680.0
+        ],
+        [
+          494.0604430379745,
+          758.0
+        ]
+      ],
+      "samples": 79,
+      "measured": 64.13,
+      "ref": 63.91,
+      "resid": 0.23
+    }
+  },
+  "model": "gpt-6.2-astra high, fresh context",
+  "pr_head": "071f5f331ecfcf0c1831edc96024642c602ef58c",
+  "source_preparation": "Downloaded Pexels 4207708 at width 1700, cropped to frame the paper; no rotation, perspective warp or guides on input.",
+  "user_task": "把下面这道编译原理作业做在我给的原纸照片上，手写内容和图都要跟照片协调，交给我一张完整 PNG。三地址代码为 (1) i=1，(2) s=0，(3) if i>10 goto 9，(4) t=i%2，(5) if t≠0 goto 7，(6) s=s+i，(7) i=i+1，(8) goto 3，(9) exit。请给出代码、基本块划分、控制流图，以及循环中是否有可外提的不变计算和理由。",
+  "methods": {
+    "angles": "All angles in original image coordinates. The four independent paper edges were fitted using the wood/paper color change. The resulting homography gives the local reference direction. Actual text angles use linear fits to median ink locations in 32-pixel windows of the rectified image. For chart lines we sample the transverse median ink position in the indicated uninterrupted rectified spans. Endpoints are transformed back into camera coordinates before comparing angles. All residuals in degrees; small differences also reflect handwriting and sampling.",
+    "sample_rectified_frame": [
+      900,
+      1273
+    ],
+    "body_sample_y_ranges": [
+      [
+        245,
+        271
+      ],
+      [
+        839,
+        864
+      ],
+      [
+        1069,
+        1099
+      ]
+    ],
+    "horizontal_chart_spans_x": [
+      [
+        171,
+        261
+      ],
+      [
+        359,
+        430
+      ]
+    ],
+    "vertical_chart_span_y": [
+      680,
+      758
+    ],
+    "mask": "mean RGB input minus rendered image >32; rectified ink masks use bilinear interpolation and threshold >100/255"
+  },
+  "sequence": [
+    {
+      "tool": "save_section",
+      "revision": 1,
+      "paper_alignment": "unverified"
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 1,
+      "view": "review",
+      "region": false,
+      "review_alignment": "unverified"
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 1,
+      "view": "image",
+      "region": false
+    },
+    {
+      "tool": "tune_handwriting",
+      "revision": 2,
+      "paper_guides": [
+        {
+          "row": 0,
+          "left": [
+            152,
+            480
+          ],
+          "right": [
+            802,
+            180
+          ]
+        },
+        {
+          "row": 22,
+          "left": [
+            580,
+            1410
+          ],
+          "right": [
+            1258,
+            1077
+          ]
+        }
+      ]
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 2,
+      "view": "review",
+      "region": false,
+      "review_alignment": "manual_guides"
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 2,
+      "view": "image",
+      "region": false
+    },
+    {
+      "tool": "save_section",
+      "revision": 3
+    },
+    {
+      "tool": "tune_handwriting",
+      "revision": 4,
+      "paper_guides": [
+        {
+          "row": 0,
+          "left": [
+            149,
+            474
+          ],
+          "right": [
+            799,
+            174
+          ]
+        },
+        {
+          "row": 28,
+          "left": [
+            590,
+            1431
+          ],
+          "right": [
+            1268,
+            1097
+          ]
+        }
+      ]
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "review",
+      "region": false,
+      "review_alignment": "manual_guides"
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "review",
+      "region": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "image",
+      "region": true
+    },
+    {
+      "tool": "export_handwriting",
+      "revision": 4
+    }
+  ]
+}
