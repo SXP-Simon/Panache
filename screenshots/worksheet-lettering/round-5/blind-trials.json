@@ -1,0 +1,2623 @@
+{
+  "model": "gpt-6.2-astra",
+  "reasoning": "high",
+  "blind_task": "把下面这道编译原理作业做在我给的原纸照片上，手写内容和图都要跟照片协调，交给我一张完整 PNG。给出九条指令、基本块划分、控制流图和循环不变计算。",
+  "paper_sha256": "67ae41d9486dac33eddce6014f33b8ae23c647384b9196a42c5492b2c90f64ea",
+  "labels": {
+    "a1": "previous",
+    "b1": "appended receipt",
+    "b2": "appended receipt",
+    "c1": "first receipt and onboarding",
+    "c2": "first receipt and onboarding"
+  },
+  "outcome": "Two successful image previews at the same final revision and same native region, one explicit zero and one gradient. Count tool calls from the independent session only. Layout/ink were independently chosen; this checks adoption on this photo, not image superiority or a population rate.",
+  "integrated_commit": "95a95c0451388fc2167a9d8a962e6db646a6f640",
+  "integrated_binary_sha256": "cfab3a92dcc3fd4b6084668e6e9f063ba51660fe69cddf64ec0041fe7b09c299",
+  "trials": {
+    "a1": {
+      "accepted_preview_counts": {
+        "image": 4,
+        "review": 16,
+        "layout": 21
+      },
+      "events": [
+        {
+          "call": 66,
+          "tool": "export_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "2f9b4470-69d6-40d2-a6c2-95bb4fcfa391",
+            "revision": 15,
+            "format": "zip"
+          }
+        }
+      ],
+      "final_revision": 15,
+      "final_revision_paired_crops": 0,
+      "delivered_rgb_sha256": "7d2e322f39b1d3cd444f386658e52403e4b07376cf807c318ea9736dedaa107f"
+    },
+    "b1": {
+      "accepted_preview_counts": {
+        "review": 2,
+        "image": 17,
+        "layout": 145
+      },
+      "events": [
+        {
+          "call": 2,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 1,
+            "view": "review"
+          }
+        },
+        {
+          "call": 17,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 4,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                335,
+                277
+              ],
+              [
+                564,
+                277
+              ],
+              [
+                564,
+                381
+              ],
+              [
+                335,
+                381
+              ]
+            ]
+          }
+        },
+        {
+          "call": 18,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 4,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                232,
+                513
+              ],
+              [
+                454,
+                513
+              ],
+              [
+                454,
+                622
+              ],
+              [
+                232,
+                622
+              ]
+            ]
+          }
+        },
+        {
+          "call": 19,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 4,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                898,
+                301
+              ],
+              [
+                1138,
+                301
+              ],
+              [
+                1138,
+                461
+              ],
+              [
+                898,
+                461
+              ]
+            ]
+          }
+        },
+        {
+          "call": 20,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 4,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                819,
+                1173
+              ],
+              [
+                1059,
+                1173
+              ],
+              [
+                1059,
+                1333
+              ],
+              [
+                819,
+                1333
+              ]
+            ]
+          }
+        },
+        {
+          "call": 21,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 4,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                320,
+                799
+              ],
+              [
+                620,
+                799
+              ],
+              [
+                620,
+                939
+              ],
+              [
+                320,
+                939
+              ]
+            ]
+          }
+        },
+        {
+          "call": 177,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                255,
+                285
+              ],
+              [
+                515,
+                285
+              ],
+              [
+                515,
+                390
+              ],
+              [
+                255,
+                390
+              ]
+            ]
+          }
+        },
+        {
+          "call": 178,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                390,
+                359
+              ],
+              [
+                750,
+                359
+              ],
+              [
+                750,
+                465
+              ],
+              [
+                390,
+                465
+              ]
+            ]
+          }
+        },
+        {
+          "call": 179,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                620,
+                427
+              ],
+              [
+                850,
+                427
+              ],
+              [
+                850,
+                547
+              ],
+              [
+                620,
+                547
+              ]
+            ]
+          }
+        },
+        {
+          "call": 180,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                300,
+                505
+              ],
+              [
+                590,
+                505
+              ],
+              [
+                590,
+                635
+              ],
+              [
+                300,
+                635
+              ]
+            ]
+          }
+        },
+        {
+          "call": 181,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                495,
+                742
+              ],
+              [
+                845,
+                742
+              ],
+              [
+                845,
+                896
+              ],
+              [
+                495,
+                896
+              ]
+            ]
+          }
+        },
+        {
+          "call": 182,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                320,
+                800
+              ],
+              [
+                600,
+                800
+              ],
+              [
+                600,
+                960
+              ],
+              [
+                320,
+                960
+              ]
+            ]
+          }
+        },
+        {
+          "call": 183,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "image",
+            "export_blur_px": 0,
+            "region": [
+              [
+                796,
+                1150
+              ],
+              [
+                1066,
+                1150
+              ],
+              [
+                1066,
+                1280
+              ],
+              [
+                796,
+                1280
+              ]
+            ]
+          }
+        },
+        {
+          "call": 184,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "view": "review"
+          }
+        },
+        {
+          "call": 185,
+          "tool": "export_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "bee98e26-3cdc-448f-bee7-697bb832a0ab",
+            "revision": 12,
+            "format": "zip"
+          }
+        }
+      ],
+      "final_revision": 12,
+      "final_revision_paired_crops": 0,
+      "delivered_rgb_sha256": "9ec0e44ba2048908862a2cb0d784d9121bbe3a15410d0b645145c7acb1d112fe",
+      "chosen_finish": {}
+    },
+    "b2": {
+      "accepted_preview_counts": {
+        "image": 14,
+        "review": 2,
+        "layout": 25
+      },
+      "events": [
+        {
+          "call": 5,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "review"
+          }
+        },
+        {
+          "call": 9,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                265,
+                280
+              ],
+              [
+                765,
+                280
+              ],
+              [
+                765,
+                430
+              ],
+              [
+                265,
+                430
+              ]
+            ],
+            "revision": 2,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 10,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                265,
+                435
+              ],
+              [
+                765,
+                435
+              ],
+              [
+                765,
+                580
+              ],
+              [
+                265,
+                580
+              ]
+            ],
+            "revision": 2,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 11,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                200,
+                650
+              ],
+              [
+                960,
+                650
+              ],
+              [
+                960,
+                890
+              ],
+              [
+                200,
+                890
+              ]
+            ],
+            "revision": 2,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 12,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                300,
+                1160
+              ],
+              [
+                790,
+                1160
+              ],
+              [
+                790,
+                1320
+              ],
+              [
+                300,
+                1320
+              ]
+            ],
+            "revision": 2,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 45,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                268,
+                285
+              ],
+              [
+                779,
+                285
+              ],
+              [
+                779,
+                449
+              ],
+              [
+                268,
+                449
+              ]
+            ],
+            "revision": 11,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 46,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                268,
+                285
+              ],
+              [
+                779,
+                285
+              ],
+              [
+                779,
+                449
+              ],
+              [
+                268,
+                449
+              ]
+            ],
+            "revision": 11,
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 47,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                255,
+                480
+              ],
+              [
+                770,
+                480
+              ],
+              [
+                770,
+                650
+              ],
+              [
+                255,
+                650
+              ]
+            ],
+            "revision": 11,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 48,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                255,
+                480
+              ],
+              [
+                770,
+                480
+              ],
+              [
+                770,
+                650
+              ],
+              [
+                255,
+                650
+              ]
+            ],
+            "revision": 11,
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 49,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                200,
+                650
+              ],
+              [
+                960,
+                650
+              ],
+              [
+                960,
+                910
+              ],
+              [
+                200,
+                910
+              ]
+            ],
+            "revision": 11,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 50,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                200,
+                650
+              ],
+              [
+                960,
+                650
+              ],
+              [
+                960,
+                910
+              ],
+              [
+                200,
+                910
+              ]
+            ],
+            "revision": 11,
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 51,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                300,
+                1170
+              ],
+              [
+                800,
+                1170
+              ],
+              [
+                800,
+                1340
+              ],
+              [
+                300,
+                1340
+              ]
+            ],
+            "revision": 11,
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 52,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "view": "image",
+            "region": [
+              [
+                300,
+                1170
+              ],
+              [
+                800,
+                1170
+              ],
+              [
+                800,
+                1340
+              ],
+              [
+                300,
+                1340
+              ]
+            ],
+            "revision": 11,
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 53,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "revision": 11,
+            "section": 1,
+            "page": 1,
+            "view": "review"
+          }
+        },
+        {
+          "call": 54,
+          "tool": "export_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "a35c7fb4-77fe-4eed-89cb-432e5e2e81cd",
+            "revision": 11,
+            "format": "zip"
+          }
+        }
+      ],
+      "final_revision": 11,
+      "final_revision_paired_crops": 4,
+      "delivered_rgb_sha256": "1fcd987de6ac907d66c6d821c2b6ec2241d3c8a3d165b456c930ed1d832ec265",
+      "chosen_finish": {}
+    },
+    "c1": {
+      "accepted_preview_counts": {
+        "image": 34,
+        "review": 5,
+        "layout": 36
+      },
+      "events": [
+        {
+          "call": 3,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "view": "review",
+            "revision": 1
+          }
+        },
+        {
+          "call": 6,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "view": "review",
+            "revision": 2
+          }
+        },
+        {
+          "call": 9,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "view": "review",
+            "revision": 3
+          }
+        },
+        {
+          "call": 11,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "page": 1,
+            "region": [
+              [
+                467,
+                265
+              ],
+              [
+                696,
+                265
+              ],
+              [
+                696,
+                379
+              ],
+              [
+                467,
+                379
+              ]
+            ],
+            "revision": 3,
+            "section": 1,
+            "view": "image",
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 12,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "page": 1,
+            "region": [
+              [
+                759,
+                645
+              ],
+              [
+                989,
+                645
+              ],
+              [
+                989,
+                755
+              ],
+              [
+                759,
+                755
+              ]
+            ],
+            "revision": 3,
+            "section": 1,
+            "view": "image",
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 13,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "view": "image",
+            "revision": 3,
+            "region": [
+              [
+                250,
+                894
+              ],
+              [
+                890,
+                894
+              ],
+              [
+                890,
+                1134
+              ],
+              [
+                250,
+                1134
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 58,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "view": "review",
+            "revision": 12
+          }
+        },
+        {
+          "call": 59,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                898,
+                301
+              ],
+              [
+                1138,
+                301
+              ],
+              [
+                1138,
+                461
+              ],
+              [
+                898,
+                461
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 60,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                350,
+                304
+              ],
+              [
+                570,
+                304
+              ],
+              [
+                570,
+                419
+              ],
+              [
+                350,
+                419
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 61,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                898,
+                301
+              ],
+              [
+                1138,
+                301
+              ],
+              [
+                1138,
+                461
+              ],
+              [
+                898,
+                461
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 62,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                350,
+                304
+              ],
+              [
+                570,
+                304
+              ],
+              [
+                570,
+                419
+              ],
+              [
+                350,
+                419
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 63,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                819,
+                1173
+              ],
+              [
+                1059,
+                1173
+              ],
+              [
+                1059,
+                1333
+              ],
+              [
+                819,
+                1333
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 64,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                310,
+                1230
+              ],
+              [
+                630,
+                1230
+              ],
+              [
+                630,
+                1350
+              ],
+              [
+                310,
+                1350
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 65,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                819,
+                1173
+              ],
+              [
+                1059,
+                1173
+              ],
+              [
+                1059,
+                1333
+              ],
+              [
+                819,
+                1333
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 66,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                310,
+                1230
+              ],
+              [
+                630,
+                1230
+              ],
+              [
+                630,
+                1350
+              ],
+              [
+                310,
+                1350
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 67,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                410,
+                475
+              ],
+              [
+                710,
+                475
+              ],
+              [
+                710,
+                605
+              ],
+              [
+                410,
+                605
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 68,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                410,
+                475
+              ],
+              [
+                710,
+                475
+              ],
+              [
+                710,
+                605
+              ],
+              [
+                410,
+                605
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 69,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                370,
+                939
+              ],
+              [
+                800,
+                939
+              ],
+              [
+                800,
+                1092
+              ],
+              [
+                370,
+                1092
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 70,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                370,
+                939
+              ],
+              [
+                800,
+                939
+              ],
+              [
+                800,
+                1092
+              ],
+              [
+                370,
+                1092
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 71,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                181,
+                818
+              ],
+              [
+                558,
+                818
+              ],
+              [
+                558,
+                1054
+              ],
+              [
+                181,
+                1054
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 72,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                181,
+                818
+              ],
+              [
+                558,
+                818
+              ],
+              [
+                558,
+                1054
+              ],
+              [
+                181,
+                1054
+              ]
+            ],
+            "revision": 12,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 75,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "view": "review",
+            "revision": 13
+          }
+        },
+        {
+          "call": 76,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                898,
+                301
+              ],
+              [
+                1138,
+                301
+              ],
+              [
+                1138,
+                461
+              ],
+              [
+                898,
+                461
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 77,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                350,
+                304
+              ],
+              [
+                570,
+                304
+              ],
+              [
+                570,
+                419
+              ],
+              [
+                350,
+                419
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 78,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                898,
+                301
+              ],
+              [
+                1138,
+                301
+              ],
+              [
+                1138,
+                461
+              ],
+              [
+                898,
+                461
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 79,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                350,
+                304
+              ],
+              [
+                570,
+                304
+              ],
+              [
+                570,
+                419
+              ],
+              [
+                350,
+                419
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 80,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                819,
+                1173
+              ],
+              [
+                1059,
+                1173
+              ],
+              [
+                1059,
+                1333
+              ],
+              [
+                819,
+                1333
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 81,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                310,
+                1230
+              ],
+              [
+                630,
+                1230
+              ],
+              [
+                630,
+                1350
+              ],
+              [
+                310,
+                1350
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 82,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                819,
+                1173
+              ],
+              [
+                1059,
+                1173
+              ],
+              [
+                1059,
+                1333
+              ],
+              [
+                819,
+                1333
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 83,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                310,
+                1230
+              ],
+              [
+                630,
+                1230
+              ],
+              [
+                630,
+                1350
+              ],
+              [
+                310,
+                1350
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 84,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                410,
+                475
+              ],
+              [
+                710,
+                475
+              ],
+              [
+                710,
+                605
+              ],
+              [
+                410,
+                605
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 85,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                410,
+                475
+              ],
+              [
+                710,
+                475
+              ],
+              [
+                710,
+                605
+              ],
+              [
+                410,
+                605
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 86,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                370,
+                939
+              ],
+              [
+                800,
+                939
+              ],
+              [
+                800,
+                1092
+              ],
+              [
+                370,
+                1092
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 87,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                370,
+                939
+              ],
+              [
+                800,
+                939
+              ],
+              [
+                800,
+                1092
+              ],
+              [
+                370,
+                1092
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 88,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                181,
+                818
+              ],
+              [
+                558,
+                818
+              ],
+              [
+                558,
+                1054
+              ],
+              [
+                181,
+                1054
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 89,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            },
+            "page": 1,
+            "region": [
+              [
+                181,
+                818
+              ],
+              [
+                558,
+                818
+              ],
+              [
+                558,
+                1054
+              ],
+              [
+                181,
+                1054
+              ]
+            ],
+            "revision": 13,
+            "section": 1,
+            "view": "image"
+          }
+        },
+        {
+          "call": 90,
+          "tool": "export_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "780e8758-d7cb-44fa-9773-3e3d34ec8160",
+            "revision": 13,
+            "format": "zip"
+          }
+        }
+      ],
+      "final_revision": 13,
+      "final_revision_paired_crops": 7,
+      "delivered_rgb_sha256": "c220b5a863e0aaad0eb03d92db3944bd34f16f492bb390bbe55b12d45ba79216",
+      "chosen_finish": {},
+      "integrated_replay": {
+        "matching_native_crops": 14,
+        "full_page_rgb_matches": true,
+        "instruction_in_first_text": true
+      }
+    },
+    "c2": {
+      "accepted_preview_counts": {
+        "review": 3,
+        "image": 21,
+        "layout": 81
+      },
+      "events": [
+        {
+          "call": 2,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 1,
+            "section": 1,
+            "page": 1,
+            "view": "review"
+          }
+        },
+        {
+          "call": 13,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 5,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                260,
+                276
+              ],
+              [
+                630,
+                276
+              ],
+              [
+                630,
+                397
+              ],
+              [
+                260,
+                397
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 14,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 5,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                235,
+                410
+              ],
+              [
+                710,
+                410
+              ],
+              [
+                710,
+                530
+              ],
+              [
+                235,
+                530
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 15,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 5,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                200,
+                610
+              ],
+              [
+                725,
+                610
+              ],
+              [
+                725,
+                720
+              ],
+              [
+                200,
+                720
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 16,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 5,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                190,
+                835
+              ],
+              [
+                870,
+                835
+              ],
+              [
+                870,
+                1080
+              ],
+              [
+                190,
+                1080
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 17,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 5,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                145,
+                1200
+              ],
+              [
+                800,
+                1200
+              ],
+              [
+                800,
+                1340
+              ],
+              [
+                145,
+                1340
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 110,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                260,
+                276
+              ],
+              [
+                630,
+                276
+              ],
+              [
+                630,
+                397
+              ],
+              [
+                260,
+                397
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 111,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                235,
+                410
+              ],
+              [
+                710,
+                410
+              ],
+              [
+                710,
+                530
+              ],
+              [
+                235,
+                530
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 112,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                200,
+                610
+              ],
+              [
+                725,
+                610
+              ],
+              [
+                725,
+                720
+              ],
+              [
+                200,
+                720
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 113,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                160,
+                843
+              ],
+              [
+                900,
+                843
+              ],
+              [
+                900,
+                1100
+              ],
+              [
+                160,
+                1100
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 114,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "review"
+          }
+        },
+        {
+          "call": 115,
+          "tool": "preview_handwriting",
+          "has_comparison": true,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "review"
+          }
+        },
+        {
+          "call": 116,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                277,
+                302
+              ],
+              [
+                625,
+                302
+              ],
+              [
+                625,
+                396
+              ],
+              [
+                277,
+                396
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 117,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                277,
+                302
+              ],
+              [
+                625,
+                302
+              ],
+              [
+                625,
+                396
+              ],
+              [
+                277,
+                396
+              ]
+            ],
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 118,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                255,
+                490
+              ],
+              [
+                632,
+                490
+              ],
+              [
+                632,
+                591
+              ],
+              [
+                255,
+                591
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 119,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                255,
+                490
+              ],
+              [
+                632,
+                490
+              ],
+              [
+                632,
+                591
+              ],
+              [
+                255,
+                591
+              ]
+            ],
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 120,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                150,
+                1230
+              ],
+              [
+                575,
+                1230
+              ],
+              [
+                575,
+                1335
+              ],
+              [
+                150,
+                1335
+              ]
+            ],
+            "export_blur_px": 0
+          }
+        },
+        {
+          "call": 121,
+          "tool": "preview_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "section": 1,
+            "page": 1,
+            "view": "image",
+            "region": [
+              [
+                150,
+                1230
+              ],
+              [
+                575,
+                1230
+              ],
+              [
+                575,
+                1335
+              ],
+              [
+                150,
+                1335
+              ]
+            ],
+            "export_blur_gradient": {
+              "from": {
+                "sigma_px": 0.8,
+                "x": 0.7074357192494788,
+                "y": 0.19854090672225116
+              },
+              "to": {
+                "sigma_px": 0.0,
+                "x": 0.6525364836692147,
+                "y": 0.6529442417926004
+              }
+            }
+          }
+        },
+        {
+          "call": 123,
+          "tool": "export_handwriting",
+          "has_comparison": false,
+          "arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "revision": 15,
+            "format": "zip",
+            "export_blur_px": 0
+          }
+        }
+      ],
+      "final_revision": 15,
+      "final_revision_paired_crops": 3,
+      "delivered_rgb_sha256": "e754309195edc773ceef67250dd9001012b20eac580e2e6336fc22e55e6024c6",
+      "chosen_finish": {
+        "export_blur_px": 0
+      },
+      "integrated_replay": {
+        "matching_native_crops": 6,
+        "full_page_rgb_matches": true,
+        "instruction_in_first_text": true
+      }
+    }
+  }
+}

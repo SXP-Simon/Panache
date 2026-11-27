@@ -1,0 +1,182 @@
+{
+  "same_request": {
+    "draft_id": "2f9b4470-69d6-40d2-a6c2-95bb4fcfa391",
+    "section": 1,
+    "page": 1,
+    "view": "review",
+    "revision": 15,
+    "region": [
+      [
+        199,
+        676
+      ],
+      [
+        1039,
+        676
+      ],
+      [
+        1039,
+        1092
+      ],
+      [
+        199,
+        1092
+      ]
+    ]
+  },
+  "before_present": false,
+  "after_comparison": {
+    "guidance": "照片 PNG 定稿前，若原尺寸观察也显示一侧较软，先比较本版两处裁图。分别把 softer_area 和 sharper_area 中的 clear、gradient 参数传给 preview_handwriting，比较同一位置的纸面细线与笔画。参考框缺少字迹时，两档的 region 一起移到附近的小字，锚点仍按整页。0.8→0 是试看的强度；边缘宽度也受印刷影响。清晰版已协调、渐变使细字变淡或看不出收益时选清晰版。否则用预览过的同一组渐变参数导出 ZIP。",
+    "sharper_area": {
+      "clear": {
+        "draft_id": "2f9b4470-69d6-40d2-a6c2-95bb4fcfa391",
+        "export_blur_px": 0,
+        "page": 1,
+        "region": [
+          [
+            819,
+            1173
+          ],
+          [
+            1059,
+            1173
+          ],
+          [
+            1059,
+            1333
+          ],
+          [
+            819,
+            1333
+          ]
+        ],
+        "revision": 15,
+        "section": 1,
+        "view": "image"
+      },
+      "gradient": {
+        "draft_id": "2f9b4470-69d6-40d2-a6c2-95bb4fcfa391",
+        "export_blur_gradient": {
+          "from": {
+            "sigma_px": 0.8,
+            "x": 0.7074357192494788,
+            "y": 0.19854090672225116
+          },
+          "to": {
+            "sigma_px": 0.0,
+            "x": 0.6525364836692147,
+            "y": 0.6529442417926004
+          }
+        },
+        "page": 1,
+        "region": [
+          [
+            819,
+            1173
+          ],
+          [
+            1059,
+            1173
+          ],
+          [
+            1059,
+            1333
+          ],
+          [
+            819,
+            1333
+          ]
+        ],
+        "revision": 15,
+        "section": 1,
+        "view": "image"
+      }
+    },
+    "softer_area": {
+      "clear": {
+        "draft_id": "2f9b4470-69d6-40d2-a6c2-95bb4fcfa391",
+        "export_blur_px": 0,
+        "page": 1,
+        "region": [
+          [
+            898,
+            301
+          ],
+          [
+            1138,
+            301
+          ],
+          [
+            1138,
+            461
+          ],
+          [
+            898,
+            461
+          ]
+        ],
+        "revision": 15,
+        "section": 1,
+        "view": "image"
+      },
+      "gradient": {
+        "draft_id": "2f9b4470-69d6-40d2-a6c2-95bb4fcfa391",
+        "export_blur_gradient": {
+          "from": {
+            "sigma_px": 0.8,
+            "x": 0.7074357192494788,
+            "y": 0.19854090672225116
+          },
+          "to": {
+            "sigma_px": 0.0,
+            "x": 0.6525364836692147,
+            "y": 0.6529442417926004
+          }
+        },
+        "page": 1,
+        "region": [
+          [
+            898,
+            301
+          ],
+          [
+            1138,
+            301
+          ],
+          [
+            1138,
+            461
+          ],
+          [
+            898,
+            461
+          ]
+        ],
+        "revision": 15,
+        "section": 1,
+        "view": "image"
+      }
+    }
+  },
+  "all_four_previews_valid": true,
+  "same_local_review_replay": {
+    "initial": {
+      "structured_hint": false,
+      "first_text_hint": false,
+      "first_text_next_step_points_to_hint": false,
+      "binary_sha256": "cb2783d65c60fb6e958e27ab72a31c88ddfad8d3c3be17cd897b93d6f3b2d5ea"
+    },
+    "additional_block": {
+      "structured_hint": true,
+      "first_text_hint": false,
+      "first_text_next_step_points_to_hint": false,
+      "binary_sha256": "ae81ab40c7b0f99b46bd1908c8be05aafa354c7d13a86d4bef0fb77e3ca9b7cc"
+    },
+    "first_block": {
+      "structured_hint": true,
+      "first_text_hint": true,
+      "first_text_next_step_points_to_hint": true,
+      "binary_sha256": "ebd2ef8eb7b1bfb6ef62c3d40ba33cbfa45306759f24107e64bdb791c3cd5f54"
+    }
+  }
+}
