@@ -72,6 +72,22 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
     } else {
         controls::merge(&draft.controls, &patch, &fonts)?
     };
+    let keys = &input.readback_variation;
+    let before = if keys.is_empty() {
+        None
+    } else {
+        ensure!(
+            keys.len() <= 2
+                && keys.iter().all(|k| input.changes.contains_key(k)
+                    && controls::catalog()["variation"].get(k).is_some()),
+            "readback_variation must name up to two variation controls in changes"
+        );
+        Some(serde_json::to_value(controls::parameters(
+            &draft,
+            1,
+            &draft.controls,
+        )?)?)
+    };
     if let Some(guides) = &input.paper_guides {
         let paper = draft
             .paper
@@ -101,13 +117,26 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
             "Supply controls, font_path or paper_guides"
         );
         draft.require_current_revision()?;
+        let mut receipt = json!({"draft_id":draft.id,"revision":draft.revision,"changed":false,"paper":null,
+            "controls":changes,"fine_layout":"preserved"});
+        if !keys.is_empty() {
+            receipt["effective_changes"] = json!({});
+        }
         return Ok(reply(
             format!("Controls already match revision {}.", draft.revision),
-            json!({"draft_id":draft.id,"revision":draft.revision,"changed":false,"paper":null,
-                "controls":changes,"fine_layout":"preserved"}),
+            receipt,
         ));
     }
-    controls::parameters(&draft, 1, &changes)?;
+    let params = controls::parameters(&draft, 1, &changes)?;
+    let mut delta = controls::Changes::new();
+    if let Some(before) = before {
+        let after = serde_json::to_value(&params)?;
+        for k in keys {
+            if before[k] != after[k] {
+                delta.insert(k.clone(), json!({"before":before[k],"after":after[k]}));
+            }
+        }
+    }
     let preserve_layout = changes.keys().chain(draft.controls.keys()).all(|key| {
         controls::catalog()["ink"].get(key).is_some()
             || controls::catalog()["camera"].get(key).is_some()
@@ -131,8 +160,9 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
         font.as_ref().map(|(k, v)| (k.as_str(), v.as_slice())),
         &details,
     )?;
-    Ok(reply(
-        format!("Saved revision {next}."),
-        json!({"draft_id":draft.id,"revision":next,"changed":true,"paper":paper.map(|p|p.summary()),"controls":changes,"fine_layout":if preserve_layout { "preserved" } else { "inspect_again" }}),
-    ))
+    let mut receipt = json!({"draft_id":draft.id,"revision":next,"changed":true,"paper":paper.map(|p|p.summary()),"controls":changes,"fine_layout":if preserve_layout { "preserved" } else { "inspect_again" }});
+    if !keys.is_empty() {
+        receipt["effective_changes"] = json!(delta);
+    }
+    Ok(reply(format!("Saved revision {next}."), receipt))
 }

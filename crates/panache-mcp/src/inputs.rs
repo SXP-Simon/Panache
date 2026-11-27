@@ -189,6 +189,10 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
+    /// Request before/after values for up to two variation keys in changes. effective_changes omits keys whose effective value stayed the same.
+    #[serde(default)]
+    #[schemars(length(max = 2))]
+    pub readback_variation: Vec<String>,
     /// Set to true only when the user wants to preserve manual glyph adjustments. Reject reflow that would stop applying them. Ink and camera changes can still be saved.
     #[serde(default)]
     pub preserve_local_adjustments: bool,
