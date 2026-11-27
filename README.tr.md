@@ -30,7 +30,7 @@ Windows, macOS ve Linux masaüstü paketleri yerel bir MCP sunucusu içerir. **A
 
 Bağlandıktan sonra şunu sormayı deneyin:
 
-> Write my notes and the process diagram on this photo of my stationery. Show me the first page, then export the whole draft as a PDF.
+> Notlarımı ve süreç diyagramını kırtasiye kağıdımın bu fotoğrafına yaz. İlk sayfayı bana göster, ardından tüm taslağı PDF olarak dışa aktar.
 
 Fotoğraf için istemciye Panache'ın çalıştığı bilgisayarda erişilebilir bir dosya yolu verin. Modeline görsel ileten bir istemci, bitmiş sayfayı inceleyebilir ve seçilen bir alanı gözden geçirebilir. Yalnızca metin destekleyen bir istemcide ölçümleri isteyin ve görünümü değerlendirmek için dışa aktarılan PDF'i yerel olarak açın. [MCP araçları ve yapılandırma](crates/panache-mcp/README.md)
 
