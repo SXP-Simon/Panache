@@ -201,7 +201,7 @@ impl Storage {
         revision: u32,
         format: Format,
         render: F,
-    ) -> Result<(PathBuf, usize)>
+    ) -> Result<(PathBuf, usize, File)>
     where
         F: FnOnce(&mut BudgetWriter<'_>) -> Result<usize>,
     {
@@ -237,15 +237,15 @@ impl Storage {
             };
             let pages = render(&mut output)?;
             output.flush()?;
-            temp.persist_noclobber(&path)?;
+            let file = temp.persist_noclobber(&path)?;
             db.execute("UPDATE export_files SET published=1 WHERE id=?", [&id])?;
-            Ok(pages)
+            Ok((pages, file))
         };
         let result = publish();
         if result.is_err() && metadata(&path)?.is_none() {
             db.execute("DELETE FROM export_files WHERE id=? AND published=0", [id])?;
         }
-        result.map(|pages| (path, pages))
+        result.map(|(pages, file)| (path, pages, file))
     }
 
     pub fn usage(&self, drafts: &Drafts, input: Usage) -> Result<Value> {

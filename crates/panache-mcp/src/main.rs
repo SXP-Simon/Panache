@@ -1,4 +1,5 @@
 mod controls;
+mod delivery;
 mod drafts;
 mod engine;
 mod inputs;
@@ -619,7 +620,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
+        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. For clients that can receive embedded files, request include_file. An embedded resource URI is not a user-visible download URL. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
     )]
     async fn export_handwriting(
         &self,
@@ -639,7 +640,7 @@ impl Panache {
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
             let format = input.format.unwrap_or_default();
-            let (path, pages) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
+            let (path, pages, file) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
                 writer, &draft, sections, format, cancel,
                 |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
@@ -699,10 +700,14 @@ impl Panache {
                     "reviewed_pages_without_digest": without_digest,
                 });
             }
-            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n`{}`", draft.revision, path.display());
-            Ok(reply(message, json!({
+            let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n运行 Panache 的电脑上的文件：`{}`", draft.revision, path.display());
+            let mut result = reply(message, json!({
                 "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review": review,
-            })))
+            }));
+            if input.include_file {
+                delivery::include_file(&mut result, file, &path, format);
+            }
+            Ok(result)
         }).await;
         tool_result(result)
     }
