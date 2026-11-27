@@ -312,7 +312,7 @@ pub fn page(
     let observation = draft.record_review(
         section,
         page,
-        "paper-review/2",
+        "paper-review/3",
         &pixel_digest,
         &sample.content_sha256,
         &evidence,
@@ -336,7 +336,7 @@ pub fn page(
         }
         if let Some(ink) = checks.ink {
             metadata["illustration_ink_check"] = ink.guidance(&arguments,
-                "Compare an actual diagram stroke or arrow and nearby writing at native size. The regions measure darkening against the saved paper. Different coverage, overlapping marks, color and paper lighting can affect the readings. Inspect thickness and darkness in the crops. If only the diagram needs changing, adjust its source or pen settings. Use each preview call as given for one revision; omit compare_revision.");
+                "At native size compare a diagram label and nearby writing, then compare a straight frame or arrow shaft with a letter stem. Inspect letterforms, size, width, edge softness and darkness. The regions measure added ink against the saved paper. Different coverage, overlapping marks, color and paper lighting can affect the readings. Inspect thickness and darkness in the crops. If only the diagram needs changing, adjust its source or pen settings. Use each preview call as given for one revision; omit compare_revision.");
         }
         if draft.paper.is_some() {
             let mut appearance = json!({

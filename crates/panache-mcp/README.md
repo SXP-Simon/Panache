@@ -150,11 +150,23 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 要核对局部改动，用 `preview_handwriting(view="review", region=…, revision=新版本, compare_revision=旧版本)` 查看同一区域的底纸、改前和改后图。移动字块时还可用 `previous_region` 圈出旧位置。需要保护的文字或页眉可单独圈选复查。区域使用原尺寸成品像素。[局部坐标与测量示例](tool-design.md#局部改动的复查)
 
+在照片上画新的流程图时，把下例直接写入节的 Markdown。节点文字继承稿件的字体，图框和箭头按其笔画绘制。先给分支条件、箭头和节点留够空间，再移动整图。把图缩进小格会连同标签字号一起改变。已有位图的标签保存在像素中，需要改字形时可从已知题意重建节点和连线。
+
+```tex
+\begin{circuitikz}[flowchart]
+\draw (0,0) node[rectangle]{B1};
+\draw (0,-2) node[diamond]{B2};
+\draw[->] (0,0) -- (0,-2) node[midway,right]{i≤10};
+\end{circuitikz}
+```
+
+照片建稿和预览返回的 `paper_focus_check` 可用于比较不同位置印刷边缘的过渡宽度。请在推荐的原尺寸局部内对照底纸和成品，看同一位置的印字、细横线、手写字和图线。清晰度渐变时连同中间过渡区一起看。确有不协调时只选受影响的字或图块轻调柔化，复查改动区和原先清晰的区域。空白或低反差区域可能缺少测量依据。
+
 作业表可用正文横线设置参考线，将同一页的课程、姓名等字块分别定位。若侧栏印字自下往上读，将原字块的左上、右上、右下、左下四角依次投到侧栏的左下、左上、右上、右下。复查时按栏核对读向、印字和留给老师的评分区。`changed_pixels_outside_reference` 也会计入正文参考区外有意填写的表头和侧栏，应结合这些栏位解读。
 
 客户端已知目标值时，可在 `tune_handwriting` 中同时传 `changes={"perturb_theta_sigma":0.07}` 和 `readback_variation=["perturb_theta_sigma"]`。成功回执的 `effective_changes` 给出写入前后的有效值，用于直接核对本次写入，省去事后再读一次。最多点名本次提交的两个 `variation` 控件。提交 `null` 时读回继承值，有效值相同的键会省略。若要根据旧值决定改多少，仍应先用 `describe_controls` 读取该稿当前版本的值。
 
-同页复盘在有可比样本时给出 `adjacent_row_check` 和 `illustration_ink_check`。复用其 `preview_arguments`，或逐项调用 `separate_preview_arguments`，在原图尺度看邻行字宽和图线附近的正文。`evidence.adjacent_rows` 分别记录两行的横纵伸缩比和照片投影前的垂直缩放，能区分字被拉宽和整行等比放大，`evidence.illustration_contrast` 记录采样区相对底纸的亮度下降及像素数。应结合实际裁图判断书写效果。
+同页复盘在有可比样本时给出 `adjacent_row_check` 和 `illustration_ink_check`。复用其 `preview_arguments`，或逐项调用 `separate_preview_arguments`，在原图尺度看邻行字宽和图线附近的正文。`evidence.adjacent_rows` 分别记录两行的横纵伸缩比和照片投影前的垂直缩放，能区分字被拉宽和整行等比放大，`evidence.illustration_contrast` 记录采样区相对底纸的亮度下降及像素数。同一回执的 `ink_footprint_width_px` 用新增墨迹的面积与周长估算有效宽度，单位为原图像素。标签结构和节点交点都会影响数值，仍需看同倍率裁图中的具体字干、框线和箭杆。
 
 如果字像贴在照片上，先分清是墨迹边缘过锐，还是纸面光照、阴影或墨色对比造成的观感。例如，纸面右侧有阴影，但用户认为笔画已经合适，就保留原样。如果用户明确指出笔画边缘过锐，或原尺寸成品裁图中的笔画边缘确实比附近可比的实拍印字或横线更锐，可以小幅柔化试一版。比如用户说“只改第一行，第二行保留”，用 `preview_handwriting(view=layout)` 找到第一行对应的字，再用 `adjust_glyphs` 的 `softness` 只调这些字。只有用户要调整整份稿子时，才用 `tune_handwriting` 的 `ink_softness`。用户要求保留墨迹时，直接沿用原版。
 

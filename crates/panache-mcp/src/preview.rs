@@ -128,7 +128,8 @@ fn render(
         );
         let baselines = engine.review_baselines(&draft, section.clone(), page, cancel)?;
         let (preview, _) = engine.preview(&draft, section, page, cancel)?;
-        return review::page(&draft, number, page, &preview.png, &baselines, cancel);
+        let result = review::page(&draft, number, page, &preview.png, &baselines, cancel)?;
+        return add_paper_focus(state, &draft, number, page, result);
     }
     if input.view == Some(PreviewView::Layout) {
         let result = engine.layout(&draft, section, input, cancel)?;
@@ -138,7 +139,7 @@ fn render(
         input.offset.is_none() && input.limit.is_none(),
         "offset and limit require view=layout"
     );
-    image(
+    let result = image(
         engine,
         &draft,
         section,
@@ -146,7 +147,26 @@ fn render(
         input.fresh,
         !state.preserve_reviews,
         cancel,
-    )
+    )?;
+    add_paper_focus(state, &draft, number, page, result)
+}
+
+fn add_paper_focus(
+    state: &State,
+    draft: &Snapshot<'_>,
+    section: u32,
+    page: usize,
+    mut result: CallToolResult,
+) -> Result<CallToolResult> {
+    if let Some(focus) = state.paper_focus.report(draft, section, page)? {
+        result
+            .content
+            .push(ContentBlock::text(format!("底纸边缘原尺寸检查 {focus}")));
+        if let Some(data) = result.structured_content.as_mut() {
+            data["paper_focus_check"] = focus;
+        }
+    }
+    Ok(result)
 }
 
 fn paper(draft: &Snapshot<'_>) -> Result<CallToolResult> {
@@ -181,7 +201,7 @@ fn image(
     let mut message = format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision);
     let mut data = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached});
     if contains_drawing {
-        let hint = "如果当前页既有手绘图又有文字，在判断笔迹一致前，用 view=review 加 region 框住一段图线和旁边的字，同倍率比较粗细和墨色。同页看图与字只传当前版，省略 compare_revision。看不清时说明还不能判断。";
+        let hint = "如果当前页既有手绘图又有文字，在判断笔迹一致前，用 view=review 加 region 框住一段图线和旁边的字，同倍率比较粗细和墨色。先对照节点和分支标签与正文的字形、字号，再看箭杆和框线是否接近文字的主笔画。缩放整图会连同标签一起缩放。同页看图与字只传当前版，省略 compare_revision。看不清时说明还不能判断。";
         message.push('\n');
         message.push_str(hint);
         data["illustration_inspection"] = json!(hint);

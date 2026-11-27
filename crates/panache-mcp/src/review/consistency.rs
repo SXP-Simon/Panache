@@ -263,6 +263,13 @@ fn darkness(
     let mut min_distance = f32::INFINITY;
     // Only boxes crossing this scan line can obscure ownership. Merge by marking the row spans.
     let mut excluded = vec![false; (r - l) as usize];
+    // Count runs through the added ink in four directions for a Crofton perimeter estimate.
+    // A one-pixel empty border also closes runs touching an edge of the sample.
+    let mut previous = vec![false; excluded.len() + 2];
+    let mut current = previous.clone();
+    let mut axial_runs = 0u64;
+    let mut diagonal_runs = 0u64;
+    let mut width_pixels = 0u64;
     let mut excluded_pixels = 0u32;
     for y in t..b {
         excluded.fill(false);
@@ -276,11 +283,19 @@ fn darkness(
         }
         cancel.check()?;
         for x in l..r {
+            let i = (x - l) as usize + 1;
+            current[i] = false;
             if excluded[(x - l) as usize] {
                 excluded_pixels += 1;
                 continue;
             }
             let delta = light(paper[(x, y)]).saturating_sub(light(finished[(x, y)]));
+            if delta >= 32 {
+                current[i] = true;
+                width_pixels += 1;
+                axial_runs += u64::from(!current[i - 1]) + u64::from(!previous[i]);
+                diagonal_runs += u64::from(!previous[i - 1]) + u64::from(!previous[i + 1]);
+            }
             if delta >= 8 {
                 hist[usize::from(delta)] += 1;
                 let dx = x as f32 - toward[0];
@@ -292,7 +307,11 @@ fn darkness(
                 }
             }
         }
+        std::mem::swap(&mut current, &mut previous);
     }
+    let perimeter = std::f64::consts::FRAC_PI_4
+        * (axial_runs as f64 + diagonal_runs as f64 * std::f64::consts::FRAC_1_SQRT_2);
+    let width = (width_pixels >= 24).then(|| 2.0 * width_pixels as f64 / perimeter);
     let count = hist.iter().sum::<u32>();
     let percentile = |percent: u64| {
         let rank = (u64::from(count) * percent).div_ceil(100) as u32;
@@ -303,7 +322,8 @@ fn darkness(
         })
     };
     Ok((
-        json!({"region":region, "darkened_pixels":count, "overlap_pixels_excluded":excluded_pixels, "median_luma_drop":percentile(50),"p90_luma_drop":percentile(90)}),
+        json!({"region":region, "darkened_pixels":count, "overlap_pixels_excluded":excluded_pixels, "median_luma_drop":percentile(50),"p90_luma_drop":percentile(90),
+            "ink_footprint_width_px":width,"width_sample_pixels":width_pixels}),
         nearest,
     ))
 }
@@ -393,6 +413,7 @@ pub(super) fn checks(
         let gap = drawing.gap(writing_box);
         ink = Some(Check {
             metrics: json!({"illustration":diagram,"nearby_text":writing,"minimum_luma_drop":8,"region_gap_px":gap, "distant_reference":gap > nearest.bounds.height().max(16.) * 6.,
+                "width_method":"Width in native pixels estimated as twice the area divided by the four-direction Crofton perimeter of added ink with a luma drop of at least 32 (at least 24 pixels). Short strokes, joins, glyph shapes, softness and opacity affect this estimate. Compare the actual stems, lines and arrows in the crops.",
                 "sampling":"Saved-paper luma minus output luma (0–255) among darkened pixels in each layout box. Text boxes overlapping the diagram are masked from its sample, and diagram pixels are excluded from the writing sample. A distant reference or too little sampled ink needs visual confirmation."}),
             regions: crops(
                 [drawing, writing_box],
@@ -412,6 +433,36 @@ mod tests {
 
     fn bounds(left: f32, top: f32, right: f32, bottom: f32) -> Bounds {
         Bounds::from_corners([[left, top], [right, top], [right, bottom], [left, bottom]])
+    }
+
+    #[test]
+    fn equally_dark_lines_have_distinct_footprint_widths() {
+        let paper = RgbaImage::from_pixel(112, 18, Rgba([255; 4]));
+        let mut finished = paper.clone();
+        for (y, height) in [(1, 2), (9, 5)] {
+            for row in y..y + height {
+                for x in 5..105 {
+                    finished[(x, row)] = Rgba([40, 40, 40, 255]);
+                }
+            }
+        }
+        let measure = |y, end| {
+            darkness(
+                [[0, y], [112, y], [112, end], [0, end]],
+                &paper,
+                &finished,
+                [0., 0.],
+                &[],
+                &Cancellation::default(),
+            )
+            .unwrap()
+            .0
+        };
+        let thin = measure(0, 7);
+        let thick = measure(8, 18);
+        assert_eq!(thin["median_luma_drop"], thick["median_luma_drop"]);
+        assert!((1.8..2.3).contains(&thin["ink_footprint_width_px"].as_f64().unwrap()));
+        assert!((4.6..5.4).contains(&thick["ink_footprint_width_px"].as_f64().unwrap()));
     }
 
     #[test]
@@ -450,6 +501,7 @@ mod tests {
             assert_eq!(m["overlap_pixels_excluded"], 25);
             assert_eq!(m["darkened_pixels"], 0);
             assert!(m["p90_luma_drop"].is_null());
+            assert!(m["ink_footprint_width_px"].is_null());
         }
     }
 

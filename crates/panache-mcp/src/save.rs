@@ -101,13 +101,20 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
     let _budget = (bytes > 0)
         .then(|| state.storage.import(bytes))
         .transpose()?;
-    state.drafts.save(
+    let mut saved = state.drafts.save(
         input,
         &prepared,
         style.as_ref(),
         paper.as_ref(),
         font.as_ref().map(|(_, bytes)| bytes.as_slice()),
-    )
+    )?;
+    if let Some(paper) = paper {
+        let id = saved["draft_id"].as_str().expect("new draft ID");
+        let report = paper.focus.report(id, 1, 1, 1);
+        state.paper_focus.remember(id, paper.focus);
+        saved["paper_focus_check"] = report;
+    }
+    Ok(saved)
 }
 
 fn saved_reply(mut saved: Value) -> CallToolResult {
@@ -122,6 +129,9 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
         saved["placement_guidance"] = json!(hint);
         message.push('\n');
         message.push_str(hint);
+    }
+    if let Some(focus) = saved.get("paper_focus_check") {
+        message.push_str(&format!("\n底纸边缘原尺寸检查 {focus}"));
     }
     reply(message, saved)
 }

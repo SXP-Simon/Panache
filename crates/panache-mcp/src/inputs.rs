@@ -169,6 +169,10 @@ pub struct Save {
     /// Optional photo-space baselines overriding auto detection on import. Give 2..32 guides, first row 0, last row the last writable line; intermediate guides refine the fit.
     pub paper_guides: Option<Vec<Guide>>,
     /// Original Markdown of just this section. A new section starts on a fresh page.
+    /// For a new labeled diagram use native source, for example:
+    /// \begin{circuitikz}[flowchart]
+    /// \draw (0,0) node[rectangle]{B1}; \draw (0,-2) node[diamond]{B2};
+    /// \draw[->] (0,0) -- (0,-2); \end{circuitikz}
     /// Embedded images remain intact in the source. Pages render them as hand-drawn outlines without their original colors.
     /// If color matters, explain this and offer a preview. Keep the image in the text rather than using it as the paper.
     pub markdown: String,

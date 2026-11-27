@@ -1,3 +1,5 @@
+pub mod focus;
+
 use crate::{Guide, PaperMode};
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -144,6 +146,7 @@ impl PaperLayout {
 
 pub struct ImportedPaper {
     pub layout: PaperLayout,
+    pub focus: focus::Profile,
     pub bytes: Vec<u8>,
 }
 
@@ -168,6 +171,7 @@ impl ImportedPaper {
         file.take(limits.max_file_bytes as u64 + 1)
             .read_to_end(&mut bytes)?;
         let image = imaging::decode(&bytes, &limits)?;
+        let mut corrected_background = false;
         let layout = if let Some(guides) = guides {
             ensure!(mode == PaperMode::Photo, "paper_guides require photo mode");
             PaperLayout::from_guides(image.width(), image.height(), guides)?
@@ -181,6 +185,7 @@ impl ImportedPaper {
                     if mode == PaperMode::Flatten {
                         if let Some(corrected) = lines.corrected_background.take() {
                             bytes = STANDARD.decode(corrected)?;
+                            corrected_background = true;
                             ensure!(
                                 bytes.len() <= limits.max_file_bytes,
                                 "Aligned paper exceeds the file size limit"
@@ -227,6 +232,15 @@ impl ImportedPaper {
         };
         layout.apply(&mut params);
         params.validate(layout.width, layout.height, &limits)?;
-        Ok(Self { layout, bytes })
+        let focus = if corrected_background {
+            focus::measure(&imaging::decode(&bytes, &limits)?)
+        } else {
+            focus::measure(&image)
+        };
+        Ok(Self {
+            layout,
+            bytes,
+            focus,
+        })
     }
 }

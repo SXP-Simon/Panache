@@ -40,6 +40,7 @@ struct State {
     drafts: Drafts,
     preserve_reviews: bool,
     engine: Mutex<Engine>,
+    paper_focus: paper::focus::Cache,
     fonts: Vec<String>,
     local_fonts: LocalFonts,
     storage: storage::Storage,
@@ -281,7 +282,7 @@ impl ServerHandler for Panache {
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For a font comparison, show the labeled images from list_fonts(sample=...) on the actual draft paper and mixed text. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
             "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
-            "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
+            "For a new labeled flowchart, use the native [flowchart] example in save_section.markdown so its lettering follows the selected font. For uploaded sheets, follow paper_focus_check on import and preview. Compare nearby printed edges with added strokes in the sharper, transition and softer areas at native size before export. If a mismatch is visible, adjust only the affected writing or diagram, then recheck the transition and the sharper area. Never soften the source photo. If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
@@ -444,7 +445,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Create a draft from text or a problem supplied in chat. To show its first page, save first, then preview. Saves Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
+        description = "Create a draft from text or a problem supplied in chat. To show its first page, save first, then preview. Saves Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For new flowcharts use \\begin{circuitikz}[flowchart] with node[rectangle], node[diamond] or node[circle] and \\draw[->] connections. The labels and outlines use the manuscript pen. Keep the diagram at natural scale and compare a label and an arrow shaft with nearby letters in the native crop. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
@@ -548,7 +549,7 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "Use view=image to see the page without filing a check. A full-page view=review without compare_revision renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision and no region it reads stored data, review IDs, intervening edits and limitations. Add before_review_id to pin the earlier stored check for that draft, revision, section and page. With region it rerenders labeled crops in the current environment using native image coordinates and measures visible changes. The crops do not contain archived pixels. Add compare_revision for paired before/after and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. illustrations_only selects raster illustrations, not generated circuitikz. Locate a circuit on the current image, then query its region at the same revision without that filter for the whole diagram ID. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
+        description = "Use view=image to see the page without filing a check. A full-page view=review without compare_revision renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. On a photo inspect paper_focus_check for local edge changes. Open the supplied crop arguments at native size before adjusting softness. With compare_revision and no region it reads stored data, review IDs, intervening edits and limitations. Add before_review_id to pin the earlier stored check for that draft, revision, section and page. With region it rerenders labeled crops in the current environment using native image coordinates and measures visible changes. The crops do not contain archived pixels. Add compare_revision for paired before/after and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. illustrations_only selects raster illustrations, not generated circuitikz. Locate a circuit on the current image, then query its region at the same revision without that filter for the whole diagram ID. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,
@@ -789,6 +790,7 @@ async fn main() -> Result<()> {
             .with_bundled_dir(font_dir),
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
+        paper_focus: Default::default(),
         worker: fs::read_to_string(worker)?.into(),
         render_slot: Arc::new(Semaphore::new(1)),
         prepare_slot: Arc::new(Semaphore::new(1)),
