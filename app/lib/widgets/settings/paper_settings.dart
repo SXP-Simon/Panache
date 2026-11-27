@@ -6,11 +6,13 @@ import '../../models/upload.dart';
 import '../../utils/paper_exif.dart';
 import '../paper_style_picker.dart';
 import 'settings_fields.dart';
+import 'png_blur_settings.dart';
 
 List<Widget> paperSettings(
   AppLocalizations l,
   SettingsFields fields, {
   required Upload? background,
+  required bool supportsPngBlur,
   required VoidCallback onUploadBackground,
   required VoidCallback onRemoveBackground,
   required VoidCallback onDetectBackground,
@@ -78,6 +80,10 @@ List<Widget> paperSettings(
       ),
       if (background != null) _paperCamera(l, fields, background),
     ], collapsible: false),
+    if (supportsPngBlur)
+      settingsGroup('png-blur', l.pngBlur, Icons.blur_on, [
+        PngBlurSettings(fields: fields, background: background),
+      ], collapsible: false),
     settingsGroup('dimensions', l.paperSizeAndMargins, Icons.space_bar, [
       fields.parameterGrid(
         parameters.where(

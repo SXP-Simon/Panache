@@ -45,6 +45,8 @@ fn default_latin_scale() -> u8 {
 /// A struct update using `..Parameters::default()` picks up optional export fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameters {
+    #[serde(skip)]
+    pub png_finish: Option<crate::export_blur::Finish>,
     #[serde(flatten)]
     pub camera: crate::export::CameraInput,
     #[serde(default)]
@@ -107,6 +109,7 @@ pub struct Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Self {
+            png_finish: None,
             camera: Default::default(),
             layout_style: LayoutStyle::Standard,
             paper_pattern: None,
@@ -237,6 +240,17 @@ impl Parameters {
         p.preview = boolean(f, "preview", true)?;
         p.full_preview = boolean(f, "full_preview", true)?;
         p.pdf_save = boolean(f, "pdf_save", false)?;
+        let uniform = f
+            .get("export_blur_px")
+            .map(|v| v.parse())
+            .transpose()
+            .map_err(|_| Error::new("invalid_parameter", "export_blur_px"))?;
+        let gradient = f
+            .get("export_blur_gradient")
+            .map(|v| serde_json::from_str(v))
+            .transpose()
+            .map_err(|_| Error::new("invalid_parameter", "export_blur_gradient"))?;
+        p.png_finish = crate::export_blur::finish(uniform, gradient)?;
         p.ink_layers = boolean(f, "ink_layers", false)?;
         p.illustration_uses_pen = boolean(f, "illustration_uses_pen", false)?;
         p.transparent_background = boolean(f, "transparent_background", false)?;
@@ -325,6 +339,10 @@ impl Parameters {
         }
         Ok(())
     }
+    pub fn preview_ink_layers(&self) -> bool {
+        self.ink_layers && !self.png_finish.is_some_and(|f| f.active())
+    }
+
     // 2026-10-12：保留 Python 入口对右边距的字距补偿。
     pub fn effective_right_margin(&self) -> f32 {
         self.right_margin - self.word_spacing * 2.

@@ -1,4 +1,5 @@
 import 'ink_page.dart';
+import 'png_blur.dart';
 import 'render_parameter.dart';
 
 export 'render_parameter.dart';
@@ -7,6 +8,7 @@ enum PaperStyle { blank, ruled, grid, dots }
 
 class Settings {
   Settings();
+  PngBlur pngBlur = PngBlur();
 
   /// A portrait exercise-book page sized for comfortable mobile previews.
   /// The usable area targets about twenty CJK characters and sixteen lines;
@@ -104,6 +106,7 @@ class Settings {
   Map<String, dynamic> toJson() => {
     ...values,
     ...camera,
+    'pngBlur': pngBlur.toJson(),
     'fill': fill,
     'layoutStyle': layoutStyle,
     'font_option': font,
@@ -126,6 +129,7 @@ class Settings {
       for (final entry in legacyFields.entries)
         if (json.containsKey(entry.key)) entry.value: json[entry.key],
     };
+    pngBlur = PngBlur.restore(json['pngBlur']);
     _restoreCamera(json);
     for (final p in [...parameters, ...inkParameters]) {
       final value = p.valueFromDraft(json[p.key]);
@@ -197,7 +201,10 @@ class Settings {
     String text, {
     required bool preview,
     required bool pdf,
+    bool supportsPngBlur = true,
   }) => {
+    if (!pdf && supportsPngBlur) ...pngBlur.fields,
+    if (!pdf && supportsPngBlur && pngBlur.mode != PngBlurMode.off) 'seed': '0',
     ...values,
     ...camera,
     if (!strikethroughEnabled) 'strikethrough_probability': '0',

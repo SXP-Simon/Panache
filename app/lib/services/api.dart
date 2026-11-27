@@ -144,11 +144,16 @@ class HandwritingApi {
   bool get supportsCancel => _supportsCancel;
   bool supportsLocalFonts = false;
   bool supportsFineEdit = false;
+  bool supportsPngBlur = false;
   void configureCapabilities(dynamic info) {
     supportsLocalFonts =
         info is Map &&
         info['capabilities'] is Map &&
         info['capabilities']['local_fonts'] == true;
+    supportsPngBlur =
+        info is Map &&
+        info['capabilities'] is Map &&
+        info['capabilities']['export_blur'] == true;
     supportsFineEdit =
         info is Map &&
         info['capabilities'] is Map &&

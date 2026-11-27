@@ -25,6 +25,7 @@ class ApiEngineGateway implements EngineGateway, EngineCatalog {
     'capabilities': {
       'task_cancellation': info.canCancel,
       'task_submission_id': info.canChooseTaskId,
+      'export_blur': info.canBlurPng,
       'fine_edit': info.canFineEdit,
       'local_fonts': info.canListLocalFonts,
     },

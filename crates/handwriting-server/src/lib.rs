@@ -273,7 +273,7 @@ async fn read_local_font(
 }
 async fn version(State(s): State<Server>) -> Json<serde_json::Value> {
     Json(
-        serde_json::json!({"version":s.0.config.version,"capabilities":{"local_fonts":s.0.local_fonts.is_some(),"task_cancellation":true,"task_submission_id":true,"fine_edit":true}}),
+        serde_json::json!({"version":s.0.config.version,"capabilities":{"local_fonts":s.0.local_fonts.is_some(),"task_cancellation":true,"task_submission_id":true,"export_blur":true,"fine_edit":true}}),
     )
 }
 struct Upload {

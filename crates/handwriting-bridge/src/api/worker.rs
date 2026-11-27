@@ -108,7 +108,7 @@ fn generate(request: Request, task: &Mutex<Task>) -> Result<()> {
     };
     let result = if params.pdf_save || !params.preview {
         Some(export(&render_request, &directory, &cancel, progress)?)
-    } else if params.ink_layers {
+    } else if params.preview_ink_layers() {
         generation::generate(
             &render_request,
             &cancel,
@@ -136,7 +136,7 @@ fn generate(request: Request, task: &Mutex<Task>) -> Result<()> {
         state.result = Some(path);
         state.content_type = mime.into();
     } else {
-        state.content_type = if params.ink_layers {
+        state.content_type = if params.preview_ink_layers() {
             "application/json"
         } else {
             "image/png"

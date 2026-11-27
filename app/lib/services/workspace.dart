@@ -47,6 +47,7 @@ class Workspace extends ChangeNotifier {
   Settings settings;
   String text = '', version = '';
   bool fineEnabled = false;
+  bool get pngBlurActive => api.supportsPngBlur && settings.pngBlur.active;
   final _fineHistory = FineEditHistory();
   String? get _finePageKey => inkPages.elementAtOrNull(page)?.fine?.key;
   bool get canFineUndo => _fineHistory.canStep(text, _finePageKey, redo: false);
@@ -285,7 +286,7 @@ class Workspace extends ChangeNotifier {
 
   void edit({bool inkOnly = false}) {
     if (disposed) return;
-    if (!inkOnly || !initialized) ++_editRevision;
+    if (!inkOnly || pngBlurActive || !initialized) ++_editRevision;
     if (inkOnly) exportBytes = null;
     saveTimer?.cancel();
     saveTimer = Timer(const Duration(milliseconds: 400), persist);
@@ -384,6 +385,7 @@ class Workspace extends ChangeNotifier {
     }
     if (text.trim().isEmpty ||
         !settings.valid ||
+        (!pdf && api.supportsPngBlur && !settings.pngBlur.valid) ||
         (fontFile == null && settings.font == null)) {
       if (!live) {
         error = 'validation';
@@ -396,12 +398,13 @@ class Workspace extends ChangeNotifier {
       expandImages(text, images),
       preview: preview,
       pdf: pdf,
+      supportsPngBlur: api.supportsPngBlur,
     );
     if (fineEnabled && api.supportsFineEdit) {
       fields['fine_edit'] = 'true';
       fields['seed'] = '0';
       final fineEdits = _fineHistory.forText(text);
-      if (!preview && fineEdits != null) {
+      if ((!preview || pngBlurActive) && fineEdits != null) {
         fields['fine_edits'] = jsonEncode(fineEdits.toJson());
       }
     }

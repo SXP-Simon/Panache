@@ -1,26 +1,27 @@
-use handwriting_core::{Cancellation, Error, Result};
+use crate::{Cancellation, Error, Result};
 use image::{Rgba, RgbaImage};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "local-fonts", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Anchor {
+pub struct Anchor {
     /// Horizontal position in the full image, 0 at the leftmost pixel and 1 at the rightmost.
-    #[schemars(range(min = 0, max = 1))]
+    #[cfg_attr(feature = "local-fonts", schemars(range(min = 0, max = 1)))]
     pub x: f64,
     /// Vertical position in the full image, 0 at the top pixel and 1 at the bottom.
-    #[schemars(range(min = 0, max = 1))]
+    #[cfg_attr(feature = "local-fonts", schemars(range(min = 0, max = 1)))]
     pub y: f64,
     /// Gaussian sigma in original image pixels.
-    #[schemars(range(min = 0, max = 2))]
+    #[cfg_attr(feature = "local-fonts", schemars(range(min = 0, max = 2)))]
     pub sigma_px: f64,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "local-fonts", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Gradient {
+pub struct Gradient {
     /// The starting position and blur strength.
     pub from: Anchor,
     /// The distinct end position and blur strength. Outside the segment the nearest end strength applies.
@@ -51,12 +52,12 @@ impl Gradient {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum Finish {
+pub enum Finish {
     Uniform(f64),
     Gradient(Gradient),
 }
 
-pub(crate) fn finish(uniform: Option<f64>, gradient: Option<Gradient>) -> Result<Option<Finish>> {
+pub fn finish(uniform: Option<f64>, gradient: Option<Gradient>) -> Result<Option<Finish>> {
     match (uniform, gradient) {
         (None, None) => Ok(None),
         (Some(_), Some(_)) => Err(Error::new(
@@ -75,21 +76,21 @@ pub(crate) fn finish(uniform: Option<f64>, gradient: Option<Gradient>) -> Result
 }
 
 impl Finish {
-    pub(crate) fn active(self) -> bool {
+    pub fn active(self) -> bool {
         match self {
             Self::Uniform(sigma) => sigma > 0.,
             Self::Gradient(g) => g.from.sigma_px > 0. || g.to.sigma_px > 0.,
         }
     }
 
-    pub(crate) fn write_metadata(self, object: &mut Value) {
+    pub fn write_metadata(self, object: &mut Value) {
         match self {
             Self::Uniform(sigma) => object["export_blur_px"] = json!(sigma),
             Self::Gradient(g) => object["export_blur_gradient"] = json!(g),
         }
     }
 
-    pub(crate) fn apply(self, page: &RgbaImage, cancel: &Cancellation) -> Result<RgbaImage> {
+    pub fn apply(self, page: &RgbaImage, cancel: &Cancellation) -> Result<RgbaImage> {
         match self {
             Self::Uniform(sigma) => apply(page, sigma, cancel),
             Self::Gradient(g) => apply_gradient(page, g, cancel),
@@ -97,7 +98,7 @@ impl Finish {
     }
 }
 
-pub(crate) fn validate(sigma: f64) -> Result<()> {
+pub fn validate(sigma: f64) -> Result<()> {
     if (0.0..=2.0).contains(&sigma) {
         Ok(())
     } else {
@@ -231,7 +232,7 @@ fn apply_gradient(page: &RgbaImage, g: Gradient, cancel: &Cancellation) -> Resul
 }
 
 /// Filter the completed native-resolution page, including paper and alpha, in its stored RGB space.
-pub(crate) fn apply(page: &RgbaImage, sigma: f64, cancel: &Cancellation) -> Result<RgbaImage> {
+pub fn apply(page: &RgbaImage, sigma: f64, cancel: &Cancellation) -> Result<RgbaImage> {
     validate(sigma)?;
     cancel.check()?;
     if sigma == 0. || page.width() == 0 || page.height() == 0 {

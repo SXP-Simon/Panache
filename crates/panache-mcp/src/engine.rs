@@ -1,5 +1,5 @@
 mod adjustments;
-pub(crate) mod export_blur;
+pub(crate) use handwriting_core::export_blur;
 pub(crate) mod font_samples;
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
