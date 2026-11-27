@@ -139,7 +139,9 @@ pub struct Save {
     /// A chat attachment or URL alone is not a file path. If the client cannot transfer the photo to that computer, explain this instead of guessing a path.
     /// Use with the default plain preset. All revisions share the saved image.
     pub paper_path: Option<std::path::PathBuf>,
-    /// With paper_path: photo (default) preserves camera perspective; flatten aligns the background.
+    /// When asked to write on the supplied sheet, pass its original file as paper_path and use photo (default).
+    /// Keep the header, rulings and perspective even for PDF export. Use flatten for a requested straightened sheet;
+    /// recreate a blank template only when requested.
     pub paper_mode: Option<PaperMode>,
     /// Optional photo-space baselines overriding auto detection on import. Give 2..32 guides, first row 0, last row the last writable line; intermediate guides refine the fit.
     pub paper_guides: Option<Vec<Guide>>,
