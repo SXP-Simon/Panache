@@ -277,8 +277,7 @@ impl ServerHandler for Panache {
             "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
             "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
-            "Use save_section(markdown), then its draft_id and revision for preview_handwriting or export_handwriting. ",
-            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. When the user wants to compare fonts, see list_fonts for sample guidance. Use list_drafts to resume. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
+            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. When the user wants to compare fonts, see list_fonts for sample guidance. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
             "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
             "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
@@ -286,6 +285,7 @@ impl ServerHandler for Panache {
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
             "Inspect appearance with view=image; revisit actions with read_section(view=trajectory)."
         );
+        let draft_intent = "First identify the source of the work. When the user supplies text or a problem to write out and asks to see page one, they mean the first page of the new output. Call save_section first (style.homework=true for a new assignment), then preview the returned draft_id. Look up a saved draft only when the user refers to one, even if an existing draft resembles the supplied text. ";
         let mode = if self.0.preserve_reviews {
             "This connection preserves stored reviews. Use view=image to inspect and export_handwriting to print. "
         } else {
@@ -296,7 +296,7 @@ impl ServerHandler for Panache {
                 "panache-mcp",
                 handwriting_core::app_version(),
             ))
-            .with_instructions(format!("{mode}{instructions}"))
+            .with_instructions(format!("{mode}{draft_intent}{instructions}"))
     }
 }
 
@@ -428,7 +428,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Save Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
+        description = "Create a draft from text or a problem supplied in chat. To show its first page, save first, then preview. Saves Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
@@ -446,7 +446,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
+        description = "Look up saved drafts across sessions when the user wants to find, list, or resume earlier work. When the user supplies a problem to write out and wants to see page one, call save_section directly even if other drafts exist. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
     )]
     fn list_drafts(&self, Parameters(input): Parameters<List>) -> CallToolResult {
         tool_result(self.0.drafts.list(&input).map(|result| {
