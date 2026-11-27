@@ -160,6 +160,10 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 \end{circuitikz}
 ```
 
+照片上的流程图、图标及插图应和正文落在同一纸面上。整页或局部 `view="review"` 的 `diagram_perspective_check` 给出图框当前四角、同位置沿纸面两轴的参考四角、四边的方向差以及底边/顶边宽度比。用 `preview_arguments` 比较原纸与成稿，必要时用 `native_image_arguments` 放大看节点、箭头和标签。沿图上下边比对原纸横线，再沿左右侧比对页边、表格竖线或连续横线的端点。纸面模型可能只校准了旋转；没有足够参照时保留不确定性。根据模型得到的四角不构成四个独立实测点。
+
+整体已协调时保留原图。图和字都偏时先核对纸张标定；仅图形偏斜、且原纸有清楚的四角参照时，用当前版 `layout_arguments` 找根 ID，调用 `adjust_glyphs(whole_drawing=true, ids=[根ID], target_quad=四角)`。四角按左上、右上、右下、左下填写。只移动整图用 `place_center`。独立位图标签随根图共同变换；原先手动挪过的标签可用 `separate_detail_alignment` 核对。四角操作从原始图块布局重建，单纯平移保留局部几何编辑。修后复看相同区域和附近正文。`view="layout", drawings_only=true` 列出整图；`illustrations_only=true` 仍可选取位图的独立细节。
+
 照片建稿和预览返回的 `paper_focus_check` 可用于比较不同位置印刷边缘的过渡宽度。请在推荐的原尺寸局部内对照底纸和成品，看同一位置的印字、细横线、手写字和图线。清晰度渐变时连同中间过渡区一起看。确有不协调时只选受影响的字或图块轻调柔化，复查改动区和原先清晰的区域。空白或低反差区域可能缺少测量依据。
 
 判断照片上的字是否过重时，在整页复核的 `local_paper_ink_check` 中先找第一行，再比较中、下部的样本。按 `preview_arguments` 打开原尺寸的底纸和成稿，留意相邻的印字和细线。纸面亮度、印字浓淡和笔画清晰度是三种不同的线索。若标题比同处印字明显更深，可用 `layout_arguments` 定位字形，逐行调整 `adjust_glyphs.opacity`，以 `compare_revision` 查看交界与原先合适的区域。单个图块跨过深浅边界时，`opacity_ramp=[[0,65],[60,100]]` 会从图块顶部的 65% 逐渐过渡到高度 60% 处的 100%，下段维持原浓度。这些百分比乘在该字形原有的 opacity 上。

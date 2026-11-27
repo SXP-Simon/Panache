@@ -19,19 +19,31 @@ impl Engine {
         section: Section,
         input: &crate::Nudge,
         cancel: &Cancellation,
-    ) -> Result<(u32, Option<PlacementReport>)> {
+    ) -> Result<(u32, Option<PlacementReport>, usize)> {
         let changes = GlyphChanges::parse(input, &draft.style)?;
         let version = section.version;
         let mut req = self.fine_request(draft, section)?;
         let (key, mut bounds) = fine_edit::inspect_page(&req, input.page, cancel)
             .map_err(|error| draft.page_error(input.section, error))?;
-        bounds.retain(|g| changes.ids.contains(&g.id));
+        if input.whole_drawing {
+            let parent = input.ids[0];
+            ensure!(
+                bounds
+                    .iter()
+                    .any(|g| g.id == parent
+                        && (g.is_native_diagram || g.illustration == Some(parent))),
+                "Select one native diagram ID or raster illustration parent ID on this page"
+            );
+            bounds.retain(|g| g.id == parent || g.illustration == Some(parent));
+        } else {
+            bounds.retain(|g| changes.ids.contains(&g.id));
+        }
         let mut selected = BTreeMap::new();
         for glyph in &bounds {
             selected.entry(glyph.id).or_insert(glyph);
         }
         ensure!(
-            selected.len() == changes.ids.len(),
+            changes.ids.iter().all(|id| selected.contains_key(id)),
             "Glyph not on this page; inspect its layout first"
         );
         if let Some(texts) = &input.expected_texts {
@@ -55,6 +67,7 @@ impl Engine {
             .map(|e| (e.id, e))
             .collect();
         let geometry = Geometry::resolve(input, draft, &req.params, &bounds, &edits)?;
+        let affected: Vec<_> = selected.keys().copied().collect();
         for (id, glyph) in selected {
             let edit = edits.entry(id).or_insert(Adjustment {
                 id,
@@ -77,6 +90,12 @@ impl Engine {
             Geometry::Placement(_, report) => Some(report),
             _ => None,
         };
+        let mut history = json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"opacity_ramp":input.opacity_ramp,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note});
+        if input.whole_drawing {
+            history["whole_drawing"] = json!(true);
+            history["drawing_id"] = json!(input.ids[0]);
+            history["ids"] = json!(affected);
+        }
         let next = draft.store_edits(
             input.section,
             version,
@@ -84,9 +103,9 @@ impl Engine {
                 key,
                 glyphs: edits.into_values().collect(),
             },
-            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"opacity_ramp":input.opacity_ramp,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
+            &history,
         )?;
-        Ok((next, placement))
+        Ok((next, placement, affected.len()))
     }
 }
 
@@ -105,6 +124,25 @@ impl<'a> GlyphChanges<'a> {
             !ids.is_empty() && ids.len() == input.ids.len() && ids.len() <= 32,
             "Choose 1..32 distinct glyph IDs"
         );
+        if input.whole_drawing {
+            ensure!(
+                ids.len() == 1
+                    && (input.target_quad.is_some() ^ input.place_center.is_some())
+                    && input.expected_texts.is_none()
+                    && input.natural_line.is_none()
+                    && input.dx.is_none()
+                    && input.dy.is_none()
+                    && input.scale.is_none()
+                    && input.angle.is_none()
+                    && input.shape.is_none()
+                    && input.opacity.is_none()
+                    && input.opacity_ramp.is_none()
+                    && input.thickness.is_none()
+                    && input.softness.is_none()
+                    && input.color.is_none(),
+                "whole_drawing requires one drawing ID and only place_center or target_quad"
+            );
+        }
         if let Some(texts) = &input.expected_texts {
             ensure!(
                 texts.len() == input.ids.len() && texts.iter().all(|text| !text.is_empty()),
@@ -285,7 +323,10 @@ impl Geometry {
             let dest = target.map(|v| v as f32);
             let dest = projection.map_or(dest, |p| p.paper_point(dest));
             let mut mean = [0., 0.];
-            for g in bounds {
+            for g in bounds
+                .iter()
+                .filter(|g| !input.whole_drawing || g.id == input.ids[0])
+            {
                 let pos = glyph_point(g, edits.get(&g.id), [0., 0.]);
                 for axis in 0..2 {
                     mean[axis] += pos[axis] / input.ids.len() as f32;

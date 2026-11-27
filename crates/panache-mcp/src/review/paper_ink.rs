@@ -221,7 +221,10 @@ pub(super) fn measure(
         .filter(|g| {
             g.bounds.on_page(paper.dimensions())
                 && g.baseline.is_finite()
-                && sample.drawing.is_none_or(|b| !b.intersects(g.bounds))
+                && !sample
+                    .drawings
+                    .iter()
+                    .any(|d| d.bounds().intersects(g.bounds))
                 && polygon.is_none_or(|p| contains(p, g.bounds.center()))
         })
         .collect();
@@ -341,7 +344,7 @@ mod tests {
         let sample = PageSample {
             baselines: vec![],
             text,
-            drawing: None,
+            drawings: vec![],
             content_sha256: String::new(),
         };
         measure(&sample, &paper, &output, None, &Cancellation::default())

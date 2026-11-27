@@ -345,6 +345,11 @@ pub struct Nudge {
     pub page: usize,
     /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
     pub ids: Vec<u32>,
+    /// Move one complete drawing by its native diagram ID or raster illustration parent ID. Use
+    /// place_center to translate the current outline and all labels together, or target_quad to
+    /// map the original drawing into exact image corners. Supply only one of these adjustments.
+    #[serde(default)]
+    pub whole_drawing: bool,
     /// For a named text target, send its intended glyph text in ids order (one exact string per ID). A mismatch rejects the whole edit. For repeated text, use nearby words or position to select the occurrence.
     pub expected_texts: Option<Vec<String>>,
     /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
@@ -397,6 +402,8 @@ pub struct Preview {
     pub previous_region: Option<Vec<[i32; 2]>>,
     /// In layout view, only return raster illustration outlines and isolated details. Omit for generated circuitikz: its labels and lines are one glyph.
     pub illustrations_only: Option<bool>,
+    /// Layout: whole drawings only, including native diagrams and raster illustration roots.
+    pub drawings_only: Option<bool>,
     /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     /// For a hand-drawn diagram, compare its lines with nearby writing in a small review region at the same zoom.
     pub view: Option<PreviewView>,

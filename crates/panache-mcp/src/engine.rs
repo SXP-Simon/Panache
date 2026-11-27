@@ -14,6 +14,16 @@ use crate::{
 use handwriting_core::fine_edit::{self, Adjustment, Adjustments};
 use serde_json::{Value, json};
 
+fn drawing_kind(g: &fine_edit::GlyphBounds) -> Option<&'static str> {
+    if g.is_native_diagram {
+        Some("native_diagram")
+    } else if g.illustration == Some(g.id) {
+        Some("illustration")
+    } else {
+        None
+    }
+}
+
 fn glyph_source<'a>(text: &'a [u16], glyph: &fine_edit::GlyphBounds) -> Option<&'a [u16]> {
     let [start, end] = glyph.source_utf16?;
     text.get(start as usize..end as usize)
@@ -44,6 +54,33 @@ fn glyph_point(
         (center[0] + offset[0]) as f32,
         (center[1] + offset[1]) as f32,
     ]
+}
+
+// 2026-11-27：以同一外框变换预测拆分标签的位置，与各标签实际几何在照片像素中对照。
+fn detail_corner_gap(
+    draft: &Snapshot<'_>,
+    parent: &fine_edit::GlyphBounds,
+    edit: Option<&Adjustment>,
+    parts: &[&fine_edit::GlyphBounds],
+    edits: &HashMap<u32, &Adjustment>,
+) -> f32 {
+    let mut max_gap = 0.0f32;
+    let center = glyph_point(parent, None, [0., 0.]);
+    let project = |g, e, uv| crate::review::photo_point(draft, glyph_point(g, e, uv));
+    for part in parts {
+        let (w, h) = (
+            f64::from(part.bounds[2]) / 2.,
+            f64::from(part.bounds[3]) / 2.,
+        );
+        for uv in [[-w, -h], [w, -h], [w, h], [-w, h]] {
+            let point = glyph_point(part, None, uv);
+            let relative = std::array::from_fn(|i| f64::from(point[i] - center[i]));
+            let expected = project(parent, edit, relative);
+            let actual = project(part, edits.get(&part.id).copied(), uv);
+            max_gap = max_gap.max((actual[0] - expected[0]).hypot(actual[1] - expected[1]));
+        }
+    }
+    max_gap
 }
 
 #[derive(Clone)]
@@ -374,22 +411,45 @@ impl Engine {
             })
             .collect();
         let mut text = Vec::new();
-        let mut drawing = None;
+        let mut details = HashMap::<u32, Vec<&fine_edit::GlyphBounds>>::new();
+        for g in &glyphs {
+            if let Some(parent) = g.illustration
+                && parent != g.id
+                && !edits.get(&g.id).is_some_and(|e| e.hides_ink())
+            {
+                details.entry(parent).or_default().push(g);
+            }
+        }
+        let mut drawings = Vec::new();
+        let mut drawing_count = 0;
         for g in &glyphs {
             let edit = edits.get(&g.id).copied();
-            let is_drawing = g.illustration == Some(g.id) || g.is_native_diagram;
-            if !(g.is_text || is_drawing && drawing.is_none())
-                || edit.is_some_and(|v| v.hides_ink())
-            {
+            let kind = drawing_kind(g);
+            let layout_offset = drawing_count;
+            drawing_count += usize::from(kind.is_some());
+            if !(g.is_text || kind.is_some()) || edit.is_some_and(|v| v.hides_ink()) {
                 continue;
             }
             let hw = f64::from(g.bounds[2]) / 2.;
             let hh = f64::from(g.bounds[3]) / 2.;
-            let corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]
-                .map(|uv| crate::review::photo_point(draft, glyph_point(g, edit, uv)));
+            let paper_corners =
+                [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(|uv| glyph_point(g, edit, uv));
+            let corners = paper_corners.map(|p| crate::review::photo_point(draft, p));
             let bounds = crate::review::Bounds::from_corners(corners);
-            if is_drawing {
-                drawing = Some(bounds);
+            if let Some(kind) = kind {
+                drawings.push(crate::review::Drawing {
+                    id: g.id,
+                    kind,
+                    layout_offset,
+                    details: details.get(&g.id).map(|parts| {
+                        (
+                            parts.len(),
+                            detail_corner_gap(draft, g, edit, parts, &edits),
+                        )
+                    }),
+                    paper_corners,
+                    photo_corners: corners,
+                });
             } else {
                 let edge = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
                 let width = edge(corners[0], corners[1]) + edge(corners[3], corners[2]);
@@ -408,7 +468,7 @@ impl Engine {
         }
         Ok(crate::review::PageSample {
             text,
-            drawing,
+            drawings,
             baselines,
             content_sha256: format!("{:x}", membership.finalize()),
         })
@@ -429,6 +489,9 @@ impl Engine {
         let req = self.fine_request(draft, section)?;
         let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)
             .map_err(|error| draft.page_error(number, error))?;
+        if input.drawings_only == Some(true) {
+            bounds.retain(|g| drawing_kind(g).is_some());
+        }
         if input.illustrations_only == Some(true) {
             bounds.retain(|g| g.illustration.is_some());
         }
@@ -462,6 +525,9 @@ impl Engine {
                 let mut row = json!({"id":g.id,"bounds":g.bounds});
                 if input.region.is_some() {
                     row["selected_center"] = json!(center(g));
+                }
+                if let Some(kind) = drawing_kind(g) {
+                    row["kind"] = json!(kind);
                 }
                 if let Some(parent) = g.illustration {
                     row["kind"] = json!(if parent == g.id {

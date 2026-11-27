@@ -359,7 +359,7 @@ pub(super) fn checks(
         None
     };
     let mut ink = None;
-    if let Some(drawing) = sample.drawing
+    if let Some(drawing) = sample.drawings.first().map(|d| d.bounds())
         && let Some(diagram_region) = drawing.region(0., size)
         && let Some(nearest) = text.iter().min_by(|a, b| {
             // A short line beside the diagram is usually a closer body-writing reference than a title above it.
@@ -465,6 +465,18 @@ mod tests {
         assert!((4.6..5.4).contains(&thick["ink_footprint_width_px"].as_f64().unwrap()));
     }
 
+    fn drawing(x: f32, y: f32, right: f32, bottom: f32) -> super::super::Drawing {
+        let corners = [[x, y], [right, y], [right, bottom], [x, bottom]];
+        super::super::Drawing {
+            id: 1,
+            kind: "illustration",
+            layout_offset: 0,
+            details: None,
+            paper_corners: corners,
+            photo_corners: corners,
+        }
+    }
+
     #[test]
     fn shared_pixels_do_not_count_as_diagram_or_body_ink() {
         let paper = RgbaImage::from_pixel(80, 60, Rgba([255; 4]));
@@ -477,7 +489,7 @@ mod tests {
         let sample = PageSample {
             baselines: vec![],
             content_sha256: String::new(),
-            drawing: Some(bounds(5., 5., 40., 40.)),
+            drawings: vec![drawing(5., 5., 40., 40.)],
             text: vec![TextSample {
                 bounds: bounds(15., 15., 20., 20.),
                 baseline: 22.,
@@ -514,7 +526,7 @@ mod tests {
         let sample = PageSample {
             baselines: vec![],
             content_sha256: String::new(),
-            drawing: Some(bounds(0., 0., 100., 80.)),
+            drawings: vec![drawing(0., 0., 100., 80.)],
             text: vec![TextSample {
                 bounds: bounds(1100., 0., 1150., 40.),
                 baseline: 40.,

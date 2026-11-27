@@ -18,6 +18,7 @@ from zipfile import ZipFile
 from PIL import Image
 
 import coursework_form
+import diagram_perspective
 import export_blur
 import illustration_pen
 import illustration_ink_check
@@ -434,6 +435,7 @@ async def smoke(command, arguments, out):
             await illustration_pen.verify(client)
             await export_blur.verify(client, Path(temp))
             await illustration_ink_check.verify(client, Path(temp))
+            await diagram_perspective.verify(client, Path(temp))
             await paper_focus.verify(client, Path(temp))
             await paper_ink_check.verify(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)

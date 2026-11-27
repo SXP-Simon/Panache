@@ -142,6 +142,15 @@ pub fn page(
             "guidance": "Fine edit applies ink variation to individual glyphs. Switching rendering modes can change unedited writing. All measured differences remain visible changes; inspect protected areas before judging the edit."
         });
     }
+    super::drawing::add_check(
+        &mut metadata,
+        draft,
+        number,
+        page,
+        &after.sample,
+        size,
+        Some(regions.bounds),
+    );
     if before.is_none() {
         state.paper_focus.add_review_guidance(
             draft,

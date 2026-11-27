@@ -115,7 +115,8 @@ async def verify(client, home):
             if name == "drawings_then_text":
                 page = await call(client, "preview_handwriting", **key, view="layout", limit=32)
                 # The fixture ends with a single character after the native arrow.
-                arrow_item, character = [i for i in page.structuredContent["glyphs"] if "kind" not in i]
+                arrow_item, character = [i for i in page.structuredContent["glyphs"]
+                                         if i.get("kind") in (None, "native_diagram")]
                 assert arrow_item["id"] < character["id"]
                 assert character["id"] in {i["id"] for i in items}
             assert len([p for p in local.content if p.type == "image"]) == 2

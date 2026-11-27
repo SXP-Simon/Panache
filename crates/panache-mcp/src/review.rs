@@ -1,4 +1,6 @@
 mod consistency;
+mod drawing;
+pub(crate) use drawing::Drawing;
 pub mod local;
 mod paper_ink;
 pub(crate) use consistency::{Bounds, TextSample};
@@ -86,7 +88,7 @@ pub struct PageSample {
     pub baselines: Vec<[f32; 2]>,
     pub content_sha256: String,
     pub text: Vec<TextSample>,
-    pub drawing: Option<Bounds>,
+    pub drawings: Vec<Drawing>,
 }
 
 // Suggest a crop around a sampled text line at native resolution, including neighboring paper.
@@ -405,6 +407,7 @@ pub fn page(
             }
             metadata["photo_appearance"] = appearance;
         }
+        drawing::add_check(&mut metadata, draft, section, page, sample, (w, h), None);
         focus.add_review_guidance(
             draft,
             section,

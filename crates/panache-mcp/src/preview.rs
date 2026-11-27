@@ -36,7 +36,8 @@ pub(super) async fn run(
                 && input.compare_revision.is_some()
                 && input.region.is_none()
                 && input.previous_region.is_none()
-                && input.illustrations_only.is_none()),
+                && input.illustrations_only.is_none()
+                && input.drawings_only.is_none()),
         "before_review_id requires an unfiltered view=review with compare_revision and no region"
     );
     ensure!(
@@ -50,7 +51,9 @@ pub(super) async fn run(
         && input.region.is_none()
     {
         ensure!(
-            input.view == Some(PreviewView::Review) && input.illustrations_only.is_none(),
+            input.view == Some(PreviewView::Review)
+                && input.illustrations_only.is_none()
+                && input.drawings_only.is_none(),
             "compare_revision requires an unfiltered review view"
         );
         let draft = server.0.drafts.snapshot(&input.draft_id, input.revision)?;
@@ -92,6 +95,14 @@ fn render(
     ensure!(
         input.compare_revision.is_none() || input.view == Some(PreviewView::Review),
         "compare_revision requires view=review"
+    );
+    ensure!(
+        input.drawings_only.is_none() || input.view == Some(PreviewView::Layout),
+        "drawings_only requires view=layout"
+    );
+    ensure!(
+        input.drawings_only != Some(true) || input.illustrations_only != Some(true),
+        "Choose drawings_only or illustrations_only"
     );
     if input.view == Some(PreviewView::Paper) {
         ensure!(
@@ -248,7 +259,7 @@ fn image(
         data["illustration_inspection"] = json!(hint);
     }
     if draft.paper.is_some() && review_allowed {
-        let hint = "用 view=review 的 local_paper_ink_check 在原尺寸查看页首和正文，把新笔迹和附近原纸印迹放在一起看。页首纸线淡而字重时，先局部调 opacity，再查看过渡行。整页缩略图会掩盖反差。按 adjacent_row_check 检查邻行字形，有图时也对照图线。";
+        let hint = "用 view=review 的 local_paper_ink_check 在原尺寸查看页首和正文，把新笔迹和附近原纸印迹放在一起看。页首纸线淡而字重时，先局部调 opacity，再查看过渡行。整页缩略图会掩盖反差。按 adjacent_row_check 检查邻行字形，有流程图或图标时按 diagram_perspective_check 对照四角、图线方向及近远宽窄。";
         message.push('\n');
         message.push_str(hint);
         data["photo_review_arguments"] = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page":page,"view":"review"});
