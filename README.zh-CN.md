@@ -46,6 +46,16 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 
 [《钱塘湖春行》](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 
+### 在纸张照片上排版手写作业
+
+同一道编译原理作业，分别用 MCP 排在两张无横线的纸张照片上。点击成稿可查看原尺寸 PNG。
+
+| 斜拍的无横线白纸 | 花影下的白纸 |
+| --- | --- |
+| [![木桌上的斜拍白纸，手写代码、基本块与流程图沿纸边排列](assets/examples/angled-sheet-5ad065421e7c.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/922b6c7303c6a1d86271e42929bb316eb9c953bb/screenshots/worksheet-lettering/round-7/worksheet.png) | [![花头遮住部分右侧纸边，手写作业与流程图避开花头](assets/examples/flower-shadow-a07835481c3a.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/1aea40070e551868368842392ca349a823d95de0/screenshots/worksheet-lettering/round-8/worksheet.png) |
+
+底图摄影 · [Kaboompics](https://www.pexels.com/photo/empty-paper-sheet-on-wooden-table-4207708/) · [Andrzej Gdula](https://www.pexels.com/photo/white-printer-paper-on-brown-wooden-table-11485123/)
+
 ## 参与贡献
 
 遇到问题可以到 [GitHub Issues](https://github.com/SXP-Simon/Panache/issues) 反馈。本地开发、测试和提交 PR 的说明见[贡献指南](CONTRIBUTING.md#中文贡献指南)。

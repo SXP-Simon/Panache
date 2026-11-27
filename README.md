@@ -46,6 +46,16 @@ For text alone, paste the passage and say whether you want a printable page, wri
 
 [Handwritten poem](assets/examples/spring-at-qiantang-lake-6806782d66f9.webp)
 
+### Handwriting on photographed paper
+
+Panache's MCP server laid out the same compiler assignment on two photos of unruled paper. Select a page to open the full-resolution PNG.
+
+| Unruled paper on a wooden desk | Paper in shadow beside a flower |
+| --- | --- |
+| [![Handwritten code, basic blocks and a flowchart aligned with a tilted sheet on a wooden desk](assets/examples/angled-sheet-5ad065421e7c.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/922b6c7303c6a1d86271e42929bb316eb9c953bb/screenshots/worksheet-lettering/round-7/worksheet.png) | [![Handwritten assignment and flowchart on a shaded sheet with a flower overlapping the right edge](assets/examples/flower-shadow-a07835481c3a.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/1aea40070e551868368842392ca349a823d95de0/screenshots/worksheet-lettering/round-8/worksheet.png) |
+
+Original photographs · [Kaboompics](https://www.pexels.com/photo/empty-paper-sheet-on-wooden-table-4207708/) · [Andrzej Gdula](https://www.pexels.com/photo/white-printer-paper-on-brown-wooden-table-11485123/)
+
 ## Contributing
 
 Report bugs in [GitHub Issues](https://github.com/SXP-Simon/Panache/issues). For local setup, tests, and pull requests, see [CONTRIBUTING.md](CONTRIBUTING.md).

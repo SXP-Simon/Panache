@@ -142,6 +142,14 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 ## 照片排版与成品复盘
 
+同一道编译原理作业，分别用 MCP 排在两张无横线的纸张照片上。点击成稿可查看原尺寸 PNG。
+
+| 斜拍的无横线白纸 | 花影下的白纸 |
+| --- | --- |
+| [![木桌上的斜拍白纸，手写代码、基本块与流程图沿纸边排列](../../assets/examples/angled-sheet-5ad065421e7c.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/922b6c7303c6a1d86271e42929bb316eb9c953bb/screenshots/worksheet-lettering/round-7/worksheet.png) | [![花头遮住部分右侧纸边，手写作业与流程图避开花头](../../assets/examples/flower-shadow-a07835481c3a.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/1aea40070e551868368842392ca349a823d95de0/screenshots/worksheet-lettering/round-8/worksheet.png) |
+
+底图摄影 · [Kaboompics](https://www.pexels.com/photo/empty-paper-sheet-on-wooden-table-4207708/) · [Andrzej Gdula](https://www.pexels.com/photo/white-printer-paper-on-brown-wooden-table-11485123/)
+
 1. 表格、无横线纸和画作均可排字。用户已指定位置或委托选位时，直接按意图排版。落字区有歧义时，简短问“要写在哪个栏，哪些地方留白？”若必填区域在画外，或失焦、遮挡、透视已使它无法定位，建稿前指出具体缺哪一块，请用户补拍该区域或确认只填可见部分。已明确要求只写正文时，直接填写可定位的正文区。
 2. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。整页复查图长边最多 900 像素，像素坐标以返回的 `photo_size` 为准。检查有字区域的横线、页眉、页边和需要保留的图案。
 3. 调用 `tune_handwriting(draft_id, expected_revision, paper_guides, note)` 在原照片上重排全文。至少给两条参考线，每条提供行号与左右端点。无横线纸也可以指定想写入的区域。传空数组恢复建稿时的校准。旧版本仍可回看；改写书写区域会重置冲突的边距覆盖，重新排版后需重新选字。
