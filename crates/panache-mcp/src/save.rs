@@ -5,7 +5,7 @@ use rmcp::model::CallToolResult;
 use serde_json::{Value, json};
 
 pub(super) async fn run(server: &Panache, input: Save) -> Result<CallToolResult> {
-    let style = validate(&input)?;
+    let style = validate(&input, &server.0.fonts)?;
     let state = server.0.clone();
     let permit = state.prepare_slot.clone().acquire_owned().await?;
     let saved = tokio::task::spawn_blocking(move || {
@@ -16,7 +16,7 @@ pub(super) async fn run(server: &Panache, input: Save) -> Result<CallToolResult>
     Ok(saved_reply(saved))
 }
 
-fn validate(input: &Save) -> Result<Option<Style>> {
+fn validate(input: &Save, bundled: &[String]) -> Result<Option<Style>> {
     ensure!(
         !input.markdown.trim().is_empty() && !input.markdown.contains('\0'),
         "Supply nonempty Markdown without NUL characters"
@@ -41,7 +41,13 @@ fn validate(input: &Save) -> Result<Option<Style>> {
                 .is_none_or(|v| v.chars().count() <= 150),
             "Title too long"
         );
-        let style = input.style.clone().unwrap_or_default();
+        let photo = input.paper_path.is_some()
+            && input.paper_mode.unwrap_or_default() == crate::PaperMode::Photo;
+        let style = input
+            .style
+            .as_ref()
+            .map(|s| s.resolve(photo, bundled))
+            .unwrap_or_default();
         style.ink_rgba()?;
         ensure!(
             (16..=72).contains(&style.font_size),
@@ -120,4 +126,45 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
         message.push_str(hint);
     }
     reply(message, saved)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn photo_homework_font_is_a_creation_default() {
+        let bundled = vec!["李国夫手写体.ttf".to_owned(), "霞鹜文楷.ttf".to_owned()];
+        let font = |args: Value, fonts: &[String]| {
+            let mut args = args;
+            args["markdown"] = json!("试写");
+            validate(&serde_json::from_value(args).unwrap(), fonts)
+                .unwrap()
+                .unwrap()
+                .font
+        };
+        let homework = json!({"paper_path":"example.png","style":{"homework":true}});
+        assert_eq!(font(homework.clone(), &bundled), bundled[0]);
+        assert_eq!(font(homework.clone(), &bundled[1..]), bundled[1]);
+        for plain in [
+            json!({"style":{"homework":true}}),
+            json!({"paper_path":"example.png"}),
+            json!({"paper_path":"example.png","paper_mode":"flatten","style":{"homework":true}}),
+            json!({"paper_path":"example.png","style":{"homework":false}}),
+        ] {
+            assert_eq!(font(plain, &bundled), bundled[1]);
+        }
+        let mut explicit = homework;
+        explicit["style"]["font"] = json!("霞鹜文楷.ttf");
+        assert_eq!(font(explicit.clone(), &bundled), bundled[1]);
+        explicit["style"]["font"] = json!("custom-font");
+        assert_eq!(font(explicit.clone(), &bundled), "custom-font");
+        explicit["markdown"] = json!("试写");
+        explicit["style"]["font"] = Value::Null;
+        assert!(serde_json::from_value::<Save>(explicit).is_err());
+        assert!(
+            serde_json::from_value::<Save>(json!({"markdown":"a","style":{"oops":true}})).is_err()
+        );
+    }
 }

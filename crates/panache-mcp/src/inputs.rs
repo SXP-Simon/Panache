@@ -41,18 +41,20 @@ pub enum Format {
 #[serde(default, deny_unknown_fields)]
 pub struct Style {
     /// Main font ID from list_fonts. Bundled filenames remain valid. English letters and digits follow it by default.
+    #[schemars(transform = remove_schema_default)]
     pub font: String,
     pub paper: Paper,
     /// RGB hex color, e.g. #302c30.
     pub ink: String,
     /// Pixels at the paper's native resolution (794 × 1123 for presets). Accepted range 16–72.
     pub font_size: u8,
+    /// Homework paragraph layout. On a new photo sheet this also selects a handwriting font when font is omitted.
     pub homework: bool,
     /// Keep this value to reproduce handwriting variations.
-    #[schemars(transform = remove_seed_default)]
+    #[schemars(transform = remove_schema_default)]
     pub seed: u32,
 }
-fn remove_seed_default(schema: &mut schemars::Schema) {
+fn remove_schema_default(schema: &mut schemars::Schema) {
     schema.remove("default");
 }
 
@@ -97,6 +99,32 @@ pub struct Guide {
     pub right: [u32; 2],
 }
 
+// Only creation distinguishes an omitted font from an explicitly selected default.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreationStyle {
+    #[serde(default, deserialize_with = "explicit_font")]
+    font: Option<String>,
+    #[serde(flatten)]
+    settings: Style,
+}
+fn explicit_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    String::deserialize(d).map(Some)
+}
+
+impl CreationStyle {
+    pub fn resolve(&self, photo: bool, bundled: &[String]) -> Style {
+        let mut style = self.settings.clone();
+        if let Some(font) = &self.font {
+            style.font.clone_from(font);
+        } else if photo && style.homework && bundled.iter().any(|id| id == "李国夫手写体.ttf")
+        {
+            style.font = "李国夫手写体.ttf".into();
+        }
+        style
+    }
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Save {
@@ -117,8 +145,11 @@ pub struct Save {
     pub section: Option<u32>,
     /// Set only on creation.
     pub title: Option<String>,
-    /// Set only on creation. Stored with the draft.
-    pub style: Option<Style>,
+    /// For a handwritten assignment on a photo sheet, homework=true uses homework layout and, when bundled,
+    /// 李国夫手写体.ttf for an omitted font. Honor an explicitly requested font or formal style.
+    /// Preview a sample with letters and digits on the actual sheet. Set only on creation.
+    #[schemars(with = "Option<Style>")]
+    pub style: Option<CreationStyle>,
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
