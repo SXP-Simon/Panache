@@ -42,3 +42,31 @@ async def verify(client):
     exported = await call(client, "export_handwriting", revision=1, format="zip", **key)
     with ZipFile(Path(exported.structuredContent["path"])) as archive:
         assert archive.read("0.png") == original
+
+    # A real Markdown worker passes the opt-in graph, including conditions, to Rust as one drawing.
+    chart = r"""\begin{circuitikz}[flowchart]
+\draw (0,0) node[rectangle]{B2};
+\draw (3,-1) node[diamond]{B3};
+\draw[->] (0,0) -- (3,-1) node[midway,above]{i ≤ 10};
+\draw[->] (3,-1) -- (3,-2.6) -- (-1.4,-2.6) |- (0,0);
+\end{circuitikz}"""
+    saved = await call(client, "save_section", markdown="图\n\n" + chart,
+                       style={"font": "华阳手写体.ttf", "font_size": 24, "seed": 17})
+    key = {"draft_id": saved.structuredContent["draft_id"]}
+
+    async def chart_crop(revision):
+        layout = (await call(client, "preview_handwriting", **key, revision=revision,
+                             view="layout")).structuredContent
+        assert layout["total"] == 2
+        x, y, w, h = layout["glyphs"][1]["bounds"]
+        image = Image.open(io.BytesIO(await preview(revision))).convert("L")
+        return image.crop((x, y, x + w, y + h))
+
+    before = await chart_crop(1)
+    await call(client, "tune_handwriting", **key, expected_revision=1,
+               changes={"font": "李国夫手写体.ttf"})
+    restyled = await chart_crop(2)
+    assert before.size != restyled.size or before.tobytes() != restyled.tobytes()
+    await call(client, "tune_handwriting", **key, expected_revision=2, changes={"font_size": 40})
+    enlarged = await chart_crop(3)
+    assert enlarged.width > 1.3 * restyled.width and enlarged.height > 1.3 * restyled.height
