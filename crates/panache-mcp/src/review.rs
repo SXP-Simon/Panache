@@ -1,5 +1,6 @@
 mod consistency;
 pub mod local;
+mod paper_ink;
 pub(crate) use consistency::{Bounds, TextSample};
 
 use crate::{controls, drafts::Snapshot, reply};
@@ -156,6 +157,44 @@ pub fn pixel_sha256(image: &RgbaImage) -> String {
     format!("{:x}", hash.finalize())
 }
 
+fn composite_on_paper(
+    finished: &mut RgbaImage,
+    paper: &RgbaImage,
+    cancel: &Cancellation,
+) -> Result<()> {
+    for (row, base) in finished.rows_mut().zip(paper.rows()) {
+        cancel.check()?;
+        for (pixel, &under) in row.zip(base) {
+            let mut visible = under;
+            visible.blend(pixel);
+            *pixel = visible;
+        }
+    }
+    Ok(())
+}
+
+// Used by read-only image previews as well. All measurements use the visible output on the saved paper.
+pub fn local_ink_preview(
+    draft: &Snapshot<'_>,
+    section: u32,
+    page: usize,
+    png: &str,
+    sample: &PageSample,
+    cancel: &Cancellation,
+) -> Result<Option<serde_json::Value>> {
+    if draft.paper.is_none() {
+        return Ok(None);
+    }
+    let params = controls::parameters(draft, section, &draft.controls)?;
+    let mut finished = decode_page(png)?;
+    let paper = reference_paper(draft, finished.dimensions(), &params)?;
+    if params.transparent_background {
+        composite_on_paper(&mut finished, &paper, cancel)?;
+    }
+    Ok(paper_ink::measure(sample, &paper, &finished, None, cancel)?
+        .map(|e| paper_ink::report(&e, draft.id, draft.revision, section, page)))
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
@@ -309,10 +348,18 @@ pub fn page(
     if let Some(ink) = &checks.ink {
         evidence["illustration_contrast"] = ink.metrics.clone();
     }
+    let local_ink = if draft.paper.is_some() {
+        paper_ink::measure(sample, &paper, &finished, None, cancel)?
+    } else {
+        None
+    };
+    if let Some(value) = &local_ink {
+        evidence["local_paper_ink"] = value.clone();
+    }
     let observation = draft.record_review(
         section,
         page,
-        "paper-review/3",
+        "paper-review/4",
         &pixel_digest,
         &sample.content_sha256,
         &evidence,
@@ -329,6 +376,10 @@ pub fn page(
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
+        if let Some(e) = local_ink {
+            metadata["local_paper_ink_check"] =
+                paper_ink::report(&e, draft.id, draft.revision, section, page);
+        }
         let arguments = |region| json!({"draft_id":draft.id,"revision":draft.revision,"section":section,"page":page,"view":"review","region":region});
         if let Some(rows) = checks.rows {
             metadata["adjacent_row_check"] = rows.guidance(&arguments,

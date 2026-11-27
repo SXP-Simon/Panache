@@ -112,6 +112,8 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
         let id = saved["draft_id"].as_str().expect("new draft ID");
         let report = paper.focus.report(id, 1, 1, 1);
         state.paper_focus.remember(id, paper.focus);
+        saved["photo_ink_preview_arguments"] = json!({"draft_id":id,"revision":1,"section":1,"page":1,
+            "view":if state.preserve_reviews {"image"} else {"review"}});
         saved["paper_focus_check"] = report;
     }
     Ok(saved)
@@ -131,7 +133,7 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
         message.push_str(hint);
     }
     if let Some(focus) = saved.get("paper_focus_check") {
-        message.push_str(&format!("\n底纸边缘原尺寸检查 {focus}"));
+        message.push_str(&format!("\n底纸边缘原尺寸检查 {focus}。核对新增笔迹与原有印迹的反差时，调用 preview_handwriting {}，按 local_paper_ink_check 查看页首、过渡行与下方正文。", saved["photo_ink_preview_arguments"]));
     }
     reply(message, saved)
 }

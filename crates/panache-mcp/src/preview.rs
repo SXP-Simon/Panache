@@ -232,6 +232,11 @@ fn image(
     let number = section.number;
     let contains_drawing =
         section.text.contains("](data:image/") || section.text.contains("\\begin{circuitikz}");
+    let read_only_sample = if draft.paper.is_some() && !review_allowed {
+        Some(engine.review_baselines(draft, section.clone(), page, cancel)?)
+    } else {
+        None
+    };
     let (preview, cached) = engine.preview_with_refresh(draft, section, page, fresh, cancel)?;
     let mut message = format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision);
     let mut data = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached});
@@ -242,10 +247,17 @@ fn image(
         data["illustration_inspection"] = json!(hint);
     }
     if draft.paper.is_some() && review_allowed {
-        let hint = "检查照片作业是否可以交付时，用 view=review 查看同页相邻行。按 adjacent_row_check 提供的区域以原尺寸查看字形宽窄和字高；有图时也对照图线与附近正文。";
+        let hint = "用 view=review 的 local_paper_ink_check 在原尺寸查看页首和正文，把新笔迹和附近原纸印迹放在一起看。页首纸线淡而字重时，先局部调 opacity，再查看过渡行。整页缩略图会掩盖反差。按 adjacent_row_check 检查邻行字形，有图时也对照图线。";
         message.push('\n');
         message.push_str(hint);
         data["photo_review_arguments"] = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page":page,"view":"review"});
+    }
+    if let Some(sample) = read_only_sample
+        && let Some(check) =
+            review::local_ink_preview(draft, number, page, &preview.png, &sample, cancel)?
+    {
+        message.push_str(&format!("\n原纸与新增笔迹的局部反差 {check}"));
+        data["local_paper_ink_check"] = check;
     }
     let mut result = reply(message, data);
     result

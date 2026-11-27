@@ -42,7 +42,7 @@ impl Bounds {
         }
     }
 
-    fn center(self) -> [f32; 2] {
+    pub(super) fn center(self) -> [f32; 2] {
         [(self.left + self.right) / 2., (self.top + self.bottom) / 2.]
     }
 
@@ -52,7 +52,7 @@ impl Bounds {
         x.hypot(y)
     }
 
-    fn intersects(self, other: Self) -> bool {
+    pub(super) fn intersects(self, other: Self) -> bool {
         self.left < other.right
             && self.right > other.left
             && self.top < other.bottom
@@ -63,11 +63,11 @@ impl Bounds {
         self.right - self.left
     }
 
-    fn height(self) -> f32 {
+    pub(super) fn height(self) -> f32 {
         self.bottom - self.top
     }
 
-    fn on_page(self, (w, h): (u32, u32)) -> bool {
+    pub(super) fn on_page(self, (w, h): (u32, u32)) -> bool {
         self.width() > 0.
             && self.height() > 0.
             && self.left >= 0.
@@ -76,7 +76,7 @@ impl Bounds {
             && self.bottom <= h as f32
     }
 
-    fn region(self, padding: f32, (w, h): (u32, u32)) -> Option<Region> {
+    pub(super) fn region(self, padding: f32, (w, h): (u32, u32)) -> Option<Region> {
         let l = (self.left - padding).floor().clamp(0., w as f32) as u32;
         let t = (self.top - padding).floor().clamp(0., h as f32) as u32;
         let r = (self.right + padding).ceil().clamp(0., w as f32) as u32;

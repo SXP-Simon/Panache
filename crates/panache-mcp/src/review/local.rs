@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, Parameters, export};
-use image::{Pixel, RgbaImage};
+use image::RgbaImage;
 use regions::{Point, Regions};
 use rmcp::model::{CallToolResult, ContentBlock};
 use serde_json::json;
@@ -23,7 +23,7 @@ pub(crate) fn crop_bounds(region: &[[i32; 2]], size: (u32, u32)) -> Result<[u32;
 struct Appearance {
     finished: RgbaImage,
     params: Parameters,
-    content_sha256: String,
+    sample: super::PageSample,
     fine_edit: bool,
 }
 
@@ -41,7 +41,7 @@ impl Appearance {
         Ok(Self {
             finished: decode_page(&preview.png)?,
             params,
-            content_sha256: sample.content_sha256,
+            sample,
             fine_edit: preview.fine_edit,
         })
     }
@@ -52,7 +52,7 @@ impl Appearance {
             "Cannot compare local pixels: different_image_dimensions"
         );
         ensure!(
-            self.content_sha256 == after.content_sha256,
+            self.sample.content_sha256 == after.sample.content_sha256,
             "Cannot compare local pixels: page_content_changed_or_repaginated"
         );
         // Imported paper bytes are immutable per draft; generated stationery depends on controls.
@@ -67,14 +67,7 @@ impl Appearance {
 
     fn composite(&mut self, paper: &RgbaImage, cancel: &Cancellation) -> Result<()> {
         if self.params.transparent_background {
-            for (pixels, bases) in self.finished.rows_mut().zip(paper.rows()) {
-                cancel.check()?;
-                for (pixel, &base) in pixels.zip(bases) {
-                    let mut visible = base;
-                    visible.blend(pixel);
-                    *pixel = visible;
-                }
-            }
+            super::composite_on_paper(&mut self.finished, paper, cancel)?;
         }
         Ok(())
     }
@@ -131,6 +124,14 @@ pub fn page(
         "after":evidence.after,"before":evidence.before,"difference":evidence.difference,
         "guidance":"Ink counts pixels whose largest visible RGB channel difference from the paper is at least 8. Revision differences apply the same threshold to before and after appearances; outside_union_changed_pixels covers the entire page outside both polygons. This local inspection leaves full-page review status unchanged. Inspect the crops against the request, including whether disappearance was intended. Overlapping text and diagrams contribute to the same pixels. Check protected areas with another region. Stop once the target and protected areas meet the request; ask if intent or attribution is unclear."
     });
+    if draft.paper.is_some()
+        && before.is_none()
+        && let Some(e) =
+            super::paper_ink::measure(&after.sample, &paper, &after.finished, Some(region), cancel)?
+    {
+        metadata["local_paper_ink_check"] =
+            super::paper_ink::report(&e, draft.id, draft.revision, number, page);
+    }
     if let Some(prior) = &before
         && prior.fine_edit != after.fine_edit
     {

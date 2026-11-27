@@ -17,7 +17,7 @@ struct Edge {
     width: f32,
 }
 
-fn luma(pixel: Rgba<u8>) -> i16 {
+pub(crate) fn luma(pixel: Rgba<u8>) -> i16 {
     let opacity = u16::from(pixel[3]);
     (255 - ((255 - u16::from(pixel.to_luma()[0])) * opacity).div_ceil(255)) as i16
 }
@@ -25,7 +25,18 @@ fn luma(pixel: Rgba<u8>) -> i16 {
 // Track the 20% and 80% crossings of a monotone edge relative to its own local contrast.
 // Parallel profiles 2 px to either side reject isolated grain. Give diagonal edges to their
 // stronger scan direction and correct the width of that projection.
-fn stroke_edges(profile: &[[i16; 3]]) -> Vec<(usize, f32)> {
+pub(crate) struct PaperStroke {
+    pub at: usize,
+    pub width: f32,
+    pub contrast: u8,
+    pub darkest_at: usize,
+}
+
+pub(crate) fn stroke_edges(
+    profile: &[[i16; 3]],
+    min_contrast: i16,
+    min_slope: i16,
+) -> Vec<PaperStroke> {
     let mut out = Vec::new();
     let mut descending: Option<Edge> = None;
     let mut i = 0;
@@ -50,7 +61,12 @@ fn stroke_edges(profile: &[[i16; 3]]) -> Vec<(usize, f32)> {
             i += 1;
         }
         let contrast = sign * (profile[i][1] - profile[start][1]);
-        if contrast < 22 || slope < 4 || i - start > 22 || start < 2 || i + 2 >= profile.len() {
+        if contrast < min_contrast
+            || slope < min_slope
+            || i - start > 22
+            || start < 2
+            || i + 2 >= profile.len()
+        {
             continue;
         }
         let transverse = (profile[peak][2] + profile[peak + 1][2]
@@ -94,7 +110,14 @@ fn stroke_edges(profile: &[[i16; 3]]) -> Vec<(usize, f32)> {
             && edge.at - other.at <= 36
             && edge.contrast.min(other.contrast) * 2 >= edge.contrast.max(other.contrast)
         {
-            out.push((other.at, (other.width + edge.width) / 2.));
+            out.push(PaperStroke {
+                at: other.at,
+                width: (other.width + edge.width) / 2.,
+                contrast: other.contrast.min(edge.contrast) as u8,
+                darkest_at: (other.at..=edge.at + 1)
+                    .min_by_key(|&k| profile[k][1])
+                    .unwrap(),
+            });
         }
     }
     out
@@ -145,8 +168,8 @@ fn sample_cell(
                     })
                 })
                 .collect();
-            for (at, width) in stroke_edges(&profile) {
-                samples.push((width, axis([from + at as u32, cross])));
+            for stroke in stroke_edges(&profile, 22, 4) {
+                samples.push((stroke.width, axis([from + stroke.at as u32, cross])));
             }
         }
         supported += usize::from(samples.len() > old);
