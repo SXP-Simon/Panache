@@ -384,6 +384,9 @@ pub struct Preview {
     /// Gaussian sigma in output pixels (0..2). Use 0 for the original. Add region to see a 1:1 detail.
     #[schemars(range(min = 0, max = 2))]
     pub export_blur_px: Option<f64>,
+    /// In image view, use instead of export_blur_px for a gradual change of focus.
+    /// Anchors are relative to the full output, including when requesting a native crop.
+    pub export_blur_gradient: Option<crate::engine::export_blur::Gradient>,
     /// In review, compare with an earlier revision. Omit region for stored, data-only evidence (offset/limit paginate edits). With region, render paired crops.
     pub compare_revision: Option<u32>,
     /// Pin the earlier stored full-page check by ID. Requires view=review and compare_revision, without a region. The check must belong to that earlier revision, draft, section and page.
@@ -419,9 +422,11 @@ pub struct Export {
     /// PDF includes the paper. ZIP contains page PNGs and respects the transparent_background ink control.
     pub format: Option<Format>,
     /// ZIP only. Gaussian blur sigma in original image pixels, 0..2 (default 0). Softens the whole finished page, including photographed paper, for this export only.
-    #[serde(default)]
     #[schemars(range(min = 0, max = 2))]
-    pub export_blur_px: f64,
+    pub export_blur_px: Option<f64>,
+    /// ZIP PNGs: two focus anchors on the full page, with normalized x/y (0..1) and sigma_px (0..2).
+    /// Use instead of export_blur_px. Strength varies along the line and holds constant past each end.
+    pub export_blur_gradient: Option<crate::engine::export_blur::Gradient>,
     /// Include the exported bytes as an embedded MCP resource for clients that can offer attachments.
     /// Up to 512 KiB before base64 encoding. Larger files stay available at the returned server path.
     #[serde(default)]

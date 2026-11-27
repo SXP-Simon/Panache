@@ -19,12 +19,12 @@ pub(super) async fn run(
     input: Preview,
     ctx: RequestContext<RoleServer>,
 ) -> Result<CallToolResult> {
-    if let Some(sigma) = input.export_blur_px {
+    let finish = export_blur::finish(input.export_blur_px, input.export_blur_gradient)?;
+    if finish.is_some() {
         ensure!(
             matches!(input.view, None | Some(PreviewView::Image)),
-            "export_blur_px requires view=image"
+            "export_blur_px and export_blur_gradient require view=image"
         );
-        export_blur::validate(sigma)?;
     }
     ensure!(
         !input.fresh || matches!(input.view, None | Some(PreviewView::Image)),
@@ -66,7 +66,7 @@ pub(super) async fn run(
     }
     server
         .render(ctx, move |state, engine, cancel| {
-            render(state, engine, &input, cancel)
+            render(state, engine, &input, finish, cancel)
         })
         .await
 }
@@ -75,6 +75,7 @@ fn render(
     state: &State,
     engine: &mut Engine,
     input: &Preview,
+    finish: Option<export_blur::Finish>,
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
@@ -85,8 +86,8 @@ fn render(
     ensure!(
         input.region.is_none()
             || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review))
-            || input.export_blur_px.is_some(),
-        "region requires view=layout, view=review, or view=image with export_blur_px"
+            || finish.is_some(),
+        "region requires view=layout, view=review, or view=image with an explicit PNG finish"
     );
     ensure!(
         input.compare_revision.is_none() || input.view == Some(PreviewView::Review),
@@ -147,7 +148,7 @@ fn render(
         input.offset.is_none() && input.limit.is_none(),
         "offset and limit require view=layout"
     );
-    if let Some(sigma) = input.export_blur_px {
+    if let Some(finish) = finish {
         let (preview, cached) =
             engine.preview_with_refresh(&draft, section, page, input.fresh, cancel)?;
         let original = review::decode_page(&preview.png)?;
@@ -157,16 +158,17 @@ fn render(
             .as_deref()
             .map(|region| review::local::crop_bounds(region, size))
             .transpose()?;
-        let mut finished = if sigma > 0. {
-            export_blur::apply(&original, sigma, cancel)?
+        let mut finished = if finish.active() {
+            finish.apply(&original, cancel)?
         } else {
             original
         };
         if let Some([x, y, width, height]) = bounds {
             finished = image::imageops::crop_imm(&finished, x, y, width, height).to_image();
         }
-        let metadata = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached,
-            "export_blur_px":sigma,"photo_size":size,"crop_bounds":bounds,"image_size":finished.dimensions()});
+        let mut metadata = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached,
+            "photo_size":size,"crop_bounds":bounds,"image_size":finished.dimensions()});
+        finish.write_metadata(&mut metadata);
         let mut result = reply(format!("PNG 导出效果，原图像素。{metadata}"), metadata);
         result.content.push(ContentBlock::image(
             STANDARD.encode(export::png(&finished)?),

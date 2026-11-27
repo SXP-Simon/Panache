@@ -166,6 +166,17 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 用户希望输出更接近轻微虚焦的照片时，先用 `preview_handwriting(view="image", export_blur_px=0.6, region=…)` 与同区域的 `0` 档比较。客户端可能缩放整页，局部裁图保留原始像素。选定后对同一稿件版本调用 `export_handwriting(format="zip", export_blur_px=0.6)`。数值为高斯模糊的标准差，范围 0–2 个输出像素。默认值为 0。纸与墨在合成后一起柔化，透明页保留透明度。PDF 和稿件自身的设置独立于这项 PNG 交付选项。
 
+普通导出省略柔化参数。仅要求「稍微柔一点」时，可从均匀的 `export_blur_px=0.6` 试起。若指定上软下清、右上角偏软等方向，改用 `export_blur_gradient`，在同一版的预览和 ZIP 导出中传相同的对象。例如：
+
+```json
+{
+  "from": { "x": 0.5, "y": 0.12, "sigma_px": 0.8 },
+  "to":   { "x": 0.5, "y": 0.60, "sigma_px": 0.0 }
+}
+```
+
+两个点的 `x/y` 以最终整张图片为参照，左上角为 (0,0)，右下角为 (1,1)。`sigma_px` 的单位是原图像素。强度按沿两点连线的像素距离比例平滑改变，两端以外维持端点值。上例在纸面上部使用 0.8 px，自高度 12% 起逐渐变清晰，60% 以下保留原像素。把两点放在一条斜线上即可指定斜向渐变。更换或旋转底图时，按新整页重新选点。两种柔化参数只能选一种。用 `view="image"` 和 `region` 分别查看两个端点及中间区域；局部复用整页的坐标和效果。
+
 作业表可用正文横线设置参考线，将同一页的课程、姓名等字块分别定位。若侧栏印字自下往上读，将原字块的左上、右上、右下、左下四角依次投到侧栏的左下、左上、右上、右下。复查时按栏核对读向、印字和留给老师的评分区。`changed_pixels_outside_reference` 也会计入正文参考区外有意填写的表头和侧栏，应结合这些栏位解读。
 
 客户端已知目标值时，可在 `tune_handwriting` 中同时传 `changes={"perturb_theta_sigma":0.07}` 和 `readback_variation=["perturb_theta_sigma"]`。成功回执的 `effective_changes` 给出写入前后的有效值，用于直接核对本次写入，省去事后再读一次。最多点名本次提交的两个 `variation` 控件。提交 `null` 时读回继承值，有效值相同的键会省略。若要根据旧值决定改多少，仍应先用 `describe_controls` 读取该稿当前版本的值。

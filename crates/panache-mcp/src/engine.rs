@@ -523,12 +523,11 @@ impl Engine {
         writer: &mut crate::storage::BudgetWriter<'_>,
         draft: &Snapshot<'_>,
         sections: Vec<Section>,
-        input: &crate::Export,
+        (format, finish): (Format, Option<export_blur::Finish>),
         cancel: &Cancellation,
         mut on_page: impl FnMut(usize, u32, usize, &image::RgbaImage),
     ) -> Result<usize> {
         let mut count = 0;
-        let format = input.format.unwrap_or_default();
         let mut background = draft.background()?;
         let camera = draft.camera(background.as_deref())?;
         let photo = Self::photo(draft, &mut background)?;
@@ -566,8 +565,8 @@ impl Engine {
             Format::Zip => {
                 let mut zip = export::ZipExport::new(writer);
                 render_sections(&mut |i, page| {
-                    if input.export_blur_px > 0. {
-                        let finished = export_blur::apply(page, input.export_blur_px, cancel)?;
+                    if let Some(finish) = finish {
+                        let finished = finish.apply(page, cancel)?;
                         zip.add_with_camera(i, &finished, &camera)
                     } else {
                         zip.add_with_camera(i, page, &camera)

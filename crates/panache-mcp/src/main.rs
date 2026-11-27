@@ -282,7 +282,7 @@ impl ServerHandler for Panache {
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For a font comparison, show the labeled images from list_fonts(sample=...) on the actual draft paper and mixed text. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
             "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
-            "For a new labeled flowchart, use the native [flowchart] example in save_section.markdown so its lettering follows the selected font. For uploaded sheets, follow paper_focus_check on import and preview. Compare nearby printed edges with added strokes in the sharper, transition and softer areas at native size before export. If a mismatch is visible, adjust only the affected writing or diagram, then recheck the transition and the sharper area. At native size compare local_paper_ink_check for the first written row with nearby photographed marks. If the top looks too dark, taper local opacity into the body and recheck. Use opacity_ramp within a tall drawing that crosses the transition. For a softer delivered PNG, preview view=image with export_blur_px and the same native region, then export ZIP with the chosen value. If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
+            "For a new labeled flowchart, use the native [flowchart] example in save_section.markdown so its lettering follows the selected font. For uploaded sheets, follow paper_focus_check on import and preview. Compare nearby printed edges with added strokes in the sharper, transition and softer areas at native size before export. If a mismatch is visible, adjust only the affected writing or diagram, then recheck the transition and the sharper area. At native size compare local_paper_ink_check for the first written row with nearby photographed marks. If the top looks too dark, taper local opacity into the body and recheck. Use opacity_ramp within a tall drawing that crosses the transition. For a plain PNG export leave blur unset. For a lightly softened PNG with no direction specified, start with uniform export_blur_px=0.6. When focus should vary across the photograph, use export_blur_gradient instead. Position its two anchors from the request or inspected photo. Preview the same revision at both ends and in between with view=image and region, then export ZIP using the same finish. If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
@@ -549,7 +549,7 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "Use view=image to see the page without filing a check. A full-page view=review without compare_revision renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. For photo ink, inspect local_paper_ink_check beside nearby paper marks and paper_focus_check for edge changes. In image view set export_blur_px (0..2) to preview the exact ZIP finish; add region to see its 1:1 crop. Open the supplied crop arguments at native size before adjusting softness. With compare_revision and no region it reads stored data, review IDs, intervening edits and limitations. Add before_review_id to pin the earlier stored check for that draft, revision, section and page. With region it rerenders labeled crops in the current environment using native image coordinates and measures visible changes. The crops do not contain archived pixels. Add compare_revision for paired before/after and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. illustrations_only selects raster illustrations, not generated circuitikz. Locate a circuit on the current image, then query its region at the same revision without that filter for the whole diagram ID. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
+        description = "Use view=image to see the page without filing a check. A full-page view=review without compare_revision renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. For photo ink, inspect local_paper_ink_check beside nearby paper marks and paper_focus_check for edge changes. In image view set export_blur_px for uniform softness or export_blur_gradient for two full-page focus anchors. Use the same finish for ZIP. Add region for a 1:1 crop. Open the supplied crop arguments at native size before adjusting softness. With compare_revision and no region it reads stored data, review IDs, intervening edits and limitations. Add before_review_id to pin the earlier stored check for that draft, revision, section and page. With region it rerenders labeled crops in the current environment using native image coordinates and measures visible changes. The crops do not contain archived pixels. Add compare_revision for paired before/after and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. illustrations_only selects raster illustrations, not generated circuitikz. Locate a circuit on the current image, then query its region at the same revision without that filter for the whole diagram ID. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,
@@ -644,7 +644,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. For clients that can receive embedded files, request include_file. An embedded resource URI is not a user-visible download URL. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
+        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. ZIP supports uniform export_blur_px or directional export_blur_gradient as shown in preview_handwriting. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. For clients that can receive embedded files, request include_file. An embedded resource URI is not a user-visible download URL. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
     )]
     async fn export_handwriting(
         &self,
@@ -655,8 +655,9 @@ impl Panache {
         let peer = ctx.peer.clone();
         let result = self.render(ctx, move |state, engine, cancel| {
             let format = input.format.unwrap_or_default();
-            engine::export_blur::validate(input.export_blur_px)?;
-            ensure!(matches!(format, Format::Zip) || input.export_blur_px == 0., "Nonzero export_blur_px requires format=zip for page PNGs. For PDF, omit export_blur_px or set it to 0.");
+            let finish = engine::export_blur::finish(input.export_blur_px, input.export_blur_gradient)?;
+            let active_finish = finish.filter(|f| f.active());
+            ensure!(matches!(format, Format::Zip) || active_finish.is_none(), "Nonzero PNG blur requires format=zip. For PDF, omit the blur settings or use zero strength.");
             let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
             let sections = state.drafts.sections(&input.draft_id, draft.revision, None)?;
             let reviewed_pages = draft.reviewed_pages()?;
@@ -667,7 +668,7 @@ impl Panache {
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
             let (path, pages, file) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
-                writer, &draft, sections, &input, cancel,
+                writer, &draft, sections, (format, active_finish), cancel,
                 |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
                         Some(record) => {
@@ -715,7 +716,7 @@ impl Panache {
             if matches!(format, Format::Zip) {
                 let without_digest = reviewed - matching - different.len();
                 if !different.is_empty() {
-                    let stage = if input.export_blur_px > 0. { "柔化前" } else { "ZIP 中" };
+                    let stage = if active_finish.is_some() { "柔化前" } else { "ZIP 中" };
                     pixel_warning = format!(" {stage}这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
                 }
                 if without_digest > 0 {
@@ -726,15 +727,21 @@ impl Panache {
                     "different_pages": different,
                     "reviewed_pages_without_digest": without_digest,
                 });
-                review["zip_pixels"] = if input.export_blur_px > 0. {
-                    pixel_warning.push_str(&format!(" 此次导出的整页 PNG 已柔化（σ={} 原图像素）。检查单摘要仅比对柔化前的页面，最终 PNG 未与检查单逐像素比对。", input.export_blur_px));
-                    json!({"status":"not_compared_after_export_blur","export_blur_px":input.export_blur_px,"before_blur":comparison})
+                review["zip_pixels"] = if let Some(finish) = active_finish {
+                    let mut evidence = json!({"status":"not_compared_after_export_blur","before_blur":comparison});
+                    finish.write_metadata(&mut evidence);
+                    pixel_warning.push_str(" 此次导出的 PNG 已按所选参数柔化。检查单的像素摘要对应柔化前的页面。");
+                    evidence
                 } else { comparison };
             }
             let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n运行 Panache 的电脑上的文件：`{}`", draft.revision, path.display());
-            let mut result = reply(message, json!({
+            let mut metadata = json!({
                 "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review": review,
-            }));
+            });
+            if matches!(format, Format::Zip) && let Some(finish @ engine::export_blur::Finish::Gradient(_)) = finish {
+                finish.write_metadata(&mut metadata);
+            }
+            let mut result = reply(message, metadata);
             if input.include_file {
                 delivery::include_file(&mut result, file, &path, format);
             }
