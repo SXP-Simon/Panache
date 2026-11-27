@@ -448,7 +448,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       return;
     }
     w.text = editor.text;
-    if (!preview && w.finePreviewNeedsRefresh) {
+    // PDF renders the current layout and its keyed fine edits in one request.
+    if (!preview && !pdf && w.finePreviewNeedsRefresh) {
       livePreview.markSubmitted(w.editRevision);
       final refreshed = await w.generate();
       if (!mounted || !refreshed || w.previewStale) return;
