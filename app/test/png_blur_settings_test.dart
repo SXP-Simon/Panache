@@ -3,11 +3,35 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
+import 'package:handwriting_app/models/png_blur.dart';
 import 'package:handwriting_app/models/settings.dart';
 import 'package:handwriting_app/widgets/settings/png_blur_settings.dart';
 import 'package:handwriting_app/widgets/settings/settings_fields.dart';
 
 void main() {
+  test('all PNG finishes use the same handwriting for preview and ZIP', () {
+    final settings = Settings.notebook();
+    for (final mode in PngBlurMode.values) {
+      settings.pngBlur.mode = mode;
+      for (final preview in [true, false]) {
+        final fields = settings.form('例 7', preview: preview, pdf: false);
+        expect(fields['seed'], '0', reason: '$mode, preview=$preview');
+      }
+    }
+    final legacy = settings.form(
+      '例 7',
+      preview: true,
+      pdf: false,
+      supportsPngBlur: false,
+    );
+    expect(legacy.containsKey('seed'), isFalse);
+    expect(legacy.containsKey('export_blur_gradient'), isFalse);
+    expect(
+      settings.form('例 7', preview: false, pdf: true).containsKey('seed'),
+      isFalse,
+    );
+  });
+
   testWidgets(
     'paper controls set independent anchors for PNG preview and export',
     (tester) async {

@@ -203,8 +203,7 @@ class Settings {
     required bool pdf,
     bool supportsPngBlur = true,
   }) => {
-    if (!pdf && supportsPngBlur) ...pngBlur.fields,
-    if (!pdf && supportsPngBlur && pngBlur.mode != PngBlurMode.off) 'seed': '0',
+    if (!pdf && supportsPngBlur) ...{'seed': '0', ...pngBlur.fields},
     ...values,
     ...camera,
     if (!strikethroughEnabled) 'strikethrough_probability': '0',
