@@ -1,0 +1,423 @@
+{
+  "sample": "11485123",
+  "source": "https://www.pexels.com/photo/white-printer-paper-on-brown-wooden-table-11485123/",
+  "size": [
+    2400,
+    1600
+  ],
+  "model": "gpt-6.2-astra high, new context",
+  "input_sha256": "319a9ad32b731119b4f4b80dd2fd14a14cc0e00ee0eeb84d80cc7c1e869eac1f",
+  "final_sha256": "0e015cfb8d853283e0e8af276a231e69407da94c6d64ca19c77a4ca2f75052e1",
+  "revision": 5,
+  "export_identical_to_zip_member": "0.png",
+  "paper_on_create": {
+    "alignment": "unverified",
+    "bottom": 88,
+    "height": 1600,
+    "left": 200,
+    "line_spacing": 54.0,
+    "right": 200,
+    "ruled": false,
+    "top": 88,
+    "width": 2400
+  },
+  "corners_TL_TR_BR_BL": [
+    [
+      910.9008178710938,
+      285.1728210449219
+    ],
+    [
+      1734.2249755859375,
+      566.0820922851562
+    ],
+    [
+      1153.5357666015625,
+      1480.06494140625
+    ],
+    [
+      281.9484558105469,
+      1158.6019287109375
+    ]
+  ],
+  "flower_guard_polygon": [
+    [
+      1513,
+      713
+    ],
+    [
+      1563,
+      663
+    ],
+    [
+      1603,
+      566
+    ],
+    [
+      1636,
+      550
+    ],
+    [
+      1640,
+      626
+    ],
+    [
+      1776,
+      613
+    ],
+    [
+      1806,
+      753
+    ],
+    [
+      1713,
+      870
+    ],
+    [
+      1596,
+      923
+    ],
+    [
+      1370,
+      1303
+    ],
+    [
+      1206,
+      1520
+    ],
+    [
+      1186,
+      1513
+    ],
+    [
+      1303,
+      1310
+    ],
+    [
+      1523,
+      896
+    ],
+    [
+      1533,
+      846
+    ]
+  ],
+  "final_vs_unfiltered_input": {
+    "mask_pixels": 34229,
+    "off_sheet": 0,
+    "within_flower_guard": 0
+  },
+  "export_settings": {
+    "draft_id": "f3a2ecc2-3b4e-450a-8037-27b134dda92b",
+    "revision": 5,
+    "format": "zip",
+    "export_blur_gradient": {
+      "from": {
+        "sigma_px": 0.8,
+        "x": 0.6231763234681117,
+        "y": 0.6804252657911195
+      },
+      "to": {
+        "sigma_px": 0.0,
+        "x": 0.6611087953313881,
+        "y": 0.45778611632270166
+      }
+    }
+  },
+  "sequence": [
+    {
+      "tool": "save_section",
+      "revision": 1,
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 1,
+      "view": "review",
+      "error": false,
+      "alignment": "unverified"
+    },
+    {
+      "tool": "tune_handwriting",
+      "error": true,
+      "guides": [
+        {
+          "row": 0,
+          "left": [
+            919,
+            382
+          ],
+          "right": [
+            1565,
+            602
+          ]
+        },
+        {
+          "row": 27,
+          "left": [
+            378,
+            1142
+          ],
+          "right": [
+            1048,
+            1387
+          ]
+        }
+      ]
+    },
+    {
+      "tool": "tune_handwriting",
+      "revision": 2,
+      "error": false,
+      "guides": [
+        {
+          "row": 0,
+          "left": [
+            919,
+            382
+          ],
+          "right": [
+            1565,
+            602
+          ]
+        },
+        {
+          "row": 27,
+          "left": [
+            378,
+            1142
+          ],
+          "right": [
+            1048,
+            1387
+          ]
+        }
+      ]
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 2,
+      "view": "review",
+      "error": false,
+      "alignment": "manual_guides"
+    },
+    {
+      "tool": "save_section",
+      "revision": 3,
+      "error": false
+    },
+    {
+      "tool": "tune_handwriting",
+      "revision": 4,
+      "error": false,
+      "guides": [
+        {
+          "row": 0,
+          "left": [
+            905,
+            374
+          ],
+          "right": [
+            1586,
+            606
+          ]
+        },
+        {
+          "row": 30,
+          "left": [
+            355,
+            1148
+          ],
+          "right": [
+            1060,
+            1406
+          ]
+        }
+      ]
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 4,
+      "view": "review",
+      "error": false,
+      "alignment": "manual_guides"
+    },
+    {
+      "tool": "save_section",
+      "revision": 5,
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "review",
+      "error": false,
+      "alignment": "manual_guides"
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "review",
+      "error": false,
+      "alignment": "manual_guides"
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "revision": 5,
+      "view": "image",
+      "error": false
+    },
+    {
+      "tool": "export_handwriting",
+      "revision": 5,
+      "error": false
+    }
+  ],
+  "measurements": {
+    "body": {
+      "(124, 156)": {
+        "n": 10,
+        "width": 313,
+        "measured": 18.95,
+        "ref": 18.98,
+        "resid": -0.04,
+        "rms_baseline_noise_px": 1.51
+      },
+      "(876, 911)": {
+        "n": 15,
+        "width": 513,
+        "measured": 19.64,
+        "ref": 19.81,
+        "resid": -0.17,
+        "rms_baseline_noise_px": 1.61
+      },
+      "(1094, 1128)": {
+        "n": 19,
+        "width": 606,
+        "measured": 20.03,
+        "ref": 20.06,
+        "resid": -0.02,
+        "rms_baseline_noise_px": 2.47
+      }
+    },
+    "chart": {
+      "through_B1_B2_B3_B4": {
+        "rectified_xy": [
+          [
+            141.0,
+            722.5341920542376
+          ],
+          [
+            522.0,
+            722.1034742856579
+          ]
+        ],
+        "samples": 214,
+        "measured": 19.56,
+        "ref": 19.61,
+        "resid": -0.05
+      },
+      "B3_to_B5": {
+        "rectified_xy": [
+          [
+            410.60963455149505,
+            758.0
+          ],
+          [
+            410.10465116279073,
+            799.0
+          ]
+        ],
+        "samples": 42,
+        "measured": 125.06,
+        "ref": 124.27,
+        "resid": 0.79
+      }
+    },
+    "near_width_gain_pct": {
+      "guides": 4.349517822265625,
+      "photo": 5.950188636779785
+    },
+    "upper_title": {
+      "selected_px": 2982,
+      "relative_darkening_p90": 0.5117609431832434,
+      "median_paper_level": 163.33333333333334
+    },
+    "diagram": {
+      "selected_px": 6706,
+      "relative_darkening_p90": 0.3653333333333334,
+      "median_paper_level": 247.66666666666666
+    },
+    "branch_note": {
+      "selected_px": 5116,
+      "relative_darkening_p90": 0.45588157406917007,
+      "median_paper_level": 246.0
+    }
+  },
+  "measurement_method": "Independent color-boundary line fits on each visible paper edge; the flower-covered part of the right edge is excluded. Local reference directions from their homography. Text fits median stroke positions in 32-pixel windows of rectified rows; chart fits actual arrow shafts. Angles converted to original image coordinates. Text direction is approximate for handwriting. Foreground containment requires mean RGB darkening >36 and component area >=8 original pixels; loose flower guard includes the stem. Relative darkening measured on rectified stroke pixels (mean RGB drop >32; 90th percentile of drop divided by input brightness)."
+}
