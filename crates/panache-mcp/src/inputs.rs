@@ -128,7 +128,8 @@ impl CreationStyle {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Save {
-    /// Optional absolute local image path for a new draft. Imports and aligns the paper once.
+    /// Optional absolute path to an image file readable on the computer running Panache. Imports and aligns the paper once.
+    /// A chat attachment or URL alone is not a file path. If the client cannot transfer the photo to that computer, explain this instead of guessing a path.
     /// Use with the default plain preset. All revisions share the saved image.
     pub paper_path: Option<std::path::PathBuf>,
     /// With paper_path: photo (default) preserves camera perspective; flatten aligns the background.
