@@ -148,19 +148,15 @@ impl<'a> Parser<'a> {
         }
         Some(p)
     }
-    fn node(&mut self) -> Option<()> {
+    fn node(&mut self, path_midpoint: Option<Point>) -> Option<()> {
         let options = if self.source[self.at..].trim_start().starts_with('[') {
             self.group('[', ']')?
         } else {
             String::new()
         };
         let text = self.group('{', '}')?;
-        let kind = options.trim();
-        if ![
-            "ground",
-            "rground",
-            "circ",
-            "ocirc",
+        let options = split_options(&options)?;
+        const ANCHORS: &[&str] = &[
             "above",
             "below",
             "left",
@@ -169,12 +165,20 @@ impl<'a> Parser<'a> {
             "above right",
             "below left",
             "below right",
-            "",
-        ]
-        .contains(&kind)
-        {
-            return None;
-        }
+        ];
+        let (point, kind) = match options.as_slice() {
+            ["midway"] => (path_midpoint?, ""),
+            ["midway", anchor] | [anchor, "midway"] if ANCHORS.contains(anchor) => {
+                (path_midpoint?, *anchor)
+            }
+            [kind]
+                if ANCHORS.contains(kind)
+                    || matches!(*kind, "" | "ground" | "rground" | "circ" | "ocirc") =>
+            {
+                (self.current, *kind)
+            }
+            _ => return None,
+        };
         if text.chars().count() > 256
             || (matches!(kind, "ground" | "rground" | "circ" | "ocirc") && !text.is_empty())
         {
@@ -184,7 +188,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         self.circuit.decorations.push(Decoration {
-            point: self.current,
+            point,
             kind: kind.to_owned(),
             text: if text.is_empty() {
                 String::new()
@@ -224,6 +228,7 @@ impl<'a> Parser<'a> {
         }
         self.current = self.point()?;
         let first = self.current;
+        let mut path_midpoint = None;
         loop {
             self.space();
             if self.eat(";") {
@@ -237,7 +242,7 @@ impl<'a> Parser<'a> {
                 return Some(());
             }
             if self.eat("node") {
-                self.node()?;
+                self.node(path_midpoint)?;
                 continue;
             }
             let (component, route) = if self.eat("--") {
@@ -262,6 +267,12 @@ impl<'a> Parser<'a> {
                 Route::VerticalFirst => Some(Point(self.current.0, end.1)),
                 Route::HorizontalFirst => Some(Point(end.0, self.current.1)),
             };
+            path_midpoint = (component.kind == "short").then(|| {
+                middle.unwrap_or(Point(
+                    (self.current.0 + end.0) / 2.,
+                    (self.current.1 + end.1) / 2.,
+                ))
+            });
             if let Some(point) = middle
                 && point != self.current
             {
