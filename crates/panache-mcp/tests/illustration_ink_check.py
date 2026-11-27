@@ -23,8 +23,17 @@ async def verify(client, home):
     stream = io.BytesIO()
     art.save(stream, format="PNG")
     diagram = "![diagram](data:image/png;base64," + base64.b64encode(stream.getvalue()).decode() + ")"
+    arrow = "\\begin{circuitikz}\n\\draw[->] (0,0) -- (2,0);\n\\end{circuitikz}"
+    drawings = f"{diagram}\n\n{arrow}"
+    cases = [
+        ("drawings_only", drawings, False),
+        ("drawings_then_text", drawings + "\n\n字", True),
+        ("mixed", "循环 i = 10\n" + diagram, True),
+        ("text", "循环 i = 10", False),
+        ("image", diagram, False),
+    ]
     result = {}
-    for name, markdown in [("mixed", "循环 i = 10\n" + diagram), ("text", "循环 i = 10"), ("image", diagram)]:
+    for name, markdown, expect_crop in cases:
         saved = await call(client, "save_section", markdown=markdown, paper_path=str(paper),
                            paper_guides=guides, style={"seed": 27})
         key = {"draft_id": saved.structuredContent["draft_id"], "revision": 1}
@@ -32,7 +41,7 @@ async def verify(client, home):
         assert ("illustration_inspection" in image.structuredContent) == (name != "text")
         full = await call(client, "preview_handwriting", **key, view="review")
         check = full.structuredContent.get("illustration_ink_check")
-        assert bool(check) == (name == "mixed"), name
+        assert bool(check) == expect_crop, name
         if check:
             args = check["preview_arguments"]
             assert all(args[k] == v for k, v in key.items())
@@ -43,11 +52,17 @@ async def verify(client, home):
             items = layout.structuredContent["glyphs"]
             assert any(i.get("kind") == "illustration" for i in items)
             assert any("kind" not in i for i in items)
+            if name == "drawings_then_text":
+                page = await call(client, "preview_handwriting", **key, view="layout", limit=32)
+                # The fixture ends with a single character after the native arrow.
+                arrow_item, character = [i for i in page.structuredContent["glyphs"] if "kind" not in i]
+                assert arrow_item["id"] < character["id"]
+                assert character["id"] in {i["id"] for i in items}
             assert len([p for p in local.content if p.type == "image"]) == 2
-            result["crop_size"] = meta["crop_image_size"]
+            result[name + "_crop_size"] = meta["crop_image_size"]
         result[name] = bool(check)
     with open_db(home) as db:
-        assert db.execute("SELECT count(*) FROM review_observations").fetchone()[0] == 3
+        assert db.execute("SELECT count(*) FROM review_observations").fetchone()[0] == len(cases)
     return result
 
 

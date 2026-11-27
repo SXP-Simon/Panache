@@ -378,7 +378,9 @@ impl Engine {
                 };
                 let (left, right) = bounds(0);
                 let (top, bottom) = bounds(1);
-                let candidates = glyphs.iter().filter(|v| v.illustration.is_none());
+                let candidates = glyphs
+                    .iter()
+                    .filter(|v| v.is_text && edits.get(&v.id).is_none_or(|edit| edit.opacity > 0));
                 let near = candidates.map(|v| position(v, [0., 0.])).min_by(|a, b| {
                     let distance = |p: &[f32; 2]| {
                         (p[0] - p[0].clamp(left, right)).hypot(p[1] - p[1].clamp(top, bottom))
