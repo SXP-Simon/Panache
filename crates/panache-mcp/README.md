@@ -142,7 +142,7 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 ## 照片排版与成品复盘
 
-同一道编译原理作业，分别用 MCP 排在两张无横线的纸张照片上。点击成稿可查看原尺寸 PNG。
+一道模拟理工科作业，分别用 MCP 排在两张无横线的纸张照片上。点击成稿可查看原尺寸 PNG。
 
 | 斜拍的无横线白纸 | 花影下的白纸 |
 | --- | --- |

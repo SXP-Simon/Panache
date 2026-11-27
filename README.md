@@ -48,7 +48,7 @@ For text alone, paste the passage and say whether you want a printable page, wri
 
 ### Handwriting on photographed paper
 
-Panache's MCP server laid out the same compiler assignment on two photos of unruled paper. Select a page to open the full-resolution PNG.
+Panache's MCP server laid out a sample STEM assignment on two photos of unruled paper. Select a page to open the full-resolution PNG.
 
 | Unruled paper on a wooden desk | Paper in shadow beside a flower |
 | --- | --- |
