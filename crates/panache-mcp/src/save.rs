@@ -41,12 +41,10 @@ fn validate(input: &Save, bundled: &[String]) -> Result<Option<Style>> {
                 .is_none_or(|v| v.chars().count() <= 150),
             "Title too long"
         );
-        let photo = input.paper_path.is_some()
-            && input.paper_mode.unwrap_or_default() == crate::PaperMode::Photo;
         let style = input
             .style
             .as_ref()
-            .map(|s| s.resolve(photo, bundled))
+            .map(|s| s.resolve(bundled))
             .unwrap_or_default();
         style.ink_rgba()?;
         ensure!(
@@ -134,7 +132,47 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn photo_homework_font_is_a_creation_default() {
+    fn homework_variation_is_saved_on_creation_and_respects_overrides() -> Result<()> {
+        use crate::{controls, drafts::Drafts};
+        let root = tempfile::tempdir()?;
+        let drafts = Drafts::open(root.path())?;
+        for (args, legacy, size, angle) in [
+            (json!({"homework":true}), false, 1.5, 0.07),
+            (
+                json!({"homework":true,"relaxed_handwriting":false}),
+                false,
+                1.,
+                0.05,
+            ),
+            (json!({"homework":true}), true, 1., 0.05),
+            (json!({}), false, 1., 0.05),
+        ] {
+            let input: Save = serde_json::from_value(json!({"markdown":"作业","style":args}))?;
+            let style = if legacy {
+                // Archived styles predate the creation-time variation choice.
+                serde_json::from_value(args)?
+            } else {
+                validate(&input, &[])?.unwrap()
+            };
+            let saved = drafts.save(&input, "作业", Some(&style), None, None)?;
+            let draft = drafts.snapshot(saved["draft_id"].as_str().unwrap(), Some(1))?;
+            let params = controls::parameters(&draft, 1, &draft.controls)?;
+            assert_eq!(
+                (params.font_size_sigma, params.perturb_theta_sigma),
+                (size, angle)
+            );
+            let patch = serde_json::from_value(json!({"perturb_theta_sigma":0.0}))?;
+            let tuned = controls::parameters(&draft, 1, &patch)?;
+            assert_eq!(
+                (tuned.font_size_sigma, tuned.perturb_theta_sigma),
+                (size, 0.)
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn homework_font_is_a_creation_default_on_any_paper() {
         let bundled = vec!["李国夫手写体.ttf".to_owned(), "霞鹜文楷.ttf".to_owned()];
         let font = |args: Value, fonts: &[String]| {
             let mut args = args;
@@ -147,10 +185,16 @@ mod tests {
         let homework = json!({"paper_path":"example.png","style":{"homework":true}});
         assert_eq!(font(homework.clone(), &bundled), bundled[0]);
         assert_eq!(font(homework.clone(), &bundled[1..]), bundled[1]);
-        for plain in [
+        for assignment in [
             json!({"style":{"homework":true}}),
-            json!({"paper_path":"example.png"}),
+            json!({"style":{"homework":true,"paper":"ruled"}}),
             json!({"paper_path":"example.png","paper_mode":"flatten","style":{"homework":true}}),
+        ] {
+            assert_eq!(font(assignment, &bundled), bundled[0]);
+        }
+        for plain in [
+            json!({}),
+            json!({"paper_path":"example.png"}),
             json!({"paper_path":"example.png","style":{"homework":false}}),
         ] {
             assert_eq!(font(plain, &bundled), bundled[1]);

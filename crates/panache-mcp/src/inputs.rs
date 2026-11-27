@@ -48,8 +48,11 @@ pub struct Style {
     pub ink: String,
     /// Pixels at the paper's native resolution (794 × 1123 for presets). Accepted range 16–72.
     pub font_size: u8,
-    /// Homework paragraph layout. On a new photo sheet this also selects a handwriting font when font is omitted.
+    /// Use for a school assignment, with or without a paper photo. Selects homework layout and its handwriting defaults.
     pub homework: bool,
+    /// Slightly vary letter size and tilt. Defaults on for new homework. Use false for the usual, steadier variation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relaxed_handwriting: Option<bool>,
     /// Keep this value to reproduce handwriting variations.
     #[schemars(transform = remove_schema_default)]
     pub seed: u32,
@@ -66,6 +69,7 @@ impl Default for Style {
             ink: "#302c30".into(),
             font_size: 34,
             homework: false,
+            relaxed_handwriting: None,
             seed: u32::from_le_bytes(Uuid::new_v4().as_bytes()[..4].try_into().unwrap()),
         }
     }
@@ -113,13 +117,16 @@ fn explicit_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String
 }
 
 impl CreationStyle {
-    pub fn resolve(&self, photo: bool, bundled: &[String]) -> Style {
+    pub fn resolve(&self, bundled: &[String]) -> Style {
         let mut style = self.settings.clone();
         if let Some(font) = &self.font {
             style.font.clone_from(font);
-        } else if photo && style.homework && bundled.iter().any(|id| id == "李国夫手写体.ttf")
-        {
+        } else if style.homework && bundled.iter().any(|id| id == "李国夫手写体.ttf") {
             style.font = "李国夫手写体.ttf".into();
+        }
+        if style.homework {
+            // Resolve only on creation: older saved styles keep their original rendering.
+            style.relaxed_handwriting.get_or_insert(true);
         }
         style
     }
@@ -146,9 +153,9 @@ pub struct Save {
     pub section: Option<u32>,
     /// Set only on creation.
     pub title: Option<String>,
-    /// For a handwritten assignment on a photo sheet, homework=true uses homework layout and, when bundled,
-    /// 李国夫手写体.ttf for an omitted font. Honor an explicitly requested font or formal style.
-    /// Preview a sample with letters and digits on the actual sheet. Set only on creation.
+    /// For homework, including text alone, set homework=true. Omit font to use the bundled 李国夫手写体.ttf
+    /// when available. Honor a named font, and use relaxed_handwriting=false for steadier letters if requested.
+    /// Set only on creation.
     #[schemars(with = "Option<Style>")]
     pub style: Option<CreationStyle>,
 }
