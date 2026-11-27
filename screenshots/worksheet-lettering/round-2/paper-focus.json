@@ -1,0 +1,133 @@
+{
+  "worksheet": {
+    "grid": [
+      4,
+      4
+    ],
+    "guidance": "采样差异未达显著门槛。有同向可比样本时，参考裁区给出较窄与较宽的实测边缘。缓慢渐变和很小的软区可能遗漏。沿同一条纸上印线或同类印字连续检查相邻区域，用原尺寸对照图线、图内标签和正文。",
+    "local_edit_guidance": "优先检查用户指明的位置，可平移 region 连续查看过渡，保留原纸与清晰区。仅在裁图或用户反馈支持时，对可独立选择的字或图块分区小调 softness 后复看。若布局只给流程图及其标签一个字形 ID，softness 会影响整张图；需要只改某一部分应在可局部修改的图源中处理。",
+    "method": "Native 20–80% lightness transition width on opposing, locally contrasted stroke edges, confirmed by parallel profiles. Comparisons use the same scan direction. Print, material and capture can all broaden an edge.",
+    "regions": [
+      {
+        "median_edge_width_px": 1.2278107404708862,
+        "role": "narrower_reference",
+        "sample_point": [
+          939,
+          1253
+        ],
+        "sampled_strokes": 50,
+        "scan_direction": "vertical",
+        "supported_tracks": 9,
+        "crop_xyxy_native": [
+          [
+            819,
+            1173
+          ],
+          [
+            1059,
+            1333
+          ]
+        ]
+      },
+      {
+        "median_edge_width_px": 1.9683201313018799,
+        "role": "broader_reference",
+        "sample_point": [
+          1018,
+          381
+        ],
+        "sampled_strokes": 52,
+        "scan_direction": "vertical",
+        "supported_tracks": 9,
+        "crop_xyxy_native": [
+          [
+            898,
+            301
+          ],
+          [
+            1138,
+            461
+          ]
+        ]
+      }
+    ],
+    "status": "no_clear_softening_in_samples",
+    "supported_cells": 16
+  },
+  "controlled_gradient": {
+    "grid": [
+      4,
+      4
+    ],
+    "guidance": "底纸不同位置的深色印刷边缘过渡宽度有差异。按区域参数用原尺寸从较清晰处经过交界到较软处，对照当地纸上细线、图形轮廓、图内标签和正文。between_samples 是待核对点。",
+    "local_edit_guidance": "优先检查用户指明的位置，可平移 region 连续查看过渡，保留原纸与清晰区。仅在裁图或用户反馈支持时，对可独立选择的字或图块分区小调 softness 后复看。若布局只给流程图及其标签一个字形 ID，softness 会影响整张图；需要只改某一部分应在可局部修改的图源中处理。",
+    "method": "Native 20–80% lightness transition width on opposing, locally contrasted stroke edges, confirmed by parallel profiles. Comparisons use the same scan direction. Print, material and capture can all broaden an edge.",
+    "regions": [
+      {
+        "median_edge_width_px": 0.6000022888183594,
+        "role": "narrower_edges",
+        "sample_point": [
+          10,
+          303
+        ],
+        "sampled_strokes": 36,
+        "scan_direction": "vertical",
+        "supported_tracks": 9,
+        "crop_xyxy_native": [
+          [
+            0,
+            223
+          ],
+          [
+            240,
+            383
+          ]
+        ]
+      },
+      {
+        "median_edge_width_px": 3.75714111328125,
+        "role": "broader_edges",
+        "sample_point": [
+          577,
+          94
+        ],
+        "sampled_strokes": 36,
+        "scan_direction": "vertical",
+        "supported_tracks": 9,
+        "crop_xyxy_native": [
+          [
+            400,
+            14
+          ],
+          [
+            640,
+            174
+          ]
+        ]
+      },
+      {
+        "median_edge_width_px": 2.6140940189361572,
+        "role": "intermediate_edges",
+        "sample_point": [
+          400,
+          199
+        ],
+        "sampled_strokes": 27,
+        "scan_direction": "vertical",
+        "supported_tracks": 9,
+        "crop_xyxy_native": [
+          [
+            280,
+            119
+          ],
+          [
+            520,
+            279
+          ]
+        ]
+      }
+    ],
+    "status": "spatial_variation",
+    "supported_cells": 16
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "revision": 9,
+  "page_size": [
+    1440,
+    1920
+  ],
+  "rgb_sha256": "9baf2cafb916f7f38d0c994d6af8bee767107747d350f976917ee9a5bf4aed6d",
+  "export_review": {
+    "global_text_ink_zero": false,
+    "pages_with_evidence": 1,
+    "pages_with_visibility_flags": 0,
+    "pages_without_visibility_evidence": 0,
+    "unreviewed_pages": [],
+    "zip_pixels": {
+      "different_pages": [],
+      "pages_matching_latest_review": 1,
+      "reviewed_pages_without_digest": 0
+    }
+  },
+  "trial": "One independent agent session, isolated settings and draft database, given only original task/photo and stdio configuration. No human feedback. The agent revised its own layout and inspected native crops."
+}

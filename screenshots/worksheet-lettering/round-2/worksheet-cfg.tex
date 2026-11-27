@@ -1,0 +1,15 @@
+\begin{circuitikz}[flowchart]
+\draw (0,0) node[rectangle]{B1};
+\draw (0,-1.4) node[rectangle]{B2};
+\draw (0,-2.8) node[rectangle]{B3};
+\draw (0,-4.2) node[rectangle]{B4};
+\draw (0,-5.6) node[rectangle]{B5};
+\draw (4.4,-1.4) node[rectangle]{B6};
+\draw[->] (0,0) -- (0,-1.4);
+\draw[->] (0,-1.4) -- (4.4,-1.4) node[midway,above]{i > 10};
+\draw[->] (0,-1.4) -- (0,-2.8) node[midway,left]{i ≤ 10};
+\draw[->] (0,-2.8) -- (0,-4.2) node[midway,right]{t = 0};
+\draw[->] (0,-4.2) -- (0,-5.6);
+\draw[->] (0,-2.8) -- (3.15,-2.8) node[midway,above]{t ≠ 0} -- (3.15,-5.6) -- (0,-5.6);
+\draw[->] (0,-5.6) -- (-1.75,-5.6) -- (-1.75,-1.4) -- (0,-1.4);
+\end{circuitikz}

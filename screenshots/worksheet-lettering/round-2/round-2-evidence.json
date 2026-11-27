@@ -1,0 +1,120 @@
+{
+  "page_size": [
+    1440,
+    1920
+  ],
+  "source_paper_rgb_sha256": "28c1ab37ed7008692565a4d90e3b6c9f0be3ba45efaf1c8b3fc0f49cb52aa1f4",
+  "first_round_export_rgb_sha256": "a11407377dc7a66cb3e8b2fe91b3cda1d34d004f3a10ffa9fe056cd05ce95719",
+  "new_draft": {
+    "revision": 24,
+    "zip_and_preview_rgb_sha256": "ceb1d577c95cd53956298593f21026122d69b829c1b34316979abbc0a9d678ad"
+  },
+  "isolated_first_round_draft": {
+    "from_revision": 70,
+    "revision": 93,
+    "zip_and_preview_rgb_sha256": "ceb1d577c95cd53956298593f21026122d69b829c1b34316979abbc0a9d678ad"
+  },
+  "mcp_binary_sha256": "3b742c4a40bc359e8fb2aed9f950faf9e3fd01454cad990aaaa843cd96311922",
+  "original_body_utf8_sha256": "2dc8c2b74cd56698b8d67ddd29c62e0be5870276de4eac27ad77740906b45ef5",
+  "native_cfg_utf8_sha256": "9cc0d801af03b2e6e17dfd3cd1792d1fa9f840e748edd321a808fc627de33e4b",
+  "chart_selection_xyxy_exclusive": [
+    680,
+    330,
+    1220,
+    760
+  ],
+  "changed_pixels_inside_chart": 47445,
+  "changed_pixels_outside_chart": 0,
+  "equal_pixels_outside_chart": 2532600,
+  "actual_changed_bbox_xyxy_exclusive": [
+    714,
+    354,
+    1166,
+    745
+  ],
+  "protected_regions": {
+    "title": {
+      "xyxy_exclusive": [
+        0,
+        0,
+        1440,
+        330
+      ],
+      "identical_rgb_sha256": "0780c6a3db38621518f31807531f68c142f9da0dca4c08b8bd316910e2812296"
+    },
+    "code": {
+      "xyxy_exclusive": [
+        155,
+        330,
+        675,
+        820
+      ],
+      "identical_rgb_sha256": "727df2b8190644059ec76e1318d7ce5b9d858e798564e250629672d68c6a935b"
+    },
+    "lower_body_and_paper": {
+      "xyxy_exclusive": [
+        0,
+        760,
+        1440,
+        1920
+      ],
+      "identical_rgb_sha256": "6b29566d888e9a5d9da547ea402d889fe9ae31b9b0f37dcf533bb35df2d95bca"
+    }
+  },
+  "stroke_summary": {
+    "first_round_edges": {
+      "groups": 9,
+      "profiles": 124,
+      "typical_width_px": 3.437,
+      "typical_peak_drop": 110.86,
+      "min_max_group_median_width_px": [
+        2.631,
+        4.05
+      ]
+    },
+    "second_round_edges": {
+      "groups": 9,
+      "profiles": 127,
+      "typical_width_px": 2.606,
+      "typical_peak_drop": 123.0,
+      "min_max_group_median_width_px": [
+        2.149,
+        2.767
+      ]
+    },
+    "unchanged_body_rows": {
+      "groups": 9,
+      "profiles": 489,
+      "typical_width_px": 2.507,
+      "typical_peak_drop": 124.35,
+      "min_max_group_median_width_px": [
+        2.386,
+        2.643
+      ]
+    }
+  },
+  "final_release_recheck": {
+    "binary_sha256": "fc4929736187e5cc9cb28fd277cd10747b465fa0db6a367f2433e42cf53d9447",
+    "checks": {
+      "fresh": {
+        "revision": 24,
+        "fresh_preview_cached": false,
+        "zip_pages": 1,
+        "rgb_sha256": "ceb1d577c95cd53956298593f21026122d69b829c1b34316979abbc0a9d678ad"
+      },
+      "resume": {
+        "revision": 93,
+        "fresh_preview_cached": false,
+        "zip_pages": 1,
+        "rgb_sha256": "ceb1d577c95cd53956298593f21026122d69b829c1b34316979abbc0a9d678ad"
+      }
+    }
+  },
+  "adopted_softness": {
+    "global_px": 0.4,
+    "native_chart_delta_px": 0.1,
+    "effective_native_chart_px": 0.5,
+    "body_px": 0.4,
+    "selection_comparison": "softness-comparison.json"
+  }
+}
