@@ -1,4 +1,9 @@
+mod consistency;
+mod drawing;
+pub(crate) use drawing::Drawing;
 pub mod local;
+mod paper_ink;
+pub(crate) use consistency::{Bounds, TextSample};
 
 use crate::{controls, drafts::Snapshot, reply};
 use anyhow::{Result, ensure};
@@ -82,7 +87,8 @@ fn ruling_offset(paper: &RgbaImage, point: [f32; 2], radius: i32) -> Option<i32>
 pub struct PageSample {
     pub baselines: Vec<[f32; 2]>,
     pub content_sha256: String,
-    pub illustration_and_text: Option<[[f32; 2]; 2]>,
+    pub text: Vec<TextSample>,
+    pub drawings: Vec<Drawing>,
 }
 
 // Suggest a crop around a sampled text line at native resolution, including neighboring paper.
@@ -109,7 +115,7 @@ fn detail_region(
     ])
 }
 
-fn decode_page(png: &str) -> Result<RgbaImage> {
+pub(crate) fn decode_page(png: &str) -> Result<RgbaImage> {
     let bytes = STANDARD.decode(png)?;
     let limits = Limits {
         max_file_bytes: bytes.len(),
@@ -153,12 +159,51 @@ pub fn pixel_sha256(image: &RgbaImage) -> String {
     format!("{:x}", hash.finalize())
 }
 
+fn composite_on_paper(
+    finished: &mut RgbaImage,
+    paper: &RgbaImage,
+    cancel: &Cancellation,
+) -> Result<()> {
+    for (row, base) in finished.rows_mut().zip(paper.rows()) {
+        cancel.check()?;
+        for (pixel, &under) in row.zip(base) {
+            let mut visible = under;
+            visible.blend(pixel);
+            *pixel = visible;
+        }
+    }
+    Ok(())
+}
+
+// Used by read-only image previews as well. All measurements use the visible output on the saved paper.
+pub fn local_ink_preview(
+    draft: &Snapshot<'_>,
+    section: u32,
+    page: usize,
+    png: &str,
+    sample: &PageSample,
+    cancel: &Cancellation,
+) -> Result<Option<serde_json::Value>> {
+    if draft.paper.is_none() {
+        return Ok(None);
+    }
+    let params = controls::parameters(draft, section, &draft.controls)?;
+    let mut finished = decode_page(png)?;
+    let paper = reference_paper(draft, finished.dimensions(), &params)?;
+    if params.transparent_background {
+        composite_on_paper(&mut finished, &paper, cancel)?;
+    }
+    Ok(paper_ink::measure(sample, &paper, &finished, None, cancel)?
+        .map(|e| paper_ink::report(&e, draft.id, draft.revision, section, page)))
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
     page: usize,
     png: &str,
     sample: &PageSample,
+    focus: &crate::paper::focus::Cache,
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
@@ -279,7 +324,7 @@ pub fn page(
             json!({"sampled":total,"supported_samples":v.len(),"median_abs_dy_px":v.get(v.len()/2)})
         })
         .collect::<Vec<_>>();
-    let evidence = json!({
+    let mut evidence = json!({
         "visibility":status,
         "photo_size":[w,h],
         "global_ink":{"rgba":params.fill,"opacity":params.ink_opacity,"thickness":params.ink_thickness,"softness":params.ink_softness,"depth_sigma":params.ink_depth_sigma},
@@ -292,10 +337,32 @@ pub fn page(
         "changed_pixels_outside_reference":outside,
         "transparent_png":params.transparent_background,
     });
+    let checks = consistency::checks(
+        sample,
+        &paper,
+        &finished,
+        &params,
+        draft.paper.is_some(),
+        cancel,
+    )?;
+    if let Some(rows) = &checks.rows {
+        evidence["adjacent_rows"] = rows.metrics.clone();
+    }
+    if let Some(ink) = &checks.ink {
+        evidence["illustration_contrast"] = ink.metrics.clone();
+    }
+    let local_ink = if draft.paper.is_some() {
+        paper_ink::measure(sample, &paper, &finished, None, cancel)?
+    } else {
+        None
+    };
+    if let Some(value) = &local_ink {
+        evidence["local_paper_ink"] = value.clone();
+    }
     let observation = draft.record_review(
         section,
         page,
-        "paper-review/1",
+        "paper-review/4",
         &pixel_digest,
         &sample.content_sha256,
         &evidence,
@@ -312,33 +379,18 @@ pub fn page(
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
-        if let Some([[x0, y0], [x1, y1]]) = sample.illustration_and_text {
-            let padding = params.font_size.ceil();
-            let x = |v: f32| v.clamp(0., w as f32) as u32;
-            let y = |v: f32| v.clamp(0., h as f32) as u32;
-            let (l, t, r, b) = (
-                x(x0 - padding),
-                y(y0 - padding),
-                x(x1 + padding),
-                y(y1 + padding),
-            );
-            let mut check = json!({"inspect":"Compare an actual diagram stroke or arrow and adjacent handwriting at the same zoom. Use the supplied preview_arguments as given for one revision; omit compare_revision. Check thickness and darkness. If the diagram alone looks heavy, revise the illustration source and preview again; preserve the surrounding writing. Describe what you can see. If the crop is unavailable or inconclusive, ask for visual confirmation."});
-            if l < r
-                && t < b
-                && r - l <= REVIEW_MAX_EDGE
-                && b - t <= REVIEW_MAX_EDGE
-                && x0 >= 0.
-                && y0 >= 0.
-                && x1 <= w as f32
-                && y1 <= h as f32
-            {
-                check["preview_arguments"] = json!({"draft_id":draft.id,"revision":draft.revision,"section":section,"page":page,"view":"review","region":[[l,t],[r,t],[r,b],[l,b]]});
-            } else {
-                check["region_guidance"] = json!(
-                    "Choose a small visible portion of the drawing and nearby writing from the finished page; use view=review with region for each at native scale."
-                );
-            }
-            metadata["illustration_ink_check"] = check;
+        if let Some(e) = local_ink {
+            metadata["local_paper_ink_check"] =
+                paper_ink::report(&e, draft.id, draft.revision, section, page);
+        }
+        let arguments = |region| json!({"draft_id":draft.id,"revision":draft.revision,"section":section,"page":page,"view":"review","region":region});
+        if let Some(rows) = checks.rows {
+            metadata["adjacent_row_check"] = rows.guidance(&arguments,
+                "Inspect these neighboring text rows at native size. The horizontal-to-vertical stretch describes letter proportions on the photo; paper vertical scale describes the change in letter height before photo projection. Compare both rows’ median values and inspect the crop. Check whether the difference suits the writing before making a local edit.");
+        }
+        if let Some(ink) = checks.ink {
+            metadata["illustration_ink_check"] = ink.guidance(&arguments,
+                "At native size compare a diagram label and nearby writing, then compare a straight frame or arrow shaft with a letter stem. Inspect letterforms, size, width, edge softness and darkness. The regions measure added ink against the saved paper. Different coverage, overlapping marks, color and paper lighting can affect the readings. Inspect thickness and darkness in the crops. If a crop misses a frame, arrow or identifiable nearby letters, move or expand the region to include comparable marks at native scale. On ruled paper trace each arrow to its head and check that it remains distinct from the ruling. If only the diagram needs changing, adjust its source or pen settings. Use each preview call as given for one revision; omit compare_revision.");
         }
         if draft.paper.is_some() {
             let mut appearance = json!({
@@ -355,6 +407,15 @@ pub fn page(
             }
             metadata["photo_appearance"] = appearance;
         }
+        drawing::add_check(&mut metadata, draft, section, page, sample, (w, h), None);
+        focus.add_review_guidance(
+            draft,
+            section,
+            page,
+            params.transparent_background,
+            true,
+            &mut metadata,
+        )?;
         metadata
     };
     let mut response = reply(

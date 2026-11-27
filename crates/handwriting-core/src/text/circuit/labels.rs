@@ -82,6 +82,7 @@ impl Parser {
             "pm" => "±",
             "le" | "leq" => "≤",
             "ge" | "geq" => "≥",
+            "ne" | "neq" => "≠",
             "infty" => "∞",
             "angle" => "∠",
             "circ" => "°",

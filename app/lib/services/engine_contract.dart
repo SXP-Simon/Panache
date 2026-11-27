@@ -62,11 +62,12 @@ class EngineInfo {
     required this.canCancel,
     required this.canChooseTaskId,
     this.canFineEdit = false,
+    this.canBlurPng = false,
     this.canListLocalFonts = false,
   });
   final String version;
   final bool canCancel, canChooseTaskId;
-  final bool canFineEdit, canListLocalFonts;
+  final bool canFineEdit, canListLocalFonts, canBlurPng;
   factory EngineInfo.fromJson(Map<String, dynamic> value) {
     final capabilities = value['capabilities'];
     return EngineInfo(
@@ -77,6 +78,7 @@ class EngineInfo {
           capabilities is Map && capabilities['task_submission_id'] == true,
       canListLocalFonts:
           capabilities is Map && capabilities['local_fonts'] == true,
+      canBlurPng: capabilities is Map && capabilities['export_blur'] == true,
       canFineEdit: capabilities is Map && capabilities['fine_edit'] == true,
     );
   }

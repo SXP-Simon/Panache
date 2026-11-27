@@ -154,7 +154,7 @@ pub fn execute(mut request: Request) -> Result<Value> {
             include_str!("../../handwriting-core/licenses/handright-LICENSE.txt")
         ))),
         "version" => Ok(
-            json!({"version": handwriting_core::app_version(), "capabilities": {"fine_edit": true}}),
+            json!({"version": handwriting_core::app_version(), "capabilities": {"export_blur": true, "fine_edit": true}}),
         ),
         "import" | "identify" | "pdf_page" => {
             let _operation = OPERATIONS

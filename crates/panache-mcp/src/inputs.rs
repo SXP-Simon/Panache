@@ -17,6 +17,23 @@ pub struct FontList {
     pub refresh: bool,
     /// Set false only to look up an already approved font or its ID when no new style choice is needed. Omit or set true for samples and style choices, even with an exact-name query.
     pub include_sample_guidance: Option<bool>,
+    /// Instead of searching, render the same saved page in its current font and up to two alternatives.
+    pub sample: Option<FontSample>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FontSample {
+    pub draft_id: String,
+    /// Omit for latest.
+    pub revision: Option<u32>,
+    /// One-based section and page (both default to 1).
+    pub section: Option<u32>,
+    pub page: Option<usize>,
+    /// One or two candidate IDs from list_fonts. The current font is shown automatically.
+    pub fonts: Vec<String>,
+    /// Optional common crop [x,y,width,height] in native output pixels. Frame real mixed text at writing size.
+    pub crop: Option<[u32; 4]>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -53,6 +70,10 @@ pub struct Style {
     /// Slightly vary letter size and tilt. Defaults on for new homework. Use false for the usual, steadier variation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relaxed_handwriting: Option<bool>,
+    /// Use the manuscript pen color, opacity, thickness and softness for embedded illustrations.
+    /// New homework enables this by default. Existing labels inside the image keep their drawn shapes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub illustration_uses_pen: Option<bool>,
     /// Keep this value to reproduce handwriting variations.
     #[schemars(transform = remove_schema_default)]
     pub seed: u32,
@@ -70,6 +91,7 @@ impl Default for Style {
             font_size: 34,
             homework: false,
             relaxed_handwriting: None,
+            illustration_uses_pen: None,
             seed: u32::from_le_bytes(Uuid::new_v4().as_bytes()[..4].try_into().unwrap()),
         }
     }
@@ -127,6 +149,7 @@ impl CreationStyle {
         if style.homework {
             // Resolve only on creation: older saved styles keep their original rendering.
             style.relaxed_handwriting.get_or_insert(true);
+            style.illustration_uses_pen.get_or_insert(true);
         }
         style
     }
@@ -146,6 +169,10 @@ pub struct Save {
     /// Optional photo-space baselines overriding auto detection on import. Give 2..32 guides, first row 0, last row the last writable line; intermediate guides refine the fit.
     pub paper_guides: Option<Vec<Guide>>,
     /// Original Markdown of just this section. A new section starts on a fresh page.
+    /// For a new labeled diagram use native source, for example:
+    /// \begin{circuitikz}[flowchart]
+    /// \draw (0,0) node[rectangle]{B1}; \draw (0,-2) node[diamond]{B2};
+    /// \draw[->] (0,0) -- (0,-2); \end{circuitikz}
     /// Embedded images remain intact in the source. Pages render them as hand-drawn outlines without their original colors.
     /// If color matters, explain this and offer a preview. Keep the image in the text rather than using it as the paper.
     pub markdown: String,
@@ -295,6 +322,17 @@ pub struct Shape {
     pub top_width_percent: u8,
 }
 
+#[derive(Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NaturalLine {
+    /// Start of the writing baseline in original preview pixels, at the selection's left edge.
+    pub start: [u32; 2],
+    /// End of the available baseline, in writing direction. Extra space stays blank.
+    pub end: [u32; 2],
+    /// Uniform size relative to the source layout, 50..200 (default 100). Reuse the same value on adjacent rows.
+    pub scale_percent: Option<u8>,
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Nudge {
@@ -307,11 +345,18 @@ pub struct Nudge {
     pub page: usize,
     /// Up to 32 glyph IDs from preview_handwriting(view="layout") on this page.
     pub ids: Vec<u32>,
+    /// Move one complete drawing by its native diagram ID or raster illustration parent ID. Use
+    /// place_center to translate the current outline and all labels together, or target_quad to
+    /// map the original drawing into exact image corners. Supply only one of these adjustments.
+    #[serde(default)]
+    pub whole_drawing: bool,
     /// For a named text target, send its intended glyph text in ids order (one exact string per ID). A mismatch rejects the whole edit. For repeated text, use nearby words or position to select the occurrence.
     pub expected_texts: Option<Vec<String>>,
     /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
     pub place_center: Option<[u32; 2]>,
-    /// Image destinations of the original block's TL,TR,BR,BL corners, in that order (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Replaces prior geometry; use separately from other geometry changes.
+    /// Place one source line along a worksheet baseline, preserving letter proportions, spacing, and baseline offsets in paper space. Use separately from other geometry changes.
+    pub natural_line: Option<NaturalLine>,
+    /// Exact stretch to the original block's TL,TR,BR,BL image destinations (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Use only for intentional four-corner warping. Replaces prior geometry.
     pub target_quad: Option<[[u32; 2]; 4]>,
     /// Absolute offsets in pixels from the original glyph position. Omitted fields retain their values.
     pub dx: Option<i32>,
@@ -322,6 +367,11 @@ pub struct Nudge {
     pub angle: Option<i8>,
     /// For text glyphs, a local multiplier of the draft-wide ink opacity, 0..100 percent. 100 adds no fading, 0 hides the glyph. This cannot exceed the global opacity.
     pub opacity: Option<u8>,
+    /// Optional gradual fade within each selected glyph or diagram. Two [height %, opacity multiplier %]
+    /// anchors in the unrotated glyph, top to bottom. Both coordinates are 0..100; heights must increase.
+    /// Values extend beyond the ends. Example [[0,65],[60,100]] preserves the bottom 40%.
+    /// Multiplies opacity. Pass [[0,100],[100,100]] to clear.
+    pub opacity_ramp: Option<[[u8; 2]; 2]>,
     /// Stroke weight delta in pixels, -2..2, in 0.1 px steps.
     pub thickness: Option<f64>,
     /// Edge softness delta in pixels, -2..2, in 0.1 px steps.
@@ -335,6 +385,13 @@ pub struct Nudge {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// In image view, explicitly preview the ZIP PNG finish at the same native dimensions.
+    /// Gaussian sigma in output pixels (0..2). Use 0 for the original. Add region to see a 1:1 detail.
+    #[schemars(range(min = 0, max = 2))]
+    pub export_blur_px: Option<f64>,
+    /// In image view, use instead of export_blur_px for a gradual change of focus.
+    /// Anchors are relative to the full output, including when requesting a native crop.
+    pub export_blur_gradient: Option<crate::engine::export_blur::Gradient>,
     /// In review, compare with an earlier revision. Omit region for stored, data-only evidence (offset/limit paginate edits). With region, render paired crops.
     pub compare_revision: Option<u32>,
     /// Pin the earlier stored full-page check by ID. Requires view=review and compare_revision, without a region. The check must belong to that earlier revision, draft, section and page.
@@ -345,6 +402,8 @@ pub struct Preview {
     pub previous_region: Option<Vec<[i32; 2]>>,
     /// In layout view, only return raster illustration outlines and isolated details. Omit for generated circuitikz: its labels and lines are one glyph.
     pub illustrations_only: Option<bool>,
+    /// Layout: whole drawings only, including native diagrams and raster illustration roots.
+    pub drawings_only: Option<bool>,
     /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
     /// For a hand-drawn diagram, compare its lines with nearby writing in a small review region at the same zoom.
     pub view: Option<PreviewView>,
@@ -369,6 +428,12 @@ pub struct Export {
     pub revision: Option<u32>,
     /// PDF includes the paper. ZIP contains page PNGs and respects the transparent_background ink control.
     pub format: Option<Format>,
+    /// ZIP only. Gaussian blur sigma in original image pixels, 0..2 (default 0). Softens the whole finished page, including photographed paper, for this export only.
+    #[schemars(range(min = 0, max = 2))]
+    pub export_blur_px: Option<f64>,
+    /// ZIP PNGs: two focus anchors on the full page, with normalized x/y (0..1) and sigma_px (0..2).
+    /// Use instead of export_blur_px. Strength varies along the line and holds constant past each end.
+    pub export_blur_gradient: Option<crate::engine::export_blur::Gradient>,
     /// Include the exported bytes as an embedded MCP resource for clients that can offer attachments.
     /// Up to 512 KiB before base64 encoding. Larger files stay available at the returned server path.
     #[serde(default)]

@@ -28,6 +28,7 @@ pub struct Decoration {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Circuit {
     pub american: bool,
+    pub flowchart: bool,
     pub segments: Vec<Segment>,
     pub decorations: Vec<Decoration>,
 }
@@ -173,6 +174,8 @@ impl<'a> Parser<'a> {
             }
             [kind]
                 if ANCHORS.contains(kind)
+                    || (self.circuit.flowchart
+                        && matches!(*kind, "circle" | "rectangle" | "diamond"))
                     || matches!(*kind, "" | "ground" | "rground" | "circ" | "ocirc") =>
             {
                 (self.current, *kind)
@@ -297,6 +300,7 @@ pub fn parse(source: &str) -> Option<Circuit> {
         names: HashMap::new(),
         circuit: Circuit {
             american: false,
+            flowchart: false,
             segments: Vec::new(),
             decorations: Vec::new(),
         },
@@ -309,6 +313,7 @@ pub fn parse(source: &str) -> Option<Circuit> {
         let options = p.group('[', ']')?;
         for option in split_options(&options)? {
             match option {
+                "flowchart" => p.circuit.flowchart = true,
                 "american" | "american resistors" => p.circuit.american = true,
                 "RPvoltages" | "voltage dir=RP" => p.rp = true,
                 "thin" | "semithick" | "thick" => (),
@@ -337,7 +342,7 @@ pub fn parse(source: &str) -> Option<Circuit> {
             return None;
         }
     }
-    if p.circuit.segments.is_empty() {
+    if p.circuit.segments.is_empty() && (!p.circuit.flowchart || p.circuit.decorations.is_empty()) {
         None
     } else {
         Some(p.circuit)

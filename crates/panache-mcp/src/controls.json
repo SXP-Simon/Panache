@@ -29,6 +29,7 @@
     "latin_digits": {"type":"boolean","default":false,"description":"Leave unset on new drafts. False keeps 0–9 at the main font and size. True applies the Latin size and any selected Latin font to digits."}
   },
   "ink": {
+    "illustration_uses_pen": {"type":"boolean","description":"Render embedded diagram strokes and labels using the manuscript ink color, opacity, thickness and softness. The shapes and lettering in the source image stay as drawn."},
     "transparent_background": {"type":"boolean","description":"Ink-only PNG preview and ZIP. PDF retains the paper."},
     "ink": {"type":"color"},
     "ink_alpha": {"type":"integer","min":0,"max":255,"description":"Alpha channel of the selected RGBA pen color, before ink opacity."},

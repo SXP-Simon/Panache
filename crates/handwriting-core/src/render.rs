@@ -48,6 +48,7 @@ use units::{fixed_cell, keeps_grid_cell, layout_units};
 // 2026-10-15：先缓存整行，知道最高根式/最低分母后再统一落笔，避免后出现的公式撞进上一行。
 struct LineUnit {
     is_text: bool,
+    is_native_diagram: bool,
     glyph: Glyph,
     rigid: bool,
     align_to_rulings: bool,
@@ -478,7 +479,7 @@ fn render_planes(
                     (h as f32 - p.top_margin - p.bottom_margin).max(1.) as u32,
                     imaging::scale(alt),
                 );
-                let image = imaging::handdrawn(
+                let mut image = imaging::handdrawn(
                     &image::DynamicImage::ImageRgba8(fitted),
                     p.seed.wrapping_add(i as u64),
                     cancel,
@@ -512,6 +513,17 @@ fn render_planes(
                         pages.push_tile(tile)?;
                     }
                 } else {
+                    if p.illustration_uses_pen {
+                        let mask = GrayImage::from_fn(image.width(), image.height(), |x, y| {
+                            image::Luma([image[(x, y)][3]])
+                        });
+                        image = ink_effects::composite(
+                            RgbaImage::new(image.width(), image.height()),
+                            mask,
+                            &r.params,
+                            cancel,
+                        )?;
+                    }
                     image::imageops::overlay(&mut pages.canvas, &image, x as i64, top as i64);
                 }
                 pages.dirty = true;
@@ -557,6 +569,7 @@ fn render_planes(
                 let advance = g.step(unit, p, extra, compound);
                 pages.x = x + advance;
                 pages.line.push(LineUnit {
+                    is_native_diagram: matches!(node, Node::Circuit(_)),
                     is_text: unit.iter().all(|node| matches!(node, Node::Char(_))),
                     glyph: g,
                     rigid: compound || cell.is_some(),
@@ -588,6 +601,7 @@ mod ruled_tests {
     fn sample_line() -> Vec<LineUnit> {
         vec![LineUnit {
             is_text: true,
+            is_native_diagram: false,
             glyph: Glyph {
                 mask: GrayImage::from_pixel(8, 40, Luma([255])),
                 advance: 8.,

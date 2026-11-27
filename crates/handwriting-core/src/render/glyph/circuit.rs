@@ -6,6 +6,7 @@ use rand_chacha::ChaCha8Rng;
 use std::f32::consts::{PI, TAU};
 
 mod branch;
+mod flowchart;
 
 #[derive(Clone, Copy)]
 enum Stroke {
@@ -17,6 +18,7 @@ type CircuitPath = (Vec<(i32, i32)>, Stroke);
 struct Drawing {
     paths: Vec<CircuitPath>,
     scale: f32,
+    arrow_size: f32,
     naturalness: f32,
     rng: ChaCha8Rng,
     holes: Vec<Point>,
@@ -201,7 +203,7 @@ impl Drawing {
         if len > 0. {
             let ux = dx / len;
             let uy = dy / len;
-            let back = 0.13_f32.min(len * 0.45);
+            let back = self.arrow_size.min(len * 0.45);
             let wing = back * 0.47;
             self.path(vec![
                 Point(b.0 - ux * back - uy * wing, b.1 - uy * back + ux * wing),
@@ -212,7 +214,7 @@ impl Drawing {
     }
 }
 // 2026-11-22：按字体采样的小数笔宽覆盖像素，避免整数笔刷把两像素线扩成三像素。
-fn pen_paths(paths: Vec<CircuitPath>, width: f32) -> Result<Option<Glyph>> {
+fn pen_paths(paths: Vec<CircuitPath>, width: f32, pen_offset: f32) -> Result<Option<Glyph>> {
     let mut points = paths.iter().flat_map(|(points, _)| points);
     let Some(&(x, y)) = points.next() else {
         return Ok(None);
@@ -230,6 +232,11 @@ fn pen_paths(paths: Vec<CircuitPath>, width: f32) -> Result<Option<Glyph>> {
             Stroke::Pen => width,
             Stroke::DotFill => 1.,
         };
+        let offset = if matches!(pen, Stroke::Pen) {
+            pen_offset
+        } else {
+            0.
+        };
         let reach = (diameter + 1.) * 0.5;
         for pair in points.windows(2) {
             let ((ax, ay), (bx, by)) = (pair[0], pair[1]);
@@ -237,7 +244,7 @@ fn pen_paths(paths: Vec<CircuitPath>, width: f32) -> Result<Option<Glyph>> {
             let length_sq = (dx * dx + dy * dy).max(1.);
             for y in ay.min(by) - pad..=ay.max(by) + pad {
                 for x in ax.min(bx) - pad..=ax.max(bx) + pad {
-                    let (px, py) = ((x - ax) as f32, (y - ay) as f32);
+                    let (px, py) = ((x - ax) as f32 - offset, (y - ay) as f32 - offset);
                     let t = ((px * dx + py * dy) / length_sq).clamp(0., 1.);
                     let distance = (px - t * dx).hypot(py - t * dy);
                     let alpha =
@@ -270,7 +277,18 @@ impl Glyphs<'_> {
             f32::NEG_INFINITY,
             f32::NEG_INFINITY,
         );
-        for p in circuit.segments.iter().flat_map(|s| [s.start, s.end]) {
+        for p in circuit
+            .segments
+            .iter()
+            .flat_map(|s| [s.start, s.end])
+            .chain(
+                circuit
+                    .decorations
+                    .iter()
+                    .filter(|_| circuit.flowchart)
+                    .map(|d| d.point),
+            )
+        {
             bounds.0 = bounds.0.min(p.0);
             bounds.1 = bounds.1.min(p.1);
             bounds.2 = bounds.2.max(p.0);
@@ -278,9 +296,20 @@ impl Glyphs<'_> {
         }
         let span = (bounds.2 - bounds.0).max(bounds.3 - bounds.1).max(1.);
         let scale = (size * 1.75).clamp(10., 160.).min(1800. / span);
+        let standard = self.pen.thickness(size);
+        let width = if circuit.flowchart {
+            flowchart::pen_width(self.book.primary(), size, standard)
+        } else {
+            standard
+        };
         let mut draw = Drawing {
             paths: Vec::new(),
             scale,
+            arrow_size: if circuit.flowchart {
+                (width * 4. / scale).max(0.20)
+            } else {
+                0.13
+            },
             naturalness: self.pen.naturalness,
             rng: self.next_drawing_rng(),
             holes: Vec::new(),
@@ -291,13 +320,29 @@ impl Glyphs<'_> {
                 .chain(circuit.decorations.iter().map(|d| d.point))
                 .collect(),
         };
+        let mut children = Vec::new();
+        let nodes = if circuit.flowchart {
+            flowchart::nodes(self, circuit, &draw, size, depth, &mut children)?
+        } else {
+            Vec::new()
+        };
         let mut labels: Vec<(String, Point, i32)> = Vec::new();
         for segment in &circuit.segments {
-            branch::draw(&mut draw, segment, circuit.american, &mut labels)?;
+            if circuit.flowchart && segment.kind == "short" {
+                let segment = flowchart::clip(segment, &nodes)?;
+                draw.contacts.extend([segment.start, segment.end]);
+                branch::draw(&mut draw, &segment, circuit.american, &mut labels)?;
+            } else {
+                branch::draw(&mut draw, segment, circuit.american, &mut labels)?;
+            }
+        }
+        for node in &nodes {
+            node.outline(&mut draw);
         }
         for decoration in &circuit.decorations {
             let p = decoration.point;
             match decoration.kind.as_str() {
+                "circle" | "rectangle" | "diamond" => {}
                 "circ" => draw.dot(p, false),
                 "ocirc" => draw.dot(p, true),
                 "ground" => {
@@ -341,9 +386,9 @@ impl Glyphs<'_> {
                 }
             }
         }
-        let mut children = Vec::new();
+        let label_size = if circuit.flowchart { size } else { size * 0.69 };
         for (text, p, anchor) in labels {
-            let g = self.sequence_at(&crate::text::parse(&text), size * 0.69, depth + 1)?;
+            let g = self.sequence_at(&crate::text::parse(&text), label_size, depth + 1)?;
             let (x, y) = draw.point(p);
             let x = match anchor {
                 -1 => x - g.right(),
@@ -353,7 +398,13 @@ impl Glyphs<'_> {
             let y = y - (g.top + g.bottom()) / 2;
             children.push((g, x, y));
         }
-        if let Some(ink) = pen_paths(draw.finish(), self.pen.thickness(size))? {
+        // 刚性墨迹以 128 为阈值，偶数像素笔宽须落在两列/两行之间。
+        let offset = if circuit.flowchart && (width.round() as u32).is_multiple_of(2) {
+            0.5
+        } else {
+            0.
+        };
+        if let Some(ink) = pen_paths(draw.finish(), width, offset)? {
             children.push((ink, 0, 0));
         }
         let mut result = Self::compose(0., children, Vec::new())?;
@@ -370,6 +421,7 @@ mod tests {
         Drawing {
             paths: Vec::new(),
             scale,
+            arrow_size: 0.13,
             naturalness: 1.,
             rng: rand::SeedableRng::seed_from_u64(20261123),
             holes: Vec::new(),
@@ -402,7 +454,7 @@ mod tests {
     #[test]
     fn horizontal_ink_coverage_tracks_fractional_pen_width() {
         for width in [0.75, 1., 1.4, 2., 2.8] {
-            let ink = pen_paths(vec![(vec![(0, 0), (20, 0)], Stroke::Pen)], width)
+            let ink = pen_paths(vec![(vec![(0, 0), (20, 0)], Stroke::Pen)], width, 0.)
                 .unwrap()
                 .unwrap();
             let coverage: f32 = (0..ink.mask.height())
@@ -416,7 +468,7 @@ mod tests {
     fn subpixel_wires_survive_the_page_ink_threshold() {
         use imageproc::region_labelling::{Connectivity, connected_components};
         for end in [(72, 31), (31, -72), (-72, -13), (-17, 72), (72, 0), (0, 72)] {
-            let wire = pen_paths(vec![(vec![(0, 0), end], Stroke::Pen)], 0.75)
+            let wire = pen_paths(vec![(vec![(0, 0), end], Stroke::Pen)], 0.75, 0.)
                 .unwrap()
                 .unwrap();
             let ink = GrayImage::from_fn(wire.mask.width(), wire.mask.height(), |x, y| {

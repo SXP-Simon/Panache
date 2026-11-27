@@ -15,6 +15,9 @@ pub struct Adjustment {
     pub scale: u8,
     pub angle: i8,
     pub opacity: u8,
+    // 2026-11-27：以未变换图块高度为坐标，在两个锚点间渐变笔迹浓度。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opacity_ramp: Option<OpacityRamp>,
     pub color: Option<[u8; 3]>,
     // 2026-11-18：相对全局设置的偏移，以 0.1 px 为单位。
     #[serde(default)]
@@ -23,6 +26,31 @@ pub struct Adjustment {
     pub softness: i8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warp: Option<[f64; 8]>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(transparent)]
+pub struct OpacityRamp(pub [[u8; 2]; 2]);
+
+impl OpacityRamp {
+    pub fn valid(self) -> bool {
+        self.0[0][0] < self.0[1][0] && self.0.into_iter().flatten().all(|v| v <= 100)
+    }
+
+    fn multiplier(self, position: f64) -> f64 {
+        let [[start, a], [end, b]] = self.0.map(|pair| pair.map(f64::from));
+        let t = ((position - start) / (end - start)).clamp(0., 1.);
+        (a + t * (b - a)) / 100.
+    }
+}
+
+impl Adjustment {
+    pub fn hides_ink(&self) -> bool {
+        self.opacity == 0
+            || self
+                .opacity_ramp
+                .is_some_and(|ramp| ramp.0.iter().all(|point| point[1] == 0))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -37,6 +65,8 @@ pub struct Adjustments {
 pub struct GlyphBounds {
     #[serde(skip)]
     pub is_text: bool,
+    #[serde(skip)]
+    pub is_native_diagram: bool,
     pub illustration: Option<u32>,
     pub id: u32,
     pub bounds: [i32; 4],
@@ -64,6 +94,7 @@ pub fn inspect_page(
                     .map(|t| GlyphBounds {
                         id: t.id,
                         is_text: t.is_text,
+                        is_native_diagram: t.is_native_diagram,
                         illustration: t.illustration,
                         bounds: [t.x, t.y, t.mask.width() as i32, t.mask.height() as i32],
                         source_utf16: t.source,
@@ -109,6 +140,7 @@ impl Adjustments {
                     && (50..=200).contains(&v.scale)
                     && (-45..=45).contains(&v.angle)
                     && v.opacity <= 100
+                    && v.opacity_ramp.is_none_or(OpacityRamp::valid)
                     && (-20..=20).contains(&v.thickness)
                     && (-20..=20).contains(&v.softness)
                     && v.warp
@@ -131,6 +163,7 @@ pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
 
 pub(crate) struct Tile {
     pub is_text: bool,
+    pub is_native_diagram: bool,
     pub illustration: Option<u32>,
     pub id: u32,
     pub x: i32,
@@ -293,11 +326,12 @@ pub(crate) fn paint(
     edit: Option<&Adjustment>,
     cancel: &Cancellation,
 ) -> Result<()> {
-    let (base_thickness, base_softness, base_fill, base_opacity) = if tile.illustration.is_some() {
-        (0., 0., [20, 20, 25, 255], 100)
-    } else {
-        (p.ink_thickness, p.ink_softness, p.fill, p.ink_opacity)
-    };
+    let (base_thickness, base_softness, base_fill, base_opacity) =
+        if tile.illustration.is_some() && !p.illustration_uses_pen {
+            (0., 0., [20, 20, 25, 255], 100)
+        } else {
+            (p.ink_thickness, p.ink_softness, p.fill, p.ink_opacity)
+        };
     let thickness =
         (base_thickness + edit.map_or(0., |v| f64::from(v.thickness) / 10.)).clamp(-2., 2.);
     let softness = (base_softness + edit.map_or(0., |v| f64::from(v.softness) / 10.)).clamp(0., 2.);
@@ -318,6 +352,14 @@ pub(crate) fn paint(
         .and_then(|v| v.color)
         .unwrap_or([base_fill[0], base_fill[1], base_fill[2]]);
     let opacity = u32::from(edit.map_or(100, |v| v.opacity));
+    let row_opacity = edit.and_then(|e| e.opacity_ramp).map(|ramp| {
+        (0..mask.height())
+            .map(|y| {
+                let position = (f64::from(y) + 0.5) * 100. / h;
+                (f64::from(opacity) * ramp.multiplier(position)).round() as u32
+            })
+            .collect::<Vec<_>>()
+    });
     for y in ((cy + top).floor().max(0.) as u32)
         ..((cy + bottom).ceil().max(0.) as u32).min(paper.height())
     {
@@ -343,7 +385,10 @@ pub(crate) fn paint(
                 * u32::from(base_fill[3])
                 + 12_750)
                 / 25_500;
-            let alpha = (alpha * opacity + 50) / 100;
+            let local = row_opacity
+                .as_ref()
+                .map_or(opacity, |rows| rows[sy as usize]);
+            let alpha = (alpha * local + 50) / 100;
             let pixel = &mut paper[(x, y)];
             if pixel[3] < 255 {
                 use image::Pixel;
@@ -375,6 +420,7 @@ mod tests {
                     scale: 100,
                     angle: 0,
                     opacity: 100,
+                    opacity_ramp: None,
                     color: None,
                     thickness: 0,
                     softness: 0,

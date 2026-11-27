@@ -150,6 +150,7 @@ pub(super) fn tiles(
         imageops::replace(&mut padded, &mask, PAD.into(), PAD.into());
         Tile {
             is_text: false,
+            is_native_diagram: false,
             id: part,
             illustration: Some(id),
             x: x + dx as i32 - PAD as i32,

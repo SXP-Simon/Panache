@@ -251,8 +251,9 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
 
   void notify(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -447,7 +448,8 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
       return;
     }
     w.text = editor.text;
-    if (!preview && w.finePreviewNeedsRefresh) {
+    // PDF renders the current layout and its keyed fine edits in one request.
+    if (!preview && !pdf && w.finePreviewNeedsRefresh) {
       livePreview.markSubmitted(w.editRevision);
       final refreshed = await w.generate();
       if (!mounted || !refreshed || w.previewStale) return;
@@ -767,6 +769,7 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
     fontFile: w.fontFile,
     background: w.background,
     settingsRevision: settingsRevision,
+    supportsPngBlur: w.api.supportsPngBlur,
     locked: editingLocked,
     activeSection: settingsSection,
     onSectionChanged: wide ? null : selectSettingsSection,
@@ -873,7 +876,10 @@ class _WorkbenchState extends State<Workbench> with WidgetsBindingObserver {
         pages: w.pages,
         inkPages: w.inkPages,
         inkLook: w.settings.inkLook,
-        onFineEdit: w.api.supportsFineEdit && editor.text.trim().isNotEmpty
+        onFineEdit:
+            !w.pngBlurActive &&
+                w.api.supportsFineEdit &&
+                editor.text.trim().isNotEmpty
             ? enterFineEdit
             : null,
         fineAdjustments: w.fineAdjustments,

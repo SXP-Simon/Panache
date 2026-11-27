@@ -2,12 +2,12 @@ use super::{Engine, glyph_point, glyph_source};
 use crate::{
     Nudge, Shape, Style,
     drafts::{Section, Snapshot},
-    placement::Placement,
+    placement::{Placement, PlacementReport},
 };
 use anyhow::{Context, Result, ensure};
 use handwriting_core::{
     Cancellation, Parameters,
-    fine_edit::{self, Adjustment, Adjustments, GlyphBounds},
+    fine_edit::{self, Adjustment, Adjustments, GlyphBounds, OpacityRamp},
 };
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
@@ -19,19 +19,31 @@ impl Engine {
         section: Section,
         input: &crate::Nudge,
         cancel: &Cancellation,
-    ) -> Result<u32> {
+    ) -> Result<(u32, Option<PlacementReport>, usize)> {
         let changes = GlyphChanges::parse(input, &draft.style)?;
         let version = section.version;
         let mut req = self.fine_request(draft, section)?;
         let (key, mut bounds) = fine_edit::inspect_page(&req, input.page, cancel)
             .map_err(|error| draft.page_error(input.section, error))?;
-        bounds.retain(|g| changes.ids.contains(&g.id));
+        if input.whole_drawing {
+            let parent = input.ids[0];
+            ensure!(
+                bounds
+                    .iter()
+                    .any(|g| g.id == parent
+                        && (g.is_native_diagram || g.illustration == Some(parent))),
+                "Select one native diagram ID or raster illustration parent ID on this page"
+            );
+            bounds.retain(|g| g.id == parent || g.illustration == Some(parent));
+        } else {
+            bounds.retain(|g| changes.ids.contains(&g.id));
+        }
         let mut selected = BTreeMap::new();
         for glyph in &bounds {
             selected.entry(glyph.id).or_insert(glyph);
         }
         ensure!(
-            selected.len() == changes.ids.len(),
+            changes.ids.iter().all(|id| selected.contains_key(id)),
             "Glyph not on this page; inspect its layout first"
         );
         if let Some(texts) = &input.expected_texts {
@@ -55,6 +67,7 @@ impl Engine {
             .map(|e| (e.id, e))
             .collect();
         let geometry = Geometry::resolve(input, draft, &req.params, &bounds, &edits)?;
+        let affected: Vec<_> = selected.keys().copied().collect();
         for (id, glyph) in selected {
             let edit = edits.entry(id).or_insert(Adjustment {
                 id,
@@ -63,6 +76,7 @@ impl Engine {
                 scale: 100,
                 angle: 0,
                 opacity: 100,
+                opacity_ramp: None,
                 color: None,
                 thickness: 0,
                 softness: 0,
@@ -72,15 +86,26 @@ impl Engine {
         }
         ensure!(edits.len() <= 10000, "Section glyph edit limit reached");
         cancel.check()?;
-        draft.store_edits(
+        let placement = match geometry {
+            Geometry::Placement(_, report) => Some(report),
+            _ => None,
+        };
+        let mut history = json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"opacity_ramp":input.opacity_ramp,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note});
+        if input.whole_drawing {
+            history["whole_drawing"] = json!(true);
+            history["drawing_id"] = json!(input.ids[0]);
+            history["ids"] = json!(affected);
+        }
+        let next = draft.store_edits(
             input.section,
             version,
             &Adjustments {
                 key,
                 glyphs: edits.into_values().collect(),
             },
-            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"target_quad":input.target_quad,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
-        )
+            &history,
+        )?;
+        Ok((next, placement, affected.len()))
     }
 }
 
@@ -99,6 +124,25 @@ impl<'a> GlyphChanges<'a> {
             !ids.is_empty() && ids.len() == input.ids.len() && ids.len() <= 32,
             "Choose 1..32 distinct glyph IDs"
         );
+        if input.whole_drawing {
+            ensure!(
+                ids.len() == 1
+                    && (input.target_quad.is_some() ^ input.place_center.is_some())
+                    && input.expected_texts.is_none()
+                    && input.natural_line.is_none()
+                    && input.dx.is_none()
+                    && input.dy.is_none()
+                    && input.scale.is_none()
+                    && input.angle.is_none()
+                    && input.shape.is_none()
+                    && input.opacity.is_none()
+                    && input.opacity_ramp.is_none()
+                    && input.thickness.is_none()
+                    && input.softness.is_none()
+                    && input.color.is_none(),
+                "whole_drawing requires one drawing ID and only place_center or target_quad"
+            );
+        }
         if let Some(texts) = &input.expected_texts {
             ensure!(
                 texts.len() == input.ids.len() && texts.iter().all(|text| !text.is_empty()),
@@ -107,12 +151,14 @@ impl<'a> GlyphChanges<'a> {
         }
         ensure!(
             input.target_quad.is_some()
+                || input.natural_line.is_some()
                 || input.place_center.is_some()
                 || input.dx.is_some()
                 || input.dy.is_some()
                 || input.scale.is_some()
                 || input.angle.is_some()
                 || input.opacity.is_some()
+                || input.opacity_ramp.is_some()
                 || input.shape.is_some()
                 || input.thickness.is_some()
                 || input.softness.is_some()
@@ -141,6 +187,12 @@ impl<'a> GlyphChanges<'a> {
         };
         let thickness = input.thickness.map(delta).transpose()?;
         let softness = input.softness.map(delta).transpose()?;
+        ensure!(
+            input
+                .opacity_ramp
+                .is_none_or(|pair| OpacityRamp(pair).valid()),
+            "opacity_ramp requires two [height %, opacity %] anchors in 0..100 with increasing heights"
+        );
         let color = input
             .color
             .as_ref()
@@ -167,7 +219,7 @@ impl<'a> GlyphChanges<'a> {
 
     fn apply(&self, geometry: &Geometry, glyph: &GlyphBounds, e: &mut Adjustment) -> Result<()> {
         let input = self.input;
-        if let Geometry::Quadrilateral(map) = geometry {
+        if let Geometry::Placement(map, _) = geometry {
             map.apply(e, glyph.bounds)?;
         }
         if let Some(shape) = &input.shape {
@@ -186,6 +238,9 @@ impl<'a> GlyphChanges<'a> {
         e.angle = input.angle.unwrap_or(e.angle);
         e.scale = input.scale.unwrap_or(e.scale);
         e.opacity = input.opacity.unwrap_or(e.opacity);
+        if let Some(pair) = input.opacity_ramp {
+            e.opacity_ramp = (pair[0][1] != 100 || pair[1][1] != 100).then_some(OpacityRamp(pair));
+        }
         e.thickness = self.thickness.unwrap_or(e.thickness);
         e.softness = self.softness.unwrap_or(e.softness);
         if let Some(c) = self.color {
@@ -223,7 +278,7 @@ fn shape_warp(shape: &Shape, height: i32) -> Option<[f64; 8]> {
 
 enum Geometry {
     Unchanged,
-    Quadrilateral(Placement),
+    Placement(Placement, PlacementReport),
     Translation([i32; 2]),
 }
 
@@ -240,7 +295,14 @@ impl Geometry {
             .as_ref()
             .map(|p| p.photo_size.unwrap_or([p.width, p.height]))
             .unwrap_or([params.width.unwrap_or(0), params.height.unwrap_or(0)]);
-        if let Some(quad) = input.target_quad {
+        let projection = draft.paper.as_ref().and_then(|p| p.projection.as_ref());
+        let placement = match (&input.natural_line, input.target_quad) {
+            (Some(_), Some(_)) => anyhow::bail!("Use natural_line or target_quad separately"),
+            (Some(line), None) => Some(Placement::natural_line(projection, [w, h], bounds, line)?),
+            (None, Some(quad)) => Some(Placement::target_quad(projection, [w, h], bounds, quad)?),
+            (None, None) => None,
+        };
+        if let Some((map, report)) = placement {
             ensure!(
                 input.place_center.is_none()
                     && input.dx.is_none()
@@ -248,14 +310,9 @@ impl Geometry {
                     && input.angle.is_none()
                     && input.scale.is_none()
                     && input.shape.is_none(),
-                "Use target_quad separately from other geometry fields"
+                "Use natural_line or target_quad separately from other geometry fields"
             );
-            return Ok(Self::Quadrilateral(Placement::new(
-                draft,
-                [w, h],
-                bounds,
-                quad,
-            )?));
+            return Ok(Self::Placement(map, report));
         }
         if let Some(target) = input.place_center {
             ensure!(
@@ -263,11 +320,13 @@ impl Geometry {
                 "Use place_center separately from dx/dy/shape"
             );
             ensure!(target[0] < w && target[1] < h, "Target outside the page");
-            let projection = draft.paper.as_ref().and_then(|p| p.projection.as_ref());
             let dest = target.map(|v| v as f32);
             let dest = projection.map_or(dest, |p| p.paper_point(dest));
             let mut mean = [0., 0.];
-            for g in bounds {
+            for g in bounds
+                .iter()
+                .filter(|g| !input.whole_drawing || g.id == input.ids[0])
+            {
                 let pos = glyph_point(g, edits.get(&g.id), [0., 0.]);
                 for axis in 0..2 {
                     mean[axis] += pos[axis] / input.ids.len() as f32;

@@ -62,6 +62,7 @@ class WorkbenchSettings extends StatelessWidget {
     this.activeSection,
     this.onSectionChanged,
     this.inkControls,
+    this.supportsPngBlur = false,
   });
   final Settings settings;
   final List<String> fonts;
@@ -86,6 +87,7 @@ class WorkbenchSettings extends StatelessWidget {
   final SettingsSection? activeSection;
   final ValueChanged<SettingsSection>? onSectionChanged;
   final Widget? inkControls;
+  final bool supportsPngBlur;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +158,7 @@ class WorkbenchSettings extends StatelessWidget {
                     l,
                     fields,
                     background: background,
+                    supportsPngBlur: supportsPngBlur,
                     onUploadBackground: onUploadBackground,
                     onRemoveBackground: onRemoveBackground,
                     onDetectBackground: onDetectBackground,

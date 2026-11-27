@@ -40,6 +40,7 @@ struct State {
     drafts: Drafts,
     preserve_reviews: bool,
     engine: Mutex<Engine>,
+    paper_focus: paper::focus::Cache,
     fonts: Vec<String>,
     local_fonts: LocalFonts,
     storage: storage::Storage,
@@ -279,9 +280,9 @@ impl ServerHandler for Panache {
             "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
             "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
-            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. When the user wants to compare fonts, see list_fonts for sample guidance. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
+            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For a font comparison, show the labeled images from list_fonts(sample=...) on the actual draft paper and mixed text. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
             "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
-            "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
+            "For a new labeled flowchart, use the native [flowchart] example in save_section.markdown so its lettering follows the selected font. For diagrams or icons on a paper photo, inspect diagram_perspective_check in the page review at the final position. Compare both horizontal edges and both side directions, near/far widths and nearby writing against the actual paper. Projection already covers the complete drawing. If it matches, retain it. If only this drawing differs and four actual reference corners can be located, apply target_quad with whole_drawing=true and verify the labels and arrows together. For uploaded sheets, follow paper_focus_check on import and preview. Compare nearby printed edges with added strokes in the sharper, transition and softer areas at native size before export. If a mismatch is visible, adjust only the affected writing or diagram, then recheck the transition and the sharper area. At native size compare local_paper_ink_check for the first written row with nearby photographed marks. If the top looks too dark, taper local opacity into the body and recheck. Use opacity_ramp within a tall drawing that crosses the transition. For a plain PNG export leave blur unset. For a lightly softened PNG with no direction specified, start with uniform export_blur_px=0.6. For a photographed worksheet PNG, after local edits check whether review supplies png_finish_comparison. If it does, compare its clear and gradient native crops at both locations before choosing. Keep the clear finish when both fit or delicate writing fades. When focus should vary across the photograph, use export_blur_gradient instead. Position its two anchors from the request or inspected photo. Preview the same revision at both ends and in between with view=image and region, then export ZIP using the same finish. If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
@@ -332,13 +333,7 @@ impl Panache {
                 let mut effective = serde_json::Map::new();
                 for k in data["controls"].as_object().unwrap().keys() {
                     let val = match k.as_str() {
-                        "font" => json!(
-                            draft
-                                .controls
-                                .get(k)
-                                .and_then(|v| v.as_str())
-                                .unwrap_or(&draft.style.font)
-                        ),
+                        "font" => json!(draft.font_name()),
                         "paper" => draft
                             .controls
                             .get(k)
@@ -389,9 +384,29 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Search bundled, personal and system fonts by name/source. Results are paged. Use an entry ID in save_section style.font or tune_handwriting changes.font; user and system faces are saved with the draft."
+        description = "Search bundled, personal and system fonts. To compare fonts on the saved paper, pass sample with draft_id, one or two candidate IDs and an optional native-pixel crop. The current image retains local edits. Candidates reflow, so check which words occupy the same region. Samples show the paper even for transparent PNG drafts. Returns labeled images and tune_handwriting arguments without editing the draft."
     )]
-    async fn list_fonts(&self, Parameters(input): Parameters<FontList>) -> CallToolResult {
+    async fn list_fonts(
+        &self,
+        Parameters(input): Parameters<FontList>,
+        ctx: RequestContext<RoleServer>,
+    ) -> CallToolResult {
+        if let Some(sample) = input.sample {
+            return tool_result(
+                self.render(ctx, move |state, engine, cancel| {
+                    ensure!(
+                        input.query.is_empty()
+                            && input.source.is_none()
+                            && input.offset == 0
+                            && input.limit.is_none()
+                            && !input.refresh,
+                        "Use catalog search fields separately from sample"
+                    );
+                    engine::font_samples::compare(state, engine, sample, cancel)
+                })
+                .await,
+            );
+        }
         let include_sample_guidance = input.include_sample_guidance.unwrap_or(true);
         let query = FontSearch {
             query: input.query,
@@ -407,9 +422,9 @@ impl Panache {
             let guidance = concat!(
                 "Select only the main font for a new draft. Its letters and digits are the default, including for homework and lab reports. ",
                 "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
-                "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
+                "Save the actual paper, settings and task text first. Call list_fonts(sample={draft_id,fonts:[candidate_id]}) for labeled images of the same page, optionally adding crop:[x,y,width,height] around a mixed line. Compare stroke weight, slant, relative size and digit legibility. ",
                 "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
-                "Keep an approved font. For a less regular hand inspect describe_controls(group=variation) and preview a small change. If the user wants occasional corrections, inspect group=strike. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
+                "Keep an approved font, or apply the chosen candidate's tune_arguments once. Render diagram labels with that same draft font. For a less regular hand inspect describe_controls(group=variation) and preview a small change. If the user wants occasional corrections, inspect group=strike. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
             );
             let mut data = json!({
                 "entries": page.fonts, "total": page.total,
@@ -430,7 +445,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Create a draft from text or a problem supplied in chat. To show its first page, save first, then preview. Saves Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
+        description = "Create a draft from text or a problem supplied in chat. To show its first page, save first, then preview. Saves Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For new flowcharts use \\begin{circuitikz}[flowchart] with node[rectangle], node[diamond] or node[circle] and \\draw[->] connections. The labels and outlines use the manuscript pen. Keep the diagram at natural scale. On a photo inspect diagram_perspective_check: compare its whole frame and labels with the local paper plane, both across and down the sheet, as well as their pen weight. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
@@ -534,7 +549,7 @@ impl Panache {
 
     #[tool(
         annotations(open_world_hint = false),
-        description = "Use view=image to see the page without filing a check. A full-page view=review without compare_revision renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. With compare_revision and no region it reads stored data, review IDs, intervening edits and limitations. Add before_review_id to pin the earlier stored check for that draft, revision, section and page. With region it rerenders labeled crops in the current environment using native image coordinates and measures visible changes. The crops do not contain archived pixels. Add compare_revision for paired before/after and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. illustrations_only selects raster illustrations, not generated circuitikz. Locate a circuit on the current image, then query its region at the same revision without that filter for the whole diagram ID. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
+        description = "Use view=image to see the page without filing a check. A full-page view=review without compare_revision renders and records a check. To look up an existing check without rendering use read_section(view=review, section, page). view=review returns paper, finished appearance, overlay and full-page evidence. For a diagram on photographed paper, open diagram_perspective_check in review to compare the current four corners with the local paper axes. Its layout_arguments identify the whole drawing. For photo ink, inspect local_paper_ink_check beside nearby paper marks and paper_focus_check for edge changes. In image view set export_blur_px for uniform softness or export_blur_gradient for two full-page focus anchors. Use the same finish for ZIP. Add region for a 1:1 crop. Open the supplied crop arguments at native size before adjusting softness. With compare_revision and no region it reads stored data, review IDs, intervening edits and limitations. Add before_review_id to pin the earlier stored check for that draft, revision, section and page. With region it rerenders labeled crops in the current environment using native image coordinates and measures visible changes. The crops do not contain archived pixels. Add compare_revision for paired before/after and previous_region for the old location of moved content. Use a separate region to inspect protected content. view=layout returns glyph IDs and base boxes [x,y,width,height], paginated by offset/limit. Use region to select current glyph centers. drawings_only selects native diagrams and whole raster drawings. illustrations_only selects raster units including independently editable details. Edit its Markdown to change a label. Projected layouts include base photo_quad (TL,TR,BR,BL) and photo_baseline. view=paper returns the saved background."
     )]
     async fn preview_handwriting(
         &self,
@@ -562,7 +577,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually. An ID is local to the exact layout revision, section and page that returned it. After an intervening edit, read the latest layout and resolve the intended glyph again; do not reuse old IDs by changing only expected_revision."
+        description = "Adjust selected glyphs by IDs from this section/page's layout at the same revision. For worksheet lettering use natural_line with two image points on the writing baseline. It preserves original letter proportions and spacing in paper space, replaces prior warps, and leaves unused row width blank. Use one uniform size across related rows. For an entire diagram on a photo, inspect diagram_perspective_check first. Use whole_drawing=true with its single root ID and place_center to translate all parts, or target_quad when four measured corners require a correction. Use target_quad only for an intentional exact four-corner warp. Offsets and per-glyph shape are in paper space. After an intervening edit, read the latest layout and locate the intended glyph again; do not reuse old IDs by changing only expected_revision."
     )]
     async fn adjust_glyphs(
         &self,
@@ -583,11 +598,15 @@ impl Panache {
                     input.note.as_ref().is_none_or(|s| s.chars().count() <= 320),
                     "Note exceeds 320 characters"
                 );
-                let next = engine.adjust(&draft, section, &input, cancel)?;
-                Ok(reply(
-                    format!("Saved revision {next}."),
-                    json!({"draft_id":draft.id,"revision":next,"count":input.ids.len()}),
-                ))
+                let (next, placement, count) = engine.adjust(&draft, section, &input, cancel)?;
+                let mut message = format!("Saved revision {next}.");
+                let mut data = json!({"draft_id":draft.id,"revision":next,"count":count});
+                if let Some(report) = placement {
+                    message.push(' ');
+                    message.push_str(&report.summary());
+                    data["placement"] = json!(report);
+                }
+                Ok(reply(message, data))
             })
             .await,
         )
@@ -625,7 +644,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. For clients that can receive embedded files, request include_file. An embedded resource URI is not a user-visible download URL. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
+        description = "Export a revision in section order as PDF (default, includes paper) or ZIP of PNGs. Return the path, page count and review.unreviewed_pages for print-and-report. To look up a listed page use read_section(view=review); only a requested new check needs preview_handwriting(view=review) at the exported revision. ZIP supports uniform export_blur_px or directional export_blur_gradient as shown in preview_handwriting. For transparent PNGs set transparent_background=true in the ink group before exporting ZIP. For clients that can receive embedded files, request include_file. An embedded resource URI is not a user-visible download URL. The returned path is local to the computer running Panache. With only this path, tell the user in their language: 'On the computer running Panache, open this file: <path>'. Put the path in inline code, never in a download link. If the chat host confirms a visible attachment, point to that attachment instead; if its receipt gives a download URL, include that exact URL in the final reply."
     )]
     async fn export_handwriting(
         &self,
@@ -635,6 +654,10 @@ impl Panache {
         let progress_token = ctx.meta.get_progress_token();
         let peer = ctx.peer.clone();
         let result = self.render(ctx, move |state, engine, cancel| {
+            let format = input.format.unwrap_or_default();
+            let finish = engine::export_blur::finish(input.export_blur_px, input.export_blur_gradient)?;
+            let active_finish = finish.filter(|f| f.active());
+            ensure!(matches!(format, Format::Zip) || active_finish.is_none(), "Nonzero PNG blur requires format=zip. For PDF, omit the blur settings or use zero strength.");
             let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
             let sections = state.drafts.sections(&input.draft_id, draft.revision, None)?;
             let reviewed_pages = draft.reviewed_pages()?;
@@ -644,9 +667,8 @@ impl Panache {
             let mut different = Vec::new();
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
-            let format = input.format.unwrap_or_default();
             let (path, pages, file) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
-                writer, &draft, sections, format, cancel,
+                writer, &draft, sections, (format, active_finish), cancel,
                 |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
                         Some(record) => {
@@ -694,21 +716,32 @@ impl Panache {
             if matches!(format, Format::Zip) {
                 let without_digest = reviewed - matching - different.len();
                 if !different.is_empty() {
-                    pixel_warning = format!(" ZIP 中这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
+                    let stage = if active_finish.is_some() { "柔化前" } else { "ZIP 中" };
+                    pixel_warning = format!(" {stage}这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
                 }
                 if without_digest > 0 {
                     pixel_warning.push_str(&format!(" {without_digest} 页的检查单没有像素摘要，无法比对。"));
                 }
-                review["zip_pixels"] = json!({
+                let comparison = json!({
                     "pages_matching_latest_review": matching,
                     "different_pages": different,
                     "reviewed_pages_without_digest": without_digest,
                 });
+                review["zip_pixels"] = if let Some(finish) = active_finish {
+                    let mut evidence = json!({"status":"not_compared_after_export_blur","before_blur":comparison});
+                    finish.write_metadata(&mut evidence);
+                    pixel_warning.push_str(" 此次导出的 PNG 已按所选参数柔化。检查单的像素摘要对应柔化前的页面。");
+                    evidence
+                } else { comparison };
             }
             let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n运行 Panache 的电脑上的文件：`{}`", draft.revision, path.display());
-            let mut result = reply(message, json!({
+            let mut metadata = json!({
                 "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review": review,
-            }));
+            });
+            if matches!(format, Format::Zip) && let Some(finish @ engine::export_blur::Finish::Gradient(_)) = finish {
+                finish.write_metadata(&mut metadata);
+            }
+            let mut result = reply(message, metadata);
             if input.include_file {
                 delivery::include_file(&mut result, file, &path, format);
             }
@@ -771,6 +804,7 @@ async fn main() -> Result<()> {
             .with_bundled_dir(font_dir),
         fonts: engine.names.clone(),
         engine: Mutex::new(engine),
+        paper_focus: Default::default(),
         worker: fs::read_to_string(worker)?.into(),
         render_slot: Arc::new(Semaphore::new(1)),
         prepare_slot: Arc::new(Semaphore::new(1)),

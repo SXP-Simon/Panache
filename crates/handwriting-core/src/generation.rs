@@ -47,11 +47,15 @@ pub fn generate(
     cancel.check()?;
     let camera =
         export::CameraMetadata::from_paper(request.background.as_deref(), &request.params.camera)?;
+    let finish_png = |image: image::RgbaImage| match request.params.png_finish {
+        Some(finish) if finish.active() => finish.apply(&image, cancel),
+        _ => Ok(image),
+    };
     match output {
         Output::Preview(emit) => {
             render::render(request, cancel, |index, image| {
                 cancel.check()?;
-                let bytes = camera.png(&image)?;
+                let bytes = camera.png(&finish_png(image)?)?;
                 cancel.check()?;
                 emit(index, bytes)?;
                 progress(Event::PageReady(index + 1))?;
@@ -121,7 +125,7 @@ pub fn generate(
             let mut zip = export::ZipExport::new(writer);
             render::render(request, cancel, |index, image| {
                 cancel.check()?;
-                zip.add_with_camera(index, &image, &camera)?;
+                zip.add_with_camera(index, &finish_png(image)?, &camera)?;
                 progress(Event::PageReady(index + 1))?;
                 cancel.check()
             })?;

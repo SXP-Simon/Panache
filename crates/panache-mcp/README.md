@@ -70,7 +70,7 @@ cargo build --locked --release -p panache-mcp
 
 | 工具 | 用法 |
 | --- | --- |
-| `list_fonts` | 按名称、文件名或来源（`bundled`、`user`、`system`）检索字体。默认 20 项，使用 `next_offset` 翻页。为作业、实验报告选笔迹时，指导模型展示中英数混排小样，按用户偏好定稿。 |
+| `list_fonts` | 按名称、文件名或来源（`bundled`、`user`、`system`）检索字体。默认 20 项，使用 `next_offset` 翻页。传入 `sample` 可在稿件的纸张上比较当前字体和一至两个候选字体。 |
 | `save_section` | 用 `markdown` 新建稿件。首次可传标题、字体、字号、纸样、墨色、种子和作业排版模式。返回 `draft_id`、版本号和节号。 |
 | `list_drafts` | 找回本地稿件和最新版本。每批 20 条，可传 `offset`。 |
 | `read_section` | `summary` 取版本、长度和样式；默认 `excerpt` 隐去正文中已识别的内嵌图片数据；`source` 读取精确 Markdown。后两种视图按字符分页，默认 1000 字，单次最多 4000 字。 |
@@ -87,6 +87,14 @@ cargo build --locked --release -p panache-mcp
 若本次只改稿、打印和统计缺单页，可在客户端的 MCP 服务配置中设置 `PANACHE_MCP_PRESERVE_REVIEWS=1`。该连接仍可正常调参、看图和导出，完整检查单与评语会保留原样。
 
 例如用 `list_fonts(query="楷", source="system", limit=8)` 检索系统字体。把 `entries[].id` 用于建稿的 `style.font` 或调稿的 `changes.font`。随包字体继续接受原文件名。个人和系统字体会随稿保存，删除源文件后仍可预览历史版本。TTF、OTF 和 TTC/OTC 中带轮廓、单个字面大小不超过 32 MiB 的字体可供选择。
+
+给照片作业选字时，先用正文中的一行试排，例如“基本块 B1（1～2），if i > 10”。在精修位置前调用 `list_fonts`：
+
+```json
+{"sample":{"draft_id":"稿件 ID","revision":1,"fonts":["华阳手写体.ttf","李国夫手写体.ttf"],"crop":[200,300,580,160]}}
+```
+
+`crop` 是原图的左、上、宽、高。请替换为稿件实际文字所在位置；省略时比较整页。客户端会收到标有字体的图片。选中候选后使用其 `tune_arguments`。图中标签若由外部程序绘制，应在绘制时采用选定字体。新作业的嵌入图沿用正文笔色、透明度、粗细和柔化；已有稿件可用 `tune_handwriting(changes={"illustration_uses_pen":true}, preserve_local_adjustments=true)` 启用。
 
 桌面与 MCP 共享“我的字体”目录，`list_fonts` 的 `user_dir` 给出绝对路径。Windows 使用 `%LOCALAPPDATA%/Panache/fonts`，macOS 使用 `~/Library/Application Support/Panache/fonts`，Linux 使用 `$XDG_DATA_HOME/Panache/fonts`（默认 `~/.local/share/Panache/fonts`）。可通过 `PANACHE_USER_FONT_DIR` 指定绝对路径。把字体放入后调用 `list_fonts(source="user", refresh=true)`。
 
@@ -134,17 +142,60 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 ## 照片排版与成品复盘
 
+一道模拟理工科作业，分别用 MCP 排在两张无横线的纸张照片上。点击成稿可查看原尺寸 PNG。
+
+| 斜拍的无横线白纸 | 花影下的白纸 |
+| --- | --- |
+| [![木桌上的斜拍白纸，手写代码、基本块与流程图沿纸边排列](../../assets/examples/angled-sheet-5ad065421e7c.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/922b6c7303c6a1d86271e42929bb316eb9c953bb/screenshots/worksheet-lettering/round-7/worksheet.png) | [![花头遮住部分右侧纸边，手写作业与流程图避开花头](../../assets/examples/flower-shadow-a07835481c3a.webp)](https://raw.githubusercontent.com/SXP-Simon/Panache/1aea40070e551868368842392ca349a823d95de0/screenshots/worksheet-lettering/round-8/worksheet.png) |
+
+底图摄影 · [Kaboompics](https://www.pexels.com/photo/empty-paper-sheet-on-wooden-table-4207708/) · [Andrzej Gdula](https://www.pexels.com/photo/white-printer-paper-on-brown-wooden-table-11485123/)
+
 1. 表格、无横线纸和画作均可排字。用户已指定位置或委托选位时，直接按意图排版。落字区有歧义时，简短问“要写在哪个栏，哪些地方留白？”若必填区域在画外，或失焦、遮挡、透视已使它无法定位，建稿前指出具体缺哪一块，请用户补拍该区域或确认只填可见部分。已明确要求只写正文时，直接填写可定位的正文区。
 2. 用 `save_section` 导入照片并保留版本号。用 `preview_handwriting(view="review")` 取得同一页的底纸、成品和叠图。整页复查图长边最多 900 像素，像素坐标以返回的 `photo_size` 为准。检查有字区域的横线、页眉、页边和需要保留的图案。
 3. 调用 `tune_handwriting(draft_id, expected_revision, paper_guides, note)` 在原照片上重排全文。至少给两条参考线，每条提供行号与左右端点。无横线纸也可以指定想写入的区域。传空数组恢复建稿时的校准。旧版本仍可回看；改写书写区域会重置冲突的边距覆盖，重新排版后需重新选字。
-4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和这次布局返回的版本交给 `adjust_glyphs`。用户点名要改哪几个字时，按 `ids` 的顺序传 `expected_texts`，例如 `ids=[4,6], expected_texts=["春","雨"]`。任一编号对应的文字不符，整批都不保存；版本冲突时重新查布局并定位。相同的字出现多次时，用上下文或位置区分。纯位置选区和旧客户端可以省略文字核对。`place_center` 将一组字移到指定照片位置；`target_quad` 按左上、右上、右下、左下四角放置所选字块，替换该组已有几何调整。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
+4. 局部改动用 `preview_handwriting(view="layout", region=[[x,y],…])` 圈选字形中心，结果按页分批。把选中的 ID 和这次布局返回的版本交给 `adjust_glyphs`。用户点名要改哪几个字时，按 `ids` 的顺序传 `expected_texts`，例如 `ids=[4,6], expected_texts=["春","雨"]`。任一编号对应的文字不符，整批都不保存；版本冲突时重新查布局并定位。相同的字出现多次时，用上下文或位置区分。纯位置选区和旧客户端可以省略文字核对。同一原始行的文字用 `natural_line={"start":[x0,y0],"end":[x1,y1]}` 沿照片上的书写基线定位。默认保留原字号和字宽，短行留白；超长时可换行或扩大可用范围。多行需要统一缩放时使用相同的 `scale_percent`。`place_center` 平移字块；明确需要铺满四角时用 `target_quad`，回执给出纸面字形中心的最大主次轴伸缩比。局部字形还可分别调倾斜、浓度和笔画。调整后复查新版本。
 5. 用 `read_section(view="trajectory")` 回看该稿的近期操作、简短调整理由和按页记录的复盘指标。有下一页时，把 `next_cursor` 作为下一次调用的 `cursor`。把需要人判断的歧义带回当前会话；确定符合用途后导出同一版本。
 
 要核对局部改动，用 `preview_handwriting(view="review", region=…, revision=新版本, compare_revision=旧版本)` 查看同一区域的底纸、改前和改后图。移动字块时还可用 `previous_region` 圈出旧位置。需要保护的文字或页眉可单独圈选复查。区域使用原尺寸成品像素。[局部坐标与测量示例](tool-design.md#局部改动的复查)
 
+在照片上画新的流程图时，把下例直接写入节的 Markdown。节点文字继承稿件的字体，图框和箭头按其笔画绘制。先给分支条件、箭头和节点留够空间，再移动整图。把图缩进小格会连同标签字号一起改变。已有位图的标签保存在像素中，需要改字形时可从已知题意重建节点和连线。
+
+```tex
+\begin{circuitikz}[flowchart]
+\draw (0,0) node[rectangle]{B1};
+\draw (0,-2) node[diamond]{B2};
+\draw[->] (0,0) -- (0,-2) node[midway,right]{i≤10};
+\end{circuitikz}
+```
+
+照片上的流程图、图标及插图应和正文落在同一纸面上。整页或局部 `view="review"` 的 `diagram_perspective_check` 给出图框当前四角、同位置沿纸面两轴的参考四角、四边的方向差以及底边/顶边宽度比。用 `preview_arguments` 比较原纸与成稿，必要时用 `native_image_arguments` 放大看节点、箭头和标签。沿图上下边比对原纸横线，再沿左右侧比对页边、表格竖线或连续横线的端点。纸面模型可能只校准了旋转；没有足够参照时保留不确定性。根据模型得到的四角不构成四个独立实测点。
+
+整体已协调时保留原图。图和字都偏时先核对纸张标定；仅图形偏斜、且原纸有清楚的四角参照时，用当前版 `layout_arguments` 找根 ID，调用 `adjust_glyphs(whole_drawing=true, ids=[根ID], target_quad=四角)`。四角按左上、右上、右下、左下填写。只移动整图用 `place_center`。独立位图标签随根图共同变换；原先手动挪过的标签可用 `separate_detail_alignment` 核对。四角操作从原始图块布局重建，单纯平移保留局部几何编辑。修后复看相同区域和附近正文。`view="layout", drawings_only=true` 列出整图；`illustrations_only=true` 仍可选取位图的独立细节。
+
+照片建稿和预览返回的 `paper_focus_check` 可用于比较不同位置印刷边缘的过渡宽度。请在推荐的原尺寸局部内对照底纸和成品，看同一位置的印字、细横线、手写字和图线。清晰度渐变时连同中间过渡区一起看。确有不协调时只选受影响的字或图块轻调柔化，复查改动区和原先清晰的区域。空白或低反差区域可能缺少测量依据。
+
+判断照片上的字是否过重时，在整页复核的 `local_paper_ink_check` 中先找第一行，再比较中、下部的样本。按 `preview_arguments` 打开原尺寸的底纸和成稿，留意相邻的印字和细线。纸面亮度、印字浓淡和笔画清晰度是三种不同的线索。若标题比同处印字明显更深，可用 `layout_arguments` 定位字形，逐行调整 `adjust_glyphs.opacity`，以 `compare_revision` 查看交界与原先合适的区域。单个图块跨过深浅边界时，`opacity_ramp=[[0,65],[60,100]]` 会从图块顶部的 65% 逐渐过渡到高度 60% 处的 100%，下段维持原浓度。这些百分比乘在该字形原有的 opacity 上。
+
+用户希望输出更接近轻微虚焦的照片时，先用 `preview_handwriting(view="image", export_blur_px=0.6, region=…)` 与同区域的 `0` 档比较。客户端可能缩放整页，局部裁图保留原始像素。选定后对同一稿件版本调用 `export_handwriting(format="zip", export_blur_px=0.6)`。数值为高斯模糊的标准差，范围 0–2 个输出像素。默认值为 0。纸与墨在合成后一起柔化，透明页保留透明度。PDF 和稿件自身的设置独立于这项 PNG 交付选项。
+
+普通导出省略柔化参数。仅要求「稍微柔一点」时，可从均匀的 `export_blur_px=0.6` 试起。若指定上软下清、右上角偏软等方向，改用 `export_blur_gradient`，在同一版的预览和 ZIP 导出中传相同的对象。例如：
+
+```json
+{
+  "from": { "x": 0.5, "y": 0.12, "sigma_px": 0.8 },
+  "to":   { "x": 0.5, "y": 0.60, "sigma_px": 0.0 }
+}
+```
+
+两个点的 `x/y` 以最终整张图片为参照，左上角为 (0,0)，右下角为 (1,1)。`sigma_px` 的单位是原图像素。强度按沿两点连线的像素距离比例平滑改变，两端以外维持端点值。上例在纸面上部使用 0.8 px，自高度 12% 起逐渐变清晰，60% 以下保留原像素。把两点放在一条斜线上即可指定斜向渐变。更换或旋转底图时，按新整页重新选点。两种柔化参数只能选一种。用 `view="image"` 和 `region` 分别查看两个端点及中间区域；局部复用整页的坐标和效果。
+
+照片 PNG 的整页或局部复查可能返回 `png_finish_comparison`。在同版的两个参考区分别用 `clear` 和 `gradient` 原样调用 `preview_handwriting`，核对偏软一侧的纸与笔迹是否更协调，以及清晰一侧的小字是否完整。两端取自同方向可比的纸面印迹；较宽的印刷边缘也可能来自纸张或印刷。需要时可把两档裁区同步移到附近字迹。两档差别很小或细字变淡时，可直接交付清晰版。
+
 作业表可用正文横线设置参考线，将同一页的课程、姓名等字块分别定位。若侧栏印字自下往上读，将原字块的左上、右上、右下、左下四角依次投到侧栏的左下、左上、右上、右下。复查时按栏核对读向、印字和留给老师的评分区。`changed_pixels_outside_reference` 也会计入正文参考区外有意填写的表头和侧栏，应结合这些栏位解读。
 
 客户端已知目标值时，可在 `tune_handwriting` 中同时传 `changes={"perturb_theta_sigma":0.07}` 和 `readback_variation=["perturb_theta_sigma"]`。成功回执的 `effective_changes` 给出写入前后的有效值，用于直接核对本次写入，省去事后再读一次。最多点名本次提交的两个 `variation` 控件。提交 `null` 时读回继承值，有效值相同的键会省略。若要根据旧值决定改多少，仍应先用 `describe_controls` 读取该稿当前版本的值。
+
+同页复盘在有可比样本时给出 `adjacent_row_check` 和 `illustration_ink_check`。复用其 `preview_arguments`，或逐项调用 `separate_preview_arguments`，在原图尺度看邻行字宽和图线附近的正文。`evidence.adjacent_rows` 分别记录两行的横纵伸缩比和照片投影前的垂直缩放，能区分字被拉宽和整行等比放大，`evidence.illustration_contrast` 记录采样区相对底纸的亮度下降及像素数。同一回执的 `ink_footprint_width_px` 用新增墨迹的面积与周长估算有效宽度，单位为原图像素。标签结构和节点交点都会影响数值，仍需看同倍率裁图中的具体字干、框线和箭杆。
 
 如果字像贴在照片上，先分清是墨迹边缘过锐，还是纸面光照、阴影或墨色对比造成的观感。例如，纸面右侧有阴影，但用户认为笔画已经合适，就保留原样。如果用户明确指出笔画边缘过锐，或原尺寸成品裁图中的笔画边缘确实比附近可比的实拍印字或横线更锐，可以小幅柔化试一版。比如用户说“只改第一行，第二行保留”，用 `preview_handwriting(view=layout)` 找到第一行对应的字，再用 `adjust_glyphs` 的 `softness` 只调这些字。只有用户要调整整份稿子时，才用 `tune_handwriting` 的 `ink_softness`。用户要求保留墨迹时，直接沿用原版。
 

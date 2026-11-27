@@ -157,7 +157,7 @@ impl ResultFormat {
             Self::Pdf
         } else if !params.preview {
             Self::Zip
-        } else if params.ink_layers {
+        } else if params.preview_ink_layers() {
             Self::InkLayers
         } else if params.full_preview {
             Self::Images

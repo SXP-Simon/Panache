@@ -1,4 +1,6 @@
 mod adjustments;
+pub(crate) use handwriting_core::export_blur;
+pub(crate) mod font_samples;
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, FontBook, Limits, RenderRequest, export};
@@ -11,6 +13,16 @@ use crate::{
 
 use handwriting_core::fine_edit::{self, Adjustment, Adjustments};
 use serde_json::{Value, json};
+
+fn drawing_kind(g: &fine_edit::GlyphBounds) -> Option<&'static str> {
+    if g.is_native_diagram {
+        Some("native_diagram")
+    } else if g.illustration == Some(g.id) {
+        Some("illustration")
+    } else {
+        None
+    }
+}
 
 fn glyph_source<'a>(text: &'a [u16], glyph: &fine_edit::GlyphBounds) -> Option<&'a [u16]> {
     let [start, end] = glyph.source_utf16?;
@@ -42,6 +54,33 @@ fn glyph_point(
         (center[0] + offset[0]) as f32,
         (center[1] + offset[1]) as f32,
     ]
+}
+
+// 2026-11-27：以同一外框变换预测拆分标签的位置，与各标签实际几何在照片像素中对照。
+fn detail_corner_gap(
+    draft: &Snapshot<'_>,
+    parent: &fine_edit::GlyphBounds,
+    edit: Option<&Adjustment>,
+    parts: &[&fine_edit::GlyphBounds],
+    edits: &HashMap<u32, &Adjustment>,
+) -> f32 {
+    let mut max_gap = 0.0f32;
+    let center = glyph_point(parent, None, [0., 0.]);
+    let project = |g, e, uv| crate::review::photo_point(draft, glyph_point(g, e, uv));
+    for part in parts {
+        let (w, h) = (
+            f64::from(part.bounds[2]) / 2.,
+            f64::from(part.bounds[3]) / 2.,
+        );
+        for uv in [[-w, -h], [w, -h], [w, h], [-w, h]] {
+            let point = glyph_point(part, None, uv);
+            let relative = std::array::from_fn(|i| f64::from(point[i] - center[i]));
+            let expected = project(parent, edit, relative);
+            let actual = project(part, edits.get(&part.id).copied(), uv);
+            max_gap = max_gap.max((actual[0] - expected[0]).hypot(actual[1] - expected[1]));
+        }
+    }
+    max_gap
 }
 
 #[derive(Clone)]
@@ -119,17 +158,16 @@ impl Engine {
         background: Option<Vec<u8>>,
         edits: Option<Adjustments>,
     ) -> Result<RenderRequest> {
-        let font_name = draft
-            .controls
-            .get("font")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(&draft.style.font);
+        let primary = self.draft_font(draft, draft.font_name())?;
+        self.request_with_font(draft, section, background, edits, primary)
+    }
+    fn draft_font(&mut self, draft: &Snapshot<'_>, font_name: &str) -> Result<Arc<fontdue::Font>> {
         ensure!(
             font_name.starts_with("upload:") || self.names.iter().any(|f| f == font_name),
             "Font no longer available: {}",
             font_name
         );
-        let primary = if font_name.starts_with("upload:") {
+        Ok(if font_name.starts_with("upload:") {
             let key = format!("{}:{}", draft.id, font_name);
             if let Some(font) = self.fonts.get(&key) {
                 font.clone()
@@ -140,7 +178,16 @@ impl Engine {
             }
         } else {
             self.font(font_name)?
-        };
+        })
+    }
+    fn request_with_font(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        background: Option<Vec<u8>>,
+        edits: Option<Adjustments>,
+        primary: Arc<fontdue::Font>,
+    ) -> Result<RenderRequest> {
         let fonts = FontBook::with_text_fallbacks(primary, &section.text, |name| {
             if self.names.iter().any(|n| n == name) {
                 self.font(name).map(Some)
@@ -206,23 +253,8 @@ impl Engine {
         let camera = draft.camera(background.as_deref())?;
         let photo = Self::photo(draft, &mut background)?;
         let request = self.request(draft, section, background, edits)?;
-        let mut image = None;
-        let pages =
-            Self::render_pages(&request, photo.as_ref(), cancel, page_number, |i, page| {
-                if i + 1 == page_number {
-                    image = Some(STANDARD.encode(camera.png(&page)?));
-                }
-                Ok(())
-            })?;
-        let png = image.ok_or_else(|| {
-            draft.page_error(
-                n,
-                handwriting_core::Error::new(
-                    "invalid_page",
-                    format!("Section has {pages} pages; requested {page_number}"),
-                ),
-            )
-        })?;
+        let image = Self::render_page(draft, n, &request, photo.as_ref(), cancel, page_number)?;
+        let png = STANDARD.encode(camera.png(&image)?);
         let preview = RenderedPreview {
             png,
             fine_edit: request.params.fine_edit,
@@ -275,6 +307,31 @@ impl Engine {
             }
             None => handwriting_core::render::render_until_page(request, cancel, stop, emit),
         }
+    }
+    fn render_page(
+        draft: &Snapshot<'_>,
+        section: u32,
+        request: &RenderRequest,
+        photo: Option<&(&handwriting_core::photo::PaperProjection, image::RgbaImage)>,
+        cancel: &Cancellation,
+        page_number: usize,
+    ) -> Result<image::RgbaImage> {
+        let mut image = None;
+        let pages = Self::render_pages(request, photo, cancel, page_number, |i, page| {
+            if i + 1 == page_number {
+                image = Some(page);
+            }
+            Ok(())
+        })?;
+        image.ok_or_else(|| {
+            draft.page_error(
+                section,
+                handwriting_core::Error::new(
+                    "invalid_page",
+                    format!("Section has {pages} pages; requested {page_number}"),
+                ),
+            )
+        })
     }
     pub fn page_count(
         &mut self,
@@ -353,47 +410,65 @@ impl Engine {
                 )
             })
             .collect();
-        // Use edited geometry on this page. Raster details belong to the parent illustration.
-        let illustration_and_text = glyphs
-            .iter()
-            .find(|g| g.illustration == Some(g.id))
-            .and_then(|g| {
-                let position = |g: &fine_edit::GlyphBounds, offset| {
-                    crate::review::photo_point(
-                        draft,
-                        glyph_point(g, edits.get(&g.id).copied(), offset),
-                    )
-                };
-                let hw = f64::from(g.bounds[2]) / 2.;
-                let hh = f64::from(g.bounds[3]) / 2.;
-                let corners =
-                    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(|uv| position(g, uv));
-                let bounds = |axis: usize| {
-                    corners
-                        .iter()
-                        .map(|p| p[axis])
-                        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), x| {
-                            (lo.min(x), hi.max(x))
-                        })
-                };
-                let (left, right) = bounds(0);
-                let (top, bottom) = bounds(1);
-                let candidates = glyphs
-                    .iter()
-                    .filter(|v| v.is_text && edits.get(&v.id).is_none_or(|edit| edit.opacity > 0));
-                let near = candidates.map(|v| position(v, [0., 0.])).min_by(|a, b| {
-                    let distance = |p: &[f32; 2]| {
-                        (p[0] - p[0].clamp(left, right)).hypot(p[1] - p[1].clamp(top, bottom))
-                    };
-                    distance(a).total_cmp(&distance(b))
-                })?;
-                Some([
-                    [left.min(near[0]), top.min(near[1])],
-                    [right.max(near[0]), bottom.max(near[1])],
-                ])
-            });
+        let mut text = Vec::new();
+        let mut details = HashMap::<u32, Vec<&fine_edit::GlyphBounds>>::new();
+        for g in &glyphs {
+            if let Some(parent) = g.illustration
+                && parent != g.id
+                && !edits.get(&g.id).is_some_and(|e| e.hides_ink())
+            {
+                details.entry(parent).or_default().push(g);
+            }
+        }
+        let mut drawings = Vec::new();
+        let mut drawing_count = 0;
+        for g in &glyphs {
+            let edit = edits.get(&g.id).copied();
+            let kind = drawing_kind(g);
+            let layout_offset = drawing_count;
+            drawing_count += usize::from(kind.is_some());
+            if !(g.is_text || kind.is_some()) || edit.is_some_and(|v| v.hides_ink()) {
+                continue;
+            }
+            let hw = f64::from(g.bounds[2]) / 2.;
+            let hh = f64::from(g.bounds[3]) / 2.;
+            let paper_corners =
+                [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(|uv| glyph_point(g, edit, uv));
+            let corners = paper_corners.map(|p| crate::review::photo_point(draft, p));
+            let bounds = crate::review::Bounds::from_corners(corners);
+            if let Some(kind) = kind {
+                drawings.push(crate::review::Drawing {
+                    id: g.id,
+                    kind,
+                    layout_offset,
+                    details: details.get(&g.id).map(|parts| {
+                        (
+                            parts.len(),
+                            detail_corner_gap(draft, g, edit, parts, &edits),
+                        )
+                    }),
+                    paper_corners,
+                    photo_corners: corners,
+                });
+            } else {
+                let edge = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+                let width = edge(corners[0], corners[1]) + edge(corners[3], corners[2]);
+                let height = edge(corners[0], corners[3]) + edge(corners[1], corners[2]);
+                let dy = f64::from(g.baseline - g.bounds[1]) - hh;
+                let baseline = glyph_point(g, edit, [0., dy])[1];
+                let top = glyph_point(g, edit, [0., -hh]);
+                let bottom = glyph_point(g, edit, [0., hh]);
+                text.push(crate::review::TextSample {
+                    bounds,
+                    baseline,
+                    paper_vertical_scale: edge(top, bottom) / g.bounds[3] as f32,
+                    stretch: (width / height) / (hw / hh) as f32,
+                });
+            }
+        }
         Ok(crate::review::PageSample {
-            illustration_and_text,
+            text,
+            drawings,
             baselines,
             content_sha256: format!("{:x}", membership.finalize()),
         })
@@ -414,6 +489,9 @@ impl Engine {
         let req = self.fine_request(draft, section)?;
         let (_, mut bounds) = fine_edit::inspect_page(&req, page, cancel)
             .map_err(|error| draft.page_error(number, error))?;
+        if input.drawings_only == Some(true) {
+            bounds.retain(|g| drawing_kind(g).is_some());
+        }
         if input.illustrations_only == Some(true) {
             bounds.retain(|g| g.illustration.is_some());
         }
@@ -447,6 +525,9 @@ impl Engine {
                 let mut row = json!({"id":g.id,"bounds":g.bounds});
                 if input.region.is_some() {
                     row["selected_center"] = json!(center(g));
+                }
+                if let Some(kind) = drawing_kind(g) {
+                    row["kind"] = json!(kind);
                 }
                 if let Some(parent) = g.illustration {
                     row["kind"] = json!(if parent == g.id {
@@ -508,7 +589,7 @@ impl Engine {
         writer: &mut crate::storage::BudgetWriter<'_>,
         draft: &Snapshot<'_>,
         sections: Vec<Section>,
-        format: Format,
+        (format, finish): (Format, Option<export_blur::Finish>),
         cancel: &Cancellation,
         mut on_page: impl FnMut(usize, u32, usize, &image::RgbaImage),
     ) -> Result<usize> {
@@ -549,7 +630,14 @@ impl Engine {
             }
             Format::Zip => {
                 let mut zip = export::ZipExport::new(writer);
-                render_sections(&mut |i, page| zip.add_with_camera(i, page, &camera))?;
+                render_sections(&mut |i, page| {
+                    if let Some(finish) = finish {
+                        let finished = finish.apply(page, cancel)?;
+                        zip.add_with_camera(i, &finished, &camera)
+                    } else {
+                        zip.add_with_camera(i, page, &camera)
+                    }
+                })?;
                 zip.finish()?;
             }
         };

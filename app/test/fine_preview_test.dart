@@ -4,20 +4,24 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:handwriting_app/widgets/workbench_motion.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show StandardMessageCodec;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handwriting_app/l10n/app_localizations.dart';
 import 'package:handwriting_app/main.dart';
 import 'package:handwriting_app/models/fine_edit.dart';
 import 'package:handwriting_app/models/fine_transform.dart';
 import 'package:handwriting_app/models/ink_page.dart';
+import 'package:handwriting_app/models/png_blur.dart';
 import 'package:handwriting_app/services/api.dart';
 import 'package:handwriting_app/services/workspace.dart';
 import 'package:handwriting_app/utils/ink_effects.dart' show decodeInkImage;
 import 'package:handwriting_app/utils/fine_raster.dart';
 import 'package:handwriting_app/view_models/fine_selection.dart';
 import 'package:handwriting_app/widgets/fine_preview.dart';
+import 'package:handwriting_app/widgets/workbench_motion.dart';
+
+import 'workspace_test.dart' show ControlledApi;
 
 Future<Uint8List> _png(Color background, List<Rect> ink, Color color) async {
   final recorder = ui.PictureRecorder();
@@ -55,6 +59,82 @@ Future<InkPage> _page() async => InkPage(
 );
 
 void main() {
+  testWidgets('PDF still exports fine edits with invalid PNG gradient', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = ControlledApi()
+      ..supportsFineEdit = true
+      ..supportsPngBlur = true;
+    api.submission.complete('pdf');
+    final workspace = Workspace(api: api)
+      ..initialized = true
+      ..text = 'AB'
+      ..fonts = ['test.ttf']
+      ..fineEnabled = true;
+    workspace.settings.font = workspace.fonts.single;
+    final page = (await tester.runAsync(_page))!;
+    workspace.generation
+      ..pages = [page.paper]
+      ..inkPages = [page]
+      ..previewRevision = workspace.editRevision;
+    workspace.applyFineEdits(page.fine!, [
+      (
+        id: 1,
+        dx: 3,
+        dy: 0,
+        scale: 100,
+        angle: 0,
+        opacity: 100,
+        thickness: 0,
+        softness: 0,
+        color: null,
+        warp: null,
+      ),
+    ]);
+    // A softened PNG preview has no editable ink layers.
+    workspace.generation.inkPages = [];
+    final blur = workspace.settings.pngBlur;
+    blur.mode = PngBlurMode.gradient;
+    blur.to.y = blur.from.y;
+    workspace.edit();
+    addTearDown(workspace.dispose);
+
+    var saves = 0;
+    tester.binding.defaultBinaryMessenger.setMockMessageHandler(
+      'dev.flutter.pigeon.file_saver.FileSaverHostApi.saveAs',
+      (_) async {
+        saves++;
+        return const StandardMessageCodec().encodeMessage(['test.pdf']);
+      },
+    );
+    await tester.pumpWidget(
+      HandwritingApp(locale: const Locale('en'), workspace: workspace),
+    );
+    await tester.pump();
+    expect(workspace.previewStale, isTrue);
+    expect(blur.valid, isFalse);
+    await tester.tap(find.byKey(const ValueKey('export-pdf')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(api.previewRequested.isCompleted, isFalse);
+    final request = api.submittedFields!;
+    expect(request['pdf_save'], 'true');
+    expect(request['preview'], 'false');
+    expect(request, isNot(contains('export_blur_gradient')));
+    final edits = jsonDecode(request['fine_edits']!) as Map;
+    expect(edits['key'], page.fine!.key);
+    expect((edits['glyphs'] as List).single['dx'], 3);
+    expect(saves, 1);
+    expect(workspace.exportExtension, 'pdf');
+    expect(workspace.error, isEmpty);
+    expect(blur.valid, isFalse);
+  });
+
   testWidgets(
     'saving a fine page preserves transparent paper and translucent ink',
     (tester) async {

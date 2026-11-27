@@ -69,6 +69,19 @@ fn relative_coordinates_reference_and_named_coordinates_remain_exact() {
         ]
     );
 }
+
+#[test]
+fn framed_nodes_are_opt_in_and_keep_named_edges_and_conditions() {
+    let body = r"\coordinate (rhs) at (4,1);
+        \draw (0,0) node[rectangle]{B3}; \draw (rhs) node[diamond]{B5};
+        \draw[->] (0,0) -| (rhs) node[midway,left]{$t\neq 0$};";
+    assert!(circuit::parse(&env(body)).is_none());
+    let graph = circuit::parse(&env(&format!("[flowchart]{body}"))).unwrap();
+    assert!(graph.flowchart);
+    assert_eq!(graph.decorations[2].text, "t≠ 0");
+    assert_eq!(graph.segments[1].end, circuit::Point(4., 1.));
+    assert!(graph.segments[1].end_arrow);
+}
 #[test]
 fn flowchart_conditions_follow_their_wire_without_moving_its_endpoint() {
     let source = env(r"\draw[->] (0,0) -- (4,2) node[midway,above] {$i\le10$}

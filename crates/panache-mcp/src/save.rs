@@ -101,13 +101,22 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
     let _budget = (bytes > 0)
         .then(|| state.storage.import(bytes))
         .transpose()?;
-    state.drafts.save(
+    let mut saved = state.drafts.save(
         input,
         &prepared,
         style.as_ref(),
         paper.as_ref(),
         font.as_ref().map(|(_, bytes)| bytes.as_slice()),
-    )
+    )?;
+    if let Some(paper) = paper {
+        let id = saved["draft_id"].as_str().expect("new draft ID");
+        let report = paper.focus.report(id, 1, 1, 1, false);
+        state.paper_focus.remember(id, paper.focus);
+        saved["photo_ink_preview_arguments"] = json!({"draft_id":id,"revision":1,"section":1,"page":1,
+            "view":if state.preserve_reviews {"image"} else {"review"}});
+        saved["paper_focus_check"] = report;
+    }
+    Ok(saved)
 }
 
 fn saved_reply(mut saved: Value) -> CallToolResult {
@@ -123,6 +132,9 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
         message.push('\n');
         message.push_str(hint);
     }
+    if let Some(focus) = saved.get("paper_focus_check") {
+        message.push_str(&format!("\n底纸边缘原尺寸检查 {focus}。核对新增笔迹与原有印迹的反差时，调用 preview_handwriting {}，按 local_paper_ink_check 查看页首、过渡行与下方正文。", saved["photo_ink_preview_arguments"]));
+    }
     reply(message, saved)
 }
 
@@ -130,6 +142,28 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn illustration_pen_default_is_pinned_when_homework_is_created() -> Result<()> {
+        for (args, enabled) in [
+            (json!({}), false),
+            (json!({"homework":true}), true),
+            (
+                json!({"homework":true,"illustration_uses_pen":false}),
+                false,
+            ),
+            (json!({"illustration_uses_pen":true}), true),
+        ] {
+            let style: crate::CreationStyle = serde_json::from_value(args)?;
+            assert_eq!(
+                style.resolve(&[]).illustration_uses_pen.unwrap_or(false),
+                enabled
+            );
+        }
+        let archived: Style = serde_json::from_value(json!({"homework":true}))?;
+        assert!(!archived.illustration_uses_pen.unwrap_or(false));
+        Ok(())
+    }
 
     #[test]
     fn homework_variation_is_saved_on_creation_and_respects_overrides() -> Result<()> {
