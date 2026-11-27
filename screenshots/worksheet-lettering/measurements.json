@@ -1,0 +1,173 @@
+{
+  "pixel_contrast": {
+    "before": {
+      "code": {
+        "box": [
+          205,
+          375,
+          633,
+          699
+        ],
+        "pixels": 8675,
+        "p50": 77.0,
+        "p90": 129.0
+      },
+      "diagram": {
+        "box": [
+          690,
+          365,
+          1170,
+          710
+        ],
+        "pixels": 13974,
+        "p50": 112.0,
+        "p90": 160.0
+      },
+      "analysis": {
+        "box": [
+          187,
+          1190,
+          1150,
+          1380
+        ],
+        "pixels": 18275,
+        "p50": 78.0,
+        "p90": 117.0
+      }
+    },
+    "geometry": {
+      "code": {
+        "box": [
+          205,
+          375,
+          633,
+          699
+        ],
+        "pixels": 7783,
+        "p50": 78.0,
+        "p90": 129.0
+      },
+      "diagram": {
+        "box": [
+          690,
+          365,
+          1170,
+          710
+        ],
+        "pixels": 13974,
+        "p50": 112.0,
+        "p90": 160.0
+      },
+      "analysis": {
+        "box": [
+          187,
+          1190,
+          1150,
+          1380
+        ],
+        "pixels": 20253,
+        "p50": 79.0,
+        "p90": 117.0
+      }
+    },
+    "after": {
+      "code": {
+        "box": [
+          205,
+          375,
+          633,
+          699
+        ],
+        "pixels": 7783,
+        "p50": 78.0,
+        "p90": 129.0
+      },
+      "diagram": {
+        "box": [
+          690,
+          365,
+          1170,
+          710
+        ],
+        "pixels": 16144,
+        "p50": 78.0,
+        "p90": 118.0
+      },
+      "analysis": {
+        "box": [
+          187,
+          1190,
+          1150,
+          1380
+        ],
+        "pixels": 20253,
+        "p50": 79.0,
+        "p90": 117.0
+      }
+    }
+  },
+  "aspect_ratios": {
+    "49": {
+      "编译原理作业　　三地址代码与控制流": 0.8992,
+      "一、三地址代码": 0.8551,
+      "(1)　i = 1": 1.9515,
+      "(2)　s = 0": 1.6448,
+      "(3)　if i > 10 goto 9": 1.5101,
+      "三、循环不变计算": 1.0843,
+      "(4)　t = i % 2": 1.4278,
+      "(5)　if t ≠ 0 goto 7": 1.3134,
+      "(6)　s = s + i": 1.4901,
+      "(7)　i = i + 1": 1.7025,
+      "(8)　goto 3": 1.4075,
+      "(9)　exit": 1.4921,
+      "控制流图（CFG）": 1.2941,
+      "二、基本块划分": 1.1132,
+      "入口指令为 1、3、4、6、7、9。": 1.8079,
+      "B1（1～2）　　B2（3）　　 B3（4～5）": 2.0972,
+      "B4（6）　　　B5（7～8）　 B6（9，出口）": 1.9034,
+      "沿 B5 回到 B2 时，i 已加 1。循环判断、取余和奇偶判断": 1.1734,
+      "都依赖本轮的 i，累加还依赖 s。常数 0、1、2、10": 1.3464,
+      "本身无需计算，因此循环内没有可外提的计算。": 1.1815
+    },
+    "69": {
+      "编译原理作业　　三地址代码与控制流": 1.0,
+      "一、三地址代码": 1.0,
+      "(1)　i = 1": 1.0,
+      "(2)　s = 0": 1.0,
+      "(3)　if i > 10 goto 9": 1.0,
+      "三、循环不变计算": 1.0,
+      "(4)　t = i % 2": 1.0,
+      "(5)　if t ≠ 0 goto 7": 1.0,
+      "(6)　s = s + i": 1.0,
+      "(7)　i = i + 1": 1.0,
+      "(8)　goto 3": 1.0,
+      "(9)　exit": 1.0,
+      "控制流图（CFG）": 1.0,
+      "二、基本块划分": 1.0,
+      "入口指令为 1、3、4、6、7、9。": 1.0,
+      "B1（1～2）　　B2（3）　　 B3（4～5）": 1.0,
+      "B4（6）　　　B5（7～8）　 B6（9，出口）": 1.0,
+      "沿 B5 回到 B2 时，i 已加 1。循环判断、取余和奇偶判断": 1.0,
+      "都依赖本轮的 i，累加还依赖 s。常数 0、1、2、10": 1.0,
+      "本身无需计算，因此循环内没有可外提的计算。": 1.0
+    }
+  },
+  "page_sha256_rgb": {
+    "before": "2521dabf94b04a8728e0c8b7cb79f2bcef8a79bc16acf16937a795273411dbd5",
+    "geometry": "bdf06e1fdfc5919ae5b10adaa9f6fd6693896dbf9b960488fcafff8af99f90a0",
+    "after": "a11407377dc7a66cb3e8b2fe91b3cda1d34d004f3a10ffa9fe056cd05ce95719"
+  },
+  "fixed_roi_method": {
+    "color": "Pillow convert L, 8-bit",
+    "select": "paper > 125 and paper - finished > 20",
+    "quantiles": "linear interpolation",
+    "coordinates": "[x0, y0, x1, y1), native 1440 x 1920",
+    "stages": {
+      "before": "archived revision 49",
+      "geometry": "revision 69, 20 lines placed at a common 100% paper-space scale",
+      "after": "revision 70, illustration_uses_pen=true"
+    },
+    "pixel_strip": "ink-pixels.png stacks the paper, before, geometry and after L crops. Each starts at photo (205,365) and is 965 x 345. Covers code and diagram ROIs."
+  },
+  "aspect_method": "Median over each row of ||J e_x|| / ||J e_y|| at each edited glyph center in paper space, prior to photo projection."
+}
