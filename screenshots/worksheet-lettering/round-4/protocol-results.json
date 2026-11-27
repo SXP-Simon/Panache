@@ -1,0 +1,50 @@
+[
+  {
+    "gradient": {
+      "from": {
+        "x": 0.25,
+        "y": 0.25,
+        "sigma_px": 0
+      },
+      "to": {
+        "x": 0.75,
+        "y": 0.75,
+        "sigma_px": 2
+      }
+    },
+    "horizontal_drop": [
+      0,
+      16,
+      39
+    ],
+    "vertical_drop": [
+      2,
+      16,
+      32
+    ]
+  },
+  {
+    "gradient": {
+      "from": {
+        "x": 0.75,
+        "y": 0.75,
+        "sigma_px": 0
+      },
+      "to": {
+        "x": 0.25,
+        "y": 0.25,
+        "sigma_px": 2
+      }
+    },
+    "horizontal_drop": [
+      37,
+      14,
+      0
+    ],
+    "vertical_drop": [
+      30,
+      14,
+      1
+    ]
+  }
+]
