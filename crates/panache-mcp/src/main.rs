@@ -654,6 +654,9 @@ impl Panache {
         let progress_token = ctx.meta.get_progress_token();
         let peer = ctx.peer.clone();
         let result = self.render(ctx, move |state, engine, cancel| {
+            let format = input.format.unwrap_or_default();
+            engine::export_blur::validate(input.export_blur_px)?;
+            ensure!(matches!(format, Format::Zip) || input.export_blur_px == 0., "Nonzero export_blur_px requires format=zip for page PNGs. For PDF, omit export_blur_px or set it to 0.");
             let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
             let sections = state.drafts.sections(&input.draft_id, draft.revision, None)?;
             let reviewed_pages = draft.reviewed_pages()?;
@@ -663,9 +666,8 @@ impl Panache {
             let mut different = Vec::new();
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
-            let format = input.format.unwrap_or_default();
             let (path, pages, file) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
-                writer, &draft, sections, format, cancel,
+                writer, &draft, sections, &input, cancel,
                 |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
                         Some(record) => {
@@ -713,16 +715,21 @@ impl Panache {
             if matches!(format, Format::Zip) {
                 let without_digest = reviewed - matching - different.len();
                 if !different.is_empty() {
-                    pixel_warning = format!(" ZIP 中这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
+                    let stage = if input.export_blur_px > 0. { "柔化前" } else { "ZIP 中" };
+                    pixel_warning = format!(" {stage}这些页的像素与该版最近一次整页检查单不一致：{}。", serde_json::to_string(&different)?);
                 }
                 if without_digest > 0 {
                     pixel_warning.push_str(&format!(" {without_digest} 页的检查单没有像素摘要，无法比对。"));
                 }
-                review["zip_pixels"] = json!({
+                let comparison = json!({
                     "pages_matching_latest_review": matching,
                     "different_pages": different,
                     "reviewed_pages_without_digest": without_digest,
                 });
+                review["zip_pixels"] = if input.export_blur_px > 0. {
+                    pixel_warning.push_str(&format!(" 此次导出的整页 PNG 已柔化（σ={} 原图像素）。检查单摘要仅比对柔化前的页面，最终 PNG 未与检查单逐像素比对。", input.export_blur_px));
+                    json!({"status":"not_compared_after_export_blur","export_blur_px":input.export_blur_px,"before_blur":comparison})
+                } else { comparison };
             }
             let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n运行 Panache 的电脑上的文件：`{}`", draft.revision, path.display());
             let mut result = reply(message, json!({

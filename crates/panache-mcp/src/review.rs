@@ -112,7 +112,7 @@ fn detail_region(
     ])
 }
 
-fn decode_page(png: &str) -> Result<RgbaImage> {
+pub(crate) fn decode_page(png: &str) -> Result<RgbaImage> {
     let bytes = STANDARD.decode(png)?;
     let limits = Limits {
         max_file_bytes: bytes.len(),

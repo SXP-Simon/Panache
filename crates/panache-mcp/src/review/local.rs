@@ -16,6 +16,10 @@ use regions::{Point, Regions};
 use rmcp::model::{CallToolResult, ContentBlock};
 use serde_json::json;
 
+pub(crate) fn crop_bounds(region: &[[i32; 2]], size: (u32, u32)) -> Result<[u32; 4]> {
+    Ok(Regions::new(region, None, size)?.bounds)
+}
+
 struct Appearance {
     finished: RgbaImage,
     params: Parameters,

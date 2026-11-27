@@ -1,12 +1,12 @@
 use crate::{
     Panache, Preview, PreviewView, State,
     drafts::{Section, Snapshot},
-    engine::Engine,
+    engine::{Engine, export_blur},
     reply, review,
 };
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use handwriting_core::{Cancellation, Limits};
+use handwriting_core::{Cancellation, Limits, export};
 use rmcp::{
     RoleServer,
     model::{CallToolResult, ContentBlock},
@@ -19,6 +19,13 @@ pub(super) async fn run(
     input: Preview,
     ctx: RequestContext<RoleServer>,
 ) -> Result<CallToolResult> {
+    if let Some(sigma) = input.export_blur_px {
+        ensure!(
+            matches!(input.view, None | Some(PreviewView::Image)),
+            "export_blur_px requires view=image"
+        );
+        export_blur::validate(sigma)?;
+    }
     ensure!(
         !input.fresh || matches!(input.view, None | Some(PreviewView::Image)),
         "fresh=true requires view=image (or no view)"
@@ -77,8 +84,9 @@ fn render(
     );
     ensure!(
         input.region.is_none()
-            || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review)),
-        "region requires view=layout or review"
+            || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review))
+            || input.export_blur_px.is_some(),
+        "region requires view=layout, view=review, or view=image with export_blur_px"
     );
     ensure!(
         input.compare_revision.is_none() || input.view == Some(PreviewView::Review),
@@ -139,6 +147,33 @@ fn render(
         input.offset.is_none() && input.limit.is_none(),
         "offset and limit require view=layout"
     );
+    if let Some(sigma) = input.export_blur_px {
+        let (preview, cached) =
+            engine.preview_with_refresh(&draft, section, page, input.fresh, cancel)?;
+        let original = review::decode_page(&preview.png)?;
+        let size = original.dimensions();
+        let bounds = input
+            .region
+            .as_deref()
+            .map(|region| review::local::crop_bounds(region, size))
+            .transpose()?;
+        let mut finished = if sigma > 0. {
+            export_blur::apply(&original, sigma, cancel)?
+        } else {
+            original
+        };
+        if let Some([x, y, width, height]) = bounds {
+            finished = image::imageops::crop_imm(&finished, x, y, width, height).to_image();
+        }
+        let metadata = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached,
+            "export_blur_px":sigma,"photo_size":size,"crop_bounds":bounds,"image_size":finished.dimensions()});
+        let mut result = reply(format!("PNG 导出效果，原图像素。{metadata}"), metadata);
+        result.content.push(ContentBlock::image(
+            STANDARD.encode(export::png(&finished)?),
+            "image/png",
+        ));
+        return Ok(result);
+    }
     let result = image(
         engine,
         &draft,

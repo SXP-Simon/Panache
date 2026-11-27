@@ -18,6 +18,7 @@ from zipfile import ZipFile
 from PIL import Image
 
 import coursework_form
+import export_blur
 import illustration_pen
 import illustration_ink_check
 import paper_focus
@@ -431,6 +432,7 @@ async def smoke(command, arguments, out):
             await coursework_form.exercise(client, Path(temp))
             await illustration_pen.verify(client)
             await illustration_ink_check.verify(client, Path(temp))
+            await export_blur.verify(client, Path(temp))
             await paper_focus.verify(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
