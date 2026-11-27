@@ -41,18 +41,23 @@ pub enum Format {
 #[serde(default, deny_unknown_fields)]
 pub struct Style {
     /// Main font ID from list_fonts. Bundled filenames remain valid. English letters and digits follow it by default.
+    #[schemars(transform = remove_schema_default)]
     pub font: String,
     pub paper: Paper,
     /// RGB hex color, e.g. #302c30.
     pub ink: String,
     /// Pixels at the paper's native resolution (794 × 1123 for presets). Accepted range 16–72.
     pub font_size: u8,
+    /// Use for a school assignment, with or without a paper photo. Selects homework layout and its handwriting defaults.
     pub homework: bool,
+    /// Slightly vary letter size and tilt. Defaults on for new homework. Use false for the usual, steadier variation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relaxed_handwriting: Option<bool>,
     /// Keep this value to reproduce handwriting variations.
-    #[schemars(transform = remove_seed_default)]
+    #[schemars(transform = remove_schema_default)]
     pub seed: u32,
 }
-fn remove_seed_default(schema: &mut schemars::Schema) {
+fn remove_schema_default(schema: &mut schemars::Schema) {
     schema.remove("default");
 }
 
@@ -64,6 +69,7 @@ impl Default for Style {
             ink: "#302c30".into(),
             font_size: 34,
             homework: false,
+            relaxed_handwriting: None,
             seed: u32::from_le_bytes(Uuid::new_v4().as_bytes()[..4].try_into().unwrap()),
         }
     }
@@ -97,10 +103,40 @@ pub struct Guide {
     pub right: [u32; 2],
 }
 
+// Only creation distinguishes an omitted font from an explicitly selected default.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreationStyle {
+    #[serde(default, deserialize_with = "explicit_font")]
+    font: Option<String>,
+    #[serde(flatten)]
+    settings: Style,
+}
+fn explicit_font<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    String::deserialize(d).map(Some)
+}
+
+impl CreationStyle {
+    pub fn resolve(&self, bundled: &[String]) -> Style {
+        let mut style = self.settings.clone();
+        if let Some(font) = &self.font {
+            style.font.clone_from(font);
+        } else if style.homework && bundled.iter().any(|id| id == "李国夫手写体.ttf") {
+            style.font = "李国夫手写体.ttf".into();
+        }
+        if style.homework {
+            // Resolve only on creation: older saved styles keep their original rendering.
+            style.relaxed_handwriting.get_or_insert(true);
+        }
+        style
+    }
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Save {
-    /// Optional absolute local image path for a new draft. Imports and aligns the paper once.
+    /// Optional absolute path to an image file readable on the computer running Panache. Imports and aligns the paper once.
+    /// A chat attachment or URL alone is not a file path. If the client cannot transfer the photo to that computer, explain this instead of guessing a path.
     /// Use with the default plain preset. All revisions share the saved image.
     pub paper_path: Option<std::path::PathBuf>,
     /// With paper_path: photo (default) preserves camera perspective; flatten aligns the background.
@@ -119,8 +155,11 @@ pub struct Save {
     pub section: Option<u32>,
     /// Set only on creation.
     pub title: Option<String>,
-    /// Set only on creation. Stored with the draft.
-    pub style: Option<Style>,
+    /// For homework, including text alone, set homework=true. Omit font to use the bundled 李国夫手写体.ttf
+    /// when available. Honor a named font, and use relaxed_handwriting=false for steadier letters if requested.
+    /// Set only on creation.
+    #[schemars(with = "Option<Style>")]
+    pub style: Option<CreationStyle>,
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -152,6 +191,10 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
+    /// Request before/after values for up to two variation keys in changes. effective_changes omits keys whose effective value stayed the same.
+    #[serde(default)]
+    #[schemars(length(max = 2))]
+    pub readback_variation: Vec<String>,
     /// Set to true only when the user wants to preserve manual glyph adjustments. Reject reflow that would stop applying them. Ink and camera changes can still be saved.
     #[serde(default)]
     pub preserve_local_adjustments: bool,
@@ -323,6 +366,10 @@ pub struct Export {
     pub revision: Option<u32>,
     /// PDF includes the paper. ZIP contains page PNGs and respects the transparent_background ink control.
     pub format: Option<Format>,
+    /// Include the exported bytes as an embedded MCP resource for clients that can offer attachments.
+    /// Up to 512 KiB before base64 encoding. Larger files stay available at the returned server path.
+    #[serde(default)]
+    pub include_file: bool,
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema, PartialEq, serde::Serialize)]

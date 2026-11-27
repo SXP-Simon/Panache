@@ -24,11 +24,17 @@ Offline downloads are available for Windows x64, macOS on Apple silicon, Linux x
 
 ## Local MCP for AI clients
 
-The Windows, macOS, and Linux desktop packages include a local MCP server. Open **App settings → Connect AI client** and copy the configuration into a client that supports stdio MCP. Try asking:
+The Windows, macOS, and Linux desktop packages include a local MCP server. In **App settings → Connect AI client**, copy the configuration, then add Panache in the MCP settings of an AI client that supports local stdio servers. Reload the client’s MCP settings and ask it to call Panache to list the installed handwriting fonts. The connection works if the Panache tool returns font names.
+
+**Don’t see Connect AI client?** It is not available in the web or mobile app. On a supported desktop, make sure you installed or extracted the whole desktop package, not just the app executable. See the [desktop setup notes](crates/panache-mcp/README.md) for platform details.
+
+Once connected, try asking:
 
 > Write my notes and the process diagram on this photo of my stationery. Show me the first page, then export the whole draft as a PDF.
 
 For the photo, give the client a file path accessible on the computer running Panache. A client that passes images to its model can inspect the finished page and review a selected area. In a text-only client, ask for the measurements and open the exported PDF locally to judge the appearance. [MCP tools and configuration](crates/panache-mcp/README.md)
+
+For text alone, paste the passage and say whether you want a printable page, writing on your worksheet, or transparent ink for a poster.
 
 | Process state diagram | Resource allocation table |
 | --- | --- |

@@ -118,6 +118,10 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
         full_preview: false,
         ..Default::default()
     };
+    if style.relaxed_handwriting == Some(true) {
+        params.font_size_sigma = 1.5;
+        params.perturb_theta_sigma = 0.07;
+    }
     if let Some(layout) = &draft.paper {
         layout.apply(&mut params);
     }

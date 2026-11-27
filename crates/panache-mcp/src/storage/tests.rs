@@ -44,7 +44,7 @@ fn plan_reclaims_only_selected_abandoned_writes() -> Result<()> {
     })?;
     let old = dir.path().join("exports").join("panache-old.pdf");
     fs::write(&old, b"legacy")?;
-    let (delivered, _) = store.export(&drafts, "draft", 1, Format::Pdf, |writer| {
+    let (delivered, _, _) = store.export(&drafts, "draft", 1, Format::Pdf, |writer| {
         writer.write_all(b"delivered")?;
         Ok(1)
     })?;

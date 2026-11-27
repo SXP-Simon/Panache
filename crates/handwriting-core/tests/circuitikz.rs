@@ -70,6 +70,37 @@ fn relative_coordinates_reference_and_named_coordinates_remain_exact() {
     );
 }
 #[test]
+fn flowchart_conditions_follow_their_wire_without_moving_its_endpoint() {
+    let source = env(r"\draw[->] (0,0) -- (4,2) node[midway,above] {$i\le10$}
+        |- (8,6) node[right,midway] {$i\geq1$} -- (10,6) node {end};");
+    let c = circuit::parse(&source).unwrap();
+    let labels: Vec<_> = c
+        .decorations
+        .iter()
+        .map(|d| (d.point, d.kind.as_str(), d.text.as_str()))
+        .collect();
+    assert_eq!(
+        labels,
+        [
+            (circuit::Point(2., 1.), "above", "i≤10"),
+            (circuit::Point(4., 6.), "right", "i≥1"),
+            (circuit::Point(10., 6.), "", "end")
+        ]
+    );
+    assert!(c.segments.last().unwrap().end_arrow);
+    assert!(matches!(
+        text::parse(&source).as_slice(),
+        [Node::Circuit(_)]
+    ));
+    for extra in [
+        r"\draw (3,3) node[midway] {x};",
+        r"\draw (1,1) -- (2,2) node[midway,rotate] {x};",
+    ] {
+        assert!(circuit::parse(&env(&format!(r"\draw (0,0) -- (1,0);{extra}"))).is_none());
+    }
+}
+
+#[test]
 fn unknown_topology_and_budgets_preserve_the_whole_environment() {
     for body in [
         r"\draw (0,0) to[R] (2,0);\foreach \x in{1}{x}",
