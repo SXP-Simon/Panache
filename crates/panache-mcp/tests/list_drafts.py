@@ -52,6 +52,8 @@ async def run(binary, baseline):
                 next_id = expected[19]["draft_id"] if more else None
                 assert data == ({**legacy, "next_before_draft_id": next_id} if more else legacy)
                 lines = result.content[0].text.splitlines()
+                if not expected and offset == 0 and "before_draft_id" not in arguments:
+                    assert "style.homework=true" in lines.pop()
                 if more:
                     assert lines[-1] == f'下一页：`before_draft_id="{next_id}"`'
                 else:
