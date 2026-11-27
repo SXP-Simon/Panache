@@ -34,6 +34,8 @@ Windows、macOS 和 Linux 桌面版随附本地 MCP 服务。在 **应用设置 
 
 请提供运行 Panache 的电脑能读取的照片路径。能向模型传递图片的客户端可以检查成品、放大复盘选区。在纯文字客户端中，可让 AI 说明测量结果，再打开导出的本地 PDF 看实际效果。[MCP 工具与配置说明](crates/panache-mcp/README.md)
 
+只有文字也可以开始。贴上正文，说清是要打印、填进练习纸，还是只取透明字迹贴进海报。
+
 | 进程状态转换图 | 资源分配表 |
 | --- | --- |
 | [![进程状态转换图](assets/examples/process-states-60b3a1d31f00.webp)](assets/examples/process-states-60b3a1d31f00.webp) | [![资源分配表](assets/examples/bankers-algorithm-40bcfd843ae0.webp)](assets/examples/bankers-algorithm-40bcfd843ae0.webp) |

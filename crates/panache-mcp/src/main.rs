@@ -274,6 +274,8 @@ impl ServerHandler for Panache {
     fn get_info(&self) -> rmcp::model::ServerConfig {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         let instructions = concat!(
+            "When someone only asks for handwriting help, use the text or photo already supplied. If the outcome is unclear, offer only relevant examples: a printable page, writing on their own sheet, or just the ink to paste elsewhere. Ask one short question, inviting them to paste missing text in the same turn. Skip this choice for a clear request. ",
+            "For an undecided layout show one page with view=image. Invite a concrete change such as larger writing or lighter ink. After feedback show the revised page and export the version the user chose. ",
             "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
             "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",

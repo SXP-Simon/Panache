@@ -34,6 +34,8 @@ Once connected, try asking:
 
 For the photo, give the client a file path accessible on the computer running Panache. A client that passes images to its model can inspect the finished page and review a selected area. In a text-only client, ask for the measurements and open the exported PDF locally to judge the appearance. [MCP tools and configuration](crates/panache-mcp/README.md)
 
+For text alone, paste the passage and say whether you want a printable page, writing on your worksheet, or transparent ink for a poster.
+
 | Process state diagram | Resource allocation table |
 | --- | --- |
 | [![Process state diagram](assets/examples/process-states-60b3a1d31f00.webp)](assets/examples/process-states-60b3a1d31f00.webp) | [![Resource allocation table](assets/examples/bankers-algorithm-40bcfd843ae0.webp)](assets/examples/bankers-algorithm-40bcfd843ae0.webp) |
