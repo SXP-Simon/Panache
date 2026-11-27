@@ -1,0 +1,137 @@
+{
+  "input": "original-v15.png",
+  "rgb_sha256": "e754309195edc773ceef67250dd9001012b20eac580e2e6336fc22e55e6024c6",
+  "native_size": [
+    1440,
+    1920
+  ],
+  "horizontal": {
+    "upper B1-B4 top": {
+      "centres": [
+        [
+          226.5,
+          945.0
+        ],
+        [
+          812.0,
+          913.0
+        ]
+      ],
+      "angle": -3.128,
+      "angles_of_two_nearest_printed_rules": [
+        -3.235,
+        -3.312
+      ]
+    },
+    "lower B6-B5 bottom": {
+      "centres": [
+        [
+          413.5,
+          1085.0
+        ],
+        [
+          616.0,
+          1074.0
+        ]
+      ],
+      "angle": -3.109,
+      "angles_of_two_nearest_printed_rules": [
+        -3.278,
+        -3.294
+      ]
+    }
+  },
+  "vertical": {
+    "upper left B1 left": {
+      "angle_from_vertical_positive_right": -10.059,
+      "printed_rule_endpoint_interpolation": -7.95,
+      "middle": [
+        206.0,
+        962.5
+      ],
+      "span_px": 23
+    },
+    "upper right B4 right": {
+      "angle_from_vertical_positive_right": 3.324,
+      "printed_rule_endpoint_interpolation": 4.254,
+      "middle": [
+        838.0,
+        929.0
+      ],
+      "span_px": 24
+    },
+    "lower left B6 left": {
+      "angle_from_vertical_positive_right": -5.319,
+      "printed_rule_endpoint_interpolation": -4.203,
+      "middle": [
+        393.0,
+        1068.0
+      ],
+      "span_px": 26
+    },
+    "lower right B5 right": {
+      "angle_from_vertical_positive_right": 0.0,
+      "printed_rule_endpoint_interpolation": 0.456,
+      "middle": [
+        642.0,
+        1056.0
+      ],
+      "span_px": 24
+    }
+  },
+  "body": {
+    "B_centres": [
+      [
+        189.0,
+        1128.0
+      ],
+      [
+        387.0,
+        1114.0
+      ],
+      [
+        564.0,
+        1105.0
+      ],
+      [
+        687.0,
+        1099.0
+      ],
+      [
+        866.0,
+        1089.0
+      ],
+      [
+        1041.0,
+        1078.0
+      ]
+    ],
+    "angle": -3.263,
+    "printed_rule_angles": [
+      -3.279,
+      -3.348
+    ]
+  },
+  "spread": {
+    "node_positions": [
+      [
+        422.0,
+        952.5
+      ],
+      [
+        617.0,
+        941.0
+      ],
+      [
+        414.0,
+        1068
+      ],
+      [
+        617.0,
+        1057
+      ]
+    ],
+    "diagram_ratio": 1.041,
+    "printed_rule_span_ratio_at_same_depths": 1.04
+  }
+}

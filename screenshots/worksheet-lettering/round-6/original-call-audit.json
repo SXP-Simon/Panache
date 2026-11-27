@@ -1,0 +1,123 @@
+{
+  "source_revision": 15,
+  "tool_counts": [
+    {
+      "tool": "save_section",
+      "view": null,
+      "count": 5
+    },
+    {
+      "tool": "preview_handwriting",
+      "view": "review",
+      "count": 3
+    },
+    {
+      "tool": "preview_handwriting",
+      "view": "image",
+      "count": 22
+    },
+    {
+      "tool": "preview_handwriting",
+      "view": "layout",
+      "count": 82
+    },
+    {
+      "tool": "adjust_glyphs",
+      "view": null,
+      "count": 10
+    },
+    {
+      "tool": "export_handwriting",
+      "view": null,
+      "count": 1
+    }
+  ],
+  "saved_paper_alignment": "tracked_rulings",
+  "manual_guides_calls": 0,
+  "diagram_edits": [
+    {
+      "call": 109,
+      "arguments": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "expected_revision": 14,
+        "section": 1,
+        "page": 1,
+        "ids": [
+          221
+        ],
+        "dy": 13,
+        "opacity_ramp": [
+          [
+            0,
+            92
+          ],
+          [
+            100,
+            100
+          ]
+        ]
+      }
+    }
+  ],
+  "diagram_native_image_crops": [
+    {
+      "call": 16,
+      "arguments": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "revision": 5,
+        "section": 1,
+        "page": 1,
+        "view": "image",
+        "region": [
+          [
+            190,
+            835
+          ],
+          [
+            870,
+            835
+          ],
+          [
+            870,
+            1080
+          ],
+          [
+            190,
+            1080
+          ]
+        ],
+        "export_blur_px": 0
+      }
+    },
+    {
+      "call": 113,
+      "arguments": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "revision": 15,
+        "section": 1,
+        "page": 1,
+        "view": "image",
+        "region": [
+          [
+            160,
+            843
+          ],
+          [
+            900,
+            843
+          ],
+          [
+            900,
+            1100
+          ],
+          [
+            160,
+            1100
+          ]
+        ],
+        "export_blur_px": 0
+      }
+    }
+  ],
+  "actual_perspective_oracle": "Physical printed lines and their corresponding endpoints on the supplied paper photograph; repeated B labels in adjacent body text. Projected outline is used only to restore the synthetic fault after checking the original."
+}

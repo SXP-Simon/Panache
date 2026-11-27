@@ -1,0 +1,871 @@
+{
+  "task": "核对照片作业的文字和流程图是否跟纸面协调，按需修正，交付完整 PNG。无角度、方向、图块编号或修复参数提示。",
+  "starting_revision": 16,
+  "synthetic_fault": "original revision 15 was deliberately rotated +10 degrees for its diagram only, before the blind session",
+  "calls": [
+    {
+      "tool": "--help",
+      "args": {},
+      "succeeded": false,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 16,
+        "view": "paper"
+      },
+      "succeeded": false,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 16,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 16,
+        "view": "review"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 16,
+        "view": "layout",
+        "drawings_only": true
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "paper",
+        "revision": 16
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "review",
+        "revision": 16,
+        "region": [
+          [
+            112,
+            817
+          ],
+          [
+            921,
+            817
+          ],
+          [
+            921,
+            1181
+          ],
+          [
+            112,
+            1181
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "revision": 16,
+        "region": [
+          [
+            245,
+            260
+          ],
+          [
+            920,
+            260
+          ],
+          [
+            920,
+            630
+          ],
+          [
+            245,
+            630
+          ]
+        ]
+      },
+      "succeeded": false,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "export_blur_px": 0,
+        "revision": 16,
+        "region": [
+          [
+            245,
+            275
+          ],
+          [
+            830,
+            275
+          ],
+          [
+            830,
+            595
+          ],
+          [
+            245,
+            595
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "export_blur_px": 0,
+        "revision": 16,
+        "region": [
+          [
+            245,
+            620
+          ],
+          [
+            760,
+            620
+          ],
+          [
+            760,
+            760
+          ],
+          [
+            245,
+            760
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "export_blur_px": 0,
+        "revision": 16,
+        "region": [
+          [
+            145,
+            1150
+          ],
+          [
+            655,
+            1150
+          ],
+          [
+            655,
+            1398
+          ],
+          [
+            145,
+            1398
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "export_blur_px": 0,
+        "revision": 16,
+        "region": [
+          [
+            146,
+            1075
+          ],
+          [
+            458,
+            1075
+          ],
+          [
+            458,
+            1250
+          ],
+          [
+            146,
+            1250
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "read_section",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "revision": 16,
+        "section": 1,
+        "view": "source"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "layout",
+        "revision": 16,
+        "region": [
+          [
+            200,
+            250
+          ],
+          [
+            1200,
+            250
+          ],
+          [
+            1200,
+            635
+          ],
+          [
+            200,
+            635
+          ]
+        ],
+        "limit": 32
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 16,
+        "view": "layout",
+        "drawings_only": true
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "adjust_glyphs",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "expected_revision": 16,
+        "ids": [
+          221
+        ],
+        "whole_drawing": true,
+        "target_quad": [
+          [
+            207,
+            924
+          ],
+          [
+            842,
+            890
+          ],
+          [
+            855,
+            1066
+          ],
+          [
+            180,
+            1103
+          ]
+        ],
+        "note": "依原纸横线斜率、两端跨行展开与相邻文字，校正整张控制流图的透视，使框、标签及箭头同步。"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "review",
+        "section": 1,
+        "page": 1,
+        "region": [
+          [
+            112,
+            817
+          ],
+          [
+            1120,
+            817
+          ],
+          [
+            1120,
+            1160
+          ],
+          [
+            112,
+            1160
+          ]
+        ],
+        "revision": 17
+      },
+      "succeeded": true,
+      "perspective_check_delivered": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "revision": 17,
+        "export_blur_px": 0,
+        "region": [
+          [
+            165,
+            890
+          ],
+          [
+            870,
+            890
+          ],
+          [
+            870,
+            1145
+          ],
+          [
+            165,
+            1145
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 17,
+        "view": "layout",
+        "drawings_only": true
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "adjust_glyphs",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "expected_revision": 17,
+        "ids": [
+          221
+        ],
+        "whole_drawing": true,
+        "place_center": [
+          520,
+          1006
+        ],
+        "note": "将整图沿纸面略下移，让 B5、B6 框顶及两支向下箭头与横格线分开。"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "view": "image",
+        "revision": 18,
+        "export_blur_px": 0,
+        "region": [
+          [
+            165,
+            890
+          ],
+          [
+            870,
+            890
+          ],
+          [
+            870,
+            1145
+          ],
+          [
+            165,
+            1145
+          ]
+        ]
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 18,
+        "view": "review"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_px": 0,
+        "page": 1,
+        "region": [
+          [
+            898,
+            301
+          ],
+          [
+            1138,
+            301
+          ],
+          [
+            1138,
+            461
+          ],
+          [
+            898,
+            461
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_px": 0,
+        "page": 1,
+        "region": [
+          [
+            455,
+            342
+          ],
+          [
+            695,
+            342
+          ],
+          [
+            695,
+            502
+          ],
+          [
+            455,
+            502
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_gradient": {
+          "from": {
+            "sigma_px": 0.8,
+            "x": 0.7074357192494788,
+            "y": 0.19854090672225116
+          },
+          "to": {
+            "sigma_px": 0.0,
+            "x": 0.6525364836692147,
+            "y": 0.6529442417926004
+          }
+        },
+        "page": 1,
+        "region": [
+          [
+            898,
+            301
+          ],
+          [
+            1138,
+            301
+          ],
+          [
+            1138,
+            461
+          ],
+          [
+            898,
+            461
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_gradient": {
+          "from": {
+            "sigma_px": 0.8,
+            "x": 0.7074357192494788,
+            "y": 0.19854090672225116
+          },
+          "to": {
+            "sigma_px": 0.0,
+            "x": 0.6525364836692147,
+            "y": 0.6529442417926004
+          }
+        },
+        "page": 1,
+        "region": [
+          [
+            455,
+            342
+          ],
+          [
+            695,
+            342
+          ],
+          [
+            695,
+            502
+          ],
+          [
+            455,
+            502
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_px": 0,
+        "page": 1,
+        "region": [
+          [
+            819,
+            1173
+          ],
+          [
+            1059,
+            1173
+          ],
+          [
+            1059,
+            1333
+          ],
+          [
+            819,
+            1333
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_px": 0,
+        "page": 1,
+        "region": [
+          [
+            419,
+            1190
+          ],
+          [
+            659,
+            1190
+          ],
+          [
+            659,
+            1350
+          ],
+          [
+            419,
+            1350
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_gradient": {
+          "from": {
+            "sigma_px": 0.8,
+            "x": 0.7074357192494788,
+            "y": 0.19854090672225116
+          },
+          "to": {
+            "sigma_px": 0.0,
+            "x": 0.6525364836692147,
+            "y": 0.6529442417926004
+          }
+        },
+        "page": 1,
+        "region": [
+          [
+            819,
+            1173
+          ],
+          [
+            1059,
+            1173
+          ],
+          [
+            1059,
+            1333
+          ],
+          [
+            819,
+            1333
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "export_blur_gradient": {
+          "from": {
+            "sigma_px": 0.8,
+            "x": 0.7074357192494788,
+            "y": 0.19854090672225116
+          },
+          "to": {
+            "sigma_px": 0.0,
+            "x": 0.6525364836692147,
+            "y": 0.6529442417926004
+          }
+        },
+        "page": 1,
+        "region": [
+          [
+            419,
+            1190
+          ],
+          [
+            659,
+            1190
+          ],
+          [
+            659,
+            1350
+          ],
+          [
+            419,
+            1350
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "page": 1,
+        "region": [
+          [
+            146,
+            1075
+          ],
+          [
+            458,
+            1075
+          ],
+          [
+            458,
+            1250
+          ],
+          [
+            146,
+            1250
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "review"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "page": 1,
+        "region": [
+          [
+            109,
+            680
+          ],
+          [
+            439,
+            680
+          ],
+          [
+            439,
+            812
+          ],
+          [
+            109,
+            812
+          ]
+        ],
+        "revision": 18,
+        "section": 1,
+        "view": "review"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 18,
+        "view": "review",
+        "region": [
+          [
+            160,
+            825
+          ],
+          [
+            1085,
+            825
+          ],
+          [
+            1085,
+            1155
+          ],
+          [
+            160,
+            1155
+          ]
+        ],
+        "compare_revision": 16
+      },
+      "succeeded": true,
+      "perspective_check_delivered": true
+    },
+    {
+      "tool": "preview_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "section": 1,
+        "page": 1,
+        "revision": 18,
+        "view": "image"
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    },
+    {
+      "tool": "export_handwriting",
+      "args": {
+        "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+        "revision": 18,
+        "format": "zip",
+        "export_blur_px": 0,
+        "include_file": true
+      },
+      "succeeded": true,
+      "perspective_check_delivered": false
+    }
+  ]
+}

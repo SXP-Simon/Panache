@@ -1,0 +1,121 @@
+{
+  "native_size": [
+    1440,
+    1920
+  ],
+  "source_reference": "original-v15.png",
+  "synthetic_fault": "deliberate-tilt-v16-full.png",
+  "restoration": "restored-v17-full.png",
+  "original_and_new_v15_identical": true,
+  "original_and_restoration_identical": true,
+  "original_vs_fault_changed_pixels": 17446,
+  "original_vs_fault_bounding_rectangle_inclusive": [
+    202,
+    899,
+    849,
+    1092
+  ],
+  "body_reference_method": "An additional independent copy hid only the native diagram at full opacity attenuation (0). Compare this body-only rendering to the MCP saved paper to identify every written pixel with any RGB difference (including antialiasing). Compare these same positions in all three full images.",
+  "body_non_background_pixels": 59144,
+  "changed_body_pixels_vs_body_reference_in_v15_v16_v17": [
+    0,
+    0,
+    0
+  ],
+  "export_matches_full_preview_rgb": [
+    true,
+    true,
+    true
+  ],
+  "rgb_hashes": [
+    "e754309195edc773ceef67250dd9001012b20eac580e2e6336fc22e55e6024c6",
+    "9e2cd4713f4e90a6735f220eb461b510b850960e7cfe989ca81b412089c1e06b",
+    "e754309195edc773ceef67250dd9001012b20eac580e2e6336fc22e55e6024c6"
+  ],
+  "measured_node_box_rows": [
+    {
+      "upper": {
+        "sampled_ink_centres_photo_xy": [
+          [
+            226.5,
+            945.0
+          ],
+          [
+            812.0,
+            913.0
+          ]
+        ],
+        "angle_deg": -3.128
+      },
+      "lower": {
+        "sampled_ink_centres_photo_xy": [
+          [
+            413.5,
+            1085.0
+          ],
+          [
+            616.0,
+            1074.0
+          ]
+        ],
+        "angle_deg": -3.109
+      }
+    },
+    {
+      "upper": {
+        "sampled_ink_centres_photo_xy": [
+          [
+            244.0,
+            902.0
+          ],
+          [
+            823.0,
+            956.0
+          ]
+        ],
+        "angle_deg": 5.328
+      },
+      "lower": {
+        "sampled_ink_centres_photo_xy": [
+          [
+            400.0,
+            1068.0
+          ],
+          [
+            601.5,
+            1089.0
+          ]
+        ],
+        "angle_deg": 5.95
+      }
+    },
+    {
+      "upper": {
+        "sampled_ink_centres_photo_xy": [
+          [
+            226.5,
+            945.0
+          ],
+          [
+            812.0,
+            913.0
+          ]
+        ],
+        "angle_deg": -3.128
+      },
+      "lower": {
+        "sampled_ink_centres_photo_xy": [
+          [
+            413.5,
+            1085.0
+          ],
+          [
+            616.0,
+            1074.0
+          ]
+        ],
+        "angle_deg": -3.109
+      }
+    }
+  ]
+}

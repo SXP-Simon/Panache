@@ -1,0 +1,386 @@
+[
+  {
+    "revision": 15,
+    "same_revision_preview_matches_zip": true,
+    "first_text_matches_structured": true,
+    "diagram_perspective_check": {
+      "alignment": "tracked_rulings",
+      "guidance": "检查 diagram_perspective_check：把图形作为和正文同一纸面上的整件，看原纸、图和附近字迹。沿原纸横线对照上、下横边或箭杆，再用跨行的纸边、栏线或横线端点核对左右侧边的倾斜及上下宽度变化。",
+      "interpretation": "四角按左上、右上、右下、左下排列。参考框为以当前大小和位置沿纸面两轴放置后经现有模型投影的框。零角差只说明图框跟随模型；要在原纸上核对模型及图内线条、节点和标签。底边/顶边宽度比反映上下宽窄。rotated 只校准了整体旋转。拆分细节的偏移表示与按外框共同变换的预期位置之差；有意单独移字时可能合理。保留有意的斜线和已协调的图形。参考轴不足时报告不确定。",
+      "items": [
+        {
+          "axis_difference_deg_top_bottom_left_right": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "bottom_to_top_width_ratio": 1.0626214742660522,
+          "current_photo_quad": [
+            [
+              207.18649291992188,
+              924.124755859375
+            ],
+            [
+              842.4742431640625,
+              889.615966796875
+            ],
+            [
+              855.3304443359375,
+              1065.6297607421875
+            ],
+            [
+              180.29183959960938,
+              1102.880615234375
+            ]
+          ],
+          "id": 221,
+          "kind": "native_diagram",
+          "layout_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "drawings_only": true,
+            "limit": 1,
+            "offset": 0,
+            "page": 1,
+            "revision": 15,
+            "section": 1,
+            "view": "layout"
+          },
+          "native_image_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                118,
+                827
+              ],
+              [
+                918,
+                827
+              ],
+              [
+                918,
+                1165
+              ],
+              [
+                118,
+                1165
+              ]
+            ],
+            "revision": 15,
+            "section": 1,
+            "view": "image"
+          },
+          "paper_aligned_photo_quad": [
+            [
+              207.18649291992188,
+              924.124755859375
+            ],
+            [
+              842.4742431640625,
+              889.615966796875
+            ],
+            [
+              855.3304443359375,
+              1065.6297607421875
+            ],
+            [
+              180.29183959960938,
+              1102.880615234375
+            ]
+          ],
+          "paper_bottom_to_top_width_ratio": 1.0626214742660522,
+          "preview_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "page": 1,
+            "region": [
+              [
+                118,
+                827
+              ],
+              [
+                918,
+                827
+              ],
+              [
+                918,
+                1165
+              ],
+              [
+                118,
+                1165
+              ]
+            ],
+            "revision": 15,
+            "section": 1,
+            "view": "review"
+          },
+          "separate_detail_alignment": null
+        }
+      ],
+      "placement": "图文都偏时，先核对纸面标定，再决定是否用 paper_guides。仅此图不符且能在原纸上定位四角时，使用同版 layout_arguments 找整图 ID，再用 adjust_glyphs(whole_drawing=true, target_quad=实测四角) 同步框线、箭头和标签。只移位置用 whole_drawing=true 与 place_center。对比修前、修后裁区，核对相邻正文；移动后在新位置重查。超过八个图时可用 drawings_only 分页检查。",
+      "visible_drawings_in_crop": 1
+    },
+    "render_sha256_rgb": "e754309195edc773ceef67250dd9001012b20eac580e2e6336fc22e55e6024c6",
+    "inked_body_sample_size": 59144,
+    "inked_body_pixels_different": 0,
+    "published_png": "original-v15.png"
+  },
+  {
+    "revision": 16,
+    "same_revision_preview_matches_zip": true,
+    "first_text_matches_structured": true,
+    "diagram_perspective_check": {
+      "alignment": "tracked_rulings",
+      "guidance": "检查 diagram_perspective_check：把图形作为和正文同一纸面上的整件，看原纸、图和附近字迹。沿原纸横线对照上、下横边或箭杆，再用跨行的纸边、栏线或横线端点核对左右侧边的倾斜及上下宽度变化。",
+      "interpretation": "四角按左上、右上、右下、左下排列。参考框为以当前大小和位置沿纸面两轴放置后经现有模型投影的框。零角差只说明图框跟随模型；要在原纸上核对模型及图内线条、节点和标签。底边/顶边宽度比反映上下宽窄。rotated 只校准了整体旋转。拆分细节的偏移表示与按外框共同变换的预期位置之差；有意单独移字时可能合理。保留有意的斜线和已协调的图形。参考轴不足时报告不确定。",
+      "items": [
+        {
+          "axis_difference_deg_top_bottom_left_right": [
+            8.431436538696289,
+            9.044797897338867,
+            10.012609481811523,
+            11.422767639160156
+          ],
+          "bottom_to_top_width_ratio": 1.0562787055969238,
+          "current_photo_quad": [
+            [
+              232.57269287109375,
+              879.0123291015625
+            ],
+            [
+              858.229248046875,
+              937.297119140625
+            ],
+            [
+              835.1777954101562,
+              1118.6163330078125
+            ],
+            [
+              174.9481658935547,
+              1050.548583984375
+            ]
+          ],
+          "id": 221,
+          "kind": "native_diagram",
+          "layout_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "drawings_only": true,
+            "limit": 1,
+            "offset": 0,
+            "page": 1,
+            "revision": 16,
+            "section": 1,
+            "view": "layout"
+          },
+          "native_image_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                112,
+                817
+              ],
+              [
+                921,
+                817
+              ],
+              [
+                921,
+                1181
+              ],
+              [
+                112,
+                1181
+              ]
+            ],
+            "revision": 16,
+            "section": 1,
+            "view": "image"
+          },
+          "paper_aligned_photo_quad": [
+            [
+              207.18649291992188,
+              924.124755859375
+            ],
+            [
+              842.4742431640625,
+              889.615966796875
+            ],
+            [
+              855.3304443359375,
+              1065.6297607421875
+            ],
+            [
+              180.29183959960938,
+              1102.880615234375
+            ]
+          ],
+          "paper_bottom_to_top_width_ratio": 1.0626214742660522,
+          "preview_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "page": 1,
+            "region": [
+              [
+                112,
+                817
+              ],
+              [
+                921,
+                817
+              ],
+              [
+                921,
+                1181
+              ],
+              [
+                112,
+                1181
+              ]
+            ],
+            "revision": 16,
+            "section": 1,
+            "view": "review"
+          },
+          "separate_detail_alignment": null
+        }
+      ],
+      "placement": "图文都偏时，先核对纸面标定，再决定是否用 paper_guides。仅此图不符且能在原纸上定位四角时，使用同版 layout_arguments 找整图 ID，再用 adjust_glyphs(whole_drawing=true, target_quad=实测四角) 同步框线、箭头和标签。只移位置用 whole_drawing=true 与 place_center。对比修前、修后裁区，核对相邻正文；移动后在新位置重查。超过八个图时可用 drawings_only 分页检查。",
+      "visible_drawings_in_crop": 1
+    },
+    "render_sha256_rgb": "9e2cd4713f4e90a6735f220eb461b510b850960e7cfe989ca81b412089c1e06b",
+    "inked_body_sample_size": 59144,
+    "inked_body_pixels_different": 0,
+    "published_png": "deliberate-tilt-v16-full.png"
+  },
+  {
+    "revision": 17,
+    "same_revision_preview_matches_zip": true,
+    "first_text_matches_structured": true,
+    "diagram_perspective_check": {
+      "alignment": "tracked_rulings",
+      "guidance": "检查 diagram_perspective_check：把图形作为和正文同一纸面上的整件，看原纸、图和附近字迹。沿原纸横线对照上、下横边或箭杆，再用跨行的纸边、栏线或横线端点核对左右侧边的倾斜及上下宽度变化。",
+      "interpretation": "四角按左上、右上、右下、左下排列。参考框为以当前大小和位置沿纸面两轴放置后经现有模型投影的框。零角差只说明图框跟随模型；要在原纸上核对模型及图内线条、节点和标签。底边/顶边宽度比反映上下宽窄。rotated 只校准了整体旋转。拆分细节的偏移表示与按外框共同变换的预期位置之差；有意单独移字时可能合理。保留有意的斜线和已协调的图形。参考轴不足时报告不确定。",
+      "items": [
+        {
+          "axis_difference_deg_top_bottom_left_right": [
+            0.04382508248090744,
+            0.020550966262817383,
+            0.014564954675734043,
+            0.056974198669195175
+          ],
+          "bottom_to_top_width_ratio": 1.0630650520324707,
+          "current_photo_quad": [
+            [
+              207.0,
+              924.0
+            ],
+            [
+              842.0,
+              889.9999389648438
+            ],
+            [
+              855.0,
+              1066.0
+            ],
+            [
+              179.99998474121094,
+              1103.0
+            ]
+          ],
+          "id": 221,
+          "kind": "native_diagram",
+          "layout_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "drawings_only": true,
+            "limit": 1,
+            "offset": 0,
+            "page": 1,
+            "revision": 17,
+            "section": 1,
+            "view": "layout"
+          },
+          "native_image_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "export_blur_px": 0,
+            "page": 1,
+            "region": [
+              [
+                117,
+                827
+              ],
+              [
+                917,
+                827
+              ],
+              [
+                917,
+                1165
+              ],
+              [
+                117,
+                1165
+              ]
+            ],
+            "revision": 17,
+            "section": 1,
+            "view": "image"
+          },
+          "paper_aligned_photo_quad": [
+            [
+              206.94876098632812,
+              924.2449951171875
+            ],
+            [
+              842.0645751953125,
+              889.7515258789062
+            ],
+            [
+              854.8982543945312,
+              1065.8837890625
+            ],
+            [
+              180.01406860351562,
+              1103.1202392578125
+            ]
+          ],
+          "paper_bottom_to_top_width_ratio": 1.0626660585403442,
+          "preview_arguments": {
+            "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+            "page": 1,
+            "region": [
+              [
+                117,
+                827
+              ],
+              [
+                917,
+                827
+              ],
+              [
+                917,
+                1165
+              ],
+              [
+                117,
+                1165
+              ]
+            ],
+            "revision": 17,
+            "section": 1,
+            "view": "review"
+          },
+          "separate_detail_alignment": null
+        }
+      ],
+      "placement": "图文都偏时，先核对纸面标定，再决定是否用 paper_guides。仅此图不符且能在原纸上定位四角时，使用同版 layout_arguments 找整图 ID，再用 adjust_glyphs(whole_drawing=true, target_quad=实测四角) 同步框线、箭头和标签。只移位置用 whole_drawing=true 与 place_center。对比修前、修后裁区，核对相邻正文；移动后在新位置重查。超过八个图时可用 drawings_only 分页检查。",
+      "visible_drawings_in_crop": 1
+    },
+    "render_sha256_rgb": "e754309195edc773ceef67250dd9001012b20eac580e2e6336fc22e55e6024c6",
+    "inked_body_sample_size": 59144,
+    "inked_body_pixels_different": 0,
+    "published_png": "restored-v17-full.png"
+  }
+]

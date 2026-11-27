@@ -1,0 +1,528 @@
+[
+  {
+    "copy": "control",
+    "step": 1,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 15,
+      "section": 1,
+      "page": 1,
+      "view": "review"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 2,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "page": 1,
+      "region": [
+        [
+          118,
+          827
+        ],
+        [
+          918,
+          827
+        ],
+        [
+          918,
+          1165
+        ],
+        [
+          118,
+          1165
+        ]
+      ],
+      "revision": 15,
+      "section": 1,
+      "view": "review"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 3,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "drawings_only": true,
+      "limit": 1,
+      "offset": 0,
+      "page": 1,
+      "revision": 15,
+      "section": 1,
+      "view": "layout"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 4,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 15,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 5,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 15,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0,
+      "region": [
+        [
+          148,
+          806
+        ],
+        [
+          1090,
+          806
+        ],
+        [
+          1090,
+          1170
+        ],
+        [
+          148,
+          1170
+        ]
+      ]
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 6,
+    "tool": "export_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 15,
+      "format": "zip",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false,
+      "artifact_verified": "ZIP contained one PNG, identical to the complete preview"
+    }
+  },
+  {
+    "copy": "control",
+    "step": 7,
+    "tool": "adjust_glyphs",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "expected_revision": 15,
+      "section": 1,
+      "page": 1,
+      "ids": [
+        221
+      ],
+      "angle": 10,
+      "note": "Synthetic fault test on a separate copy. Rotate this drawing by ten degrees."
+    },
+    "result": {
+      "isError": false,
+      "message": "Saved revision 16."
+    }
+  },
+  {
+    "copy": "control",
+    "step": 8,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 16,
+      "section": 1,
+      "page": 1,
+      "view": "review"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 9,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "page": 1,
+      "region": [
+        [
+          112,
+          817
+        ],
+        [
+          921,
+          817
+        ],
+        [
+          921,
+          1181
+        ],
+        [
+          112,
+          1181
+        ]
+      ],
+      "revision": 16,
+      "section": 1,
+      "view": "review"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 10,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "drawings_only": true,
+      "limit": 1,
+      "offset": 0,
+      "page": 1,
+      "revision": 16,
+      "section": 1,
+      "view": "layout"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 11,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 16,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 12,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 16,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0,
+      "region": [
+        [
+          148,
+          806
+        ],
+        [
+          1090,
+          806
+        ],
+        [
+          1090,
+          1170
+        ],
+        [
+          148,
+          1170
+        ]
+      ]
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 13,
+    "tool": "export_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 16,
+      "format": "zip",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false,
+      "artifact_verified": "ZIP contained one PNG, identical to the complete preview"
+    }
+  },
+  {
+    "copy": "control",
+    "step": 14,
+    "tool": "adjust_glyphs",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "expected_revision": 16,
+      "section": 1,
+      "page": 1,
+      "ids": [
+        221
+      ],
+      "whole_drawing": true,
+      "target_quad": [
+        [
+          207,
+          924
+        ],
+        [
+          842,
+          890
+        ],
+        [
+          855,
+          1066
+        ],
+        [
+          180,
+          1103
+        ]
+      ],
+      "note": "Restore the rounded four corners of revision 15, independently verified against the physical print on the photo."
+    },
+    "result": {
+      "isError": false,
+      "message": "Saved revision 17. Exact four-corner warp. The largest local major/minor scale ratio sampled at glyph centers is 1.00× in paper space."
+    }
+  },
+  {
+    "copy": "control",
+    "step": 15,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 17,
+      "section": 1,
+      "page": 1,
+      "view": "review"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 16,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "page": 1,
+      "region": [
+        [
+          117,
+          827
+        ],
+        [
+          917,
+          827
+        ],
+        [
+          917,
+          1165
+        ],
+        [
+          117,
+          1165
+        ]
+      ],
+      "revision": 17,
+      "section": 1,
+      "view": "review"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 17,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "drawings_only": true,
+      "limit": 1,
+      "offset": 0,
+      "page": 1,
+      "revision": 17,
+      "section": 1,
+      "view": "layout"
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 18,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 17,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 19,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 17,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0,
+      "region": [
+        [
+          148,
+          806
+        ],
+        [
+          1090,
+          806
+        ],
+        [
+          1090,
+          1170
+        ],
+        [
+          148,
+          1170
+        ]
+      ]
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "control",
+    "step": 20,
+    "tool": "export_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 17,
+      "format": "zip",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false,
+      "artifact_verified": "ZIP contained one PNG, identical to the complete preview"
+    }
+  },
+  {
+    "copy": "body-reference",
+    "step": 1,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 17,
+      "view": "layout",
+      "section": 1,
+      "page": 1,
+      "drawings_only": true,
+      "limit": 1
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "body-reference",
+    "step": 2,
+    "tool": "adjust_glyphs",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "expected_revision": 17,
+      "section": 1,
+      "page": 1,
+      "ids": [
+        221
+      ],
+      "opacity": 0,
+      "opacity_ramp": [
+        [
+          0,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ]
+    },
+    "result": {
+      "isError": false,
+      "message": "Saved revision 18."
+    }
+  },
+  {
+    "copy": "body-reference",
+    "step": 3,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 18,
+      "section": 1,
+      "page": 1,
+      "view": "image",
+      "export_blur_px": 0
+    },
+    "result": {
+      "isError": false
+    }
+  },
+  {
+    "copy": "body-reference",
+    "step": 4,
+    "tool": "preview_handwriting",
+    "arguments": {
+      "draft_id": "509d7568-4fed-4fed-b20c-99c75b6e4601",
+      "revision": 18,
+      "view": "paper"
+    },
+    "result": {
+      "isError": false
+    }
+  }
+]
