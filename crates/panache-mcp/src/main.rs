@@ -285,7 +285,7 @@ impl ServerHandler for Panache {
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
             "Inspect appearance with view=image; revisit actions with read_section(view=trajectory)."
         );
-        let draft_intent = "先判断稿件来源：用户贴了正文或题目，请你写出来并看第一页，第一页指即将生成的成品。第一步直接 save_section（新作业用 style.homework=true），再用返回的 draft_id 预览。用户明确指向已有稿才查找；即使正文和某份旧稿相似，也不要借用旧稿。 ";
+        let draft_intent = "First identify the source of the work. When the user supplies text or a problem to write out and asks to see page one, they mean the first page of the new output. Call save_section first (style.homework=true for a new assignment), then preview the returned draft_id. Look up a saved draft only when the user refers to one, even if an existing draft resembles the supplied text. ";
         let mode = if self.0.preserve_reviews {
             "This connection preserves stored reviews. Use view=image to inspect and export_handwriting to print. "
         } else {
@@ -428,7 +428,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "新建：用聊天里给的正文或题目直接生成稿件。要先看第一页，就先保存再预览。Save Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
+        description = "Create a draft from text or a problem supplied in chat. To show its first page, save first, then preview. Saves Markdown without rendering. For schoolwork with or without a photo, set style.homework=true. For a local text change try replace_section_text first to check saved placements. For pen-matched flowcharts, use a circuitikz environment with \\draw[->] paths and node labels. On creation, optionally import a local stationery image with paper_path. Append or revise a section with expected_revision. Each section starts a new page. Keep the returned draft_id and revision. Returns detected paper.alignment."
     )]
     async fn save_section(&self, Parameters(input): Parameters<Save>) -> CallToolResult {
         tool_result(save::run(self, input).await)
@@ -446,7 +446,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "查旧稿：只在找回、列出或继续修改已存稿件时调用。用户贴了题目让你写并看第一页，请直接调用 save_section；已有其他稿件也不需要先查。 Find previously saved drafts across sessions. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
+        description = "Look up saved drafts across sessions when the user wants to find, list, or resume earlier work. When the user supplies a problem to write out and wants to see page one, call save_section directly even if other drafts exist. Returns up to 20 summaries, newest creations first. Continue with before_draft_id=next_before_draft_id when returned."
     )]
     fn list_drafts(&self, Parameters(input): Parameters<List>) -> CallToolResult {
         tool_result(self.0.drafts.list(&input).map(|result| {
