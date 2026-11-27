@@ -35,6 +35,8 @@ pub struct Adjustments {
 /// Original paper-space ink bounds, before any per-glyph adjustment.
 #[derive(Serialize)]
 pub struct GlyphBounds {
+    #[serde(skip)]
+    pub is_text: bool,
     pub illustration: Option<u32>,
     pub id: u32,
     pub bounds: [i32; 4],
@@ -61,6 +63,7 @@ pub fn inspect_page(
                     .into_iter()
                     .map(|t| GlyphBounds {
                         id: t.id,
+                        is_text: t.is_text,
                         illustration: t.illustration,
                         bounds: [t.x, t.y, t.mask.width() as i32, t.mask.height() as i32],
                         source_utf16: t.source,
@@ -127,6 +130,7 @@ pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
 }
 
 pub(crate) struct Tile {
+    pub is_text: bool,
     pub illustration: Option<u32>,
     pub id: u32,
     pub x: i32,

@@ -30,8 +30,10 @@ pub fn contains(poly: &[[i32; 2]], [x, y]: [f32; 2]) -> bool {
         == 1
 }
 
+const REVIEW_MAX_EDGE: u32 = 900;
+
 fn thumbnail(img: &impl GenericImageView<Pixel = Rgba<u8>>) -> RgbaImage {
-    let scale = (900. / img.width().max(img.height()) as f32).min(1.);
+    let scale = (REVIEW_MAX_EDGE as f32 / img.width().max(img.height()) as f32).min(1.);
     imageops::thumbnail(
         img,
         (img.width() as f32 * scale).round().max(1.) as u32,
@@ -80,6 +82,7 @@ fn ruling_offset(paper: &RgbaImage, point: [f32; 2], radius: i32) -> Option<i32>
 pub struct PageSample {
     pub baselines: Vec<[f32; 2]>,
     pub content_sha256: String,
+    pub illustration_and_text: Option<[[f32; 2]; 2]>,
 }
 
 // Suggest a crop around a sampled text line at native resolution, including neighboring paper.
@@ -309,6 +312,34 @@ pub fn page(
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
+        if let Some([[x0, y0], [x1, y1]]) = sample.illustration_and_text {
+            let padding = params.font_size.ceil();
+            let x = |v: f32| v.clamp(0., w as f32) as u32;
+            let y = |v: f32| v.clamp(0., h as f32) as u32;
+            let (l, t, r, b) = (
+                x(x0 - padding),
+                y(y0 - padding),
+                x(x1 + padding),
+                y(y1 + padding),
+            );
+            let mut check = json!({"inspect":"Compare an actual diagram stroke or arrow and adjacent handwriting at the same zoom. Use the supplied preview_arguments as given for one revision; omit compare_revision. Check thickness and darkness. If the diagram alone looks heavy, revise the illustration source and preview again; preserve the surrounding writing. Describe what you can see. If the crop is unavailable or inconclusive, ask for visual confirmation."});
+            if l < r
+                && t < b
+                && r - l <= REVIEW_MAX_EDGE
+                && b - t <= REVIEW_MAX_EDGE
+                && x0 >= 0.
+                && y0 >= 0.
+                && x1 <= w as f32
+                && y1 <= h as f32
+            {
+                check["preview_arguments"] = json!({"draft_id":draft.id,"revision":draft.revision,"section":section,"page":page,"view":"review","region":[[l,t],[r,t],[r,b],[l,b]]});
+            } else {
+                check["region_guidance"] = json!(
+                    "Choose a small visible portion of the drawing and nearby writing from the finished page; use view=review with region for each at native scale."
+                );
+            }
+            metadata["illustration_ink_check"] = check;
+        }
         if draft.paper.is_some() {
             let mut appearance = json!({
                 "inspect":"Compare contrast and size with photographed marks. Check letter size against writing space. Baselines measure placement only. Without images, credit the user's observations; ask the user to inspect the crop if visual evidence is needed.",

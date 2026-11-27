@@ -177,6 +177,7 @@ fn capture_one(
     let mut mask = GrayImage::new(crop.width() + pad * 2, crop.height() + pad * 2);
     ink::paste_mask(&mut mask, &crop, pad as i32, pad as i32);
     Ok(Some(fine_edit::Tile {
+        is_text: unit.is_text,
         id: unit.id,
         illustration: None,
         x: origin.0 + left as i32 - radius as i32 - pad as i32,

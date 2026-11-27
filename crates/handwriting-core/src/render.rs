@@ -47,6 +47,7 @@ use ink::{blank_paper, normal, paint_math_unit, paste_mask, perturb};
 use units::{fixed_cell, keeps_grid_cell, layout_units};
 // 2026-10-15：先缓存整行，知道最高根式/最低分母后再统一落笔，避免后出现的公式撞进上一行。
 struct LineUnit {
+    is_text: bool,
     glyph: Glyph,
     rigid: bool,
     align_to_rulings: bool,
@@ -556,6 +557,7 @@ fn render_planes(
                 let advance = g.step(unit, p, extra, compound);
                 pages.x = x + advance;
                 pages.line.push(LineUnit {
+                    is_text: unit.iter().all(|node| matches!(node, Node::Char(_))),
                     glyph: g,
                     rigid: compound || cell.is_some(),
                     align_to_rulings: matches!(node, Node::Circuit(_) | Node::Table(_))
@@ -585,6 +587,7 @@ mod ruled_tests {
 
     fn sample_line() -> Vec<LineUnit> {
         vec![LineUnit {
+            is_text: true,
             glyph: Glyph {
                 mask: GrayImage::from_pixel(8, 40, Luma([255])),
                 advance: 8.,

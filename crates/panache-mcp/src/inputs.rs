@@ -346,6 +346,7 @@ pub struct Preview {
     /// In layout view, only return raster illustration outlines and isolated details. Omit for generated circuitikz: its labels and lines are one glyph.
     pub illustrations_only: Option<bool>,
     /// "image" (default), "paper" for saved stationery, "layout" for glyph geometry, or "review" for appearance evidence.
+    /// For a hand-drawn diagram, compare its lines with nearby writing in a small review region at the same zoom.
     pub view: Option<PreviewView>,
     /// For image (the default): render the page again instead of reusing its cached PNG,
     /// e.g. after replacing a configured font file. Does not change the draft or file a review.
