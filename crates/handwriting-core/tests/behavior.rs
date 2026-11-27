@@ -245,6 +245,32 @@ fn full_page_illustration_paginates_and_half_scale_leaves_room_for_text() {
     assert_eq!(pages(&full).len(), 2);
     assert_eq!(pages(&half).len(), 1);
 }
+#[test]
+fn illustration_keeps_selected_pen_when_text_is_rendered_as_an_ink_layer() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let image = RgbaImage::from_fn(80, 40, |x, y| {
+        if (10..65).contains(&x) && (15..20).contains(&y) {
+            Rgba([0, 0, 0, 255])
+        } else {
+            Rgba([255; 4])
+        }
+    });
+    let data = STANDARD.encode(export::png(&image).unwrap());
+    let mut r = request(&format!("![diagram](data:image/png;base64,{data})"));
+    r.params.ink_layers = true;
+    r.params.fill = [150, 20, 40, 255];
+    r.params.ink_opacity = 75;
+    r.params.illustration_uses_pen = true;
+    for fine in [false, true] {
+        r.params.fine_edit = fine;
+        assert!(
+            pages(&r)[0]
+                .pixels()
+                .any(|p| p[0].saturating_sub(p[1]) > 40)
+        );
+    }
+}
+
 fn docx_bytes(xml: &str) -> Vec<u8> {
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     zip.start_file(

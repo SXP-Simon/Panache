@@ -2,7 +2,7 @@ use super::{Engine, glyph_point, glyph_source};
 use crate::{
     Nudge, Shape, Style,
     drafts::{Section, Snapshot},
-    placement::Placement,
+    placement::{Placement, PlacementReport},
 };
 use anyhow::{Context, Result, ensure};
 use handwriting_core::{
@@ -19,7 +19,7 @@ impl Engine {
         section: Section,
         input: &crate::Nudge,
         cancel: &Cancellation,
-    ) -> Result<u32> {
+    ) -> Result<(u32, Option<PlacementReport>)> {
         let changes = GlyphChanges::parse(input, &draft.style)?;
         let version = section.version;
         let mut req = self.fine_request(draft, section)?;
@@ -72,15 +72,20 @@ impl Engine {
         }
         ensure!(edits.len() <= 10000, "Section glyph edit limit reached");
         cancel.check()?;
-        draft.store_edits(
+        let placement = match geometry {
+            Geometry::Placement(_, report) => Some(report),
+            _ => None,
+        };
+        let next = draft.store_edits(
             input.section,
             version,
             &Adjustments {
                 key,
                 glyphs: edits.into_values().collect(),
             },
-            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"target_quad":input.target_quad,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
-        )
+            &json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note}),
+        )?;
+        Ok((next, placement))
     }
 }
 
@@ -107,6 +112,7 @@ impl<'a> GlyphChanges<'a> {
         }
         ensure!(
             input.target_quad.is_some()
+                || input.natural_line.is_some()
                 || input.place_center.is_some()
                 || input.dx.is_some()
                 || input.dy.is_some()
@@ -167,7 +173,7 @@ impl<'a> GlyphChanges<'a> {
 
     fn apply(&self, geometry: &Geometry, glyph: &GlyphBounds, e: &mut Adjustment) -> Result<()> {
         let input = self.input;
-        if let Geometry::Quadrilateral(map) = geometry {
+        if let Geometry::Placement(map, _) = geometry {
             map.apply(e, glyph.bounds)?;
         }
         if let Some(shape) = &input.shape {
@@ -223,7 +229,7 @@ fn shape_warp(shape: &Shape, height: i32) -> Option<[f64; 8]> {
 
 enum Geometry {
     Unchanged,
-    Quadrilateral(Placement),
+    Placement(Placement, PlacementReport),
     Translation([i32; 2]),
 }
 
@@ -240,7 +246,14 @@ impl Geometry {
             .as_ref()
             .map(|p| p.photo_size.unwrap_or([p.width, p.height]))
             .unwrap_or([params.width.unwrap_or(0), params.height.unwrap_or(0)]);
-        if let Some(quad) = input.target_quad {
+        let projection = draft.paper.as_ref().and_then(|p| p.projection.as_ref());
+        let placement = match (&input.natural_line, input.target_quad) {
+            (Some(_), Some(_)) => anyhow::bail!("Use natural_line or target_quad separately"),
+            (Some(line), None) => Some(Placement::natural_line(projection, [w, h], bounds, line)?),
+            (None, Some(quad)) => Some(Placement::target_quad(projection, [w, h], bounds, quad)?),
+            (None, None) => None,
+        };
+        if let Some((map, report)) = placement {
             ensure!(
                 input.place_center.is_none()
                     && input.dx.is_none()
@@ -248,14 +261,9 @@ impl Geometry {
                     && input.angle.is_none()
                     && input.scale.is_none()
                     && input.shape.is_none(),
-                "Use target_quad separately from other geometry fields"
+                "Use natural_line or target_quad separately from other geometry fields"
             );
-            return Ok(Self::Quadrilateral(Placement::new(
-                draft,
-                [w, h],
-                bounds,
-                quad,
-            )?));
+            return Ok(Self::Placement(map, report));
         }
         if let Some(target) = input.place_center {
             ensure!(
@@ -263,7 +271,6 @@ impl Geometry {
                 "Use place_center separately from dx/dy/shape"
             );
             ensure!(target[0] < w && target[1] < h, "Target outside the page");
-            let projection = draft.paper.as_ref().and_then(|p| p.projection.as_ref());
             let dest = target.map(|v| v as f32);
             let dest = projection.map_or(dest, |p| p.paper_point(dest));
             let mut mean = [0., 0.];

@@ -82,6 +82,8 @@ pub struct Parameters {
     pub ink_depth_sigma: f32,
     pub ink_layers: bool,
     #[serde(default)]
+    pub illustration_uses_pen: bool,
+    #[serde(default)]
     pub transparent_background: bool,
     #[serde(default)]
     pub fine_edit: bool,
@@ -133,6 +135,7 @@ impl Default for Parameters {
             strikethrough_width: 8.,
             ink_depth_sigma: 30.,
             ink_layers: false,
+            illustration_uses_pen: false,
             transparent_background: false,
             fine_edit: false,
             fine_edits: None,
@@ -235,6 +238,7 @@ impl Parameters {
         p.full_preview = boolean(f, "full_preview", true)?;
         p.pdf_save = boolean(f, "pdf_save", false)?;
         p.ink_layers = boolean(f, "ink_layers", false)?;
+        p.illustration_uses_pen = boolean(f, "illustration_uses_pen", false)?;
         p.transparent_background = boolean(f, "transparent_background", false)?;
         p.fine_edit = boolean(f, "fine_edit", false)?;
         if p.fine_edit {

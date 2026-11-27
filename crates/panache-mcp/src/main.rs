@@ -279,7 +279,7 @@ impl ServerHandler for Panache {
             "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
             "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
-            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. When the user wants to compare fonts, see list_fonts for sample guidance. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
+            "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For a font comparison, show the labeled images from list_fonts(sample=...) on the actual draft paper and mixed text. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
             "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
             "If images cannot reach the model, use the reported measurements and ask the user to inspect the page before judging its appearance. ",
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
@@ -332,13 +332,7 @@ impl Panache {
                 let mut effective = serde_json::Map::new();
                 for k in data["controls"].as_object().unwrap().keys() {
                     let val = match k.as_str() {
-                        "font" => json!(
-                            draft
-                                .controls
-                                .get(k)
-                                .and_then(|v| v.as_str())
-                                .unwrap_or(&draft.style.font)
-                        ),
+                        "font" => json!(draft.font_name()),
                         "paper" => draft
                             .controls
                             .get(k)
@@ -389,9 +383,29 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "Search bundled, personal and system fonts by name/source. Results are paged. Use an entry ID in save_section style.font or tune_handwriting changes.font; user and system faces are saved with the draft."
+        description = "Search bundled, personal and system fonts. To compare fonts on the saved paper, pass sample with draft_id, one or two candidate IDs and an optional native-pixel crop. The current image retains local edits. Candidates reflow, so check which words occupy the same region. Samples show the paper even for transparent PNG drafts. Returns labeled images and tune_handwriting arguments without editing the draft."
     )]
-    async fn list_fonts(&self, Parameters(input): Parameters<FontList>) -> CallToolResult {
+    async fn list_fonts(
+        &self,
+        Parameters(input): Parameters<FontList>,
+        ctx: RequestContext<RoleServer>,
+    ) -> CallToolResult {
+        if let Some(sample) = input.sample {
+            return tool_result(
+                self.render(ctx, move |state, engine, cancel| {
+                    ensure!(
+                        input.query.is_empty()
+                            && input.source.is_none()
+                            && input.offset == 0
+                            && input.limit.is_none()
+                            && !input.refresh,
+                        "Use catalog search fields separately from sample"
+                    );
+                    engine::font_samples::compare(state, engine, sample, cancel)
+                })
+                .await,
+            );
+        }
         let include_sample_guidance = input.include_sample_guidance.unwrap_or(true);
         let query = FontSearch {
             query: input.query,
@@ -407,9 +421,9 @@ impl Panache {
             let guidance = concat!(
                 "Select only the main font for a new draft. Its letters and digits are the default, including for homework and lab reports. ",
                 "For a hurried pen style, try 李国夫手写体.ttf if listed. Use a short line from the task with Chinese, an English term and a number or unit. ",
-                "Preview it at the intended size on the intended paper. Compare stroke weight, slant, relative size and digit legibility. ",
+                "Save the actual paper, settings and task text first. Call list_fonts(sample={draft_id,fonts:[candidate_id]}) for labeled images of the same page, optionally adding crop:[x,y,width,height] around a mixed line. Compare stroke weight, slant, relative size and digit legibility. ",
                 "If the style is undecided, show the sample, recommend a font based on what is visible, and ask if it fits before laying out the full page. ",
-                "Keep an approved font. For a less regular hand inspect describe_controls(group=variation) and preview a small change. If the user wants occasional corrections, inspect group=strike. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
+                "Keep an approved font, or apply the chosen candidate's tune_arguments once. Render diagram labels with that same draft font. For a less regular hand inspect describe_controls(group=variation) and preview a small change. If the user wants occasional corrections, inspect group=strike. Only consider separate settings for letters or digits when the user specifically requests them or expresses dissatisfaction with their appearance; then inspect describe_controls(group=typography)."
             );
             let mut data = json!({
                 "entries": page.fonts, "total": page.total,
@@ -562,7 +576,7 @@ impl Panache {
     }
 
     #[tool(
-        description = "Adjust selected glyphs in one section/page by IDs from its layout view. Use the same revision. Offsets and shape are in paper space before sheet projection. Use place_center for a group move; target_quad maps the entire selected text block into four corners on the image. Shape adjusts each glyph individually. An ID is local to the exact layout revision, section and page that returned it. After an intervening edit, read the latest layout and resolve the intended glyph again; do not reuse old IDs by changing only expected_revision."
+        description = "Adjust selected glyphs by IDs from this section/page's layout at the same revision. For worksheet lettering use natural_line with two image points on the writing baseline. It preserves original letter proportions and spacing in paper space, replaces prior warps, and leaves unused row width blank. Use one uniform size across related rows. Use place_center for a group move. Use target_quad only for an intentional exact four-corner warp. Offsets and per-glyph shape are in paper space. After an intervening edit, read the latest layout and locate the intended glyph again; do not reuse old IDs by changing only expected_revision."
     )]
     async fn adjust_glyphs(
         &self,
@@ -583,11 +597,15 @@ impl Panache {
                     input.note.as_ref().is_none_or(|s| s.chars().count() <= 320),
                     "Note exceeds 320 characters"
                 );
-                let next = engine.adjust(&draft, section, &input, cancel)?;
-                Ok(reply(
-                    format!("Saved revision {next}."),
-                    json!({"draft_id":draft.id,"revision":next,"count":input.ids.len()}),
-                ))
+                let (next, placement) = engine.adjust(&draft, section, &input, cancel)?;
+                let mut message = format!("Saved revision {next}.");
+                let mut data = json!({"draft_id":draft.id,"revision":next,"count":input.ids.len()});
+                if let Some(report) = placement {
+                    message.push(' ');
+                    message.push_str(&report.summary());
+                    data["placement"] = json!(report);
+                }
+                Ok(reply(message, data))
             })
             .await,
         )

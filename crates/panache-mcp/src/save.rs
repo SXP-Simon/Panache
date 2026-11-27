@@ -132,6 +132,28 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn illustration_pen_default_is_pinned_when_homework_is_created() -> Result<()> {
+        for (args, enabled) in [
+            (json!({}), false),
+            (json!({"homework":true}), true),
+            (
+                json!({"homework":true,"illustration_uses_pen":false}),
+                false,
+            ),
+            (json!({"illustration_uses_pen":true}), true),
+        ] {
+            let style: crate::CreationStyle = serde_json::from_value(args)?;
+            assert_eq!(
+                style.resolve(&[]).illustration_uses_pen.unwrap_or(false),
+                enabled
+            );
+        }
+        let archived: Style = serde_json::from_value(json!({"homework":true}))?;
+        assert!(!archived.illustration_uses_pen.unwrap_or(false));
+        Ok(())
+    }
+
+    #[test]
     fn homework_variation_is_saved_on_creation_and_respects_overrides() -> Result<()> {
         use crate::{controls, drafts::Drafts};
         let root = tempfile::tempdir()?;

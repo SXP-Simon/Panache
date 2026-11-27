@@ -138,7 +138,15 @@ fn render(
         input.offset.is_none() && input.limit.is_none(),
         "offset and limit require view=layout"
     );
-    image(engine, &draft, section, page, input.fresh, cancel)
+    image(
+        engine,
+        &draft,
+        section,
+        page,
+        input.fresh,
+        !state.preserve_reviews,
+        cancel,
+    )
 }
 
 fn paper(draft: &Snapshot<'_>) -> Result<CallToolResult> {
@@ -163,18 +171,26 @@ fn image(
     section: Section,
     page: usize,
     fresh: bool,
+    review_allowed: bool,
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let number = section.number;
-    let contains_inline_image = section.text.contains("](data:image/");
+    let contains_drawing =
+        section.text.contains("](data:image/") || section.text.contains("\\begin{circuitikz}");
     let (preview, cached) = engine.preview_with_refresh(draft, section, page, fresh, cancel)?;
     let mut message = format!("第 {number} 节 · 第 {page} 页 · 版本 {}", draft.revision);
     let mut data = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page_in_section":page,"cached":cached});
-    if contains_inline_image {
+    if contains_drawing {
         let hint = "如果当前页既有手绘图又有文字，在判断笔迹一致前，用 view=review 加 region 框住一段图线和旁边的字，同倍率比较粗细和墨色。同页看图与字只传当前版，省略 compare_revision。看不清时说明还不能判断。";
         message.push('\n');
         message.push_str(hint);
         data["illustration_inspection"] = json!(hint);
+    }
+    if draft.paper.is_some() && review_allowed {
+        let hint = "检查照片作业是否可以交付时，用 view=review 查看同页相邻行。按 adjacent_row_check 提供的区域以原尺寸查看字形宽窄和字高；有图时也对照图线与附近正文。";
+        message.push('\n');
+        message.push_str(hint);
+        data["photo_review_arguments"] = json!({"draft_id":draft.id,"revision":draft.revision,"section":number,"page":page,"view":"review"});
     }
     let mut result = reply(message, data);
     result

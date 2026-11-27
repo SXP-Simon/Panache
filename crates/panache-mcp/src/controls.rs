@@ -97,6 +97,7 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
         top_margin: 62.,
         bottom_margin: 55.,
         fill: style.ink_rgba()?,
+        illustration_uses_pen: style.illustration_uses_pen.unwrap_or(false),
         strikethrough_probability: 0.,
         perturb_x_sigma: 1.,
         perturb_y_sigma: 1.,

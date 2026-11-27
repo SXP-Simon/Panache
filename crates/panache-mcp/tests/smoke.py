@@ -18,6 +18,9 @@ from zipfile import ZipFile
 from PIL import Image
 
 import coursework_form
+import illustration_pen
+import illustration_ink_check
+import font_samples
 import review_comparison
 from mcp_client import call
 
@@ -324,6 +327,7 @@ async def smoke(command, arguments, out):
             assert results["total"] == 1 and results["next_offset"] is None
             entry = results["entries"][0]
             assert entry["source"] == "user" and entry["filename"] == custom_font.name
+            await font_samples.check(client, entry["id"])
             saved_font = (await call(client, "save_section", markdown="ABC 123", style={"font": entry["id"]})).structuredContent
             font_key = {"draft_id": saved_font["draft_id"]}
             second = (await call(client, "list_fonts", source="user", query="secondsample")).structuredContent["entries"][0]
@@ -424,6 +428,8 @@ async def smoke(command, arguments, out):
             await placement_pixels(client)
             await glyph_target_text(client)
             await coursework_form.exercise(client, Path(temp))
+            await illustration_pen.verify(client)
+            await illustration_ink_check.verify(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
             poem = POEM.replace("，", "，\n")

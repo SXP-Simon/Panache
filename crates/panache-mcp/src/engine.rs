@@ -1,4 +1,5 @@
 mod adjustments;
+pub(crate) mod font_samples;
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, FontBook, Limits, RenderRequest, export};
@@ -119,17 +120,16 @@ impl Engine {
         background: Option<Vec<u8>>,
         edits: Option<Adjustments>,
     ) -> Result<RenderRequest> {
-        let font_name = draft
-            .controls
-            .get("font")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(&draft.style.font);
+        let primary = self.draft_font(draft, draft.font_name())?;
+        self.request_with_font(draft, section, background, edits, primary)
+    }
+    fn draft_font(&mut self, draft: &Snapshot<'_>, font_name: &str) -> Result<Arc<fontdue::Font>> {
         ensure!(
             font_name.starts_with("upload:") || self.names.iter().any(|f| f == font_name),
             "Font no longer available: {}",
             font_name
         );
-        let primary = if font_name.starts_with("upload:") {
+        Ok(if font_name.starts_with("upload:") {
             let key = format!("{}:{}", draft.id, font_name);
             if let Some(font) = self.fonts.get(&key) {
                 font.clone()
@@ -140,7 +140,16 @@ impl Engine {
             }
         } else {
             self.font(font_name)?
-        };
+        })
+    }
+    fn request_with_font(
+        &mut self,
+        draft: &Snapshot<'_>,
+        section: Section,
+        background: Option<Vec<u8>>,
+        edits: Option<Adjustments>,
+        primary: Arc<fontdue::Font>,
+    ) -> Result<RenderRequest> {
         let fonts = FontBook::with_text_fallbacks(primary, &section.text, |name| {
             if self.names.iter().any(|n| n == name) {
                 self.font(name).map(Some)
@@ -206,23 +215,8 @@ impl Engine {
         let camera = draft.camera(background.as_deref())?;
         let photo = Self::photo(draft, &mut background)?;
         let request = self.request(draft, section, background, edits)?;
-        let mut image = None;
-        let pages =
-            Self::render_pages(&request, photo.as_ref(), cancel, page_number, |i, page| {
-                if i + 1 == page_number {
-                    image = Some(STANDARD.encode(camera.png(&page)?));
-                }
-                Ok(())
-            })?;
-        let png = image.ok_or_else(|| {
-            draft.page_error(
-                n,
-                handwriting_core::Error::new(
-                    "invalid_page",
-                    format!("Section has {pages} pages; requested {page_number}"),
-                ),
-            )
-        })?;
+        let image = Self::render_page(draft, n, &request, photo.as_ref(), cancel, page_number)?;
+        let png = STANDARD.encode(camera.png(&image)?);
         let preview = RenderedPreview {
             png,
             fine_edit: request.params.fine_edit,
@@ -275,6 +269,31 @@ impl Engine {
             }
             None => handwriting_core::render::render_until_page(request, cancel, stop, emit),
         }
+    }
+    fn render_page(
+        draft: &Snapshot<'_>,
+        section: u32,
+        request: &RenderRequest,
+        photo: Option<&(&handwriting_core::photo::PaperProjection, image::RgbaImage)>,
+        cancel: &Cancellation,
+        page_number: usize,
+    ) -> Result<image::RgbaImage> {
+        let mut image = None;
+        let pages = Self::render_pages(request, photo, cancel, page_number, |i, page| {
+            if i + 1 == page_number {
+                image = Some(page);
+            }
+            Ok(())
+        })?;
+        image.ok_or_else(|| {
+            draft.page_error(
+                section,
+                handwriting_core::Error::new(
+                    "invalid_page",
+                    format!("Section has {pages} pages; requested {page_number}"),
+                ),
+            )
+        })
     }
     pub fn page_count(
         &mut self,
@@ -353,47 +372,42 @@ impl Engine {
                 )
             })
             .collect();
-        // Use edited geometry on this page. Raster details belong to the parent illustration.
-        let illustration_and_text = glyphs
-            .iter()
-            .find(|g| g.illustration == Some(g.id))
-            .and_then(|g| {
-                let position = |g: &fine_edit::GlyphBounds, offset| {
-                    crate::review::photo_point(
-                        draft,
-                        glyph_point(g, edits.get(&g.id).copied(), offset),
-                    )
-                };
-                let hw = f64::from(g.bounds[2]) / 2.;
-                let hh = f64::from(g.bounds[3]) / 2.;
-                let corners =
-                    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(|uv| position(g, uv));
-                let bounds = |axis: usize| {
-                    corners
-                        .iter()
-                        .map(|p| p[axis])
-                        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), x| {
-                            (lo.min(x), hi.max(x))
-                        })
-                };
-                let (left, right) = bounds(0);
-                let (top, bottom) = bounds(1);
-                let candidates = glyphs
-                    .iter()
-                    .filter(|v| v.is_text && edits.get(&v.id).is_none_or(|edit| edit.opacity > 0));
-                let near = candidates.map(|v| position(v, [0., 0.])).min_by(|a, b| {
-                    let distance = |p: &[f32; 2]| {
-                        (p[0] - p[0].clamp(left, right)).hypot(p[1] - p[1].clamp(top, bottom))
-                    };
-                    distance(a).total_cmp(&distance(b))
-                })?;
-                Some([
-                    [left.min(near[0]), top.min(near[1])],
-                    [right.max(near[0]), bottom.max(near[1])],
-                ])
-            });
+        let mut text = Vec::new();
+        let mut drawing = None;
+        for g in &glyphs {
+            let edit = edits.get(&g.id).copied();
+            let is_drawing = g.illustration == Some(g.id) || g.is_native_diagram;
+            if !(g.is_text || is_drawing && drawing.is_none())
+                || edit.is_some_and(|v| v.opacity == 0)
+            {
+                continue;
+            }
+            let hw = f64::from(g.bounds[2]) / 2.;
+            let hh = f64::from(g.bounds[3]) / 2.;
+            let corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]
+                .map(|uv| crate::review::photo_point(draft, glyph_point(g, edit, uv)));
+            let bounds = crate::review::Bounds::from_corners(corners);
+            if is_drawing {
+                drawing = Some(bounds);
+            } else {
+                let edge = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+                let width = edge(corners[0], corners[1]) + edge(corners[3], corners[2]);
+                let height = edge(corners[0], corners[3]) + edge(corners[1], corners[2]);
+                let dy = f64::from(g.baseline - g.bounds[1]) - hh;
+                let baseline = glyph_point(g, edit, [0., dy])[1];
+                let top = glyph_point(g, edit, [0., -hh]);
+                let bottom = glyph_point(g, edit, [0., hh]);
+                text.push(crate::review::TextSample {
+                    bounds,
+                    baseline,
+                    paper_vertical_scale: edge(top, bottom) / g.bounds[3] as f32,
+                    stretch: (width / height) / (hw / hh) as f32,
+                });
+            }
+        }
         Ok(crate::review::PageSample {
-            illustration_and_text,
+            text,
+            drawing,
             baselines,
             content_sha256: format!("{:x}", membership.finalize()),
         })

@@ -84,6 +84,13 @@ pub struct Snapshot<'a> {
 }
 
 impl Snapshot<'_> {
+    pub fn font_name(&self) -> &str {
+        self.controls
+            .get("font")
+            .and_then(Value::as_str)
+            .unwrap_or(&self.style.font)
+    }
+
     pub fn review_section(&self, requested: Option<u32>) -> Result<u32> {
         if let Some(section) = requested {
             ensure!(section > 0, "section starts at 1");

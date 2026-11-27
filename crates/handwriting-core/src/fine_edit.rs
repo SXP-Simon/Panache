@@ -37,6 +37,8 @@ pub struct Adjustments {
 pub struct GlyphBounds {
     #[serde(skip)]
     pub is_text: bool,
+    #[serde(skip)]
+    pub is_native_diagram: bool,
     pub illustration: Option<u32>,
     pub id: u32,
     pub bounds: [i32; 4],
@@ -64,6 +66,7 @@ pub fn inspect_page(
                     .map(|t| GlyphBounds {
                         id: t.id,
                         is_text: t.is_text,
+                        is_native_diagram: t.is_native_diagram,
                         illustration: t.illustration,
                         bounds: [t.x, t.y, t.mask.width() as i32, t.mask.height() as i32],
                         source_utf16: t.source,
@@ -131,6 +134,7 @@ pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
 
 pub(crate) struct Tile {
     pub is_text: bool,
+    pub is_native_diagram: bool,
     pub illustration: Option<u32>,
     pub id: u32,
     pub x: i32,
@@ -293,11 +297,12 @@ pub(crate) fn paint(
     edit: Option<&Adjustment>,
     cancel: &Cancellation,
 ) -> Result<()> {
-    let (base_thickness, base_softness, base_fill, base_opacity) = if tile.illustration.is_some() {
-        (0., 0., [20, 20, 25, 255], 100)
-    } else {
-        (p.ink_thickness, p.ink_softness, p.fill, p.ink_opacity)
-    };
+    let (base_thickness, base_softness, base_fill, base_opacity) =
+        if tile.illustration.is_some() && !p.illustration_uses_pen {
+            (0., 0., [20, 20, 25, 255], 100)
+        } else {
+            (p.ink_thickness, p.ink_softness, p.fill, p.ink_opacity)
+        };
     let thickness =
         (base_thickness + edit.map_or(0., |v| f64::from(v.thickness) / 10.)).clamp(-2., 2.);
     let softness = (base_softness + edit.map_or(0., |v| f64::from(v.softness) / 10.)).clamp(0., 2.);

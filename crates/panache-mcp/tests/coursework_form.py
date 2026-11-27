@@ -112,3 +112,54 @@ async def exercise(client, directory):
     review = (await call(client, "preview_handwriting", **key, revision=revision,
                          view="review")).structuredContent
     assert review["evidence"]["changed_pixels_outside_reference"] > 0
+
+    # Recreate a twice-wide worksheet row and restore its original letters with one edit.
+    async def layout_glyphs():
+        layout = (await call(client, "preview_handwriting", **key, revision=revision,
+                             view="layout", limit=32)).structuredContent
+        return {g["text"]: g for g in layout["glyphs"]}
+
+    glyphs = await layout_glyphs()
+    line = [glyphs[c] for c in body[0]]
+    xs, ys = zip(*(p for glyph in line for p in glyph["photo_quad"]))
+    wide = corners((min(xs), min(ys), min(xs) + 2 * (max(xs) - min(xs)), max(ys)))
+    targets = dict(ids=[g["id"] for g in line], expected_texts=list(body[0]))
+    stretched = await call(client, "adjust_glyphs", **key, expected_revision=revision,
+                           **targets, target_quad=wide)
+    revision = stretched.structuredContent["revision"]
+    report = stretched.structuredContent["placement"]
+    assert report["mode"] == "target_quad" and 1.9 < report["max_glyph_center_axis_ratio"] < 2.1
+    assert "natural_line" in stretched.content[0].text
+    distorted = finished_image(await call(client, "preview_handwriting", **key, revision=revision))
+    row = (78, 118, 383, 159)
+    original_ink = ink.crop(row)
+    wide_ink = ink_mask(paper.crop(row), distorted.crop(row))
+    assert wide_ink.getbbox()[2] - wide_ink.getbbox()[0] > 1.8 * (
+        original_ink.getbbox()[2] - original_ink.getbbox()[0])
+
+    glyphs = await layout_glyphs()
+    targets["ids"] = [glyphs[c]["id"] for c in body[0]]
+    start = min((glyphs[c]["photo_baseline"][0] for c in body[0]), key=lambda p: p[0])
+    baseline = {"start": start, "end": [383, start[1]]}
+    for args, reason in [
+        ({"natural_line": {**baseline, "end": [start[0] + 5, start[1]]}}, "Split the line"),
+        ({"natural_line": baseline, "target_quad": wide}, "separately"),
+        ({"natural_line": baseline, "ids": [line[0]["id"], glyphs[body[1][0]]["id"]],
+          "expected_texts": [body[0][0], body[1][0]]}, "one original layout baseline"),
+    ]:
+        rejected = await client.call_tool("adjust_glyphs", {
+            **key, "expected_revision": revision, **targets, **args,
+        })
+        assert rejected.isError and reason in rejected.content[0].text
+
+    restored = await call(client, "adjust_glyphs", **key, expected_revision=revision,
+                          **targets, natural_line=baseline)
+    revision = restored.structuredContent["revision"]
+    report = restored.structuredContent["placement"]
+    assert report["mode"] == "natural_line" and report["scale_percent"] == 100
+    assert report["available_paper_px"] > 2 * report["used_paper_px"]
+    result = finished_image(await call(client, "preview_handwriting", **key, revision=revision))
+    aligned = ink_mask(paper.crop(row), result.crop(row))
+    intersection = ImageChops.darker(original_ink, aligned).histogram()[255]
+    union = ImageChops.lighter(original_ink, aligned).histogram()[255]
+    assert intersection / union > 0.85, (intersection, union)

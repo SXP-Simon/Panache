@@ -17,6 +17,23 @@ pub struct FontList {
     pub refresh: bool,
     /// Set false only to look up an already approved font or its ID when no new style choice is needed. Omit or set true for samples and style choices, even with an exact-name query.
     pub include_sample_guidance: Option<bool>,
+    /// Instead of searching, render the same saved page in its current font and up to two alternatives.
+    pub sample: Option<FontSample>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FontSample {
+    pub draft_id: String,
+    /// Omit for latest.
+    pub revision: Option<u32>,
+    /// One-based section and page (both default to 1).
+    pub section: Option<u32>,
+    pub page: Option<usize>,
+    /// One or two candidate IDs from list_fonts. The current font is shown automatically.
+    pub fonts: Vec<String>,
+    /// Optional common crop [x,y,width,height] in native output pixels. Frame real mixed text at writing size.
+    pub crop: Option<[u32; 4]>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -53,6 +70,10 @@ pub struct Style {
     /// Slightly vary letter size and tilt. Defaults on for new homework. Use false for the usual, steadier variation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relaxed_handwriting: Option<bool>,
+    /// Use the manuscript pen color, opacity, thickness and softness for embedded illustrations.
+    /// New homework enables this by default. Existing labels inside the image keep their drawn shapes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub illustration_uses_pen: Option<bool>,
     /// Keep this value to reproduce handwriting variations.
     #[schemars(transform = remove_schema_default)]
     pub seed: u32,
@@ -70,6 +91,7 @@ impl Default for Style {
             font_size: 34,
             homework: false,
             relaxed_handwriting: None,
+            illustration_uses_pen: None,
             seed: u32::from_le_bytes(Uuid::new_v4().as_bytes()[..4].try_into().unwrap()),
         }
     }
@@ -127,6 +149,7 @@ impl CreationStyle {
         if style.homework {
             // Resolve only on creation: older saved styles keep their original rendering.
             style.relaxed_handwriting.get_or_insert(true);
+            style.illustration_uses_pen.get_or_insert(true);
         }
         style
     }
@@ -295,6 +318,17 @@ pub struct Shape {
     pub top_width_percent: u8,
 }
 
+#[derive(Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NaturalLine {
+    /// Start of the writing baseline in original preview pixels, at the selection's left edge.
+    pub start: [u32; 2],
+    /// End of the available baseline, in writing direction. Extra space stays blank.
+    pub end: [u32; 2],
+    /// Uniform size relative to the source layout, 50..200 (default 100). Reuse the same value on adjacent rows.
+    pub scale_percent: Option<u8>,
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Nudge {
@@ -311,7 +345,9 @@ pub struct Nudge {
     pub expected_texts: Option<Vec<String>>,
     /// Move this selection as a group so its mean glyph center lands at [x,y] on the preview. Use separately from dx, dy and shape.
     pub place_center: Option<[u32; 2]>,
-    /// Image destinations of the original block's TL,TR,BR,BL corners, in that order (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Replaces prior geometry; use separately from other geometry changes.
+    /// Place one source line along a worksheet baseline, preserving letter proportions, spacing, and baseline offsets in paper space. Use separately from other geometry changes.
+    pub natural_line: Option<NaturalLine>,
+    /// Exact stretch to the original block's TL,TR,BR,BL image destinations (for a 90° counterclockwise sidebar: BL,TL,TR,BR of the field). Use only for intentional four-corner warping. Replaces prior geometry.
     pub target_quad: Option<[[u32; 2]; 4]>,
     /// Absolute offsets in pixels from the original glyph position. Omitted fields retain their values.
     pub dx: Option<i32>,
