@@ -1,0 +1,70 @@
+{
+  "page_size": [
+    350,
+    270
+  ],
+  "format": "Original 0.png from /api/generate_handwriting/task/{id}/result; pixel comparison in RGBA",
+  "shared_fields": {
+    "text": "第一行  x = 12\n第二行  y = 24\n第三行  36 + 48\n第四行  84 ÷ 7",
+    "font_option": "霞鹜文楷.ttf",
+    "font_size": "24",
+    "line_spacing": "48",
+    "width": "350",
+    "height": "270",
+    "top_margin": "20",
+    "bottom_margin": "20",
+    "left_margin": "20",
+    "right_margin": "20",
+    "strikethrough_probability": "0",
+    "preview": "false",
+    "pdf_save": "false",
+    "font_size_sigma": "1",
+    "perturb_x_sigma": "1",
+    "ink_layers": "true"
+  },
+  "additional_fields": {
+    "before-off": {},
+    "before-gradient": {
+      "seed": "0",
+      "export_blur_gradient": "{\"from\": {\"x\": 0.5, \"y\": 0.1, \"sigma_px\": 1.2}, \"to\": {\"x\": 0.5, \"y\": 0.5, \"sigma_px\": 0}}"
+    },
+    "after-off": {
+      "seed": "0"
+    },
+    "after-gradient": {
+      "seed": "0",
+      "export_blur_gradient": "{\"from\": {\"x\": 0.5, \"y\": 0.1, \"sigma_px\": 1.2}, \"to\": {\"x\": 0.5, \"y\": 0.5, \"sigma_px\": 0}}"
+    }
+  },
+  "gradient": {
+    "from": {
+      "x": 0.5,
+      "y": 0.1,
+      "sigma_px": 1.2
+    },
+    "to": {
+      "x": 0.5,
+      "y": 0.5,
+      "sigma_px": 0
+    }
+  },
+  "rgba_sha256": {
+    "before-off": "f46d59cea992624e0a6e16a4dffc264c7ca7d83ea230bb2c9ceb50dc5308dd1b",
+    "before-gradient": "580bb20d64e62ff07fe5484189e30d2eb80e0f9b1412149c2ad32db28a7bb4d6",
+    "after-off": "6d7d3b60c56728418b9759248ca60e1791e1d95130bd43ff3c60bf73fa995acf",
+    "after-gradient": "580bb20d64e62ff07fe5484189e30d2eb80e0f9b1412149c2ad32db28a7bb4d6"
+  },
+  "changed_pixels": {
+    "before": {
+      "full": 5239,
+      "top_y_0_136": 3151,
+      "lower_y_136_270": 2088
+    },
+    "after": {
+      "full": 2517,
+      "top_y_0_136": 2517,
+      "lower_y_136_270": 0
+    }
+  },
+  "measurement_notes": "Off requests omit both blur fields. The older off request uses a random seed, so its changed-pixel numbers may vary upon rerun. Both gradient requests use seed=0 and produce identical pages. The lower region spans rows y=136 to 269, after the zero-strength anchor."
+}

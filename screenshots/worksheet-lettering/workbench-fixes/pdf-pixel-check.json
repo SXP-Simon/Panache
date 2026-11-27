@@ -1,0 +1,24 @@
+{
+  "raster_size": [
+    560,
+    710
+  ],
+  "glyph_id": 0,
+  "unmoved_bounds_xyxy": [
+    37,
+    76,
+    70,
+    107
+  ],
+  "moved_bounds_xyxy": [
+    40,
+    76,
+    73,
+    107
+  ],
+  "glyph_mask_pixels": 197,
+  "difference_after_compensating_for_3px_translation": 0,
+  "page_pixels_different_from_unmoved": 282,
+  "rgb_sha256": "db9331ab64bd4d76d893664048e6f473613314dd6e61a86df6412b8ba52bd9fc",
+  "replay_against_captured_pdf_different_pixels": 0
+}
