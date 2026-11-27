@@ -87,7 +87,7 @@ fn render(
         input.region.is_none()
             || matches!(input.view, Some(PreviewView::Layout | PreviewView::Review))
             || finish.is_some(),
-        "region requires view=layout, view=review, or view=image with an explicit PNG finish"
+        "region requires view=layout, view=review, or view=image with export_blur_px=0 (clear) or the PNG finish being compared"
     );
     ensure!(
         input.compare_revision.is_none() || input.view == Some(PreviewView::Review),
@@ -121,15 +121,7 @@ fn render(
             "Review a single page without pagination"
         );
         if let Some(region) = &input.region {
-            return review::local::page(
-                &state.drafts,
-                engine,
-                &draft,
-                section,
-                input,
-                region,
-                cancel,
-            );
+            return review::local::page(state, engine, &draft, section, input, region, cancel);
         }
         ensure!(
             !state.preserve_reviews,
@@ -137,8 +129,15 @@ fn render(
         );
         let baselines = engine.review_baselines(&draft, section.clone(), page, cancel)?;
         let (preview, _) = engine.preview(&draft, section, page, cancel)?;
-        let result = review::page(&draft, number, page, &preview.png, &baselines, cancel)?;
-        return add_paper_focus(state, &draft, number, page, result);
+        return review::page(
+            &draft,
+            number,
+            page,
+            &preview.png,
+            &baselines,
+            &state.paper_focus,
+            cancel,
+        );
     }
     if input.view == Some(PreviewView::Layout) {
         let result = engine.layout(&draft, section, input, cancel)?;
@@ -195,7 +194,7 @@ fn add_paper_focus(
     page: usize,
     mut result: CallToolResult,
 ) -> Result<CallToolResult> {
-    if let Some(focus) = state.paper_focus.report(draft, section, page)? {
+    if let Some(focus) = state.paper_focus.report(draft, section, page, false)? {
         result
             .content
             .push(ContentBlock::text(format!("底纸边缘原尺寸检查 {focus}")));

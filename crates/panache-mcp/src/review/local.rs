@@ -3,8 +3,8 @@ mod regions;
 
 use super::{decode_page, reference_paper, rgb_delta, thumbnail};
 use crate::{
-    Preview, controls,
-    drafts::{Drafts, Section, Snapshot},
+    Preview, State, controls,
+    drafts::{Section, Snapshot},
     engine::Engine,
     reply,
 };
@@ -74,7 +74,7 @@ impl Appearance {
 }
 
 pub fn page(
-    drafts: &Drafts,
+    state: &State,
     engine: &mut Engine,
     draft: &Snapshot<'_>,
     section: Section,
@@ -96,8 +96,9 @@ pub fn page(
     let paper = reference_paper(draft, size, &after.params)?;
     after.composite(&paper, cancel)?;
     let before = if let Some(revision) = input.compare_revision {
-        let old = drafts.snapshot(draft.id, Some(revision))?;
-        let section = drafts
+        let old = state.drafts.snapshot(draft.id, Some(revision))?;
+        let section = state
+            .drafts
             .sections(old.id, revision, Some(number))?
             .pop()
             .context("Section absent in compare_revision")?;
@@ -140,6 +141,16 @@ pub fn page(
             "before": mode(prior.fine_edit), "after": mode(after.fine_edit),
             "guidance": "Fine edit applies ink variation to individual glyphs. Switching rendering modes can change unedited writing. All measured differences remain visible changes; inspect protected areas before judging the edit."
         });
+    }
+    if before.is_none() {
+        state.paper_focus.add_review_guidance(
+            draft,
+            number,
+            page,
+            after.params.transparent_background,
+            false,
+            &mut metadata,
+        )?;
     }
     let mut response = reply(metadata.to_string(), metadata);
     let mut append = |label: &str, img: RgbaImage| -> Result<()> {

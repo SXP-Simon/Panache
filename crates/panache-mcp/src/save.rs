@@ -110,7 +110,7 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
     )?;
     if let Some(paper) = paper {
         let id = saved["draft_id"].as_str().expect("new draft ID");
-        let report = paper.focus.report(id, 1, 1, 1);
+        let report = paper.focus.report(id, 1, 1, 1, false);
         state.paper_focus.remember(id, paper.focus);
         saved["photo_ink_preview_arguments"] = json!({"draft_id":id,"revision":1,"section":1,"page":1,
             "view":if state.preserve_reviews {"image"} else {"review"}});

@@ -133,10 +133,12 @@ async def verify(client, home):
         await call(client, "preview_handwriting", **key, revision=5, view="review")
     ).structuredContent
     assert transparent["evidence"]["transparent_png"]
+    assert "png_finish_comparison" not in transparent
     ref = transparent["local_paper_ink_check"]["samples"][0]
     local = (
         await call(client, "preview_handwriting", **ref["preview_arguments"])
     ).structuredContent
+    assert "png_finish_comparison" not in local
     assert (
         ref["paper_marks"]["median_luma_drop"]
         == local["local_paper_ink_check"]["samples"][0]["paper_marks"][

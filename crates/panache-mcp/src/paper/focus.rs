@@ -213,7 +213,14 @@ pub fn measure(img: &impl GenericImageView<Pixel = Rgba<u8>>) -> Profile {
 }
 
 impl Profile {
-    pub fn report(&self, draft: &str, revision: u32, section: u32, page: usize) -> Value {
+    pub fn report(
+        &self,
+        draft: &str,
+        revision: u32,
+        section: u32,
+        page: usize,
+        compare_finish: bool,
+    ) -> Value {
         let [w, h] = self.size;
         let crop = |[x, y]: [u32; 2]| {
             let cw = w.min(240);
@@ -323,9 +330,39 @@ impl Profile {
                 "采样差异未达显著门槛。有同向可比样本时，参考裁区给出较窄与较宽的实测边缘。缓慢渐变和很小的软区可能遗漏。沿同一条纸上印线或同类印字连续检查相邻区域，用原尺寸对照图线、图内标签和正文。"
             }
         };
-        json!({"status":status,"supported_cells":coverage,"grid":[GRID,GRID],"regions":regions,"guidance":guidance,
+        let mut report = json!({"status":status,"supported_cells":coverage,"grid":[GRID,GRID],"regions":regions,"guidance":guidance,
             "local_edit_guidance":"优先检查用户指明的位置，可平移 region 连续查看过渡，保留原纸与清晰区。仅在裁图或用户反馈支持时，对可独立选择的字或图块分区小调 softness 后复看。若布局只给流程图及其标签一个字形 ID，softness 会影响整张图；需要只改某一部分应在可局部修改的图源中处理。",
-            "method":"Native 20–80% lightness transition width on opposing, locally contrasted stroke edges, confirmed by parallel profiles. Comparisons use the same scan direction. Print, material and capture can all broaden an edge."})
+            "method":"Native 20–80% lightness transition width on opposing, locally contrasted stroke edges, confirmed by parallel profiles. Comparisons use the same scan direction. Print, material and capture can all broaden an edge."});
+        // 2026-11-27：半像素差只用于提供可逆的对照预览，不改变纸面焦差检测结论。
+        if compare_finish
+            && let Some((delta, sharp, soft)) = largest.or(references)
+            && delta >= 0.5
+            && sharp.point != soft.point
+            && w > 1
+            && h > 1
+        {
+            let anchor = |s: &Sample, sigma: f64| {
+                json!({
+                    "x":f64::from(s.point[0])/f64::from(w-1),
+                    "y":f64::from(s.point[1])/f64::from(h-1),
+                    "sigma_px":sigma
+                })
+            };
+            let gradient = json!({"from":anchor(soft,0.8),"to":anchor(sharp,0.)});
+            let pair = |point| {
+                let mut clear = crop(point);
+                clear["view"] = json!("image");
+                let mut candidate = clear.clone();
+                clear["export_blur_px"] = json!(0);
+                candidate["export_blur_gradient"] = gradient.clone();
+                json!({"clear":clear,"gradient":candidate})
+            };
+            report["png_finish_comparison"] = json!({
+                "guidance":"照片 PNG 定稿前，若原尺寸观察也显示一侧较软，先比较本版两处裁图。分别把 softer_area 和 sharper_area 中的 clear、gradient 参数传给 preview_handwriting，比较同一位置的纸面细线与笔画。参考框缺少字迹时，两档的 region 一起移到附近的小字，锚点仍按整页。0.8→0 是试看的强度；边缘宽度也受印刷影响。清晰版已协调、渐变使细字变淡或看不出收益时选清晰版。否则用预览过的同一组渐变参数导出 ZIP。",
+                "softer_area":pair(soft.point),"sharper_area":pair(sharp.point)
+            });
+        }
+        report
     }
 }
 
@@ -333,6 +370,38 @@ impl Profile {
 pub struct Cache(Mutex<VecDeque<(String, Profile)>>);
 
 impl Cache {
+    pub fn add_review_guidance(
+        &self,
+        draft: &Snapshot<'_>,
+        section: u32,
+        page: usize,
+        transparent: bool,
+        whole_page: bool,
+        metadata: &mut Value,
+    ) -> Result<()> {
+        if transparent && !whole_page {
+            return Ok(());
+        }
+        if let Some(mut focus) = self.report(draft, section, page, !transparent)? {
+            if let Some(trial) = focus
+                .as_object_mut()
+                .and_then(|obj| obj.remove("png_finish_comparison"))
+            {
+                let hint = "照片 PNG 定稿时，请打开 png_finish_comparison：在同一版的偏软和偏清两处，分别比较 clear 和 gradient 的原尺寸图，再选导出参数。两档都协调或渐变损失细笔时选清晰版。";
+                let previous = metadata["next_step"].as_str().unwrap_or_default();
+                metadata["next_step"] = json!(format!("{previous} {hint}").trim());
+                if let Some(appearance) = metadata.get_mut("photo_appearance") {
+                    appearance["png_finish_guidance"] = json!(hint);
+                }
+                metadata["png_finish_comparison"] = trial;
+            }
+            if whole_page {
+                metadata["paper_focus_check"] = focus;
+            }
+        }
+        Ok(())
+    }
+
     pub fn remember(&self, id: &str, profile: Profile) {
         let mut entries = self.0.lock().unwrap_or_else(|e| e.into_inner());
         entries.retain(|e| e.0 != id);
@@ -342,7 +411,13 @@ impl Cache {
         }
     }
 
-    pub fn report(&self, draft: &Snapshot<'_>, section: u32, page: usize) -> Result<Option<Value>> {
+    pub fn report(
+        &self,
+        draft: &Snapshot<'_>,
+        section: u32,
+        page: usize,
+        compare_finish: bool,
+    ) -> Result<Option<Value>> {
         if draft.paper.is_none() {
             return Ok(None);
         }
@@ -369,6 +444,7 @@ impl Cache {
             draft.revision,
             section,
             page,
+            compare_finish,
         )))
     }
 }
@@ -386,7 +462,7 @@ mod tests {
     }
 
     fn report(img: GrayImage) -> Value {
-        measure(&DynamicImage::ImageLuma8(img)).report("draft", 2, 3, 4)
+        measure(&DynamicImage::ImageLuma8(img)).report("draft", 2, 3, 4, true)
     }
 
     #[test]
@@ -398,6 +474,7 @@ mod tests {
             let original = report(lines.clone());
             assert_eq!(original["status"], "no_clear_softening_in_samples");
             assert_eq!(original["regions"][0]["role"], "narrower_reference");
+            assert!(original.get("png_finish_comparison").is_none());
             assert_eq!(original["regions"][1]["role"], "broader_reference");
             assert_eq!(
                 original["regions"][0]["scan_direction"],
@@ -433,6 +510,29 @@ mod tests {
     }
 
     #[test]
+    fn reversible_trial_can_follow_subthreshold_samples_without_changing_the_detector() {
+        let sample = |width, x| Sample {
+            point: [x, 100],
+            cell: [x / 100, 1],
+            horizontal_scan: false,
+            width,
+            strokes: 32,
+            tracks: 6,
+        };
+        for (difference, offer) in [(0.49, false), (0.5, true), (0.74, true)] {
+            let profile = Profile {
+                size: [400, 300],
+                samples: vec![sample(1.2, 50), sample(1.2 + difference, 250)],
+            };
+            for review in [false, true] {
+                let r = profile.report("id", 4, 2, 1, review);
+                assert_eq!(r["status"], "no_clear_softening_in_samples");
+                assert_eq!(r.get("png_finish_comparison").is_some(), review && offer);
+            }
+        }
+    }
+
+    #[test]
     fn blank_shadow_and_weak_grain_supply_no_supported_strokes() {
         let noisy = GrayImage::from_fn(480, 360, |x, y| {
             Luma([(160 + x / 12 + (x.wrapping_mul(y) % 8)) as u8])
@@ -441,6 +541,7 @@ mod tests {
             let r = report(img);
             assert_eq!(r["status"], "insufficient_edge_support");
             assert_eq!(r["supported_cells"], 0);
+            assert!(r.get("png_finish_comparison").is_none());
         }
     }
 }

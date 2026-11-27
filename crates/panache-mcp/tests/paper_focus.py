@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import base64
 import io
+import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -45,6 +46,7 @@ async def verify(client, home):
         )
     ).structuredContent
     key = {"draft_id": saved["draft_id"], "revision": 1}
+    assert "png_finish_comparison" not in saved
     check = saved["paper_focus_check"]
     assert check["status"] == "spatial_variation", check
     assert [p["role"] for p in check["regions"][:2]] == [
@@ -59,6 +61,7 @@ async def verify(client, home):
     )
     assert len(check["regions"]) == 3
     image = await call(client, "preview_handwriting", **key)
+    assert "png_finish_comparison" not in image.structuredContent
     assert image.structuredContent["paper_focus_check"] == check
     with open_db(home) as db:
 
@@ -69,11 +72,17 @@ async def verify(client, home):
             ).fetchone()[0]
 
         assert count() == 0
+        pairs = None
         for sample in check["regions"]:
             args = sample["preview_arguments"]
             assert args["draft_id"] == key["draft_id"] and args["revision"] == 1
             assert (args["section"], args["page"], args["view"]) == (1, 1, "review")
             local = await call(client, "preview_handwriting", **args)
+            if pairs is None:
+                pairs = local.structuredContent["png_finish_comparison"]
+            assert local.structuredContent["png_finish_comparison"] == pairs
+            assert json.loads(local.content[0].text)["png_finish_comparison"] == pairs
+            assert "png_finish_comparison" in local.structuredContent["next_step"]
             imgs = [
                 Image.open(io.BytesIO(base64.b64decode(p.data))).convert("RGB")
                 for p in local.content
@@ -86,10 +95,32 @@ async def verify(client, home):
                 is None
             )
         assert count() == 0
-        fresh = (
-            await call(client, "preview_handwriting", **key, view="review")
-        ).structuredContent
+        result = await call(client, "preview_handwriting", **key, view="review")
+        fresh = result.structuredContent
+        first, _ = json.JSONDecoder().raw_decode(result.content[0].text)
+        assert first["png_finish_comparison"] == pairs
+        assert "png_finish_comparison" in first["photo_appearance"]["png_finish_guidance"]
+        assert "png_finish_comparison" in first["next_step"]
         assert fresh["paper_focus_check"] == check and count() == 1
+        assert fresh["png_finish_comparison"] == pairs
+        gradient = pairs["softer_area"]["gradient"]["export_blur_gradient"]
+        for area, sample, endpoint, strength in [
+            ("softer_area", soft, "from", 0.8), ("sharper_area", clear, "to", 0)
+        ]:
+            x, y = sample["sample_point"]
+            assert gradient[endpoint] == {
+                "x": x / (paper.width - 1), "y": y / (paper.height - 1), "sigma_px": strength
+            }
+            baseline = pairs[area]["clear"]
+            assert baseline == {**sample["preview_arguments"], "view": "image", "export_blur_px": 0}
+            assert pairs[area]["gradient"] == {
+                **sample["preview_arguments"], "view": "image", "export_blur_gradient": gradient
+            }
+            for mode in ["clear", "gradient"]:
+                preview = await call(client, "preview_handwriting", **pairs[area][mode])
+                assert "png_finish_comparison" not in preview.structuredContent
+                assert preview.structuredContent["image_size"] == [240, 160]
+        assert count() == 1
         archived = (
             await call(
                 client,

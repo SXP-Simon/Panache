@@ -177,6 +177,8 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 两个点的 `x/y` 以最终整张图片为参照，左上角为 (0,0)，右下角为 (1,1)。`sigma_px` 的单位是原图像素。强度按沿两点连线的像素距离比例平滑改变，两端以外维持端点值。上例在纸面上部使用 0.8 px，自高度 12% 起逐渐变清晰，60% 以下保留原像素。把两点放在一条斜线上即可指定斜向渐变。更换或旋转底图时，按新整页重新选点。两种柔化参数只能选一种。用 `view="image"` 和 `region` 分别查看两个端点及中间区域；局部复用整页的坐标和效果。
 
+照片 PNG 的整页或局部复查可能返回 `png_finish_comparison`。在同版的两个参考区分别用 `clear` 和 `gradient` 原样调用 `preview_handwriting`，核对偏软一侧的纸与笔迹是否更协调，以及清晰一侧的小字是否完整。两端取自同方向可比的纸面印迹；较宽的印刷边缘也可能来自纸张或印刷。需要时可把两档裁区同步移到附近字迹。两档差别很小或细字变淡时，可直接交付清晰版。
+
 作业表可用正文横线设置参考线，将同一页的课程、姓名等字块分别定位。若侧栏印字自下往上读，将原字块的左上、右上、右下、左下四角依次投到侧栏的左下、左上、右上、右下。复查时按栏核对读向、印字和留给老师的评分区。`changed_pixels_outside_reference` 也会计入正文参考区外有意填写的表头和侧栏，应结合这些栏位解读。
 
 客户端已知目标值时，可在 `tune_handwriting` 中同时传 `changes={"perturb_theta_sigma":0.07}` 和 `readback_variation=["perturb_theta_sigma"]`。成功回执的 `effective_changes` 给出写入前后的有效值，用于直接核对本次写入，省去事后再读一次。最多点名本次提交的两个 `variation` 控件。提交 `null` 时读回继承值，有效值相同的键会省略。若要根据旧值决定改多少，仍应先用 `describe_controls` 读取该稿当前版本的值。

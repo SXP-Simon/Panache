@@ -201,6 +201,7 @@ pub fn page(
     page: usize,
     png: &str,
     sample: &PageSample,
+    focus: &crate::paper::focus::Cache,
     cancel: &Cancellation,
 ) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
@@ -404,6 +405,14 @@ pub fn page(
             }
             metadata["photo_appearance"] = appearance;
         }
+        focus.add_review_guidance(
+            draft,
+            section,
+            page,
+            params.transparent_background,
+            true,
+            &mut metadata,
+        )?;
         metadata
     };
     let mut response = reply(
