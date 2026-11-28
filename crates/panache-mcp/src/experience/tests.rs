@@ -59,6 +59,78 @@ fn search(db: &Drafts, tags: Value) -> Result<Value> {
 }
 
 #[test]
+fn chinese_bm25_backfills_active_rules_and_tracks_their_lifecycle() -> Result<()> {
+    let (home, db) = fixture()?;
+    let source = draft(&db, "source", "source")?;
+    let positive = draft(&db, "positive", "positive")?;
+    let boundary = draft(&db, "boundary", "boundary")?;
+    let mut request = record(&source, "math");
+    let rule = &mut request["rules"][0];
+    rule["scope"] = json!("分母碰到横线时，检查分母与横线间距");
+    rule["action"] = json!("上移算式");
+    rule["reason"] = json!("分母遮住了数字");
+    let mut other = rule.clone();
+    other["scope"] = json!("纸页有横线");
+    other["reason"] = json!("格内空间充足");
+    let mut hidden = other.clone();
+    hidden["action"] = json!("绝密待验证的规则");
+    request["rules"]
+        .as_array_mut()
+        .unwrap()
+        .extend([other, hidden]);
+    let records = db.record_experience(args(request))?;
+    let rows = records["rules"].as_array().unwrap();
+    for row in &rows[..2] {
+        for (case, role) in [(&positive, "positive"), (&boundary, "boundary")] {
+            db.validate_experience(validation(&row["rule_id"], case, role, true))?;
+        }
+    }
+    let first = rows[0]["rule_id"].clone();
+    let second = rows[1]["rule_id"].clone();
+    // Simulate a store created by a release before the FTS index existed.
+    db.connect()?.execute_batch("DROP TABLE experience_fts")?;
+    let reader = Drafts::open(home.path())?;
+    let again = Drafts::open(home.path())?;
+    let lookup = |query: Value| reader.search_experience(args(query));
+    let prompt = "请把分母与横线之间的间距留出来";
+    let found = lookup(json!({"query":prompt}))?;
+    assert_eq!(found["rules"].as_array().unwrap().len(), 2);
+    assert_eq!(found["rules"][0]["rule_id"], first);
+    assert_eq!(found["rules"][1]["rule_id"], second);
+    assert_eq!(
+        found["rules"][0]["source"]["export_id"],
+        source["export_id"]
+    );
+    assert_eq!(
+        lookup(json!({"query":prompt,"tags":["table"]}))?["rules"],
+        json!([])
+    );
+    assert_eq!(lookup(json!({"query":prompt,"tags":["MATH"]}))?, found);
+    assert_eq!(
+        lookup(json!({"query":prompt,"offset":1}))?["rules"][0]["rule_id"],
+        second
+    );
+    assert_eq!(lookup(json!({"query":"绝密待验证"}))?["rules"], json!([]));
+    assert!(lookup(json!({"query":" —— "})).is_err());
+    assert!(lookup(json!({"query":"\"分母\" OR (*) -NEAR"})).is_ok());
+    again.retire_experience(args(json!({"rule_id":first,"reason":"withdraw"})))?;
+    db.validate_experience(validation(
+        &second,
+        &draft(&db, "bad", "bad")?,
+        "boundary",
+        false,
+    ))?;
+    assert_eq!(lookup(json!({"query":prompt}))?["rules"], json!([]));
+    assert_eq!(
+        db.connect()?
+            .query_row("SELECT count(*) FROM experience_fts", [], |r| r
+                .get::<_, u32>(0))?,
+        0
+    );
+    Ok(())
+}
+
+#[test]
 fn only_active_matches_are_visible_and_a_failed_boundary_removes_the_rule() -> Result<()> {
     let (home, db) = fixture()?;
     let source = draft(&db, "source", "source")?;

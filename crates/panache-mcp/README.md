@@ -236,7 +236,9 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 ## 普通作业的经验检索与总结
 
-新作业用 `save_section` 建稿时传入 `style.homework=true`。保存成功后，返回的 `experience_search` 给出检索工具和本节标签示例，续写同一作业也能取得提示。宿主结合实际任务补全或删改标签，例如有数据表、分式的作业可调用 `search_homework_experience({"tags":["homework","table","formula"]})`。逐条判断已验证经验的适用范围。没有命中时可从 `available_tags` 选取符合题意的已有词重试，无相关词就照常完成。标签检索使用主题词即可。
+普通作业可直接用题目原话查询，例如 `search_homework_experience({"query":"保留旧教材的分数命令，计算行要排成上下分数"})`。SQLite FTS5 对每条经验的适用条件、动作、理由按 BM25 排序，三栏权重依次是 4、2、1。连续汉字按相邻双字切分，拉丁字母和数字按词处理。不同词元可以分别命中。题面中明确排除的内容也可能在字面上匹配，采用前须读返回的 `scope`。全文查询接受最多 1200 个字符，每页最多 20 条，可用 `next_offset` 翻页。
+
+原有 `search_homework_experience({"tags":["homework","table","formula"]})` 仍按标签检索；规则的所有必要标签都要被查询覆盖。也可以同时传 `query` 和非空 `tags`，先限定标签范围，再按全文相关性排序。作业以 `style.homework=true` 保存后，`experience_search` 会提示宿主使用原话及可选标签。两种检索都只展示已验证且有效的经验，返回来源检查单。未命中时可查看 `available_tags`。
 
 修订已有作业时，先用 `preview_handwriting(view="review", revision=修前版, section=节, page=页)` 查看原版受影响的位置，保存 `review_id`。改后核对同处，必要时带 `compare_revision` 和同一 `region` 对照。若交付时才补看旧版，在结论里注明事后复核。提交候选时尽量沿用建稿主题词，只选检索该做法所必需的标签，把具体条件写进 `scope`。
 
@@ -244,7 +246,7 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 - **一条经验写一个可单独验证的动作。** 宿主填写适用标签 `tags`、具体条件 `scope`、动作 `action`、结合页面观察写出的理由 `reason`、该条自己的检查单 `reviews`。同一道题若有两个独立问题，可拆成两条，分别验证、检索和退役。拆分粒度由宿主判断。每次调用可传 0–16 条。同标签、条件和动作的重复提案复用原 ID。
 - **有修前、修后检查单时，在最终答复前提交复盘决定。** 调用 `record_homework_experience`，逐条引用本次导出和交付版检查单，可附同稿旧版。只有本题的数值或笔误可传 `rules=[]`。干净完成的作业也可以直接交付。工具返回每条的 ID 和状态；宿主可以向用户简述刚记录的做法及其待验证状态。
-- **下次按新作业的主题直接搜条目。** 每条必要标签都在查询标签中才会命中。普通检索仅返回 `active`，附适用条件、动作、理由及可回查的来源。持有 ID 时可用 `read_homework_experience` 审计来源及逐次验证。不同会话共享同一个 Panache 数据目录时可见同一经验库。
+- **下次用新作业的原话或主题直接搜条目。** 持有 ID 时可用 `read_homework_experience` 审计来源及逐次验证。不同会话共享同一个 Panache 数据目录时可见同一经验库。
 - **验证由发起验证的宿主负责。** `validate_homework_experience` 需要独立正例和边界例，各有自己的交付与检查单；宿主判断实际收益和是否误伤。双方都通过才生效，任一失败或主动 `retire_homework_experience` 会从普通检索撤下。存储层核验证据身份，无法判定推理是否正确。保留原检查记录的连接可检索经验，其导出只报告交付情况。
 
 ## 多轮手写实验

@@ -139,6 +139,14 @@ async def exercise(binary, home):
         await validate(boundary, "boundary", True)
         match = (await search(tags))["rules"]
         assert [r["rule_id"] for r in match] == [rule_id]
+        by_text = await result(
+            reader, "search_homework_experience", query="check the divisor"
+        )
+        assert [r["rule_id"] for r in by_text["rules"]] == [rule_id]
+        pending = await result(
+            reader, "search_homework_experience", query="unverified control"
+        )
+        assert not pending["rules"]
         assert match[0]["action"] == action
         assert not (await search(["homework"]))["rules"]
         assert not (await search(["control-only"]))["rules"]
@@ -160,12 +168,18 @@ async def exercise(binary, home):
         assert historical["review_id"] == cite["review_id"]
         assert historical["pixel_sha256"] == cite["pixel_sha256"]
         await validate(negative, "positive", False)
+        assert not (
+            await result(reader, "search_homework_experience", query="divisor")
+        )["rules"]
         assert not (await search(tags))["rules"]
         assert "division" not in (await search([])).get("available_tags", [])
 
     async with isolated_session(binary, home) as (next_agent, _):
         hidden = await result(next_agent, "search_homework_experience", tags=tags)
         assert hidden["rules"] == []
+        assert not (
+            await result(next_agent, "search_homework_experience", query=action)
+        )["rules"]
         audit = await result(next_agent, "read_homework_experience", rule_id=rule_id)
         assert audit["status"] == "rejected"
 

@@ -1,4 +1,5 @@
 //! Evidence-backed, individually retrievable guidance from ordinary homework deliveries.
+mod fulltext;
 #[cfg(test)]
 mod tests;
 
@@ -31,7 +32,7 @@ pub(crate) fn initialize(db: &Connection) -> Result<()> {
             ON experience_cases(rule_id,draft,revision,reviews) WHERE role='source';
         CREATE INDEX IF NOT EXISTS experience_cases_by_rule ON experience_cases(rule_id,seq);
     ")?;
-    Ok(())
+    fulltext::initialize(db)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -71,7 +72,11 @@ pub struct Record {
 #[serde(deny_unknown_fields)]
 pub struct Search {
     /// Task topics in either language. Use [] for active vocabulary. Canonical examples: homework, photographed-paper, ruled-paper, formula, table, flowchart, illustration.
+    #[serde(default)]
     tags: Vec<String>,
+    /// Use the user's own homework description, including Chinese, to rank active rules by BM25.
+    /// Optional nonempty tags keep the existing all-rule-tags-must-match filter.
+    query: Option<String>,
     /// Result offset; also pages the vocabulary on a miss.
     #[serde(default)]
     offset: u32,
@@ -310,18 +315,46 @@ impl Drafts {
     }
 
     pub fn search_experience(&self, input: Search) -> Result<Value> {
-        let query = serde_json::to_string(&tags(&input.tags)?)?;
+        let topics = tags(&input.tags)?;
+        let expression = input
+            .query
+            .as_deref()
+            .map(fulltext::expression)
+            .transpose()?;
         let mut db = self.connect()?;
         let tx = db.transaction()?;
-        let mut stmt = tx.prepare("SELECT r.id,r.scope,r.action,r.reason,
+        let columns = "SELECT r.id,r.scope,r.action,r.reason,
                 (SELECT json_group_array(tag) FROM experience_tags WHERE rule_id=r.id),
                 (SELECT json_object('draft_id',draft,'revision',revision,'export_id',export_id,'reviews',json(reviews))
                     FROM experience_cases WHERE rule_id=r.id AND role='source' ORDER BY seq LIMIT 1)
-            FROM experience_rules r WHERE status='active' AND NOT EXISTS (
-                SELECT 1 FROM experience_tags t WHERE t.rule_id=r.id AND tag NOT IN (SELECT value FROM json_each(?)))
-            ORDER BY (SELECT count(*) FROM experience_tags WHERE rule_id=r.id) DESC,r.id LIMIT 21 OFFSET ?")?;
+            ";
+        let tag_filter = " AND NOT EXISTS (SELECT 1 FROM experience_tags t
+            WHERE t.rule_id=r.id AND tag NOT IN (SELECT value FROM json_each(:tags)))";
+        let mut sql = columns.to_owned();
+        let mut bindings: Vec<(&str, &dyn rusqlite::ToSql)> = vec![(":offset", &input.offset)];
+        let tags_json = serde_json::to_string(&topics)?;
+        if let Some(terms) = &expression {
+            sql.push_str(
+                " FROM experience_fts JOIN experience_rules r ON r.id=experience_fts.rule_id
+                WHERE experience_fts MATCH :query AND r.status='active'",
+            );
+            bindings.push((":query", terms));
+        } else {
+            sql.push_str(" FROM experience_rules r WHERE r.status='active'");
+        }
+        if expression.is_none() || !topics.is_empty() {
+            sql.push_str(tag_filter);
+            bindings.push((":tags", &tags_json));
+        }
+        sql.push_str(if expression.is_some() {
+            " ORDER BY bm25(experience_fts,0,4,2,1),r.id"
+        } else {
+            " ORDER BY (SELECT count(*) FROM experience_tags WHERE rule_id=r.id) DESC,r.id"
+        });
+        sql.push_str(" LIMIT 21 OFFSET :offset");
+        let mut stmt = tx.prepare(&sql)?;
         let mut rules = stmt
-            .query_map(params![query, input.offset], |r| {
+            .query_map(bindings.as_slice(), |r| {
                 Ok(json!({
                     "rule_id": r.get::<_, String>(0)?, "status": "active",
                     "scope": r.get::<_, String>(1)?, "action": r.get::<_, String>(2)?,
@@ -378,9 +411,16 @@ impl Drafts {
                 WHEN (SELECT count(DISTINCT role) FROM experience_cases WHERE rule_id=? AND passed=1 AND role IN ('positive','boundary'))=2 THEN 'active'
                 ELSE 'pending' END WHERE id=?",params![case.passed,input.rule_id,input.rule_id])?;
         }
-        let state = status(&tx, &input.rule_id)?;
+        let updated = status(&tx, &input.rule_id)?;
+        if updated != state {
+            if updated == "active" {
+                fulltext::insert(&tx, &input.rule_id)?;
+            } else if state == "active" {
+                fulltext::remove(&tx, &input.rule_id)?;
+            }
+        }
         tx.commit()?;
-        Ok(json!({"rule_id":input.rule_id,"status":state}))
+        Ok(json!({"rule_id":input.rule_id,"status":updated}))
     }
 
     pub fn retire_experience(&self, input: Retire) -> Result<Value> {
@@ -390,6 +430,9 @@ impl Drafts {
         let state = status(&tx, &input.rule_id)?;
         ensure!(state != "rejected", "Rule already rejected by validation");
         tx.execute("UPDATE experience_rules SET status='retired',retirement=? WHERE id=? AND status<>'retired'",params![input.reason.trim(),input.rule_id])?;
+        if state == "active" {
+            fulltext::remove(&tx, &input.rule_id)?;
+        }
         tx.commit()?;
         Ok(json!({"rule_id":input.rule_id,"status":"retired"}))
     }

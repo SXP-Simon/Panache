@@ -185,7 +185,7 @@ fn experience_search(
     }
     Some(
         json!({"tool":"search_homework_experience","arguments":{"tags":tags},
-        "guidance":"按题意调整标签，检索已验证经验并核对适用范围。未命中时查看 available_tags，有贴合本题的已有词可补入重试，否则照常完成。若接下来要修订已有内容，先看修前版的具体位置，改后复核同处。"}),
+        "guidance":"用 query 传入用户的作业原话检索已验证经验，再核对适用范围。也可单用下列主题标签，或在 query 上加标签缩小范围。未命中时查看 available_tags，有贴合本题的已有词可补入重试，否则照常完成。若接下来要修订已有内容，先看修前版的具体位置，改后复核同处。"}),
     )
 }
 
