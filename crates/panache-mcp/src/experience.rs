@@ -1,5 +1,6 @@
 //! Evidence-backed, individually retrievable guidance from ordinary homework deliveries.
 mod fulltext;
+mod opportunity;
 #[cfg(test)]
 mod tests;
 
@@ -301,7 +302,7 @@ impl Drafts {
             }
             let next_step = match state.as_str() {
                 "pending" => {
-                    "Use validate_homework_experience on separate positive and boundary homework deliveries with their native reviews. Search can return the rule after both pass."
+                    "A later reviewed homework export can offer optional validation. Both an independent positive and a boundary case must pass before ordinary search returns the rule."
                 }
                 "active" => "Search again with current homework tags before applying the rule.",
                 _ => {

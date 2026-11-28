@@ -98,6 +98,13 @@ pub(super) fn append_experience_reflection(
     reply.structured_content.as_mut().unwrap()["experience_reflection"] = result;
 }
 
+pub(super) fn append_experience_validation(reply: &mut CallToolResult, offer: serde_json::Value) {
+    reply.content.push(ContentBlock::text(format!(
+        "文件已生成，可按原样交付。若这就是本次已经核对的主题，请用 read_candidate 看候选的适用条件，有直接证据再提交验证。这一步和本次是否总结新经验是两回事，可以跳过。\n{offer}"
+    )));
+    reply.structured_content.as_mut().unwrap()["experience_validation"] = offer;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

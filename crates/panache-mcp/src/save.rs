@@ -150,9 +150,19 @@ fn experience_search(
     prepared: &str,
     markdown: &str,
 ) -> Option<Value> {
-    if !style.homework {
-        return None;
-    }
+    style.homework.then(|| json!({
+        "tool":"search_homework_experience",
+        "arguments":{"tags":experience_topics(style, paper, prepared, markdown)},
+        "guidance":"用 query 传入用户的作业原话检索已验证经验，再核对适用范围。也可单用下列主题标签，或在 query 上加标签缩小范围。未命中时查看 available_tags，有贴合本题的已有词可补入重试，否则照常完成。若接下来要修订已有内容，先看修前版的具体位置，改后复核同处。"
+    }))
+}
+
+pub(super) fn experience_topics(
+    style: &Style,
+    paper: Option<&paper::PaperLayout>,
+    prepared: &str,
+    markdown: &str,
+) -> Vec<&'static str> {
     let mut tags = vec!["homework"];
     if let Some(paper) = paper {
         tags.push("imported-paper");
@@ -178,15 +188,13 @@ fn experience_search(
     if prepared.contains('=')
         || prepared.contains(")/(")
         || markdown.contains("$$")
+        || prepared.contains(r"\frac{")
         || markdown.contains(r"\frac{")
         || (markdown.contains(r"\(") && markdown.contains(r"\)"))
     {
         tags.push("formula");
     }
-    Some(
-        json!({"tool":"search_homework_experience","arguments":{"tags":tags},
-        "guidance":"用 query 传入用户的作业原话检索已验证经验，再核对适用范围。也可单用下列主题标签，或在 query 上加标签缩小范围。未命中时查看 available_tags，有贴合本题的已有词可补入重试，否则照常完成。若接下来要修订已有内容，先看修前版的具体位置，改后复核同处。"}),
-    )
+    tags
 }
 
 fn saved_reply(mut saved: Value) -> CallToolResult {

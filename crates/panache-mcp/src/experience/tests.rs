@@ -344,3 +344,84 @@ fn instruction_identity_preserves_case_and_internal_whitespace() -> Result<()> {
     assert_eq!(ids.len(), 3);
     Ok(())
 }
+
+#[test]
+fn offers_one_pending_rule_for_a_published_independent_review() -> Result<()> {
+    let (_home, db) = fixture()?;
+    let source = draft(&db, "source", "source")?;
+    let clone = draft(&db, "duplicate of source", "source")?;
+    let revision_one = draft(&db, "mistake", "before")?;
+    let draft_id = revision_one["draft_id"].as_str().unwrap();
+    let save =
+        args(json!({"draft_id":draft_id,"section":1,"expected_revision":1,"markdown":"fixed"}));
+    db.save(&save, "fixed", None, None, None)?;
+    let fixed = make_case(&db, draft_id, 2, "after")?;
+    let clean = draft(&db, "independent clean layout", "clean")?;
+    let id = db.record_experience(args(record(&source, "formula")))?["rules"][0]["rule_id"].clone();
+    let mut another = record(&source, "formula");
+    another["rules"][0]["scope"] = json!("Another applicable candidate");
+    let other = db.record_experience(args(another))?["rules"][0]["rule_id"].clone();
+    db.retire_experience(args(json!({"rule_id":other,"reason":"withdraw"})))?;
+
+    let offer = |case: &Value, pixels: &str, tags: &[&str], prior: Value| {
+        db.validation_opportunity(
+            case["draft_id"].as_str().unwrap(),
+            case["revision"].as_u64().unwrap() as u32,
+            case["export_id"].as_str().unwrap(),
+            &[json!({"section":1,"page":1,"reference":case["reviews"][0],
+                "pixel_sha256":pixels,"tags":tags,"earlier_reference":prior})],
+        )
+    };
+    let topics = ["homework", "formula"];
+    for (case, pixels) in [(&source, "source"), (&clone, "source")] {
+        assert!(offer(case, pixels, &topics, Value::Null)?.is_none());
+    }
+    assert!(offer(&clean, "clean", &["homework", "table"], Value::Null)?.is_none());
+    let mut invalid = clean.clone();
+    invalid["export_id"] = json!("unpublished");
+    assert!(offer(&invalid, "clean", &topics, Value::Null)?.is_none());
+    assert_eq!(search(&db, json!(topics))?["rules"], json!([]));
+    assert_eq!(
+        db.search_experience(args(json!({"query":"denominator"})))?["rules"],
+        json!([])
+    );
+
+    let first = offer(&fixed, "after", &topics, revision_one["reviews"][0].clone())?.unwrap();
+    assert_eq!(first["read_candidate"]["arguments"]["rule_id"], id);
+    assert_eq!(
+        first["validation"]["possible_kinds"],
+        json!(["positive", "boundary"])
+    );
+    assert_eq!(
+        first["validation"]["evidence"]["reviews"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(first.get("action").is_none());
+    assert_eq!(
+        db.validate_experience(validation(&id, &fixed, "positive", true))?["status"],
+        "pending"
+    );
+    assert!(offer(&fixed, "after", &topics, revision_one["reviews"][0].clone())?.is_none());
+    assert_eq!(search(&db, json!(topics))?["rules"], json!([]));
+
+    let second = offer(&clean, "clean", &topics, Value::Null)?.unwrap();
+    assert_eq!(second["validation"]["possible_kinds"], json!(["boundary"]));
+    assert_eq!(
+        db.validate_experience(validation(&id, &clean, "boundary", true))?["status"],
+        "active"
+    );
+    assert_eq!(search(&db, json!(topics))?["rules"][0]["rule_id"], id);
+    assert!(
+        offer(
+            &draft(&db, "another", "another")?,
+            "another",
+            &topics,
+            Value::Null
+        )?
+        .is_none()
+    );
+    Ok(())
+}
