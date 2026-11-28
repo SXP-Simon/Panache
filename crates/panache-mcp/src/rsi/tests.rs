@@ -107,6 +107,7 @@ fn policies_pin_rules_bound_work_and_validate_on_separate_drafts() -> Result<()>
     let seed = d.read_rsi_policy(PolicyQuery {
         policy_id: Some("pilot-v1".into()),
         include_evidence_guide: false,
+        evidence_guide_version: None,
     })?;
     let mut rules = seed["rules"].clone();
     rules["max_steps"] = json!(2);
@@ -139,6 +140,7 @@ fn policies_pin_rules_bound_work_and_validate_on_separate_drafts() -> Result<()>
     let report = d.read_rsi_policy(PolicyQuery {
         policy_id: Some("example-v2".into()),
         include_evidence_guide: false,
+        evidence_guide_version: None,
     })?;
     assert_eq!(report["recent_validations"][0]["task_ids"], json!([t]));
     assert_eq!(
@@ -169,13 +171,23 @@ fn evidence_guide_is_discoverable_and_independent_of_stored_rules() -> Result<()
         pinned,
         read(json!({"policy_id":"pilot-v1","include_evidence_guide":false}))?
     );
-    assert_eq!(guide["version"], "paper-homework/1");
+    assert_eq!(guide["version"], "paper-homework/2");
+    let old = read(json!({"evidence_guide_version":"paper-homework/1"}))?;
+    assert_eq!(old["evidence_guide"]["version"], "paper-homework/1");
+    assert!(
+        old["evidence_guide"]["checks"]
+            .get("formula_rendering")
+            .is_none()
+    );
+    assert!(read(json!({"evidence_guide_version":"unknown"})).is_err());
     for name in [
         "paper_and_rulings",
         "focus_and_contrast",
         "pages_and_delivery",
         "table_cells",
         "diagram_branches",
+        "formula_rendering",
+        "mixed_content_projection",
     ] {
         let check = &guide["checks"][name];
         assert!(!check["sources"].as_array().unwrap().is_empty());

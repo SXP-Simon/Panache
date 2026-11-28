@@ -40,9 +40,19 @@ pub struct Publish {
 pub struct PolicyQuery {
     /// Omit to list recent versions. Use the exact ID to read a pinned document.
     pub policy_id: Option<String>,
-    /// Include the versioned evidence guide alongside the list or policy document.
+    /// Include the current evidence guide alongside the list or policy document.
     #[serde(default)]
     pub include_evidence_guide: bool,
+    /// Request an exact guide for comparison or replay, independently of the policy version.
+    pub evidence_guide_version: Option<EvidenceGuide>,
+}
+
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+pub enum EvidenceGuide {
+    #[serde(rename = "paper-homework/1")]
+    Original,
+    #[serde(rename = "paper-homework/2")]
+    Photo,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -86,9 +96,12 @@ pub(super) fn load(db: &Connection, id: &str) -> Result<Policy> {
 impl Drafts {
     pub fn read_rsi_policy(&self, input: PolicyQuery) -> Result<Value> {
         let mut result = self.policy_and_reports(input.policy_id)?;
-        if input.include_evidence_guide {
-            result["evidence_guide"] =
-                serde_json::from_str(include_str!("../../evidence-guide-v1.json"))?;
+        if input.include_evidence_guide || input.evidence_guide_version.is_some() {
+            let document = match input.evidence_guide_version.unwrap_or(EvidenceGuide::Photo) {
+                EvidenceGuide::Original => include_str!("../../evidence-guide-v1.json"),
+                EvidenceGuide::Photo => include_str!("../../evidence-guide-v2.json"),
+            };
+            result["evidence_guide"] = serde_json::from_str(document)?;
         }
         Ok(result)
     }
