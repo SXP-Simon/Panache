@@ -1,0 +1,110 @@
+{
+  "case": "Plain transcription, separate empty store. Model was given only the ordinary user prompt.",
+  "prompt": "小学语文抄写作业。请在普通横线纸上抄写“春天来了，燕子回家了。”一行，给我单页 PDF。\n",
+  "first_attempt": {
+    "outcome": "Client approval prevented the save before it reached the Panache server. The trial runner was then configured to authorize the specified local homework tools.",
+    "native_calls": [],
+    "receipt": {
+      "case": null,
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "empty_cwd": true,
+      "ephemeral": true,
+      "ignore_user_config": true,
+      "shell_tool_disabled": true,
+      "no_project_instructions": true,
+      "prompt_sha256": "7ebf358e998db8fdd5739300b6f700a8108e2da48c7de396e3cac05cfa2912c6",
+      "binary_sha256": "fd8294ec7c8c06553d3e33bf9e4b948933b23ce5089fc30ce0e2c5d08411a3db",
+      "thread_ids": [
+        "01a22156-491c-7752-b4c3-96c4eec5145d"
+      ],
+      "cli_exit_code": 0,
+      "usage": [
+        {
+          "input_tokens": 126912,
+          "cached_input_tokens": 110080,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 328,
+          "reasoning_output_tokens": 42
+        }
+      ],
+      "other_tools": []
+    }
+  },
+  "successful_attempt": {
+    "receipt": {
+      "case": null,
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "empty_cwd": true,
+      "ephemeral": true,
+      "ignore_user_config": true,
+      "shell_tool_disabled": true,
+      "no_project_instructions": true,
+      "prompt_sha256": "7ebf358e998db8fdd5739300b6f700a8108e2da48c7de396e3cac05cfa2912c6",
+      "binary_sha256": "fd8294ec7c8c06553d3e33bf9e4b948933b23ce5089fc30ce0e2c5d08411a3db",
+      "thread_ids": [
+        "01a22157-40d8-7010-afda-ebd8040c3455"
+      ],
+      "cli_exit_code": 0,
+      "usage": [
+        {
+          "input_tokens": 243520,
+          "cached_input_tokens": 198272,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 523,
+          "reasoning_output_tokens": 20
+        }
+      ],
+      "other_tools": []
+    },
+    "actual_tools": [
+      "save_section",
+      "search_homework_experience",
+      "preview_handwriting",
+      "export_handwriting"
+    ],
+    "query": {
+      "tags": [
+        "homework",
+        "ruled-paper"
+      ]
+    },
+    "native_search": {
+      "available_tags": [],
+      "next_offset": null,
+      "next_tag_offset": null,
+      "rules": []
+    },
+    "export_id": "3e21ad9a-dbe4-417e-95b5-ecb659824430",
+    "pdf_sha256": "2b4357e2c3ea045e2f87106bbceb5850796bb109b4e96ac559c99d27c4bdcbaa",
+    "pages": 1,
+    "reflection_offered": {
+      "arguments": {
+        "draft_id": "b7028b96-8c5c-410a-a2bf-855af9d209c0",
+        "export_id": "3e21ad9a-dbe4-417e-95b5-ecb659824430",
+        "revision": 1,
+        "rules": []
+      },
+      "guidance": "交付后由你判断是否值得记下经验，零条也是完整结果。只在本次检查支持可复用的具体做法时调用 record_homework_experience；一个做法写一条，逐条引用交付版检查单，说明适用条件、行动和原因。导出成功本身仅证明文件已生成。",
+      "page_reviews": [
+        {
+          "page": 1,
+          "reference": {
+            "review_id": "4f9f7ffb-729a-430b-8a57-2d6a87a9e1ff",
+            "revision": 1
+          },
+          "section": 1
+        }
+      ],
+      "reviewed_pages": 1,
+      "tool": "record_homework_experience"
+    },
+    "draft_id": "b7028b96-8c5c-410a-a2bf-855af9d209c0",
+    "wire_sha256": "5432b7cfc7f98ed29bab3d6d423704fa376f871bbd5e873a5ab33e5e84879cc4",
+    "final_response_sha256": "ac2a70f62737c7e3bc53092e5b7c65425dd9e7406b545f7cb3c13583d15dcdb6",
+    "published_exports": 1,
+    "recorded_rules": 0
+  },
+  "interpretation": "No write of a lesson followed the successful reviewed PDF. The absence of a written rule is observable; the model did not state a separate reason."
+}

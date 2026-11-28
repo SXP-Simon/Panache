@@ -89,3 +89,14 @@ python scripts/rsi_pilot/real_photo_episode_local.py --out "$RUN" --binary "$MCP
 - **只改一行。** [细粒度实验](results/real-photo-local-refinement.json)保留了模型建议、实验方的候选动作、正文改动像素、保护区和实际选定的 PDF 版本。该对照和主任务三选一是独立任务，各自保留了交付决定。
 
 [原纸与初稿同位置](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7236162974) · [公式的真实拦截和修订](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7236214826) · [公开局部图库](https://github.com/SXP-Simon/Panache/tree/669a9db2c133edcd019e490156257b972dc72cac/screenshots/rsi-pilot/real-photo)
+
+## 从普通作业学习单条经验
+
+一次独立模型会话只收到用户作业和 Panache MCP。每次使用新的工作目录和会话；可复用的内容留在同一 Panache 数据库。代理转发真正的 stdio 消息，保留模型调用参数、原生回执和图片摘要。它不会代模型提交经验。验证任务由实验程序安排。
+
+- 一道语文抄写顺利交付，宿主保留零条。另一道物理作业有表格、两行照抄用的旧命令、两处误排的分式。Astra 修完后把两个现象归纳成了一条动作，关联修前和交付版的检查单。最终聊天回复只提到了作业改动。[抄写题](results/experience-plain.json) · [物理题逐步记录和候选原文](results/experience-source.json) · [同页两版截图](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7236947200)
+- 第一次验证混淆了“眼前的初稿是否要修”和“修完能不能交”，导致原候选被错误拒绝。原库保留该拒绝。后续正例在两个真实版本上分别盲判；边界题单问当前页是否需要改变。[误拒及两次独立读图](results/experience-evaluator-error.json)
+- 在新库用同一题面重新做作业，Astra 按照自己的实际返工拆出三条。分式改写引用 r1、r2、r4，速度单位引用 r1、r4，分母避开横线引用 r2、r4。三条分别有 ID。验证实验只推进分式改写，另两条仍是候选。[三条原文、像素和最终交付回复](results/experience-three-rules.json)
+- 新的 Terra 会话按化学作业标签查询，只命中分式改写。它保留供照抄的旧命令，把显示行排成 3/24 × 100% = 12.5%，复核后导出。另一个模型从 PDF 内嵌页读回分数和百分数。相同标签下仍待验证或已经失败的规则均未返回。[所有会话、逐题判定和图片摘要](results/experience-cross-session.json) · [修前与交付图](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7237004841) · [验证题图板](https://github.com/SXP-Simon/Panache/blob/c3f52ad98484755cc7f8479e358b47c4c76a2202/screenshots/rsi-pilot/atomic-experience/experience-verified-examples.png)
+- 运行独立会话需要能访问所选模型的 Codex CLI。配置 JSON 含 `binary`、`worker`、`fonts`、`home` 四个绝对路径，分别指向 MCP 可执行文件、Markdown worker、字体目录和本次实验的专用数据目录。用新目录复现普通物理作业：`python scripts/rsi_pilot/experience_mixed.py --config config.json --out run`。新运行会有自己的稿件、模型判断和规则 ID。
+- 单独验证检索和撤回的存储语义可执行 `uv run --script crates/panache-mcp/tests/experience_visibility.py /path/to/panache-mcp`。该测试覆盖同一作业提出两条、独立样本验证、相同标签下的可见性、失效后跨连接隐藏，以及新会话按检查单回查原像素。它使用受控输入，宿主自主决策的实测另见逐题记录。

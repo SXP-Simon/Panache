@@ -1,0 +1,454 @@
+{
+  "prompt": "我们物理小组每周用这份旧教材模板做测速记录。这份 Panache 草稿 394db5d6-829a-4adc-a3a1-e3b48b1ca47b 明天要交。两行速度在纸上都没有显示成上下分数，还缺了速度单位。请看看原来的页面，把两个计算都改成老师能直接批的样子，保留数据表和两行供同学照抄的旧教材输入。请检查后给我一页 PDF。",
+  "run": {
+    "completed_mcp_items": 18,
+    "client_rejections": [],
+    "case": "origin",
+    "model": "gpt-6.2-astra",
+    "reasoning_effort": "high",
+    "empty_cwd": true,
+    "ephemeral": true,
+    "ignore_user_config": true,
+    "shell_tool_disabled": true,
+    "no_project_instructions": true,
+    "prompt_sha256": "12f6e4fc29ae75ce8a6d42b56c59d117d098db0bb3a8b9153d23f74c9b6cadb9",
+    "binary_sha256": "84ad942827a7b8ce222b160f0e6cb03173ac1316f2bab9fc8501539ac1a82748",
+    "thread_ids": [
+      "01a22162-9504-7873-9642-a65051d063bc"
+    ],
+    "cli_exit_code": 0,
+    "usage": [
+      {
+        "input_tokens": 586586,
+        "cached_input_tokens": 545792,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2401,
+        "reasoning_output_tokens": 73
+      }
+    ],
+    "other_tools": []
+  },
+  "tools": [
+    {
+      "tool": "search_homework_experience",
+      "error": false,
+      "input": {
+        "tags": [
+          "homework",
+          "physics",
+          "formula",
+          "table",
+          "legacy input",
+          "units"
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "read_section",
+      "error": false,
+      "input": {
+        "view": "source"
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 1,
+        "view": "review"
+      },
+      "images": [
+        "960bccbdf09c14837e06045e9bd1c4e472299837852b68cc8f34189df2012ab7",
+        "9d97606edc2dae0233d4f5c530206bafcf420f58e969615fdc36cfe1d3231d9d",
+        "c4f381efe049f696f7e81edde1f768c71bae2cd994845c5c4f84f1072e955f9f"
+      ]
+    },
+    {
+      "tool": "save_section",
+      "error": false,
+      "input": {
+        "section": 1
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 2,
+        "view": "review"
+      },
+      "images": []
+    },
+    {
+      "tool": "search_homework_experience",
+      "error": false,
+      "input": {
+        "tags": [
+          "homework",
+          "ruled-paper",
+          "table",
+          "formula"
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": true,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 2,
+        "view": "review",
+        "region": [
+          [
+            70,
+            413
+          ],
+          [
+            670,
+            413
+          ],
+          [
+            670,
+            830
+          ],
+          [
+            70,
+            830
+          ]
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 2,
+        "view": "review"
+      },
+      "images": [
+        "960bccbdf09c14837e06045e9bd1c4e472299837852b68cc8f34189df2012ab7",
+        "bafc872318bc04d0271e1d1a5b5b40df410bda8cfc9eaf280b9320222427bccd",
+        "f8b1e3912877042e912f35fa1c37751b7397c750f9378a3b997094e0e1f2ab62"
+      ]
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "revision": 2,
+        "page": 1,
+        "section": 1,
+        "view": "layout",
+        "region": [
+          [
+            85,
+            690
+          ],
+          [
+            300,
+            690
+          ],
+          [
+            300,
+            758
+          ],
+          [
+            85,
+            758
+          ]
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "revision": 2,
+        "page": 1,
+        "section": 1,
+        "view": "layout",
+        "region": [
+          [
+            85,
+            530
+          ],
+          [
+            300,
+            530
+          ],
+          [
+            300,
+            588
+          ],
+          [
+            85,
+            588
+          ]
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "adjust_glyphs",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "revision": 3,
+        "page": 1,
+        "section": 1,
+        "view": "layout",
+        "region": [
+          [
+            85,
+            690
+          ],
+          [
+            300,
+            690
+          ],
+          [
+            300,
+            758
+          ],
+          [
+            85,
+            758
+          ]
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "adjust_glyphs",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 4,
+        "view": "review"
+      },
+      "images": [
+        "960bccbdf09c14837e06045e9bd1c4e472299837852b68cc8f34189df2012ab7",
+        "b890a8ab0cc1a80d37c0c1d0b7544dbb321197026b3b5be5d6afe77b96f4ad69",
+        "46089ad47b851a9ade7e17cb7ee8194b43029d337046cb9944d082db639c8870"
+      ]
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": true,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 4,
+        "view": "image",
+        "region": [
+          [
+            85,
+            417
+          ],
+          [
+            625,
+            417
+          ],
+          [
+            625,
+            760
+          ],
+          [
+            85,
+            760
+          ]
+        ]
+      },
+      "images": []
+    },
+    {
+      "tool": "preview_handwriting",
+      "error": false,
+      "input": {
+        "section": 1,
+        "page": 1,
+        "revision": 4,
+        "view": "image",
+        "region": [
+          [
+            85,
+            417
+          ],
+          [
+            625,
+            417
+          ],
+          [
+            625,
+            760
+          ],
+          [
+            85,
+            760
+          ]
+        ]
+      },
+      "images": [
+        "d808367805149a9c43a4cfc7018755b24fdd1ac655f054018d4b5a039bf40826"
+      ]
+    },
+    {
+      "tool": "export_handwriting",
+      "error": false,
+      "input": {
+        "revision": 4
+      },
+      "images": []
+    },
+    {
+      "tool": "record_homework_experience",
+      "error": false,
+      "input": {
+        "revision": 4
+      },
+      "images": []
+    }
+  ],
+  "source_markdown": "小车测速记录\n\n| 次数 | 路程 | 时间 |\n| --- | --- | --- |\n| 第一次 | 15 m | 5 s |\n| 第二次 | 12 m | 6 s |\n\n旧教材输入一：`\\nicefrac{15}{5}`\n\n速度一：\n$$\\nicefrac{15}{5}=3$$\n\n旧教材输入二：`\\nicefrac{12}{6}`\n\n速度二：\n$$\\nicefrac{12}{6}=2$$\n",
+  "rules": [
+    {
+      "tags": [
+        "formula"
+      ],
+      "scope": "旧教材的分数命令在待批算式中逐字印出，同页另有供照抄的原始命令。",
+      "action": "只把待批算式内的旧分数命令改成支持的 \\frac，逐行核对分子、分母和横线，同时检查照抄行仍逐字显示原始命令。",
+      "reason": "两行速度从带美元符号的命令文本变成了上下分数，两行旧教材输入仍可逐字抄写。",
+      "reviews": [
+        {
+          "review_id": "5f23aadd-a678-4ab6-99d0-82330157af53",
+          "revision": 1
+        },
+        {
+          "review_id": "9aa1e31c-d1ed-4d04-b4b9-1adca001501e",
+          "revision": 2
+        },
+        {
+          "review_id": "d614e299-42d5-45b2-b719-a06a37234483",
+          "revision": 4
+        }
+      ],
+      "next_step": "Use validate_homework_experience on separate positive and boundary homework deliveries with their native reviews. Search can return the rule after both pass.",
+      "rule_id": "485fb830-e4ac-46b2-b2a1-b03f4cfbf424",
+      "status": "pending"
+    },
+    {
+      "tags": [
+        "formula"
+      ],
+      "scope": "有量纲的速度计算写了数字结果，但未标出速度单位。",
+      "action": "依据数据表为路程和时间的代入值标上各自单位，在速度结果后标出对应的路程单位除以时间单位，并逐项核对。",
+      "reason": "原算式以 3 和 2 结尾，终稿的两个结果旁均可见米每秒，与表中的米、秒一致。",
+      "reviews": [
+        {
+          "review_id": "5f23aadd-a678-4ab6-99d0-82330157af53",
+          "revision": 1
+        },
+        {
+          "review_id": "d614e299-42d5-45b2-b719-a06a37234483",
+          "revision": 4
+        }
+      ],
+      "next_step": "Use validate_homework_experience on separate positive and boundary homework deliveries with their native reviews. Search can return the rule after both pass.",
+      "rule_id": "ec6781e4-49ba-4715-a95d-646ff09f7804",
+      "status": "pending"
+    },
+    {
+      "tags": [
+        "ruled-paper",
+        "formula"
+      ],
+      "scope": "竖排分数的分母与纸面横线相交，当前行上方仍有空隙。",
+      "action": "整体移动该行算式，使分子和分母落在相邻横线之间，并在原图尺寸复查间距。",
+      "reason": "排成分数后纸面横线仍穿过两行分母的位置，上移后两处分母都与横线分开。",
+      "reviews": [
+        {
+          "review_id": "9aa1e31c-d1ed-4d04-b4b9-1adca001501e",
+          "revision": 2
+        },
+        {
+          "review_id": "d614e299-42d5-45b2-b719-a06a37234483",
+          "revision": 4
+        }
+      ],
+      "next_step": "Use validate_homework_experience on separate positive and boundary homework deliveries with their native reviews. Search can return the rule after both pass.",
+      "rule_id": "e5b83e17-3054-446f-9d43-b52aafa2852e",
+      "status": "pending"
+    }
+  ],
+  "source_reviews": [
+    {
+      "review_id": "5f23aadd-a678-4ab6-99d0-82330157af53",
+      "revision": 1,
+      "section": 1,
+      "page": 1,
+      "pixel_sha256": "ddc63cf93ecf95a8475ddb8fd956497437c55647a1eb4d166758f205ace0a53d",
+      "width": 794,
+      "height": 1123
+    },
+    {
+      "review_id": "9aa1e31c-d1ed-4d04-b4b9-1adca001501e",
+      "revision": 2,
+      "section": 1,
+      "page": 1,
+      "pixel_sha256": "550c2572667682ed773f1666ae088c7add0baa48b8f763dab998eff87e428960",
+      "width": 794,
+      "height": 1123
+    },
+    {
+      "review_id": "d614e299-42d5-45b2-b719-a06a37234483",
+      "revision": 4,
+      "section": 1,
+      "page": 1,
+      "pixel_sha256": "54546a1171f6b67150d87226fa55fa0c3074b9ef303ae5bd089c21896cc35e02",
+      "width": 794,
+      "height": 1123
+    }
+  ],
+  "export": {
+    "draft_id": "394db5d6-829a-4adc-a3a1-e3b48b1ca47b",
+    "revision": 4,
+    "export_id": "7e276e9d-e3d2-4c42-9990-63d14d768ade",
+    "pages": 1
+  },
+  "export_pdf_sha256": "962cb7c6b6e82d6b1eed590e2125768ca9e5cf5998f3a9994c6e16fc1ea20d5d",
+  "export_embedded_rgb_matches_final_review": true,
+  "user_facing_reply_mentioned_experience": true,
+  "delivery_reply": "《小车测速记录》已导出为一页 PDF，整页已检查。两行算式均已排成上下分数，分母与纸面横线清楚分开。按表中数据核算，第一次速度为 **3 m/s**，第二次为 **2 m/s**。数据表和两行供照抄的旧教材输入均已保留。\n\n已为后续周报记下分数排版、单位核对和横线避让三项做法，待其他作业验证。",
+  "source_plate_sha256": "2a5a26c5ccdedbaaa6a8086a464baf4ad3724b2907b84da756e06977d34fd052"
+}

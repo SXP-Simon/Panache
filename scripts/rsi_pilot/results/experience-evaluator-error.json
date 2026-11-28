@@ -1,0 +1,30 @@
+{
+  "first_run_source": "experience-source.json",
+  "rule_id": "73c923f7-6cd8-4322-b08b-9fa4ccf2773f",
+  "source_rule_status_after_evaluator_mistake": "rejected",
+  "original_page_only": {
+    "decision": "repair",
+    "transcription": "命令对应：十一分之六\n模板输入：\\nicefrac{6}{11}\n最终显示：$$\\nicefrac{6}{11}$$",
+    "reason": "旧模板的输入示例已保留，但最终显示行仍直接显示了美元符号和 LaTeX 命令，没有排版成十一分之六。"
+  },
+  "ambiguous_prompt_and_results": {
+    "decision": "repair",
+    "transcription": "命令对照 十一分之六\n模板输入：\\nicefrac{6}{11}\n最终显示：$$\\nicefrac{6}{11}$$",
+    "reason": "模板输入中的旧命令仍完整可见，但最终显示行也印出了美元符号和命令文字，没有排出十一分之六的分数线。",
+    "advice_decision": "accept",
+    "advice_reason": "该页同时有供照抄的旧输入和误印为字面命令的计算式，符合经验的适用范围。按要求保留模板输入，并将显示行改为显示数学环境中的 \\frac{6}{11}，再逐行确认分数线和完整旧命令，所得交付符合题意。"
+  },
+  "corrected_page_only": {
+    "decision": "accept",
+    "transcription": {
+      "模板输入": "\\nicefrac{6}{11}",
+      "最终显示": "6/11（6 在上，11 在下）"
+    },
+    "reason": "模板输入保留了原命令，最终显示的分数是十一分之六，满足题意。"
+  },
+  "stored_result": {
+    "rule_id": "73c923f7-6cd8-4322-b08b-9fa4ccf2773f",
+    "status": "rejected"
+  },
+  "explanation": "The validation harness compared the evaluator’s post-repair accept with the required pre-repair repair. It submitted a false negative. The original rule remains rejected. The follow-up study used an independent ordinary authoring run, separate storage and separate observations of both actual revisions."
+}
