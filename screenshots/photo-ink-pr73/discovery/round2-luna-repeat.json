@@ -1,0 +1,466 @@
+{
+  "method": "Two fresh Luna runs, same original focus fixture and r1 seed as Round 1, new fixed paraphrase across arms. This is not a held-out photo. Tool-call limit requested and scored from complete trace where possible, not enforced.",
+  "user_prompt": "我想只把这页合成作业照片顶部刚写的字边缘放软一点，靠近镜头的下半部保持原样。不要动纸上原来印好的横线或右下角标记，也不要改字色、文字位置。看过效果后交付逐页 PNG 的 ZIP。",
+  "input_matches": true,
+  "candidates": [
+    "f80be9e4c705cf918e599a93eeb4bc8fa7a2b8f3cc3ddebe599264d25430918a",
+    "d8bc53111d65ccbc0465b3d4ba7a02b294a435c573997362cd796a0cb1044f55"
+  ],
+  "cases": [
+    {
+      "model": "repeat_Luna",
+      "arm": "context_hint_v1",
+      "cohort": "E",
+      "case": "focus",
+      "complete": false,
+      "calls": 13,
+      "errors": 1,
+      "sequence": [
+        {
+          "tool": "read_section",
+          "error": false,
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "layout",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "variation",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "result_revision": 1
+        },
+        {
+          "tool": "adjust_glyphs",
+          "error": false,
+          "expected_revision": 1,
+          "glyphs_targeted": 16,
+          "softness": 0.6,
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": true,
+          "view": "image",
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              240,
+              0
+            ],
+            [
+              240,
+              160
+            ],
+            [
+              0,
+              160
+            ]
+          ]
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "export_blur_px": 0,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              240,
+              0
+            ],
+            [
+              240,
+              160
+            ],
+            [
+              0,
+              160
+            ]
+          ]
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "export_blur_px": 0,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              357
+            ],
+            [
+              240,
+              357
+            ],
+            [
+              240,
+              517
+            ],
+            [
+              0,
+              517
+            ]
+          ]
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "format": "zip",
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 2,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 12,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 7,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": false,
+      "db_published_files": 2,
+      "wire_captured_publishes": 2,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 13,
+      "selected_final_archive": {
+        "call": 13,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": false,
+        "published_sha256": "159881fb72606354de39ab1cdadc2d267c5d1a2c950ccd62e2b68f82fa26237f",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "734d2ef371ab527661e2099bd09ac9769866c26bd4981a544bb280585f1cec7e",
+        "changed": 4338,
+        "upper_changed": 4338,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          29.054,
+          0.0
+        ],
+        "correct": false,
+        "safe_local_softness_alternate": true
+      },
+      "successful_draft_write_calls": [
+        7
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 11,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": false,
+          "published_sha256": "159881fb72606354de39ab1cdadc2d267c5d1a2c950ccd62e2b68f82fa26237f",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "734d2ef371ab527661e2099bd09ac9769866c26bd4981a544bb280585f1cec7e",
+          "changed": 4338,
+          "upper_changed": 4338,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            29.054,
+            0.0
+          ],
+          "correct": false,
+          "safe_local_softness_alternate": true
+        },
+        {
+          "call": 13,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": false,
+          "published_sha256": "159881fb72606354de39ab1cdadc2d267c5d1a2c950ccd62e2b68f82fa26237f",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "734d2ef371ab527661e2099bd09ac9769866c26bd4981a544bb280585f1cec7e",
+          "changed": 4338,
+          "upper_changed": 4338,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            29.054,
+            0.0
+          ],
+          "correct": false,
+          "safe_local_softness_alternate": true
+        }
+      ],
+      "first_correct_publish_call": null,
+      "strict_result": false,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 11,
+      "first_user_scope_publish_in_12": true,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": false
+    },
+    {
+      "model": "repeat_Luna",
+      "arm": "context_hint_plus_schema_v2",
+      "cohort": "F",
+      "case": "focus",
+      "complete": false,
+      "calls": 11,
+      "errors": 1,
+      "sequence": [
+        {
+          "tool": "list_drafts",
+          "error": true
+        },
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "read_section",
+          "error": false,
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              240,
+              0
+            ],
+            [
+              240,
+              160
+            ],
+            [
+              0,
+              160
+            ]
+          ]
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              250
+            ],
+            [
+              0,
+              250
+            ]
+          ]
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_focus": {
+              "from": {
+                "x": 0.5,
+                "y": 0.14,
+                "sigma_px": 0.6
+              },
+              "to": {
+                "x": 0.5,
+                "y": 0.48,
+                "sigma_px": 0.0
+              }
+            }
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "format": "zip",
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 2,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        }
+      ],
+      "review_call": 11,
+      "ink_lookup_call": 7,
+      "focus_attempt_call": 8,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 8,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": true,
+      "db_published_files": 2,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 1,
+      "call_count_lower_bound": 12,
+      "selected_final_archive": {
+        "call": 10,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": false,
+        "published_sha256": "a58a9accd61db91daebb823bf52489813f039955dd975e9a4489fa610f361e92",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "fec6fc27c275655452f40df25dbd78264a53c7fabae946880caea43e6fff96ee",
+        "changed": 8748,
+        "upper_changed": 8748,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          32.256,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        8
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 10,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": false,
+          "published_sha256": "a58a9accd61db91daebb823bf52489813f039955dd975e9a4489fa610f361e92",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "fec6fc27c275655452f40df25dbd78264a53c7fabae946880caea43e6fff96ee",
+          "changed": 8748,
+          "upper_changed": 8748,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            32.256,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 10,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 10,
+      "first_user_scope_publish_in_12": null,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": null
+    }
+  ]
+}

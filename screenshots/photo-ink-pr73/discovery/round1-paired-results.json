@@ -1,0 +1,2396 @@
+{
+  "method": "Synthetic frozen scenarios, identical draft store and verified initial PNG per baseline/contextual_hint pair. Each model cohort has one conversation for four cases; this is not sixteen independent sessions. Actual MCP stdio, software fixtures, no private/user photos. No statement of human preference.",
+  "scoring": {
+    "calls": "All recorded calls except initialization/catalog; different no-write early stopping can reduce total. Some replications lost native export wire entries. Verified DB-backed file count supplies only a lower bound; do not infer unknown export call positions.",
+    "protect": "Protected bottom-right mark, no changed pixel outside 8px dilation of initial new ink, no layout/recalibration, exact plain selected revision ZIP RGB; the exclusion mask is a proxy and allows intended ink blur near original lines.",
+    "focus": "Correct stored ink-only gradient with nonzero upper and sharp lower anchor; no changed pixel at or below y=437. Local selected glyph alternate reported separately. No export blur.",
+    "light": "Only stored photo ink light positive setting, dark site has larger mean absolute RGB change for deep ink. No focus blur or global opacity.",
+    "controls": "Keep and stored_canvas gate: original r1 chosen and unchanged, no revision writes or recalibration for strict count; safe local-only blocked alternatives reported separately because user disallowed reflow/calibration, not all localized edits.",
+    "budgets": "Observe all real calls; separately cut first correct output at 12. Actor summary explanations are not equivalent to calls."
+  },
+  "fixtures": {
+    "focus": {
+      "synthetic_photo_sha256": "eac3f99ddc04b507d49802bbbc822dc3ddc241b931acc20bf06018ead1b481b7",
+      "initial_png_sha256": "c1348099574c5f338b8e2703d883d7625e7652025d0dea18fd5feca50b0e2f43",
+      "user_prompt": "这份作业已写在拍下来的同一张纸上。纸张远处（图的上方）的新字比旁边原有印线明显锐，像后来贴上去的；下方的字现在就好。只轻微软化远处新字的边沿，不要动原有印线、角标、排版和字色。核对画面后交付逐页 PNG 的 ZIP。",
+      "alignment": "manual_guides",
+      "hint_fields": [
+        "describe_arguments",
+        "focus",
+        "guidance",
+        "light"
+      ]
+    },
+    "light": {
+      "synthetic_photo_sha256": "2b291ae5627664cc528a6c0a6dcaa569966a9c7865dcbebb25df2bea743f4340",
+      "initial_png_sha256": "65a3a7da2c5e789ca4f3e7f5850e61c35fb8917b99848a98283919be9d03540a",
+      "user_prompt": "这份已写好的作业在一张右下方较亮、左上方带点阴影的照片上。新字的颜色像横跨阴影都没有变化，看起来浮在纸面上。让新增的有色笔迹跟着纸面所在位置的明暗变化，不要统一压深或变浅，不要把笔画变糊，也别动原有印线、角标和排版。核对后交付逐页 PNG 的 ZIP。",
+      "alignment": "manual_guides",
+      "hint_fields": [
+        "describe_arguments",
+        "guidance",
+        "light"
+      ]
+    },
+    "keep": {
+      "synthetic_photo_sha256": "3e5462c935fefe9f4638b7c6a65c71176f9867ddaeb7c11dc0070e147d5bc602",
+      "initial_png_sha256": "a75f6b124c2c9e53cad0a404ab27acc91cc537bf1fd777da57a50d572963557a",
+      "user_prompt": "这份照着纸张写好的作业现在看起来已经合适：字、印线、角标、版面和远近的效果都保留，不需要再润饰。只核对画面并把当前稿交付为逐页 PNG 的 ZIP，不新建修订。",
+      "alignment": "manual_guides",
+      "hint_fields": [
+        "describe_arguments",
+        "guidance",
+        "light"
+      ]
+    },
+    "blocked": {
+      "synthetic_photo_sha256": "09c3e846cd226f363243d4c3495367f4124e43ca2d859f7a2b4aa830fa17803c",
+      "initial_png_sha256": "be4d981c0a195af11c3ea035b94cd4d3f257c2cb9fdd2320ab8130d579d6d1b1",
+      "user_prompt": "这张照片上方的新字有点过锐，我只想让上方新增字迹稍微柔一点。纸张和排版已经确认，不要重新标定纸面，不要移动或重排任何字，也不要柔化原来的印线和角标。如果不能在这些限制下做到，就交付现稿并说明原因。请交付逐页 PNG 的 ZIP。",
+      "alignment": "stored_canvas",
+      "hint_fields": []
+    }
+  },
+  "oracle": {
+    "focus": {
+      "settings": {
+        "photo_ink_focus": {
+          "from": {
+            "x": 0.5,
+            "y": 0.1,
+            "sigma_px": 1
+          },
+          "to": {
+            "x": 0.5,
+            "y": 0.68,
+            "sigma_px": 0
+          }
+        }
+      },
+      "changed_px": 21825,
+      "upper_changed": 15500,
+      "lower_changed": 0,
+      "protected_mark_unchanged": true,
+      "outside_original_ink_changed": 12754,
+      "deep_ink_regions": [
+        3222,
+        1928
+      ],
+      "delta_abs_rgb_means_deep_ink": [
+        95.245,
+        0.0
+      ]
+    },
+    "light": {
+      "settings": {
+        "photo_ink_light": 65
+      },
+      "changed_px": 15852,
+      "upper_changed": 6101,
+      "lower_changed": 1766,
+      "protected_mark_unchanged": true,
+      "outside_original_ink_changed": 60,
+      "deep_ink_regions": [
+        3022,
+        2028
+      ],
+      "delta_abs_rgb_means_deep_ink": [
+        63.32,
+        33.138
+      ]
+    }
+  },
+  "cases": [
+    {
+      "model": "Luna",
+      "arm": "baseline",
+      "cohort": "A",
+      "case": "focus",
+      "complete": true,
+      "calls": 3,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "export_blur_gradient": {
+            "from": {
+              "x": 0.5,
+              "y": 0.06,
+              "sigma_px": 0.6
+            },
+            "to": {
+              "x": 0.5,
+              "y": 0.45,
+              "sigma_px": 0
+            }
+          },
+          "result_revision": 1
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 1,
+          "format": "zip",
+          "export_blur_gradient": {
+            "from": {
+              "x": 0.5,
+              "y": 0.06,
+              "sigma_px": 0.6
+            },
+            "to": {
+              "x": 0.5,
+              "y": 0.45,
+              "sigma_px": 0
+            }
+          },
+          "result_revision": 1
+        }
+      ],
+      "review_call": null,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": null,
+      "export_finish_attempt_call": 2,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": false,
+      "db_published_files": 2,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 1,
+      "call_count_lower_bound": 4,
+      "selected_final_archive": {
+        "call": 3,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": true,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "6ce6efc1bf88bd2bc9bb7bf6cd4a378984b6a2aea632c6af526f0e263f20a319",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": false,
+        "rgb_sha256": "bec909b8bc7f487c0029dbd10411b215566d253d6b82823800da7ff24f03837d",
+        "changed": 11498,
+        "upper_changed": 11498,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 4793,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          17.005,
+          0.0
+        ],
+        "correct": false,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 1,
+      "publishes": [
+        {
+          "call": 3,
+          "revision": 1,
+          "kind": "zip",
+          "gradient_blur": true,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "6ce6efc1bf88bd2bc9bb7bf6cd4a378984b6a2aea632c6af526f0e263f20a319",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": false,
+          "rgb_sha256": "bec909b8bc7f487c0029dbd10411b215566d253d6b82823800da7ff24f03837d",
+          "changed": 11498,
+          "upper_changed": 11498,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 4793,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            17.005,
+            0.0
+          ],
+          "correct": false,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": null,
+      "strict_result": false,
+      "user_scope_final": false,
+      "first_user_scope_publish_call": null,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": null
+    },
+    {
+      "model": "Luna",
+      "arm": "baseline",
+      "cohort": "A",
+      "case": "light",
+      "complete": true,
+      "calls": 9,
+      "errors": 1,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": true
+        },
+        {
+          "tool": "describe_controls",
+          "error": false
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_light": 100
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 8,
+      "ink_lookup_call": 4,
+      "focus_attempt_call": null,
+      "light_attempt_call": 5,
+      "first_write_attempt_call": 5,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": true,
+      "db_published_files": 2,
+      "wire_captured_publishes": 2,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 9,
+      "selected_final_archive": {
+        "call": 9,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+        "changed": 15860,
+        "upper_changed": 6104,
+        "lower_changed": 1768,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          97.124,
+          50.574
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        5
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 7,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+          "changed": 15860,
+          "upper_changed": 6104,
+          "lower_changed": 1768,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            97.124,
+            50.574
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        },
+        {
+          "call": 9,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+          "changed": 15860,
+          "upper_changed": 6104,
+          "lower_changed": 1768,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            97.124,
+            50.574
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 7,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 7,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Luna",
+      "arm": "baseline",
+      "cohort": "A",
+      "case": "keep",
+      "complete": true,
+      "calls": 3,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 1,
+          "format": "zip",
+          "result_revision": 1
+        }
+      ],
+      "review_call": 2,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": null,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": null,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 3,
+      "selected_final_archive": {
+        "call": 3,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+        "changed": 0,
+        "upper_changed": 0,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          0.0,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 1,
+      "publishes": [
+        {
+          "call": 3,
+          "revision": 1,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+          "changed": 0,
+          "upper_changed": 0,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            0.0,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 3,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 3,
+      "final_kept_original": true,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Luna",
+      "arm": "baseline",
+      "cohort": "A",
+      "case": "blocked",
+      "complete": true,
+      "calls": 9,
+      "errors": 1,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": true,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_focus": {
+              "from": {
+                "x": 0.5,
+                "y": 0.08,
+                "sigma_px": 0.5
+              },
+              "to": {
+                "x": 0.5,
+                "y": 0.38,
+                "sigma_px": 0
+              }
+            }
+          }
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              40
+            ],
+            [
+              480,
+              40
+            ],
+            [
+              480,
+              170
+            ],
+            [
+              0,
+              170
+            ]
+          ]
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              40
+            ],
+            [
+              480,
+              40
+            ],
+            [
+              480,
+              240
+            ],
+            [
+              0,
+              240
+            ]
+          ]
+        },
+        {
+          "tool": "adjust_glyphs",
+          "error": false,
+          "expected_revision": 1,
+          "glyphs_targeted": 16,
+          "softness": 0.5,
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 8,
+      "ink_lookup_call": 2,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 3,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": null,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 9,
+      "selected_final_archive": {
+        "call": 9,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "328fa713700520a350db30148d179f18fb56b30c73d7f9124446ef39bac409eb",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "79a2beca06e60f8377e8e037163e40a3d9232ed92081e912f002ee75162ab69b",
+        "changed": 21366,
+        "upper_changed": 8783,
+        "lower_changed": 2549,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 43,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          246.077,
+          268.086
+        ],
+        "correct": false,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        6
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 9,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "328fa713700520a350db30148d179f18fb56b30c73d7f9124446ef39bac409eb",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "79a2beca06e60f8377e8e037163e40a3d9232ed92081e912f002ee75162ab69b",
+          "changed": 21366,
+          "upper_changed": 8783,
+          "lower_changed": 2549,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 43,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            246.077,
+            268.086
+          ],
+          "correct": false,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": null,
+      "strict_result": false,
+      "user_scope_final": false,
+      "first_user_scope_publish_call": null,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": false,
+      "first_correct_in_12": false
+    },
+    {
+      "model": "Luna",
+      "arm": "contextual_hint",
+      "cohort": "B",
+      "case": "focus",
+      "complete": true,
+      "calls": 17,
+      "errors": 6,
+      "sequence": [
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "read_section",
+          "error": true,
+          "view": "layout"
+        },
+        {
+          "tool": "read_section",
+          "error": true,
+          "view": "review"
+        },
+        {
+          "tool": "read_section",
+          "error": false,
+          "view": "source",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": true,
+          "group": "photo_appearance",
+          "revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": true,
+          "revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": true,
+          "group": "focus",
+          "revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "describe_controls",
+          "error": false
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "camera",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "image",
+          "result_revision": 1
+        },
+        {
+          "tool": "read_section",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "export_handwriting",
+          "error": true,
+          "revision": 1,
+          "format": "png"
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_focus": {
+              "from": {
+                "x": 0.0981,
+                "y": 0.0892,
+                "sigma_px": 0.8
+              },
+              "to": {
+                "x": 0.2046,
+                "y": 0.6839,
+                "sigma_px": 0.0
+              }
+            }
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        }
+      ],
+      "review_call": 2,
+      "ink_lookup_call": 15,
+      "focus_attempt_call": 16,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 16,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": true,
+      "db_published_files": 3,
+      "wire_captured_publishes": 0,
+      "unlogged_publishes": 3,
+      "call_count_lower_bound": 20,
+      "selected_final_archive": {
+        "call": null,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": null,
+        "published_sha256": "ffd49089af7a00e63a5b31468354dd45ba1a4209be21a1c3f0cfe1a878296233",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "b79c91d2a00274cc09f950e9dfe16f0367f484f2d9b86288750689a44f17241c",
+        "changed": 15125,
+        "upper_changed": 12920,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          59.518,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false,
+        "wire_incomplete_attachment_valid_db_match": true
+      },
+      "successful_draft_write_calls": [
+        16
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [],
+      "first_correct_publish_call": null,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": null,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": null
+    },
+    {
+      "model": "Luna",
+      "arm": "contextual_hint",
+      "cohort": "B",
+      "case": "light",
+      "complete": true,
+      "calls": 5,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_light": 100
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        }
+      ],
+      "review_call": 2,
+      "ink_lookup_call": 3,
+      "focus_attempt_call": null,
+      "light_attempt_call": 4,
+      "first_write_attempt_call": 4,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": true,
+      "db_published_files": 2,
+      "wire_captured_publishes": 0,
+      "unlogged_publishes": 2,
+      "call_count_lower_bound": 7,
+      "selected_final_archive": {
+        "call": null,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": null,
+        "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+        "changed": 15860,
+        "upper_changed": 6104,
+        "lower_changed": 1768,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          97.124,
+          50.574
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false,
+        "wire_incomplete_attachment_valid_db_match": true
+      },
+      "successful_draft_write_calls": [
+        4
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [],
+      "first_correct_publish_call": null,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": null,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": null
+    },
+    {
+      "model": "Luna",
+      "arm": "contextual_hint",
+      "cohort": "B",
+      "case": "keep",
+      "complete": true,
+      "calls": 4,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        }
+      ],
+      "review_call": 2,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": null,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": null,
+      "db_published_files": 2,
+      "wire_captured_publishes": 0,
+      "unlogged_publishes": 2,
+      "call_count_lower_bound": 6,
+      "selected_final_archive": {
+        "call": null,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": null,
+        "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+        "changed": 0,
+        "upper_changed": 0,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          0.0,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false,
+        "wire_incomplete_attachment_valid_db_match": true
+      },
+      "successful_draft_write_calls": [],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 1,
+      "publishes": [],
+      "first_correct_publish_call": null,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": null,
+      "final_kept_original": true,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": null
+    },
+    {
+      "model": "Luna",
+      "arm": "contextual_hint",
+      "cohort": "B",
+      "case": "blocked",
+      "complete": true,
+      "calls": 4,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "list_drafts",
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        }
+      ],
+      "review_call": 2,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": null,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": null,
+      "db_published_files": 2,
+      "wire_captured_publishes": 0,
+      "unlogged_publishes": 2,
+      "call_count_lower_bound": 6,
+      "selected_final_archive": {
+        "call": null,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": null,
+        "published_sha256": "da8f904192d21fc51d425bedf169492f3b07c3f5d80e2764be3b4e0bd5b80682",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "68d5da7aa16e9fe8701f7d7e873a02a3e1fff0b94b99302422ba40ae38077632",
+        "changed": 0,
+        "upper_changed": 0,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          0.0,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false,
+        "wire_incomplete_attachment_valid_db_match": true
+      },
+      "successful_draft_write_calls": [],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 1,
+      "publishes": [],
+      "first_correct_publish_call": null,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": null,
+      "final_kept_original": true,
+      "blocked_calibration_explanation": false,
+      "first_correct_in_12": null
+    },
+    {
+      "model": "Terra",
+      "arm": "contextual_hint",
+      "cohort": "C",
+      "case": "focus",
+      "complete": true,
+      "calls": 6,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_focus": {
+              "from": {
+                "x": 0.1,
+                "y": 0.09,
+                "sigma_px": 0.8
+              },
+              "to": {
+                "x": 0.2,
+                "y": 0.68,
+                "sigma_px": 0
+              }
+            }
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              300
+            ],
+            [
+              0,
+              300
+            ]
+          ],
+          "compare_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "hint": [
+            "describe_arguments",
+            "focus",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": 2,
+      "focus_attempt_call": 3,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 3,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": true,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 6,
+      "selected_final_archive": {
+        "call": 6,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "d14790e9444844c3c90d73ac7ad8487f7c404c54b9c6ae1425abc438bf631551",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "78fb9042ba507f9136801eaff3efec40b39c395c4d7bc4b6754bb23177ca67dc",
+        "changed": 15116,
+        "upper_changed": 12943,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          59.841,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        3
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 6,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "d14790e9444844c3c90d73ac7ad8487f7c404c54b9c6ae1425abc438bf631551",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "78fb9042ba507f9136801eaff3efec40b39c395c4d7bc4b6754bb23177ca67dc",
+          "changed": 15116,
+          "upper_changed": 12943,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            59.841,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 6,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 6,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Terra",
+      "arm": "contextual_hint",
+      "cohort": "C",
+      "case": "light",
+      "complete": true,
+      "calls": 6,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_light": 100
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              640
+            ],
+            [
+              0,
+              640
+            ]
+          ],
+          "compare_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": 2,
+      "focus_attempt_call": null,
+      "light_attempt_call": 3,
+      "first_write_attempt_call": 3,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": true,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 6,
+      "selected_final_archive": {
+        "call": 6,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+        "changed": 15860,
+        "upper_changed": 6104,
+        "lower_changed": 1768,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          97.124,
+          50.574
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        3
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 6,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+          "changed": 15860,
+          "upper_changed": 6104,
+          "lower_changed": 1768,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            97.124,
+            50.574
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 6,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 6,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Terra",
+      "arm": "contextual_hint",
+      "cohort": "C",
+      "case": "keep",
+      "complete": true,
+      "calls": 2,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1,
+          "hint": [
+            "describe_arguments",
+            "guidance",
+            "light"
+          ]
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 1,
+          "format": "zip",
+          "result_revision": 1
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": null,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": true,
+      "expected_parameter_chosen": null,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 2,
+      "selected_final_archive": {
+        "call": 2,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+        "changed": 0,
+        "upper_changed": 0,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          0.0,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 1,
+      "publishes": [
+        {
+          "call": 2,
+          "revision": 1,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+          "changed": 0,
+          "upper_changed": 0,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            0.0,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 2,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 2,
+      "final_kept_original": true,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Terra",
+      "arm": "contextual_hint",
+      "cohort": "C",
+      "case": "blocked",
+      "complete": true,
+      "calls": 7,
+      "errors": 1,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "revision": 1,
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              220
+            ],
+            [
+              0,
+              220
+            ]
+          ]
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": true,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_focus": {
+              "from": {
+                "x": 0.5,
+                "y": 0.1,
+                "sigma_px": 0.6
+              },
+              "to": {
+                "x": 0.5,
+                "y": 0.5,
+                "sigma_px": 0
+              }
+            }
+          }
+        },
+        {
+          "tool": "adjust_glyphs",
+          "error": false,
+          "expected_revision": 1,
+          "glyphs_targeted": 30,
+          "softness": 0.5,
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              190
+            ],
+            [
+              0,
+              190
+            ]
+          ],
+          "compare_revision": 1
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 1,
+          "format": "zip",
+          "result_revision": 1
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": 2,
+      "focus_attempt_call": 4,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 4,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": null,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 7,
+      "selected_final_archive": {
+        "call": 7,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "da8f904192d21fc51d425bedf169492f3b07c3f5d80e2764be3b4e0bd5b80682",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "68d5da7aa16e9fe8701f7d7e873a02a3e1fff0b94b99302422ba40ae38077632",
+        "changed": 0,
+        "upper_changed": 0,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          0.0,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        5
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 7,
+          "revision": 1,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "da8f904192d21fc51d425bedf169492f3b07c3f5d80e2764be3b4e0bd5b80682",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "68d5da7aa16e9fe8701f7d7e873a02a3e1fff0b94b99302422ba40ae38077632",
+          "changed": 0,
+          "upper_changed": 0,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            0.0,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 7,
+      "strict_result": false,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 7,
+      "final_kept_original": true,
+      "blocked_calibration_explanation": true,
+      "first_correct_in_12": false
+    },
+    {
+      "model": "Terra",
+      "arm": "baseline",
+      "cohort": "D",
+      "case": "focus",
+      "complete": true,
+      "calls": 6,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "revision": 1,
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              200
+            ],
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        {
+          "tool": "adjust_glyphs",
+          "error": false,
+          "expected_revision": 1,
+          "glyphs_targeted": 30,
+          "softness": 0.5,
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              220
+            ],
+            [
+              0,
+              220
+            ]
+          ],
+          "compare_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 3,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": false,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 6,
+      "selected_final_archive": {
+        "call": 6,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "1e6a3e1266b34ebaeb9772a4cdc3e0249a45c3d84cd445e8cdeaeb435a8f71ad",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "3fcf835e69cdddd374f3e0da4003d03d0694a4e9300a8daf6dfc99b4914b0807",
+        "changed": 7732,
+        "upper_changed": 7732,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          42.535,
+          0.0
+        ],
+        "correct": false,
+        "safe_local_softness_alternate": true
+      },
+      "successful_draft_write_calls": [
+        3
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 6,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "1e6a3e1266b34ebaeb9772a4cdc3e0249a45c3d84cd445e8cdeaeb435a8f71ad",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "3fcf835e69cdddd374f3e0da4003d03d0694a4e9300a8daf6dfc99b4914b0807",
+          "changed": 7732,
+          "upper_changed": 7732,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            42.535,
+            0.0
+          ],
+          "correct": false,
+          "safe_local_softness_alternate": true
+        }
+      ],
+      "first_correct_publish_call": null,
+      "strict_result": false,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 6,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": false
+    },
+    {
+      "model": "Terra",
+      "arm": "baseline",
+      "cohort": "D",
+      "case": "light",
+      "complete": true,
+      "calls": 8,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": false
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "camera",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "describe_controls",
+          "error": false,
+          "group": "ink",
+          "revision": 1,
+          "result_revision": 1
+        },
+        {
+          "tool": "tune_handwriting",
+          "error": false,
+          "expected_revision": 1,
+          "changes": {
+            "photo_ink_light": 100
+          },
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              220
+            ],
+            [
+              0,
+              220
+            ]
+          ],
+          "compare_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": 4,
+      "focus_attempt_call": null,
+      "light_attempt_call": 5,
+      "first_write_attempt_call": 5,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": true,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 8,
+      "selected_final_archive": {
+        "call": 8,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+        "changed": 15860,
+        "upper_changed": 6104,
+        "lower_changed": 1768,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          97.124,
+          50.574
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        5
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 8,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "dc931c82a4e2336d6eb48edc91ddfb8d8d667efb987042bc944d08d081f4765a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "4f7f9cf6001b17d7a8cb8cbc417b181a073664f52963b9cbe04a75f6c272bbd4",
+          "changed": 15860,
+          "upper_changed": 6104,
+          "lower_changed": 1768,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            97.124,
+            50.574
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 8,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 8,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Terra",
+      "arm": "baseline",
+      "cohort": "D",
+      "case": "keep",
+      "complete": true,
+      "calls": 2,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 1,
+          "format": "zip",
+          "result_revision": 1
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": null,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": null,
+      "db_published_files": 1,
+      "wire_captured_publishes": 1,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 2,
+      "selected_final_archive": {
+        "call": 2,
+        "revision": 1,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+        "changed": 0,
+        "upper_changed": 0,
+        "lower_changed": 0,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 0,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          0.0,
+          0.0
+        ],
+        "correct": true,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 1,
+      "publishes": [
+        {
+          "call": 2,
+          "revision": 1,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "68ab19c0a064416485d1cff0c2ff60fb2dae9266be592efeced10af77f9aba4a",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "a5c4264ba298b3619b37769f44426a92cc7afe5652cdb8c76cc1dfea5dad258f",
+          "changed": 0,
+          "upper_changed": 0,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            0.0,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 2,
+      "strict_result": true,
+      "user_scope_final": true,
+      "first_user_scope_publish_call": 2,
+      "final_kept_original": true,
+      "blocked_calibration_explanation": null,
+      "first_correct_in_12": true
+    },
+    {
+      "model": "Terra",
+      "arm": "baseline",
+      "cohort": "D",
+      "case": "blocked",
+      "complete": true,
+      "calls": 7,
+      "errors": 0,
+      "sequence": [
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "result_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "layout",
+          "revision": 1,
+          "result_revision": 1,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              200
+            ],
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 1,
+          "format": "zip",
+          "result_revision": 1
+        },
+        {
+          "tool": "adjust_glyphs",
+          "error": false,
+          "expected_revision": 1,
+          "glyphs_targeted": 30,
+          "softness": 0.5,
+          "result_revision": 2
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2,
+          "region": [
+            [
+              0,
+              0
+            ],
+            [
+              480,
+              0
+            ],
+            [
+              480,
+              220
+            ],
+            [
+              0,
+              220
+            ]
+          ],
+          "compare_revision": 1
+        },
+        {
+          "tool": "preview_handwriting",
+          "error": false,
+          "view": "review",
+          "revision": 2,
+          "result_revision": 2
+        },
+        {
+          "tool": "export_handwriting",
+          "error": false,
+          "revision": 2,
+          "format": "zip",
+          "result_revision": 2
+        }
+      ],
+      "review_call": 1,
+      "ink_lookup_call": null,
+      "focus_attempt_call": null,
+      "light_attempt_call": null,
+      "first_write_attempt_call": 4,
+      "export_finish_attempt_call": null,
+      "actual_hint_seen": false,
+      "expected_parameter_chosen": null,
+      "db_published_files": 2,
+      "wire_captured_publishes": 2,
+      "unlogged_publishes": 0,
+      "call_count_lower_bound": 7,
+      "selected_final_archive": {
+        "call": 7,
+        "revision": 2,
+        "kind": "zip",
+        "gradient_blur": false,
+        "flat_blur": false,
+        "explicit_revision": true,
+        "published_sha256": "8d1219a6f9e4be557dcad4fc1ccf713b580362deaa4d2d7504113c3953d20aba",
+        "pages": 1,
+        "actual_archive_matches_received_hash": true,
+        "rgb_matches_plain_preview": true,
+        "rgb_sha256": "5b6e705847ceddc7a07440cb2644d030ba32eb4a92ddff2842f22ff41d66cac9",
+        "changed": 22776,
+        "upper_changed": 10193,
+        "lower_changed": 2549,
+        "protected_corner_mark_changed": 0,
+        "outside_8px_ink_mask_changed": 43,
+        "deep_ink_abs_rgb_dark_vs_light": [
+          243.602,
+          268.086
+        ],
+        "correct": false,
+        "safe_local_softness_alternate": false
+      },
+      "successful_draft_write_calls": [
+        4
+      ],
+      "unauthorized_calibration_attempts": [],
+      "location_change_attempts": [],
+      "final_draft_revision": 2,
+      "publishes": [
+        {
+          "call": 3,
+          "revision": 1,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "da8f904192d21fc51d425bedf169492f3b07c3f5d80e2764be3b4e0bd5b80682",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "68d5da7aa16e9fe8701f7d7e873a02a3e1fff0b94b99302422ba40ae38077632",
+          "changed": 0,
+          "upper_changed": 0,
+          "lower_changed": 0,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 0,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            0.0,
+            0.0
+          ],
+          "correct": true,
+          "safe_local_softness_alternate": false
+        },
+        {
+          "call": 7,
+          "revision": 2,
+          "kind": "zip",
+          "gradient_blur": false,
+          "flat_blur": false,
+          "explicit_revision": true,
+          "published_sha256": "8d1219a6f9e4be557dcad4fc1ccf713b580362deaa4d2d7504113c3953d20aba",
+          "pages": 1,
+          "actual_archive_matches_received_hash": true,
+          "rgb_matches_plain_preview": true,
+          "rgb_sha256": "5b6e705847ceddc7a07440cb2644d030ba32eb4a92ddff2842f22ff41d66cac9",
+          "changed": 22776,
+          "upper_changed": 10193,
+          "lower_changed": 2549,
+          "protected_corner_mark_changed": 0,
+          "outside_8px_ink_mask_changed": 43,
+          "deep_ink_abs_rgb_dark_vs_light": [
+            243.602,
+            268.086
+          ],
+          "correct": false,
+          "safe_local_softness_alternate": false
+        }
+      ],
+      "first_correct_publish_call": 3,
+      "strict_result": false,
+      "user_scope_final": false,
+      "first_user_scope_publish_call": 3,
+      "final_kept_original": false,
+      "blocked_calibration_explanation": false,
+      "first_correct_in_12": false
+    }
+  ]
+}
