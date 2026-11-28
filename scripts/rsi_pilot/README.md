@@ -68,3 +68,24 @@ python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content results \
 - v3 由宿主依据 v2 的错拒提出，先冻结再在两项新纸型任务上比较。两份初稿本来都合格，v2、v3 均交付且获独立模型通过，共使用 8 次、5 次模型决策。[每轮证据和模型用量](results/prospective.json)
 - 单独测试照片上方 40% 的 132 个字形时，模型建议局部柔化 0.7 px。两页下部均为零像素变化。独立模型将局部稿和原稿并列；同强度的全局柔化使近处字迹显得过软。[同尺度比较与使用的 MCP 调用](results/appearance-trial.json)
 - 既有局部编辑实验另留五道有已知答案的题。普通和细分评审提示均答对 5/5。回看这五题时，只复核一题，按变化像素最多会选到正确的移字稿，按“目标框仍有墨、模型却要求返工”的分歧会选到删错字的稿。该挑样规则属于事后分析，可用下一批失败稿检验。[逐题记录](results/review-calibration.json)
+
+## 用户实拍原纸上的混排作业
+
+这次使用 [首张开发纸的标注](paper_labels.json) 对应的原始 JPEG。它也是用户再次指定的附件。原纸、完整原尺寸页和分区盲审输入保存在运行目录，公开展示只取内页局部。不同纸张需要重新确定标注与裁区。以下命令从仓库根目录执行，沿用上文的 Markdown worker、字体、原生 MCP 和结构探针。Python 环境还需 Pillow、NumPy、OpenCV 和 PyMuPDF；实时验卷使用已登录的 Codex CLI。将 `PHOTO`、`RUN`、`MCP`、`WORKER`、`PROBE` 分别设为此次原照、新运行目录和对应的程序路径。
+
+```sh
+python scripts/rsi_pilot/real_photo_episode.py first --out "$RUN" --photo "$PHOTO" --binary "$MCP" --worker "$WORKER" --fonts assets/font_assets --probe "$PROBE"
+python scripts/rsi_pilot/real_photo_episode.py guided --out "$RUN"
+python scripts/rsi_pilot/real_photo_episode_controls.py --out "$RUN"
+python scripts/rsi_pilot/real_photo_episode_repair.py unsupported --out "$RUN" --binary "$MCP"
+python scripts/rsi_pilot/real_photo_episode_repair.py repair --out "$RUN" --binary "$MCP"
+python scripts/rsi_pilot/real_photo_episode_challenge.py --out "$RUN" --binary "$MCP"
+python scripts/rsi_pilot/real_photo_episode_report.py --out "$RUN" --results "$RUN/results"
+python scripts/rsi_pilot/real_photo_episode_local.py --out "$RUN" --binary "$MCP" --results "$RUN/results"
+```
+
+- **首次是否主动检查。** [写前判断](results/real-photo-planning.json)直接给原照，一组另收到真实 MCP 初始化说明。[写后验卷、选稿和公式返工](results/real-photo-episode.json)保留主任务、原生页指纹、匿名决定、输入成本和导出核验。样稿本身和模型说过会检查什么分别留档。
+- **局部光学和透视。** [原纸九区量测](results/real-photo-audit.json)给出纸面亮度、印线边缘宽度和行距。[四条件控件](results/real-photo-optical-controls.json)与[实际两版成稿的换位盲评](results/real-photo-native-pair.json)分别回答能否识别已知错位及实际改稿是否值得保留。[墨层作用范围](results/real-photo-finish-check.json)可用 `real_photo_finish_check.py --manifest "$RUN/manifest.json" --binary "$MCP" --out "$RUN/finish-check"` 重测。
+- **只改一行。** [细粒度实验](results/real-photo-local-refinement.json)保留了模型建议、实验方的候选动作、正文改动像素、保护区和实际选定的 PDF 版本。该对照和主任务三选一是独立任务，各自保留了交付决定。
+
+[原纸与初稿同位置](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7236162974) · [公式的真实拦截和修订](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7236214826) · [公开局部图库](https://github.com/SXP-Simon/Panache/tree/669a9db2c133edcd019e490156257b972dc72cac/screenshots/rsi-pilot/real-photo)

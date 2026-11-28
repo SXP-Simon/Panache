@@ -1,0 +1,1007 @@
+{
+  "scope": "One byte-identical development photograph from the earlier pilot. A short host-authored reproducible Markdown fixture, independently judged by real Codex CLI Terra requests. No claim of human authenticity or generalization.",
+  "brief": "写一份传感器波形的周期测量作业。一次试验从第一个上升过零点计到四个完整周期结束，两个时刻为 0.5 s 和 2.5 s。写清测量方法、数据表、带分母的周期计算和频率结论，画出操作流程，并附一张波形示意图。使用所给原纸。",
+  "provenance": {
+    "binary_sha256": "f8d145008e36f1d9d120560060c127a36a5747ed4c3c2e4d5886648957af18d5",
+    "worker_sha256": "9858a3996ff49895899d153fda57586227f1fa2be139b3f61a6d895ee5c5e237",
+    "photo_sha256": "67ae41d9486dac33eddce6014f33b8ae23c647384b9196a42c5492b2c90f64ea",
+    "waveform_sha256": "faf4668d55a7ead871951b14a1b8d318e1c94281dbb865753675c60209d300c1",
+    "probe_sha256": "70610abc0b6e7eb4bb613679957591c25404b8601bc3e48d50327c57395e4686",
+    "font_sha256": "990667a527a9a725607ce965e529199464e47236664137e653c96301039d05f3"
+  },
+  "source_sha256": "c3bcfa032bfed78785e944fd07c46ba4932e3f552978083c0268d48df8f4dbe2",
+  "probe_recheck": {
+    "binary_sha256": "06fc531f628f3ff9fc0b86e5c49c5ded36051c3ab7945eba96440f9e699b22be",
+    "matching_snapshots": [
+      "homework/r1",
+      "homework/r2",
+      "homework/r3",
+      "local-refinement/r1",
+      "local-refinement/r2",
+      "equation-repair/r1",
+      "equation-repair/r2"
+    ],
+    "note": "The initial manifest recorded the original probe hash. The shared build directory was rebuilt during this run. The listed AST snapshots match this separately hashed probe on retained worker output. It is an inspection tool external to the MCP renderer."
+  },
+  "native_components": [
+    {
+      "id": 42,
+      "kind": "table",
+      "rows": [
+        [
+          "上升过零点",
+          "时刻 / s"
+        ],
+        [
+          "起点",
+          "0.5"
+        ],
+        [
+          "四个周期后",
+          "2.5"
+        ]
+      ]
+    },
+    {
+      "denominator": "4",
+      "id": 74,
+      "kind": "fraction",
+      "numerator": "2.5-0.5"
+    },
+    {
+      "flowchart": true,
+      "id": 108,
+      "kind": "graph",
+      "mark_count": 3
+    }
+  ],
+  "design": {
+    "seed": 64019,
+    "homework": true,
+    "font_size": 34,
+    "font": "李国夫手写体.ttf",
+    "physical_pages": 2,
+    "pagination": "Second page has only the concluding sentence."
+  },
+  "unprompted": {
+    "vote": {
+      "decision": "deliver",
+      "observations": [
+        "成稿写明以同一方向的上升过零点标记周期，避免将半个周期误认为完整周期。",
+        "数据表记录起点为 0.5 s、四个完整周期后为 2.5 s。",
+        "周期计算写有分母：T = (2.5 − 0.5) / 4 = 0.5 s；频率结论为 2 Hz。",
+        "画出了“读波形 → 记时刻 → 求周期”的操作流程，并附有波形示意图。",
+        "第二页说明了跨越多个周期计时后取平均，以减小时刻读数误差的影响。",
+        "[Institution name withheld] The draft was rendered on the supplied ruled stationery."
+      ],
+      "redaction": "The last observation is paraphrased to remove the printed institution. The receipt hashes the original unredacted model response."
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "decision_sha256": "f04649dd3c2a450c92e112f609d24c159bae4a51dd6aef168d11141c9f480918",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "cbdd1100e2a96ac5e3fd09ddd3fc4660af97a785585b54bc49266fcebcf9d8c4",
+      "image_sha256": [
+        "cc52e038932d750e247a225e5bbad37e1cda2eb8a489e12672f6d6a570f11e78",
+        "3d7c3d21b13a828fe10524258ab676d8f63ccc9fb413342b2099248e0876cde2"
+      ],
+      "usage": {
+        "input_tokens": 26801,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 234,
+        "reasoning_output_tokens": 43
+      }
+    },
+    "omissions": "Confirmed the visible arithmetic and named all content types. Did not mention regional exposure, focus, geometric fit, or the sparse second page."
+  },
+  "guided": {
+    "vote": {
+      "action": "keep",
+      "changes": {},
+      "reason": "保留当前稿件。题目要求的测量方法、数据表、分式计算、频率结论、流程图和波形示意图均可见。现有照片和测量提示不足以支持对新增墨层进行有把握的亮度或焦点调整；不必为了接近纸面印刷墨色而调整。",
+      "observations": [
+        {
+          "对象": "周期公式",
+          "图中实际看见": "第 1 页公式及其原尺寸局部可读作 T = (2.5 − 0.5) / 4 = 0.5 s。分子是 2.5 − 0.5，分母是 4，结果是 0.5 s；分数横线和分母均可见，但分母笔画较小。",
+          "测量提示": "公式所在区域的纸面亮度中位数为 201，新增墨亮度下降的 p90 为 155。",
+          "仍无法确认": "未读取保存的源文本，也未调用预览工具；只能依据提供的成图判断，无法核对源文本与成图是否完全一致。"
+        },
+        {
+          "对象": "测量方法与数据表",
+          "图中实际看见": "文字说明用相同方向的过零点标记周期，避免把半个周期当成完整周期。表中起点为 0.5 s，四个周期后为 2.5 s；表格上下边缘与附近纸线方向大体一致。",
+          "测量提示": "表格投影四角显示近端宽度约 371 像素、远端约 351 像素；提供的导线也显示纸面向右上方倾斜。",
+          "仍无法确认": "没有布局预览或逐对象的完整投影检查，不能仅凭投影四角断言所有文字和表格边缘都精确贴合纸面。"
+        },
+        {
+          "对象": "频率与结论",
+          "图中实际看见": "第 1 页写出频率为每秒 2 个周期，即 2 Hz；第 2 页说明跨越多个周期后取平均，可减小时刻读数误差的影响。",
+          "测量提示": "第 2 页结论区域纸面亮度中位数为 206，新增墨亮度下降的 p90 为 160。",
+          "仍无法确认": "无法从这两张照片判断实际测量仪器的读数精度。"
+        },
+        {
+          "对象": "操作流程",
+          "图中实际看见": "流程图依次为“读波形 → 记时刻 → 求周期”，三个方框和连接箭头可辨。",
+          "测量提示": "流程图投影区域随纸面透视倾斜；中部书写与印刷线的边缘宽度代理中位数分别约为 1.03 和 1.27 像素。",
+          "仍无法确认": "边缘宽度受笔画形状、方向和对比度影响，不能单独据此确定手写墨迹需要调整多少模糊度。"
+        },
+        {
+          "对象": "波形示意图",
+          "图中实际看见": "第 1 页下方有约四个周期的波形，波形中心轴与附近纸线方向大体一致；局部图中未见明显的白色矩形边框或光晕。",
+          "测量提示": "该区域纸面亮度中位数为 181，低于上部区域；新增墨亮度下降的 p90 为 120。较暗纸面可能来自阴影、纸色或曝光，不能仅凭数值确定原因。",
+          "仍无法确认": "示意图没有时间刻度，不能单靠图形验证 0.5 s 和 2.5 s；具体时刻来自表格。"
+        },
+        {
+          "对象": "整体焦点与对比",
+          "图中实际看见": "上部文字和表格笔画较清晰，下部波形所在纸面较暗。可见的印刷线与手写笔画形状不同，不能直接把两者的边缘宽度等同为光学焦点。",
+          "测量提示": "印刷边缘采样状态为未发现明确的软化趋势；上、中、下部边缘宽度代理并不呈现一致的手写软化方向。",
+          "仍无法确认": "没有获得 review 视图，也没有同尺度的新旧候选对照，因此不能确认任一 photo_ink_light 或 photo_ink_focus 数值会带来净改善。"
+        }
+      ],
+      "expected": "保留当前两页稿件及其可见内容。没有执行新渲染，也没有修改原纸或新增墨层。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "decision_sha256": "696f786210dfec368e9fe3aac1bf9ae2cfe20b4f8e6b74a9ac7198e4b78d3267",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "f0fe2960a8dbd94bc7c4b88ce3d79eebd5b155f7a1cf47851df6834ee8af4487",
+      "image_sha256": [
+        "cc52e038932d750e247a225e5bbad37e1cda2eb8a489e12672f6d6a570f11e78",
+        "3d7c3d21b13a828fe10524258ab676d8f63ccc9fb413342b2099248e0876cde2",
+        "5a088d3417e052dfd74c395e0e016438da62c1a308687ef978b811ea67da34e2",
+        "5ae7d322b7ad2f1e7fe246453a3aa5bc332dbca265f8722a716f1d2b60d4603c",
+        "385cc4fa7d50be52c3736778cfe906c6095d8cf17d878a5e6f5e109f5d15b626",
+        "6906734d8148af11c6ee1fc4060bf682333e18279ec3c5648cd6ce867b5f4934",
+        "a15dc6ec4338f67fa9686e1c6066f08bd60e151ed2ba81dc401d38e79d553cce",
+        "861990c8a1ecef41cbdb072781a25672a529a4cd6290bd321dc375ce0e35722b"
+      ],
+      "usage": {
+        "input_tokens": 31814,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1201,
+        "reasoning_output_tokens": 77
+      }
+    },
+    "guide_version": "paper-homework/2",
+    "guide_sha256": "27e0a8fb6150345e172b8a77a277fd9caa136186b8e5ab0a5042920822cb6d42",
+    "task_id": "0892cc68-7ff3-4706-b2c5-5e711b9584d0",
+    "selected_revision": 1
+  },
+  "native_challenge": {
+    "initiator": "Operator after guided keep. An independent blinded model made the actual terminal choice.",
+    "mapping": {
+      "S7Q": 3,
+      "D5K": 1,
+      "W2L": 2
+    },
+    "settings": [
+      {
+        "photo_ink_light": 30,
+        "photo_ink_focus": {
+          "from": {
+            "x": 0.5,
+            "y": 0.15,
+            "sigma_px": 0.65
+          },
+          "to": {
+            "x": 0.5,
+            "y": 0.78,
+            "sigma_px": 0.0
+          }
+        }
+      },
+      {
+        "photo_ink_light": 95,
+        "photo_ink_focus": {
+          "from": {
+            "x": 0.5,
+            "y": 0.15,
+            "sigma_px": 1.9
+          },
+          "to": {
+            "x": 0.5,
+            "y": 0.78,
+            "sigma_px": 1.0
+          }
+        }
+      }
+    ],
+    "fresh_baseline_byte_equivalent": true,
+    "comparisons": {
+      "1": {
+        "native_pages": [
+          {
+            "page": 1,
+            "glyphs": 117,
+            "review_id": "dc3d6d6a-9bef-4f67-8332-0001c7609854",
+            "sha256": "cc52e038932d750e247a225e5bbad37e1cda2eb8a489e12672f6d6a570f11e78"
+          },
+          {
+            "page": 2,
+            "glyphs": 28,
+            "review_id": "e7515ab1-a453-49b9-acce-29db0c42747c",
+            "sha256": "3d7c3d21b13a828fe10524258ab676d8f63ccc9fb413342b2099248e0876cde2"
+          }
+        ],
+        "export": {
+          "sha256": "14ba49d2e7ebd61e7375bf0c59599b3c42115fdb135c1ea5de62fe6de650476a",
+          "pages": 2,
+          "revision": 1,
+          "native_review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 2,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "embedded_rgb_vs_preview": [
+            {
+              "width": 1440,
+              "height": 1920,
+              "rgb_equal": true
+            },
+            {
+              "width": 1440,
+              "height": 1920,
+              "rgb_equal": true
+            }
+          ]
+        },
+        "rendered_change": [
+          {
+            "page": 1,
+            "changed_rgb_pixels_vs_r1": 0,
+            "header_rows_0_210_changed": 0,
+            "paper_only_page_two_below_y500_changed": null
+          },
+          {
+            "page": 2,
+            "changed_rgb_pixels_vs_r1": 0,
+            "header_rows_0_210_changed": 0,
+            "paper_only_page_two_below_y500_changed": 0
+          }
+        ],
+        "native_roi_measurements": {
+          "upper_text": {
+            "page": 1,
+            "native_xyxy": [
+              195,
+              258,
+              930,
+              387
+            ],
+            "paper_luma_p25_p50_p75": [
+              204.0,
+              206.0,
+              207.0
+            ],
+            "ink_luma_drop_p90": 159.0,
+            "ink_pixel_count": 5558
+          },
+          "printed_table": {
+            "page": 1,
+            "native_xyxy": [
+              200,
+              402,
+              750,
+              622
+            ],
+            "paper_luma_p25_p50_p75": [
+              202.0,
+              204.0,
+              205.0
+            ],
+            "ink_luma_drop_p90": 153.0,
+            "ink_pixel_count": 12568
+          },
+          "equation": {
+            "page": 1,
+            "native_xyxy": [
+              140,
+              616,
+              810,
+              744
+            ],
+            "paper_luma_p25_p50_p75": [
+              198.0,
+              201.0,
+              203.0
+            ],
+            "ink_luma_drop_p90": 155.0,
+            "ink_pixel_count": 6002
+          },
+          "flowchart": {
+            "page": 1,
+            "native_xyxy": [
+              130,
+              776,
+              460,
+              1195
+            ],
+            "paper_luma_p25_p50_p75": [
+              194.0,
+              198.0,
+              200.0
+            ],
+            "ink_luma_drop_p90": 153.0,
+            "ink_pixel_count": 11964
+          },
+          "embedded_wave": {
+            "page": 1,
+            "native_xyxy": [
+              450,
+              1290,
+              1030,
+              1510
+            ],
+            "paper_luma_p25_p50_p75": [
+              178.0,
+              181.0,
+              183.0
+            ],
+            "ink_luma_drop_p90": 120.0,
+            "ink_pixel_count": 6216
+          },
+          "conclusion": {
+            "page": 2,
+            "native_xyxy": [
+              202,
+              250,
+              1240,
+              379
+            ],
+            "paper_luma_p25_p50_p75": [
+              203.0,
+              206.0,
+              207.0
+            ],
+            "ink_luma_drop_p90": 160.0,
+            "ink_pixel_count": 5265
+          }
+        }
+      },
+      "2": {
+        "native_pages": [
+          {
+            "page": 1,
+            "glyphs": 117,
+            "review_id": "cffbb16f-c854-40e6-a017-52579895d0e1",
+            "sha256": "df5ac6f4ddb5901b9b4ed4e00740859450b1e1f7f2658514ded5b3ec96b4473e"
+          },
+          {
+            "page": 2,
+            "glyphs": 28,
+            "review_id": "546bd765-fab2-47ab-a634-1594cf943d20",
+            "sha256": "3c26e35219b33439b3780f22a696152280102207f65853039c3112f6f6a7820c"
+          }
+        ],
+        "export": {
+          "sha256": "ace23283df519691ce2de69b97c35093df6b9bd2cdffea4a91d2d1e0635463b0",
+          "pages": 2,
+          "revision": 2,
+          "native_review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 2,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "embedded_rgb_vs_preview": [
+            {
+              "width": 1440,
+              "height": 1920,
+              "rgb_equal": true
+            },
+            {
+              "width": 1440,
+              "height": 1920,
+              "rgb_equal": true
+            }
+          ]
+        },
+        "rendered_change": [
+          {
+            "page": 1,
+            "changed_rgb_pixels_vs_r1": 81725,
+            "header_rows_0_210_changed": 0,
+            "paper_only_page_two_below_y500_changed": null
+          },
+          {
+            "page": 2,
+            "changed_rgb_pixels_vs_r1": 11477,
+            "header_rows_0_210_changed": 0,
+            "paper_only_page_two_below_y500_changed": 0
+          }
+        ],
+        "native_roi_measurements": {
+          "upper_text": {
+            "page": 1,
+            "native_xyxy": [
+              195,
+              258,
+              930,
+              387
+            ],
+            "paper_luma_p25_p50_p75": [
+              204.0,
+              206.0,
+              207.0
+            ],
+            "ink_luma_drop_p90": 134.0,
+            "ink_pixel_count": 7838
+          },
+          "printed_table": {
+            "page": 1,
+            "native_xyxy": [
+              200,
+              402,
+              750,
+              622
+            ],
+            "paper_luma_p25_p50_p75": [
+              202.0,
+              204.0,
+              205.0
+            ],
+            "ink_luma_drop_p90": 138.0,
+            "ink_pixel_count": 17142
+          },
+          "equation": {
+            "page": 1,
+            "native_xyxy": [
+              140,
+              616,
+              810,
+              744
+            ],
+            "paper_luma_p25_p50_p75": [
+              198.0,
+              201.0,
+              203.0
+            ],
+            "ink_luma_drop_p90": 150.0,
+            "ink_pixel_count": 6627
+          },
+          "flowchart": {
+            "page": 1,
+            "native_xyxy": [
+              130,
+              776,
+              460,
+              1195
+            ],
+            "paper_luma_p25_p50_p75": [
+              194.0,
+              198.0,
+              200.0
+            ],
+            "ink_luma_drop_p90": 155.0,
+            "ink_pixel_count": 12106
+          },
+          "embedded_wave": {
+            "page": 1,
+            "native_xyxy": [
+              450,
+              1290,
+              1030,
+              1510
+            ],
+            "paper_luma_p25_p50_p75": [
+              178.0,
+              181.0,
+              183.0
+            ],
+            "ink_luma_drop_p90": 124.0,
+            "ink_pixel_count": 6273
+          },
+          "conclusion": {
+            "page": 2,
+            "native_xyxy": [
+              202,
+              250,
+              1240,
+              379
+            ],
+            "paper_luma_p25_p50_p75": [
+              203.0,
+              206.0,
+              207.0
+            ],
+            "ink_luma_drop_p90": 134.0,
+            "ink_pixel_count": 7595
+          }
+        }
+      },
+      "3": {
+        "native_pages": [
+          {
+            "page": 1,
+            "glyphs": 117,
+            "review_id": "0a4bc9b6-3b8a-45fa-b098-51b726ce1da6",
+            "sha256": "92b407511942c8c370e402c237292914b48f044f9dc36b20462c34bfe2599a0d"
+          },
+          {
+            "page": 2,
+            "glyphs": 28,
+            "review_id": "a34a5f11-9bbd-4e5a-a83a-805d785b2e4a",
+            "sha256": "5c9d6043dd3bd905a0d8140ff401edd0f7eb29d120ad53c75a2af9be6a8a5897"
+          }
+        ],
+        "export": {
+          "sha256": "8f60ab8a744b8d67976c3d1cd51e9d050412dae68fdfbdc1ca48a58228454708",
+          "pages": 2,
+          "revision": 3,
+          "native_review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 2,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "embedded_rgb_vs_preview": [
+            {
+              "width": 1440,
+              "height": 1920,
+              "rgb_equal": true
+            },
+            {
+              "width": 1440,
+              "height": 1920,
+              "rgb_equal": true
+            }
+          ]
+        },
+        "rendered_change": [
+          {
+            "page": 1,
+            "changed_rgb_pixels_vs_r1": 163807,
+            "header_rows_0_210_changed": 0,
+            "paper_only_page_two_below_y500_changed": null
+          },
+          {
+            "page": 2,
+            "changed_rgb_pixels_vs_r1": 21163,
+            "header_rows_0_210_changed": 0,
+            "paper_only_page_two_below_y500_changed": 0
+          }
+        ],
+        "native_roi_measurements": {
+          "upper_text": {
+            "page": 1,
+            "native_xyxy": [
+              195,
+              258,
+              930,
+              387
+            ],
+            "paper_luma_p25_p50_p75": [
+              204.0,
+              206.0,
+              207.0
+            ],
+            "ink_luma_drop_p90": 92.0,
+            "ink_pixel_count": 11681
+          },
+          "printed_table": {
+            "page": 1,
+            "native_xyxy": [
+              200,
+              402,
+              750,
+              622
+            ],
+            "paper_luma_p25_p50_p75": [
+              202.0,
+              204.0,
+              205.0
+            ],
+            "ink_luma_drop_p90": 84.0,
+            "ink_pixel_count": 29007
+          },
+          "equation": {
+            "page": 1,
+            "native_xyxy": [
+              140,
+              616,
+              810,
+              744
+            ],
+            "paper_luma_p25_p50_p75": [
+              198.0,
+              201.0,
+              203.0
+            ],
+            "ink_luma_drop_p90": 93.0,
+            "ink_pixel_count": 12068
+          },
+          "flowchart": {
+            "page": 1,
+            "native_xyxy": [
+              130,
+              776,
+              460,
+              1195
+            ],
+            "paper_luma_p25_p50_p75": [
+              194.0,
+              198.0,
+              200.0
+            ],
+            "ink_luma_drop_p90": 106.0,
+            "ink_pixel_count": 21176
+          },
+          "embedded_wave": {
+            "page": 1,
+            "native_xyxy": [
+              450,
+              1290,
+              1030,
+              1510
+            ],
+            "paper_luma_p25_p50_p75": [
+              178.0,
+              181.0,
+              183.0
+            ],
+            "ink_luma_drop_p90": 116.0,
+            "ink_pixel_count": 7766
+          },
+          "conclusion": {
+            "page": 2,
+            "native_xyxy": [
+              202,
+              250,
+              1240,
+              379
+            ],
+            "paper_luma_p25_p50_p75": [
+              203.0,
+              206.0,
+              207.0
+            ],
+            "ink_luma_drop_p90": 88.0,
+            "ink_pixel_count": 11513
+          }
+        }
+      }
+    },
+    "selection": {
+      "guided_revision": 1,
+      "blind_verdict": {
+        "choice": "W2L",
+        "equivalent_codes": [],
+        "reason": "表格、带分母的周期计算、频率结论和操作流程均可读，波形示意完整；笔迹的柔和程度与周围纸面更协调。",
+        "observed_limitations": "波形示意图没有标注时间轴或过零点，部分笔画与纸张横线交叠。"
+      },
+      "selected_revision": 2,
+      "selected_pdf": {
+        "sha256": "ace23283df519691ce2de69b97c35093df6b9bd2cdffea4a91d2d1e0635463b0",
+        "pages": 2,
+        "revision": 2,
+        "native_review": {
+          "global_text_ink_zero": false,
+          "pages_with_evidence": 2,
+          "pages_with_visibility_flags": 0,
+          "pages_without_visibility_evidence": 0,
+          "unreviewed_pages": []
+        },
+        "embedded_rgb_vs_preview": [
+          {
+            "width": 1440,
+            "height": 1920,
+            "rgb_equal": true
+          },
+          {
+            "width": 1440,
+            "height": 1920,
+            "rgb_equal": true
+          }
+        ]
+      },
+      "model_receipt": {
+        "provider": "Codex CLI",
+        "decision_sha256": "7c7d7364034dcdf751142538725f82d1dce807d9d698b40e64eefb98db2df83c",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "b623c6ddaab4dad2ec698257ce4785b95fdad00a52071ead707bfa3265e39979",
+        "image_sha256": [
+          "92b407511942c8c370e402c237292914b48f044f9dc36b20462c34bfe2599a0d",
+          "5c9d6043dd3bd905a0d8140ff401edd0f7eb29d120ad53c75a2af9be6a8a5897",
+          "cc52e038932d750e247a225e5bbad37e1cda2eb8a489e12672f6d6a570f11e78",
+          "3d7c3d21b13a828fe10524258ab676d8f63ccc9fb413342b2099248e0876cde2",
+          "df5ac6f4ddb5901b9b4ed4e00740859450b1e1f7f2658514ded5b3ec96b4473e",
+          "3c26e35219b33439b3780f22a696152280102207f65853039c3112f6f6a7820c",
+          "091316f4032f6dda86bc342365ff1a8e997fdf4982edc7bf8f35685605c6620d",
+          "b3f42889bb37ce8206d9ad1d3f847dfeeeb04e70de8c7f733991e7534bc09d45",
+          "24bca5b4248d9e671ed11ebf2f4598fa0b0f5ed0a180d418c3c47bf2d3b4c688",
+          "ad189d3898265d3aa767d7a302db978d3956e3765de8847d2d6857b3740a756a",
+          "2b9515b1bab92ef524c688a2fa5a4e1f4936b23330396a73c161f5d8a920f30e",
+          "622b5c9816fb838eaa2a88f01b7ec84ad5b8cb458bd9cbe30df67c80a02e42ec"
+        ],
+        "usage": {
+          "input_tokens": 43150,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 157,
+          "reasoning_output_tokens": 62
+        }
+      },
+      "task_id": "75ab86be-8a3e-4930-8e08-a5ba45daaf41",
+      "binary_sha256": "d0677f47417e46e28282a8405235907c39965328ca74042aa920f2266e4fe78d"
+    },
+    "limitation": "Separate optical-only assessments of r1/r2 in both positions preferred r1. Assessors disagree. The three-way choice is the observed delivery choice, not evidence of a consistent optical gain."
+  },
+  "equation_controls": {
+    "scope": "Image-only formula row, four independent Terra contexts; omitted denominator and literal control are engineered, not natural renderer failure rates.",
+    "native_crop": [
+      120,
+      615,
+      1240,
+      738
+    ],
+    "results": [
+      {
+        "opaque_id": "J4R",
+        "condition": "literal_command",
+        "expected": "repair",
+        "equation_source": "`T = \\badfrac{2.5-0.5}{4} = 0.5 s`",
+        "image_sha256": "e7268734fd48a4973c154af3554183a4b819bf6c0946950fe9c306c843293fe2",
+        "source_sha256": "a65462e32a3443989af347eb660e8aa65bd0871ae2557979db2689f522fc6ef2",
+        "vote": {
+          "transcription": "T = \\badfrac{2.5 - 0.5}{4} = 0.5 s",
+          "decision": "repair",
+          "reason": "计算结果正确，但分式命令写成了 \\badfrac，分母未正确呈现；应改为 T = (2.5 - 0.5)/4 = 0.5 s。"
+        },
+        "receipt": {
+          "provider": "Codex CLI",
+          "decision_sha256": "eccc709df688690cca60485e4fa293db2407298906429e34606973a780fde5c9",
+          "model": "gpt-6.1-terra",
+          "reasoning_effort": "high",
+          "prompt_sha256": "f475954997b8397dccc3eef7a6f01839db45f343f8528a9f8a871b21196c754e",
+          "image_sha256": [
+            "e7268734fd48a4973c154af3554183a4b819bf6c0946950fe9c306c843293fe2"
+          ],
+          "usage": {
+            "input_tokens": 20493,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 190,
+            "reasoning_output_tokens": 104
+          }
+        }
+      },
+      {
+        "opaque_id": "M8D",
+        "condition": "valid_delta",
+        "expected": "accept",
+        "equation_source": "$$T=\\frac{2.5-0.5}{4}=0.5\\,\\mathrm{s}$$",
+        "image_sha256": "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a",
+        "source_sha256": "c3bcfa032bfed78785e944fd07c46ba4932e3f552978083c0268d48df8f4dbe2",
+        "vote": {
+          "transcription": "T = (2.5 - 0.5) / 4 = 0.5 s",
+          "decision": "accept",
+          "reason": "四个完整周期历时 2.0 s，平均周期为 2.0 ÷ 4 = 0.5 s，计算正确。"
+        },
+        "receipt": {
+          "provider": "Codex CLI",
+          "decision_sha256": "15def24f2a00b163bb68e96c688e0b387e6801e2652ad141ddadaae2532096b5",
+          "model": "gpt-6.1-terra",
+          "reasoning_effort": "high",
+          "prompt_sha256": "f475954997b8397dccc3eef7a6f01839db45f343f8528a9f8a871b21196c754e",
+          "image_sha256": [
+            "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a"
+          ],
+          "usage": {
+            "input_tokens": 20490,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 106,
+            "reasoning_output_tokens": 34
+          }
+        }
+      },
+      {
+        "opaque_id": "N2V",
+        "condition": "missing_denominator",
+        "expected": "repair",
+        "equation_source": "$$T=(2.5-0.5)=0.5\\,\\mathrm{s}$$",
+        "image_sha256": "3738e685954469088ed56dec892a90a0d1f631bf2d42c598df7d9472fc12e5fc",
+        "source_sha256": "ac0d1f3182385364df490c7db4ffa91834b18d154e6b74bffbc5dc4d498c986c",
+        "vote": {
+          "transcription": "T = (2.5 - 0.5) = 0.5 s",
+          "decision": "repair",
+          "reason": "测量时间跨越四个完整周期，计算式缺少分母 4。正确计算为 T = (2.5 - 0.5) / 4 = 0.5 s。"
+        },
+        "receipt": {
+          "provider": "Codex CLI",
+          "decision_sha256": "f0f72970a0c7fcd99fe107a912543c647026667260ad2465f82c010beacabc8c",
+          "model": "gpt-6.1-terra",
+          "reasoning_effort": "high",
+          "prompt_sha256": "f475954997b8397dccc3eef7a6f01839db45f343f8528a9f8a871b21196c754e",
+          "image_sha256": [
+            "3738e685954469088ed56dec892a90a0d1f631bf2d42c598df7d9472fc12e5fc"
+          ],
+          "usage": {
+            "input_tokens": 20495,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 145,
+            "reasoning_output_tokens": 65
+          }
+        }
+      },
+      {
+        "opaque_id": "K9T",
+        "condition": "valid_simplified",
+        "expected": "accept",
+        "equation_source": "$$T=\\frac{2.0}{4}=0.5\\,\\mathrm{s}$$",
+        "image_sha256": "b13e3a4fa7a671cc7c94499e961edfad284aadd811b1567e5005dacf9db4282c",
+        "source_sha256": "da565f71296fad95b1e62978f272ca55f0c0768288529fc6289d61982b873878",
+        "vote": {
+          "transcription": "T = 2.0/4 = 0.5 s",
+          "decision": "accept",
+          "reason": "四个完整周期的总时间为 2.5 − 0.5 = 2.0 s，因此周期为 2.0/4 = 0.5 s，计算正确。"
+        },
+        "receipt": {
+          "provider": "Codex CLI",
+          "decision_sha256": "baf202a68a1cc423d28c5fbdcbb8908f024d30076ee31640943c08acf6fc1001",
+          "model": "gpt-6.1-terra",
+          "reasoning_effort": "high",
+          "prompt_sha256": "f475954997b8397dccc3eef7a6f01839db45f343f8528a9f8a871b21196c754e",
+          "image_sha256": [
+            "b13e3a4fa7a671cc7c94499e961edfad284aadd811b1567e5005dacf9db4282c"
+          ],
+          "usage": {
+            "input_tokens": 20491,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 122,
+            "reasoning_output_tokens": 48
+          }
+        }
+      }
+    ],
+    "additional_real_math_command": {
+      "condition": "unsupported_command_in_display_math",
+      "opaque_id": "U8A",
+      "equation_source": "$$T=\\badfrac{2.5-0.5}{4}=0.5\\,\\mathrm{s}$$",
+      "source_sha256": "babb40f6d4aa55771046c865e8d07200b5d0992ddb7ea268a3b29704587a55a9",
+      "native_crop": [
+        120,
+        615,
+        1240,
+        738
+      ],
+      "prepared_sha256": "c2de082df1a8ad802b1ccff2973c61cfa40341e7f6dfb532059f94b13396469a",
+      "retained_command_in_prepared": true,
+      "worker_excerpt": "为 2.0 s，除以完整周期数，得到单周期时长。\n$$T=\\badfrac{2.5-0.5}{4}=0.5\\,\\mathrm{s}$$\n频率为每秒 2 个周期，即 2 Hz。\n测量",
+      "vote": {
+        "transcription": "$$T=\\badfrac{2.5-0.5}{4}=0.5\\,\\mathrm{s}$$",
+        "decision": "repair",
+        "reason": "周期计算结果 0.5 s 正确，但 \\badfrac 不是标准 LaTeX 命令，应改为 \\frac。"
+      },
+      "receipt": {
+        "provider": "Codex CLI",
+        "decision_sha256": "ee1752da4d079296f8ed3c8172696a04fa0775c6286aef42b5a6c5dc90fca5fc",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "f475954997b8397dccc3eef7a6f01839db45f343f8528a9f8a871b21196c754e",
+        "image_sha256": [
+          "07d37fefa4e7b6658382689d574859b6a0e80b8afafa84358e7fb7e2647f0cb0"
+        ],
+        "usage": {
+          "input_tokens": 20500,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 242,
+          "reasoning_output_tokens": 168
+        }
+      },
+      "image_sha256": "07d37fefa4e7b6658382689d574859b6a0e80b8afafa84358e7fb7e2647f0cb0"
+    }
+  },
+  "formula_repair": {
+    "scope": "Negative control draft forked by SQLite backup, exact pre-edit image hash verified. Only selected verified revision was exported in this repair task.",
+    "draft_id": "b83e6150-13d9-4e5d-9611-0822edc17de0",
+    "task_id": "6bad6976-c97b-489e-8cd1-8b1921efcd96",
+    "decisions": [
+      {
+        "action": "revise",
+        "decision_id": "6bad6976-c97b-489e-8cd1-8b1921efcd96/1",
+        "expected_step": 0,
+        "instruction": "Restore the divisor 4 in a native LaTeX fraction and inspect a fresh render before export.",
+        "reason": "测量时间跨越四个完整周期，计算式缺少分母 4。正确计算为 T = (2.5 - 0.5) / 4 = 0.5 s。",
+        "result_revision": 2,
+        "review_ids": [
+          "870bac65-bb6c-4c3b-a70b-811471740b4c",
+          "23263a1b-311f-4e92-9699-995d41d2b563"
+        ],
+        "revision": 1,
+        "task_id": "6bad6976-c97b-489e-8cd1-8b1921efcd96",
+        "tool": "save_section"
+      },
+      {
+        "action": "select",
+        "decision_id": "6bad6976-c97b-489e-8cd1-8b1921efcd96/2",
+        "expected_step": 1,
+        "instruction": null,
+        "reason": "两个时刻相差 2.0 s，包含四个完整周期，因此周期为 0.5 s，计算正确。",
+        "result_revision": null,
+        "review_ids": [
+          "0cc56391-6e5d-4893-b04a-5f184da91c53",
+          "d867adc1-79a1-479b-bdbd-94be5c13435b"
+        ],
+        "revision": 2,
+        "task_id": "6bad6976-c97b-489e-8cd1-8b1921efcd96",
+        "tool": null
+      }
+    ],
+    "pre_edit_vote": {
+      "transcription": "T = (2.5 - 0.5) = 0.5 s",
+      "decision": "repair",
+      "reason": "测量时间跨越四个完整周期，计算式缺少分母 4。正确计算为 T = (2.5 - 0.5) / 4 = 0.5 s。"
+    },
+    "pre_edit_sha256": "3738e685954469088ed56dec892a90a0d1f631bf2d42c598df7d9472fc12e5fc",
+    "post_edit_vote": {
+      "transcription": "T = (2.5 − 0.5) / 4 = 0.5 s",
+      "decision": "accept",
+      "reason": "两个时刻相差 2.0 s，包含四个完整周期，因此周期为 0.5 s，计算正确。"
+    },
+    "post_edit_receipt": {
+      "provider": "Codex CLI",
+      "decision_sha256": "1889958f25ff1716f2d9638c33db0e8a690e22b388ff1210ccc60f95ed8663cb",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "f475954997b8397dccc3eef7a6f01839db45f343f8528a9f8a871b21196c754e",
+      "image_sha256": [
+        "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a"
+      ],
+      "usage": {
+        "input_tokens": 20499,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 101,
+        "reasoning_output_tokens": 34
+      }
+    },
+    "post_edit_sha256": "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a",
+    "selected_pdf": {
+      "sha256": "14ba49d2e7ebd61e7375bf0c59599b3c42115fdb135c1ea5de62fe6de650476a",
+      "pages": 2,
+      "revision": 2,
+      "native_review": {
+        "global_text_ink_zero": false,
+        "pages_with_evidence": 2,
+        "pages_with_visibility_flags": 0,
+        "pages_without_visibility_evidence": 0,
+        "unreviewed_pages": []
+      },
+      "embedded_rgb_vs_preview": [
+        {
+          "width": 1440,
+          "height": 1920,
+          "rgb_equal": true
+        },
+        {
+          "width": 1440,
+          "height": 1920,
+          "rgb_equal": true
+        }
+      ]
+    }
+  },
+  "scope_note": "The supplemental genuine display-math unsupported command was added after the four seeded single-region evaluations; its prompt and native crop were the same. Each case has a separate fresh model context. Exact positive images repeat across repair and clean control. These are controls, not an estimate of population accuracy.",
+  "public_interior_assets": {
+    "selected-homework-interior.png": "c327306d7192d37ba8a9aa21392629c6ae2ed4c9604f1a05da2f3095428f3481",
+    "formula-interception.png": "5910ab6cc2434b162a7466912cc492d5262134b064b57331cff056c69c8b43b8",
+    "five-formula-controls.png": "e6ba839ddca4d55c313ffc8a1025e012ef169f595d891641d2bd72b866965f5f",
+    "formula-literal_command.png": "e7268734fd48a4973c154af3554183a4b819bf6c0946950fe9c306c843293fe2",
+    "formula-valid_delta.png": "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a",
+    "formula-missing_denominator.png": "3738e685954469088ed56dec892a90a0d1f631bf2d42c598df7d9472fc12e5fc",
+    "formula-valid_simplified.png": "b13e3a4fa7a671cc7c94499e961edfad284aadd811b1567e5005dacf9db4282c",
+    "formula-unsupported_command_in_display_math.png": "07d37fefa4e7b6658382689d574859b6a0e80b8afafa84358e7fb7e2647f0cb0"
+  }
+}

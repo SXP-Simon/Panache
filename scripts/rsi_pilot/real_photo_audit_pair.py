@@ -5,9 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-
 from codex_judge import run as judge
+from PIL import Image, ImageDraw, ImageFont
 from real_photo_audit_trial import CATEGORIES, card, read, save, scan_width, sha
 
 PAIR_PROMPT = """这两张图标记为 A 和 B，分别是同一真实练习纸上的两份手写稿，五个局部都裁自相同的原图坐标并保持原比例。只评价笔画深浅、边缘清晰度与当地纸上印线是否协调。请指出哪几个局部的变化能够直接看出，哪些局部没有可辨差异；若内容或位置改动妨碍对照则写明。在证据不足或变化无关紧要时可选 tie。不要推断哪个版本更晚。只返回 JSON：preferred 为 A、B 或 tie，reason 为具体可见证据，regions 为各局部的观察。不要使用工具或读取文件。"""

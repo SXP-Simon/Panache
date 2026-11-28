@@ -10,10 +10,9 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
-
-from paper_geometry import _pitch, _reference_y, load_labels
 from paper_detector import detect_guides
+from paper_geometry import _pitch, _reference_y, load_labels
+from PIL import Image
 
 
 def summarize(values):

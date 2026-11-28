@@ -1,0 +1,31 @@
+{
+  "photo_sha256": "67ae41d9486dac33eddce6014f33b8ae23c647384b9196a42c5492b2c90f64ea",
+  "binary_sha256": "25ff08f291dfe3f0f27ff11729e372c55b673b0455a50dc64249873370b3a3f6",
+  "style": {
+    "font": "李国夫手写体.ttf",
+    "font_size": 35,
+    "seed": 803,
+    "ink": "#6a4754"
+  },
+  "focus_gradient": {
+    "from": {
+      "x": 0.5,
+      "y": 0.12,
+      "sigma_px": 0.9
+    },
+    "to": {
+      "x": 0.5,
+      "y": 0.55,
+      "sigma_px": 0
+    }
+  },
+  "alignment": "tracked_rulings",
+  "scope": "Technical action footprint on separately generated writing. Counts are photo pixels, not grades of realism. Far = y < 30%, near = y >= 55%. Ink visibility requires a maximum RGB difference >8 vs native blank; focus change is any RGB difference vs initial.",
+  "visible_ink_far": 19574,
+  "visible_ink_near": 12436,
+  "changed_far": 40903,
+  "changed_near": 0,
+  "changed_top_200_rows": 0,
+  "light_75_changed_gt1": 68990,
+  "reset_rgb_exact": true
+}

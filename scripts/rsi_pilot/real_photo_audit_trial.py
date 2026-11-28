@@ -13,11 +13,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-
 from appearance import sample_profile
 from codex_judge import run as judge
 from paper_geometry import _reference_y, load_labels
+from PIL import Image, ImageDraw, ImageFont
 
 CATEGORIES = {
     "text": ((280, 305, 706, 389), [0, 12]),
