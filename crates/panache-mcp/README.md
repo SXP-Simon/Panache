@@ -227,6 +227,13 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 使用 Windows 上的 Python 客户端脚本时，若只有终端显示的中文乱码，可以将该客户端的标准输出和终端设为 UTF-8（例如向 Python 进程传入 `PYTHONIOENCODING=utf-8`）。
 
+### 原照中的墨色与焦点
+
+原纸按 `paper_mode=photo` 导入后，已追踪的纸线或用户指定的参考线会建立纸面到照片的坐标映射。在具备这项映射的稿件上，`describe_controls(group=ink)` 提供两个仅处理新增墨迹的选项。文字、公式、表格、流程图和已描线的位图轮廓共用这层墨。两项设置可单独放入 `tune_handwriting` 的 `changes`，可传 `null` 恢复原值。调整后按同一页、同一选区复查；保留足够清楚的笔迹。
+
+- `photo_ink_light` 取 0–100。数值越大，非零墨色通道越多地随脚下的纸色相乘。纯黑墨的色值仍为零。用邻近的实际纸纹、印迹和新增笔迹比较冷暖与反差，单凭该区变暗无法判定曝光。若边缘过硬，可分别试局部透明度或焦点。
+- `photo_ink_focus` 的 `from`、`to` 各给 `x`、`y`（整张原照的 0–1 坐标）和 `sigma_px`（0–2 个原照像素）。沿两点之间逐渐变焦，外侧维持对应端点的值。用原尺寸裁图判定远近清晰度，清晰端可保留 0。柔化发生在透视投影之后，纸面照片保持原样，PDF 与可见 PNG 共用同一处理。
+
 ## 验证
 
 构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF。
