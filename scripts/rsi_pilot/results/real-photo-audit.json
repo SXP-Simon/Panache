@@ -1,0 +1,337 @@
+{
+  "photo_sha256": "67ae41d9486dac33eddce6014f33b8ae23c647384b9196a42c5492b2c90f64ea",
+  "size": [
+    1440,
+    1920
+  ],
+  "source_identity": "byte-identical to pilot image-1",
+  "labels": "20 thin writable rulings, three checked x columns. Header and footer bars excluded.",
+  "geometry": {
+    "xs": [
+      317,
+      720,
+      1123
+    ],
+    "pitch_first_left_center_right_px": [
+      45,
+      40,
+      42
+    ],
+    "pitch_last_left_center_right_px": [
+      88,
+      90,
+      90
+    ],
+    "line_tilt_deg_first_middle_last": [
+      -3.762,
+      -3.691,
+      -2.557
+    ],
+    "center_minus_end_chord_px": {
+      "median": 0.75,
+      "p10": -2.1,
+      "p90": 3.05
+    },
+    "max_abs_chord_error_px": 3.5,
+    "detector_span_first_middle_last_px": [
+      962,
+      1157,
+      1404
+    ],
+    "span_limit": "Traced native pixel spans only. Foreground right edge is cropped; the last span is a lower bound."
+  },
+  "paper_max_min_median_Y_ratio": 1.261,
+  "paper_max_min_median_EV": 0.335,
+  "sampling": "3 x 3 strata. 13 neighborhoods per row around each checked column. Edge spread is the mean of both 20–80% flanks of a printed ruling measured vertically; local shoulder subtraction and >=5 luminance-unit depth required. Blank-paper luminance is measured 19–40% of a local pitch above each ruling. Percentiles cover valid sample taps. Bootstrap resamples marked rows within each stratum (2000 draws, fixed seed).",
+  "limits": "One processed JPEG. Relative linear-light Y assumes sRGB; absolute illuminance, shutter exposure, ISO, PSF, pen reflectance and independent scene-level uncertainty are unidentifiable. Printed line thickness, curvature, compression and resampling affect measured edges. Bootstrap intervals quantify row-sample variability on this photograph alone.",
+  "strata": {
+    "top_left": {
+      "edge_px": {
+        "median": 1.61,
+        "p10": 1.338,
+        "p90": 1.984
+      },
+      "contrast": {
+        "median": 55.121,
+        "p10": 43.149,
+        "p90": 89.876
+      },
+      "paper_luma8": {
+        "median": 206.772,
+        "p10": 204.772,
+        "p90": 207.071
+      },
+      "paper_Y_linear": {
+        "median": 0.623,
+        "p10": 0.61,
+        "p90": 0.624
+      },
+      "rows": 7,
+      "requested_taps": 91,
+      "valid_taps": 91,
+      "median_row_edge_px": 1.623,
+      "row_bootstrap_95_px": [
+        1.419,
+        1.808
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "top_center": {
+      "edge_px": {
+        "median": 1.464,
+        "p10": 1.292,
+        "p90": 3.367
+      },
+      "contrast": {
+        "median": 59.75,
+        "p10": 22.2,
+        "p90": 90.15
+      },
+      "paper_luma8": {
+        "median": 205.071,
+        "p10": 202.772,
+        "p90": 207.071
+      },
+      "paper_Y_linear": {
+        "median": 0.611,
+        "p10": 0.596,
+        "p90": 0.624
+      },
+      "rows": 7,
+      "requested_taps": 91,
+      "valid_taps": 91,
+      "median_row_edge_px": 1.452,
+      "row_bootstrap_95_px": [
+        1.363,
+        2.319
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "top_right": {
+      "edge_px": {
+        "median": 1.941,
+        "p10": 1.39,
+        "p90": 2.938
+      },
+      "contrast": {
+        "median": 44.229,
+        "p10": 36.2,
+        "p90": 83.5
+      },
+      "paper_luma8": {
+        "median": 205.571,
+        "p10": 202.772,
+        "p90": 207.071
+      },
+      "paper_Y_linear": {
+        "median": 0.614,
+        "p10": 0.596,
+        "p90": 0.624
+      },
+      "rows": 7,
+      "requested_taps": 91,
+      "valid_taps": 91,
+      "median_row_edge_px": 1.962,
+      "row_bootstrap_95_px": [
+        1.494,
+        2.652
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "middle_left": {
+      "edge_px": {
+        "median": 1.319,
+        "p10": 1.219,
+        "p90": 1.4
+      },
+      "contrast": {
+        "median": 107.1,
+        "p10": 96.68,
+        "p90": 118.6
+      },
+      "paper_luma8": {
+        "median": 202.0,
+        "p10": 198.0,
+        "p90": 204.0
+      },
+      "paper_Y_linear": {
+        "median": 0.591,
+        "p10": 0.565,
+        "p90": 0.604
+      },
+      "rows": 7,
+      "requested_taps": 91,
+      "valid_taps": 91,
+      "median_row_edge_px": 1.336,
+      "row_bootstrap_95_px": [
+        1.263,
+        1.348
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "middle_center": {
+      "edge_px": {
+        "median": 1.239,
+        "p10": 1.065,
+        "p90": 1.338
+      },
+      "contrast": {
+        "median": 102.55,
+        "p10": 95.72,
+        "p90": 106.6
+      },
+      "paper_luma8": {
+        "median": 196.0,
+        "p10": 191.0,
+        "p90": 200.772
+      },
+      "paper_Y_linear": {
+        "median": 0.552,
+        "p10": 0.521,
+        "p90": 0.583
+      },
+      "rows": 7,
+      "requested_taps": 91,
+      "valid_taps": 91,
+      "median_row_edge_px": 1.233,
+      "row_bootstrap_95_px": [
+        1.194,
+        1.291
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "middle_right": {
+      "edge_px": {
+        "median": 1.355,
+        "p10": 1.185,
+        "p90": 1.451
+      },
+      "contrast": {
+        "median": 108.4,
+        "p10": 93.504,
+        "p90": 118.107
+      },
+      "paper_luma8": {
+        "median": 199.0,
+        "p10": 195.0,
+        "p90": 201.772
+      },
+      "paper_Y_linear": {
+        "median": 0.571,
+        "p10": 0.546,
+        "p90": 0.59
+      },
+      "rows": 7,
+      "requested_taps": 91,
+      "valid_taps": 91,
+      "median_row_edge_px": 1.357,
+      "row_bootstrap_95_px": [
+        1.258,
+        1.38
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "bottom_left": {
+      "edge_px": {
+        "median": 1.288,
+        "p10": 1.091,
+        "p90": 1.391
+      },
+      "contrast": {
+        "median": 108.872,
+        "p10": 105.26,
+        "p90": 112.83
+      },
+      "paper_luma8": {
+        "median": 193.0,
+        "p10": 188.288,
+        "p90": 197.0
+      },
+      "paper_Y_linear": {
+        "median": 0.533,
+        "p10": 0.506,
+        "p90": 0.558
+      },
+      "rows": 6,
+      "requested_taps": 78,
+      "valid_taps": 78,
+      "median_row_edge_px": 1.29,
+      "row_bootstrap_95_px": [
+        1.164,
+        1.35
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "bottom_center": {
+      "edge_px": {
+        "median": 1.174,
+        "p10": 0.962,
+        "p90": 1.295
+      },
+      "contrast": {
+        "median": 101.818,
+        "p10": 99.629,
+        "p90": 104.159
+      },
+      "paper_luma8": {
+        "median": 186.288,
+        "p10": 180.288,
+        "p90": 188.0
+      },
+      "paper_Y_linear": {
+        "median": 0.494,
+        "p10": 0.459,
+        "p90": 0.503
+      },
+      "rows": 6,
+      "requested_taps": 78,
+      "valid_taps": 78,
+      "median_row_edge_px": 1.184,
+      "row_bootstrap_95_px": [
+        1.096,
+        1.234
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    },
+    "bottom_right": {
+      "edge_px": {
+        "median": 1.211,
+        "p10": 1.052,
+        "p90": 1.341
+      },
+      "contrast": {
+        "median": 108.107,
+        "p10": 104.553,
+        "p90": 113.945
+      },
+      "paper_luma8": {
+        "median": 187.0,
+        "p10": 182.288,
+        "p90": 192.0
+      },
+      "paper_Y_linear": {
+        "median": 0.497,
+        "p10": 0.471,
+        "p90": 0.527
+      },
+      "rows": 6,
+      "requested_taps": 78,
+      "valid_taps": 78,
+      "median_row_edge_px": 1.183,
+      "row_bootstrap_95_px": [
+        1.125,
+        1.3
+      ],
+      "max_near_white_channel_fraction": 0.0,
+      "max_near_black_channel_fraction": 0.0
+    }
+  }
+}

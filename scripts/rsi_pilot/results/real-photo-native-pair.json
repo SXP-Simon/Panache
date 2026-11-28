@@ -1,0 +1,183 @@
+{
+  "scope": "Blinded two-position optical-only comparison of actual native MCP pages. Each optical grade is model evidence, not human approval.",
+  "page_sha256": {
+    "before": "cc52e038932d750e247a225e5bbad37e1cda2eb8a489e12672f6d6a570f11e78",
+    "after": "df5ac6f4ddb5901b9b4ed4e00740859450b1e1f7f2658514ded5b3ec96b4473e",
+    "paper": "825ad396c4d9a071a58751726e4b3d5ce1dacb036b935b326e3a5132b2a4351f"
+  },
+  "windows": {
+    "text": {
+      "all_rgb_pixels": 35784,
+      "changed_ge_3": 8762,
+      "changed_ge_12": 5876,
+      "brightened_ge_3": 3369,
+      "darkened_ge_3": 5352,
+      "paper_background_changed_ge_12_without_detected_ink": 0,
+      "before": {
+        "stroke_peaks": 726,
+        "median_20_80_px": 0.937,
+        "ink_pixels_gt10": 5392,
+        "p90_ink_drop": 159.0
+      },
+      "after": {
+        "stroke_peaks": 716,
+        "median_20_80_px": 1.264,
+        "ink_pixels_gt10": 7702,
+        "p90_ink_drop": 133.0
+      }
+    },
+    "fraction": {
+      "all_rgb_pixels": 21675,
+      "changed_ge_3": 1789,
+      "changed_ge_12": 247,
+      "brightened_ge_3": 581,
+      "darkened_ge_3": 1188,
+      "paper_background_changed_ge_12_without_detected_ink": 0,
+      "before": {
+        "stroke_peaks": 159,
+        "median_20_80_px": 0.969,
+        "ink_pixels_gt10": 1253,
+        "p90_ink_drop": 157.0
+      },
+      "after": {
+        "stroke_peaks": 158,
+        "median_20_80_px": 1.106,
+        "ink_pixels_gt10": 1434,
+        "p90_ink_drop": 146.0
+      }
+    },
+    "table": {
+      "all_rgb_pixels": 75702,
+      "changed_ge_3": 14614,
+      "changed_ge_12": 7334,
+      "brightened_ge_3": 5138,
+      "darkened_ge_3": 9329,
+      "paper_background_changed_ge_12_without_detected_ink": 0,
+      "before": {
+        "stroke_peaks": 1206,
+        "median_20_80_px": 0.859,
+        "ink_pixels_gt10": 8753,
+        "p90_ink_drop": 152.0
+      },
+      "after": {
+        "stroke_peaks": 1209,
+        "median_20_80_px": 0.994,
+        "ink_pixels_gt10": 12612,
+        "p90_ink_drop": 132.0
+      }
+    },
+    "flow": {
+      "all_rgb_pixels": 89040,
+      "changed_ge_3": 5623,
+      "changed_ge_12": 0,
+      "brightened_ge_3": 1,
+      "darkened_ge_3": 5229,
+      "paper_background_changed_ge_12_without_detected_ink": 0,
+      "before": {
+        "stroke_peaks": 859,
+        "median_20_80_px": 1.034,
+        "ink_pixels_gt10": 9503,
+        "p90_ink_drop": 153.0
+      },
+      "after": {
+        "stroke_peaks": 859,
+        "median_20_80_px": 1.037,
+        "ink_pixels_gt10": 9564,
+        "p90_ink_drop": 156.0
+      }
+    },
+    "raster": {
+      "all_rgb_pixels": 66654,
+      "changed_ge_3": 4431,
+      "changed_ge_12": 0,
+      "brightened_ge_3": 0,
+      "darkened_ge_3": 4077,
+      "paper_background_changed_ge_12_without_detected_ink": 0,
+      "before": {
+        "stroke_peaks": 347,
+        "median_20_80_px": 1.757,
+        "ink_pixels_gt10": 6271,
+        "p90_ink_drop": 120.0
+      },
+      "after": {
+        "stroke_peaks": 347,
+        "median_20_80_px": 1.769,
+        "ink_pixels_gt10": 6340,
+        "p90_ink_drop": 124.0
+      }
+    }
+  },
+  "blind_ballots": [
+    {
+      "labels": {
+        "A": "before",
+        "B": "after"
+      },
+      "decision": {
+        "preferred": "A",
+        "reason": "数据表局部中，A 的手写笔画和表格边缘略清晰；B 的笔画略柔，纸上印线相对更明显。其余局部没有可辨的笔画或清晰度差异。",
+        "regions": {
+          "正文": "未见可辨差异。",
+          "分式": "未见可辨差异。",
+          "数据表": "A 的文字和表格边缘略清晰，B 略柔，纸上印线相对更明显。",
+          "流程图": "未见可辨差异。",
+          "插入的波形草图": "未见可辨差异。"
+        }
+      },
+      "receipt": {
+        "provider": "Codex CLI",
+        "decision_sha256": "ca8a098a0dc06edfa53afcedbff442a947aa5053c8c1b5a545defc14c0c13bed",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "c6013bd4dcf2e39d5955985ff21fa22eb682cf8dea6752ad70af633329047399",
+        "image_sha256": [
+          "3bd69ee7e52eb00b37c5b5b9beeb3d70f988605aac8269b5a7d0a527f13f9ff4",
+          "6b56081b0e9c5ed82929e18f39a7a30c434531c8ba37516a7295cbf4ecc414ad"
+        ],
+        "usage": {
+          "input_tokens": 21836,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 239,
+          "reasoning_output_tokens": 91
+        }
+      }
+    },
+    {
+      "labels": {
+        "A": "after",
+        "B": "before"
+      },
+      "decision": {
+        "preferred": "B",
+        "reason": "B 的正文和数据表中的手写笔画边缘更清晰，深浅与周围印线协调；其余局部没有可辨的差异。未见内容或位置改动妨碍对照。",
+        "regions": {
+          "正文": "B 的手写笔画边缘更清晰，A 略显模糊。",
+          "分数": "未见可辨差异，笔画深浅和清晰度相近。",
+          "数据表": "B 的文字和表格线更清晰，A 略显模糊。",
+          "流程图": "未见可辨差异，方框、箭头和文字的深浅及清晰度相近。",
+          "波形草图": "未见可辨差异，波形笔画与纸上印线的协调程度相近。"
+        }
+      },
+      "receipt": {
+        "provider": "Codex CLI",
+        "decision_sha256": "c37cc180cdddacc3b2ea34a399ec56afe7533e0e52179129568fef329131160d",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "c6013bd4dcf2e39d5955985ff21fa22eb682cf8dea6752ad70af633329047399",
+        "image_sha256": [
+          "8d533ef057554866f1b846ac3396b6ede20851d2733b84334ff9040103a7c024",
+          "cdbb8c500c40bacd5d7941485c1f1903d77417123a0d31b561a9f302a19ba790"
+        ],
+        "usage": {
+          "input_tokens": 21836,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 277,
+          "reasoning_output_tokens": 65
+        }
+      }
+    }
+  ],
+  "asset": "native-before-after.png"
+}
