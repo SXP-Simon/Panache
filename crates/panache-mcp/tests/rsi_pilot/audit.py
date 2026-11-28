@@ -15,7 +15,6 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-
 ARMS = ("A", "B", "C")
 VERDICTS = {"pass", "rework", "uncertain"}
 INSTRUCTIONS = """独立验收。每道题仅对照其中的用户要求和成稿。先看 overview，再打开原尺寸页或局部。
@@ -32,7 +31,9 @@ def load(path):
 
 
 def save(path, data):
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def source_pages(base, render):
@@ -66,12 +67,18 @@ def write_packet(path, intent, pages):
         # Also ship three unscaled, lossless windows from each page. Full PNGs
         # let the assessor inspect other positions regardless of these windows.
         width, height = page.size
-        for location, fx, fy in (("upper", .32, .28), ("middle", .56, .53), ("lower", .62, .78)):
+        for location, fx, fy in (
+            ("upper", 0.32, 0.28),
+            ("middle", 0.56, 0.53),
+            ("lower", 0.62, 0.78),
+        ):
             cw, ch = min(500, width), min(200, height)
             x = min(max(0, int(width * fx) - cw // 2), width - cw)
             y = min(max(0, int(height * fy) - ch // 2), height - ch)
             page.crop((x, y, x + cw, y + ch)).save(path / f"page-{i}-{location}.png")
-    overview = Image.new("RGB", (sum(t.width for t in thumbs), max(t.height for t in thumbs)), "white")
+    overview = Image.new(
+        "RGB", (sum(t.width for t in thumbs), max(t.height for t in thumbs)), "white"
+    )
     left = 0
     for thumb in thumbs:
         overview.paste(thumb, (left, 0))
@@ -104,9 +111,18 @@ def prepare(manifest, out, seed):
                 code = f"P{rng.randrange(100000, 999999)}"
             by_pixels[group] = code
             write_packet(blind / code, case["intent"], pages)
-        keys.append({"case": case["id"], "split": case["split"], "family": case["family"],
-                     "arm": arm, "id": by_pixels[group], "pixels": fingerprint,
-                     "pages": len(pages), "decision": result["decision"]})
+        keys.append(
+            {
+                "case": case["id"],
+                "split": case["split"],
+                "family": case["family"],
+                "arm": arm,
+                "id": by_pixels[group],
+                "pixels": fingerprint,
+                "pages": len(pages),
+                "decision": result["decision"],
+            }
+        )
     save(out / "private-key.json", keys)
 
 
@@ -115,9 +131,12 @@ def score(key, ballot, out):
     if set(votes) != {row["id"] for row in entries}:
         raise ValueError("ballot IDs must exactly match the rendered packets")
     for vote in votes.values():
-        if (vote["verdict"] not in VERDICTS or type(vote["severe"]) is not bool
-                or (vote["severe"] and vote["verdict"] != "rework")
-                or not vote["reason"].strip()):
+        if (
+            vote["verdict"] not in VERDICTS
+            or type(vote["severe"]) is not bool
+            or (vote["severe"] and vote["verdict"] != "rework")
+            or not vote["reason"].strip()
+        ):
             raise ValueError(f"invalid vote: {vote}")
     rows = [row | votes[row["id"]] for row in entries]
     counts = {}
@@ -126,12 +145,17 @@ def score(key, ballot, out):
         for arm in ARMS:
             group = [r for r in rows if (r["split"], r["arm"]) == (split, arm)]
             counts[split][arm] = {
-                "tasks": len(group), "families": len({r["family"] for r in group}),
+                "tasks": len(group),
+                "families": len({r["family"] for r in group}),
                 "pages": sum(r["pages"] for r in group),
                 "verdicts": dict(Counter(r["verdict"] for r in group)),
                 "delivered": sum(r["decision"] == "deliver" for r in group),
-                "severe_delivered": sum(r["decision"] == "deliver" and r["severe"] for r in group),
-                "usable_delivered": sum(r["decision"] == "deliver" and r["verdict"] == "pass" for r in group),
+                "severe_delivered": sum(
+                    r["decision"] == "deliver" and r["severe"] for r in group
+                ),
+                "usable_delivered": sum(
+                    r["decision"] == "deliver" and r["verdict"] == "pass" for r in group
+                ),
             }
     save(out, {"rows": rows, "counts": counts})
 

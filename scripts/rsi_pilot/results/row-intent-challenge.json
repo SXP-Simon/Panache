@@ -1,0 +1,323 @@
+{
+  "scope": "Post-run evaluator regression, designed after the grid ambiguity. The actor never sees this sheet. The pair demonstrates a distinction, not a performance estimate.",
+  "threshold_abs_p90_rows": 0.25,
+  "shared_blank_rgb_sha256": "af0c387d5311f4ca1e130fc44ff38e6ab8b62e9b7983e3492a1b07cf43549192",
+  "shared_final_rgb_sha256": "f8b5d2a831826cdfba1bdc128fde3e4317b0ddeab4cad07e9b714e4269df0617",
+  "paired_cases": [
+    {
+      "case": "paragraph_gap",
+      "instruction": "Write two readings on the sheet. A blank line between readings is allowed.",
+      "expected": "pass",
+      "indexed_p90_abs_rows": 1.0054124269322364,
+      "nearest_p90_abs_rows": 0.010435159125351713,
+      "unused_interior_rows": [
+        1
+      ],
+      "required_assignments": [],
+      "visible_glyphs": 14,
+      "indexed_rule": "review",
+      "intent_aware_rule": "pass"
+    },
+    {
+      "case": "named_row",
+      "instruction": "Write the first reading on the first ruling and the second on the second ruling.",
+      "expected": "review",
+      "indexed_p90_abs_rows": 1.0054124269322364,
+      "nearest_p90_abs_rows": 0.010435159125351713,
+      "unused_interior_rows": [
+        1
+      ],
+      "required_assignments": [
+        {
+          "source_line": 0,
+          "required_physical_row": 0,
+          "p90_abs_rows": 0.009720718770296573,
+          "glyphs_on_requested_ruling": 7,
+          "measured_glyphs": 7
+        },
+        {
+          "source_line": 1,
+          "required_physical_row": 1,
+          "p90_abs_rows": 1.0080969906906256,
+          "glyphs_on_requested_ruling": 0,
+          "measured_glyphs": 7
+        }
+      ],
+      "visible_glyphs": 14,
+      "indexed_rule": "review",
+      "intent_aware_rule": "review"
+    }
+  ],
+  "native_grid_diagnostic": {
+    "snapshot_revision": "2",
+    "page_sequence": [
+      {
+        "section": 1,
+        "observed_pages": [
+          1
+        ],
+        "missing_page_numbers": [],
+        "duplicate_page_numbers": []
+      },
+      {
+        "section": 2,
+        "observed_pages": [
+          1
+        ],
+        "missing_page_numbers": [],
+        "duplicate_page_numbers": []
+      }
+    ],
+    "pages": [
+      {
+        "section": 1,
+        "page": 1,
+        "png_sha256": "d0d59b2f84d6b4dd51f573f86ac9176898dad84de0ff84d43a57eff340794a97",
+        "archived_indexed_p90_abs_rows": 3.0744360009942486,
+        "matched_physical_rulings": {
+          "eligible_glyphs": 183,
+          "measured_glyphs": 183,
+          "nearest_median_abs_rows": 0.006850879196163509,
+          "nearest_p90_abs_rows": 0.01416330214221264,
+          "occupied_physical_rows": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            6,
+            8,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "interior_unused_rows": [
+            5,
+            7,
+            9
+          ],
+          "unoccupied_leading_rows": 0,
+          "unoccupied_trailing_rows": 3,
+          "nonincreasing_line_transitions": 0,
+          "source_row_assignments": [
+            {
+              "source_line": 0,
+              "dominant_physical_row": 0,
+              "agreeing_glyphs": 10,
+              "measured_glyphs": 10
+            },
+            {
+              "source_line": 1,
+              "dominant_physical_row": 1,
+              "agreeing_glyphs": 19,
+              "measured_glyphs": 19
+            },
+            {
+              "source_line": 2,
+              "dominant_physical_row": 2,
+              "agreeing_glyphs": 10,
+              "measured_glyphs": 10
+            },
+            {
+              "source_line": 3,
+              "dominant_physical_row": 3,
+              "agreeing_glyphs": 15,
+              "measured_glyphs": 15
+            },
+            {
+              "source_line": 4,
+              "dominant_physical_row": 4,
+              "agreeing_glyphs": 14,
+              "measured_glyphs": 14
+            },
+            {
+              "source_line": 5,
+              "dominant_physical_row": 6,
+              "agreeing_glyphs": 17,
+              "measured_glyphs": 17
+            },
+            {
+              "source_line": 6,
+              "dominant_physical_row": 8,
+              "agreeing_glyphs": 17,
+              "measured_glyphs": 17
+            },
+            {
+              "source_line": 7,
+              "dominant_physical_row": 10,
+              "agreeing_glyphs": 21,
+              "measured_glyphs": 21
+            },
+            {
+              "source_line": 8,
+              "dominant_physical_row": 11,
+              "agreeing_glyphs": 9,
+              "measured_glyphs": 9
+            },
+            {
+              "source_line": 9,
+              "dominant_physical_row": 12,
+              "agreeing_glyphs": 22,
+              "measured_glyphs": 22
+            },
+            {
+              "source_line": 10,
+              "dominant_physical_row": 13,
+              "agreeing_glyphs": 2,
+              "measured_glyphs": 2
+            },
+            {
+              "source_line": 11,
+              "dominant_physical_row": 14,
+              "agreeing_glyphs": 19,
+              "measured_glyphs": 19
+            },
+            {
+              "source_line": 12,
+              "dominant_physical_row": 15,
+              "agreeing_glyphs": 8,
+              "measured_glyphs": 8
+            }
+          ],
+          "required_assignments": [],
+          "nearest_raster": {
+            "glyphs_with_visible_ink": 183,
+            "median_ink_bottom_signed_rows": 0.08828563629095117,
+            "mean_ink_outside_row_fraction": 0.007399874531299359,
+            "outside_quad_changed_fraction": 0.0,
+            "darkening_threshold_8bit": 12
+          }
+        }
+      },
+      {
+        "section": 2,
+        "page": 1,
+        "png_sha256": "caf48f3487ff16948571f3ce2959fdb5b5b256a5fbdf75a8892d846f85ebde9c",
+        "archived_indexed_p90_abs_rows": 0.014221799554758583,
+        "matched_physical_rulings": {
+          "eligible_glyphs": 191,
+          "measured_glyphs": 191,
+          "nearest_median_abs_rows": 0.006363180718690911,
+          "nearest_p90_abs_rows": 0.014221799554758583,
+          "occupied_physical_rows": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "interior_unused_rows": [],
+          "unoccupied_leading_rows": 0,
+          "unoccupied_trailing_rows": 5,
+          "nonincreasing_line_transitions": 0,
+          "source_row_assignments": [
+            {
+              "source_line": 0,
+              "dominant_physical_row": 0,
+              "agreeing_glyphs": 11,
+              "measured_glyphs": 11
+            },
+            {
+              "source_line": 1,
+              "dominant_physical_row": 1,
+              "agreeing_glyphs": 17,
+              "measured_glyphs": 17
+            },
+            {
+              "source_line": 2,
+              "dominant_physical_row": 2,
+              "agreeing_glyphs": 6,
+              "measured_glyphs": 6
+            },
+            {
+              "source_line": 3,
+              "dominant_physical_row": 3,
+              "agreeing_glyphs": 26,
+              "measured_glyphs": 26
+            },
+            {
+              "source_line": 4,
+              "dominant_physical_row": 4,
+              "agreeing_glyphs": 17,
+              "measured_glyphs": 17
+            },
+            {
+              "source_line": 5,
+              "dominant_physical_row": 5,
+              "agreeing_glyphs": 6,
+              "measured_glyphs": 6
+            },
+            {
+              "source_line": 6,
+              "dominant_physical_row": 6,
+              "agreeing_glyphs": 21,
+              "measured_glyphs": 21
+            },
+            {
+              "source_line": 7,
+              "dominant_physical_row": 7,
+              "agreeing_glyphs": 10,
+              "measured_glyphs": 10
+            },
+            {
+              "source_line": 8,
+              "dominant_physical_row": 8,
+              "agreeing_glyphs": 16,
+              "measured_glyphs": 16
+            },
+            {
+              "source_line": 9,
+              "dominant_physical_row": 9,
+              "agreeing_glyphs": 6,
+              "measured_glyphs": 6
+            },
+            {
+              "source_line": 10,
+              "dominant_physical_row": 10,
+              "agreeing_glyphs": 18,
+              "measured_glyphs": 18
+            },
+            {
+              "source_line": 11,
+              "dominant_physical_row": 11,
+              "agreeing_glyphs": 10,
+              "measured_glyphs": 10
+            },
+            {
+              "source_line": 12,
+              "dominant_physical_row": 12,
+              "agreeing_glyphs": 15,
+              "measured_glyphs": 15
+            },
+            {
+              "source_line": 13,
+              "dominant_physical_row": 13,
+              "agreeing_glyphs": 12,
+              "measured_glyphs": 12
+            }
+          ],
+          "required_assignments": [],
+          "nearest_raster": {
+            "glyphs_with_visible_ink": 191,
+            "median_ink_bottom_signed_rows": 0.10527397260273964,
+            "mean_ink_outside_row_fraction": 0.010723043570185978,
+            "outside_quad_changed_fraction": 0.0,
+            "darkening_threshold_8bit": 12
+          }
+        }
+      }
+    ]
+  }
+}

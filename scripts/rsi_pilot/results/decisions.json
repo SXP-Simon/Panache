@@ -1,0 +1,986 @@
+{
+  "episodes": [
+    {
+      "paper": "image-1",
+      "arm": "D",
+      "task_id": "f0aaad6b-58de-4cdc-8626-b664c1aee62f",
+      "policy": "pilot-v1",
+      "terminal": "select",
+      "selected": 2,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "reason": "整页图中的公式和数值过小，现有细节图又截断了多行内容，无法可靠判断可辨性及文字与横线的贴合程度。",
+            "expected": "取得左页完整书写区域的原生裁剪，以复核公式、数值和行线对齐；之后还需检查右页。",
+            "tool": "native_crop",
+            "arguments": {
+              "section": "左页书写区域",
+              "box": [
+                0.04,
+                0.1,
+                0.48,
+                0.39
+              ]
+            }
+          },
+          "source_sha256": "eef1234021dcc133a474e146b7515655cc55d77f01b1351d2332e135c330f7d7",
+          "decision_id": "f0aaad6b-58de-4cdc-8626-b664c1aee62f/1",
+          "model": "gpt-6.1-terra"
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "reason": "第一页面的原尺寸裁图显示文字和公式有一定辨识度，但尚缺第二页的原尺寸证据，无法判断其公式、数值和对线情况。",
+            "expected": "检查第二页文字是否沿实际横线书写，以及公式、数值能否辨认。",
+            "tool": "native_crop",
+            "arguments": {
+              "page": 2,
+              "section": "第二页作业内容",
+              "box": [
+                0.08,
+                0.1,
+                0.92,
+                0.42
+              ]
+            }
+          },
+          "source_sha256": "93d3602aba2e0182c4fff5c44eeb1d7a5e6118999d78b1f47ea5944fe6d1e2f3",
+          "decision_id": "f0aaad6b-58de-4cdc-8626-b664c1aee62f/2",
+          "model": "gpt-6.1-terra"
+        },
+        {
+          "step": 3,
+          "revision": 2,
+          "raw": {
+            "action": "select",
+            "reason": "两节原尺寸裁图显示字迹基本沿实际横线排列，公式和关键数值可辨，墨色与原照片协调，整页效果也自然。",
+            "expected": "交付当前版本，两页作业内容清晰且与照片融合。",
+            "tool": null,
+            "arguments": {
+              "version": "current"
+            }
+          },
+          "source_sha256": "1f6d5c96156e0c562957b0a1d98685a895a00a91d3dbbec774d4b9e6a59a6dfe",
+          "decision_id": "f0aaad6b-58de-4cdc-8626-b664c1aee62f/3",
+          "model": "gpt-6.1-terra"
+        }
+      ]
+    },
+    {
+      "paper": "image-2",
+      "arm": "B",
+      "task_id": "60e621fe-ae9a-4bfd-bccb-8534a21878cf",
+      "policy": "pilot-v1",
+      "terminal": "select",
+      "selected": 3,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "detect_guides",
+            "arguments": {},
+            "reason": "两页手写内容有多处偏离横线，细节图中部分笔画跨过横线；需要先测定原纸横线位置，才能针对性调整。",
+            "expected": "获得两页原纸可写横线的坐标，用于后续对齐，同时保留原稿文字和底纸。"
+          },
+          "source_sha256": "bb85760902e069d7e5ce10df38694f28ed187c7974c51bf525d14d1cea41444d",
+          "decision_id": "60e621fe-ae9a-4bfd-bccb-8534a21878cf/1",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "3577b4696ac0b2b84c6ee7c58a7b98dc292405511229afa6f135460ba16b652f",
+            "image_sha256": [
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475"
+            ],
+            "usage": {
+              "input_tokens": 22685,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 133,
+              "reasoning_output_tokens": 36
+            }
+          }
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {}
+            },
+            "reason": "整页图中两页正文的部分行跨越印刷横线，细节图还显示左侧文字接近姓名栏边界。已检测到原纸横线坐标，可先用这些坐标调整行位置，再检查文字与栏框的关系。",
+            "expected": "正文沿原纸横线排列，保留两页原稿文字、公式和底纸，便于检查是否仍有遮挡。"
+          },
+          "source_sha256": "e575314f238ceab2b13c9a7bcfb4c1b9fd64f5d5ac1f2245d8b9b692534f4426",
+          "result_revision": 3,
+          "decision_id": "60e621fe-ae9a-4bfd-bccb-8534a21878cf/2",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "5a1470dc8cc3e1b763e4e775f2d438a19242f2b55f2fe73688466ab7555b36c2",
+            "image_sha256": [
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475"
+            ],
+            "usage": {
+              "input_tokens": 23337,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 186,
+              "reasoning_output_tokens": 57
+            }
+          }
+        },
+        {
+          "step": 3,
+          "revision": 3,
+          "raw": {
+            "action": "select",
+            "revision": 3,
+            "reason": "修订版 3 的整页和细节图显示，两页正文沿原纸横线排列，印刷标题与左侧栏框未被手写内容遮挡；相较修订版 2，左侧行首越过栏框的情况已改善。两页题目、公式和正文均有呈现。",
+            "expected": "交付修订版 3，保留原纸及两页作业内容。"
+          },
+          "source_sha256": "83cbeac136545714ffa9cd5d173cb7a73319f235710d600d105851e0a8d2ce49",
+          "decision_id": "60e621fe-ae9a-4bfd-bccb-8534a21878cf/3",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "188adbd5622c690144273ecb5917e1059f6cfd7262d6cdbc42e67ae94bb72c51",
+            "image_sha256": [
+              "8d949b8f7413db80aef98da43bafdefade5282a28b772b332f05e0cf983d65f6",
+              "2d6d70772ca6a8279a7ea5a91060a03e98e8be3220d1c61ad73a9dd9935f7f31",
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475"
+            ],
+            "usage": {
+              "input_tokens": 24956,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 193,
+              "reasoning_output_tokens": 80
+            }
+          }
+        }
+      ]
+    },
+    {
+      "paper": "image-2",
+      "arm": "C",
+      "task_id": "e68fe4ed-2f7e-431d-b9cb-fba44a15d05d",
+      "policy": "photo-pilot-v2",
+      "terminal": "stop",
+      "selected": null,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "detect_guides",
+            "arguments": {},
+            "reason": "现有测量显示受支持的采样点横线偏差中位数为 0 像素，但未提供原纸行线坐标或逐区段 p90 和超界比例；整页图中部分文字与横线的关系也需要进一步核查。",
+            "expected": "获取两页原纸可用横线坐标，为后续核对文字位置和必要的调整提供依据。"
+          },
+          "source_sha256": "7e7d095286ecbb8ec48edbe79a7db694b4fb8cde0d8b0ce5112934cbaa40d374",
+          "decision_id": "e68fe4ed-2f7e-431d-b9cb-fba44a15d05d/1",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "359b5811951856bd80ddc2dbcf29e7e0d6bee0c2cea19e40ca71b3df5a637798",
+            "image_sha256": [
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475"
+            ],
+            "usage": {
+              "input_tokens": 22873,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 179,
+              "reasoning_output_tokens": 63
+            }
+          }
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "native_crop",
+            "arguments": {
+              "section": 1,
+              "page_in_section": 1,
+              "box": [
+                0.12,
+                0.24,
+                0.94,
+                0.68
+              ]
+            },
+            "reason": "第 1 页细节图中，标题下方的文字局部被截断或与相邻行重叠；现有横线偏差指标不能确认文字是否完整可读。",
+            "expected": "核对第 1 页正文、公式及相邻行的完整性和可读性，再判断是否需要调整。"
+          },
+          "source_sha256": "5ab71c6731d70c046765ec4ae5050e90e3460a1ba135cd7f3bb19bab3a311ecb",
+          "decision_id": "e68fe4ed-2f7e-431d-b9cb-fba44a15d05d/2",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "f976ea7fea42fd6919707f08570cc46cb7707244e0b9b1b24ec61b8eb2609247",
+            "image_sha256": [
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475"
+            ],
+            "usage": {
+              "input_tokens": 23536,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 166,
+              "reasoning_output_tokens": 42
+            }
+          }
+        },
+        {
+          "step": 3,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "native_crop",
+            "arguments": {
+              "section": 2,
+              "page_in_section": 1,
+              "box": [
+                0.12,
+                0.24,
+                0.94,
+                0.75
+              ]
+            },
+            "reason": "第1页原生裁剪图显示公式和正文基本可读，但部分字迹伸入左侧栏框；第2页目前只有整页图和局部拼图，尚不能完整核对递推式、数值及末尾文字是否重叠或越界。两区段的行线偏差均在0.25行距内，但该指标不能单独证明视觉质量合格。",
+            "expected": "查看第2页完整正文的原生裁剪，核对文字、公式和栏框，再决定是否调整或交付。"
+          },
+          "source_sha256": "3c22de404988584e154c825eba467884b401367d35f9980783e544934b56e3de",
+          "decision_id": "e68fe4ed-2f7e-431d-b9cb-fba44a15d05d/3",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "e5363e9d16d057375c44225340da0b0f7e30baa2cf3c93bd88321511c35bc6b1",
+            "image_sha256": [
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475",
+              "0f1cc4df5658f1e172acd5334d3fa45cc074192ecf96e98a38730469e5327ca7"
+            ],
+            "usage": {
+              "input_tokens": 24406,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 206,
+              "reasoning_output_tokens": 32
+            }
+          }
+        },
+        {
+          "step": 4,
+          "revision": 2,
+          "raw": {
+            "action": "stop",
+            "reason": "修订版 2 的两页原生裁剪图均显示部分手写内容伸入左侧印刷栏框：第 1 页公式行和末行、第 2 页折行及末尾文字尤为明显。两页行线偏差虽低于 0.25 行距，仍不能消除这些视觉缺陷；目前也没有其他候选版本。",
+            "expected": "暂缓交付；后续需要在保留原稿文字和底纸的前提下调整排版，使正文和公式避开左侧栏框，再重新核查。"
+          },
+          "source_sha256": "d4021f5d09cf7922131e2aa5968294309b8a00723a2291b71aee35e4542a3fc9",
+          "decision_id": "e68fe4ed-2f7e-431d-b9cb-fba44a15d05d/4",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "350a47429da90f6d7f3cfa9455049188e2052500cfc92856390a136a619e6836",
+            "image_sha256": [
+              "19d6a564171c8f9b407b68f7174f444adcb01bb218954070bace6598b383cc58",
+              "29a92b1c90a935ed1eb02a0919afa3a8b1db9ea6e3ca5953a64908dd389fc475",
+              "0f1cc4df5658f1e172acd5334d3fa45cc074192ecf96e98a38730469e5327ca7",
+              "6b35818ccb52d619b76814ce9deeb707fe7db0154cd652134fdfa0ca964192e2"
+            ],
+            "usage": {
+              "input_tokens": 25423,
+              "cached_input_tokens": 13824,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 188,
+              "reasoning_output_tokens": 48
+            }
+          }
+        }
+      ]
+    },
+    {
+      "paper": "image-3",
+      "arm": "D",
+      "task_id": "81b645fc-7b63-427c-b64b-0c6c3edc7f24",
+      "policy": "pilot-v1",
+      "terminal": "select",
+      "selected": 3,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "reason": "两页的横线存在不同程度的倾斜，细节图中部分笔画与横线重叠；需要先确认原照片中的实际参考线位置，才能可靠地调整书写基线。",
+            "expected": "获得两页原照片的横线位置和倾斜角度，用于复测文字是否沿线排列并减少笔画与横线重叠。",
+            "tool": "detect_guides",
+            "arguments": {
+              "source": "original"
+            }
+          },
+          "source_sha256": "b6df4b4969b381994002ea72999a0ea010edaba6eb5641a1302816af03bb256c",
+          "decision_id": "81b645fc-7b63-427c-b64b-0c6c3edc7f24/1",
+          "model": "gpt-6.1-terra"
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "reason": "检测到的横线端点可用于校正文字基线；当前图中部分字句与横线的间距不一致，细节图中的公式和数值也需要在修订后复核。",
+            "expected": "两页文字沿各自对应的实际横线排列，公式和数值保持可辨，墨色及清晰度与原照片协调；修订后对照当前版本检查，若效果变差可退回。",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {
+                "baseline_alignment": "follow_detected_guides",
+                "preserve_legibility": true,
+                "match_original_ink_and_clarity": true
+              }
+            }
+          },
+          "source_sha256": "424f3e46fc08b3615d6f73693a2e9ebd0773e12f7356639cd881ed4e528d3aa0",
+          "decision_id": "81b645fc-7b63-427c-b64b-0c6c3edc7f24/2",
+          "error": "tools/call/tune_handwriting: Unknown control baseline_alignment; use describe_controls",
+          "model": "gpt-6.1-terra"
+        },
+        {
+          "step": 3,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "reason": "已检测到 20 条横线，但上次套用因参数错误被拒绝，尚未生成新版本。使用已确认的端点参数可让字迹沿实际横线排列。",
+            "expected": "生成新版本后，可检查两页字迹是否沿横线排列，以及公式、数值的可辨性和墨色协调程度。",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {}
+            }
+          },
+          "source_sha256": "6e12cc865e6a3e6e34a8fce8e4e162a50313412406a68887e9708f0be0312c2e",
+          "result_revision": 3,
+          "decision_id": "81b645fc-7b63-427c-b64b-0c6c3edc7f24/3",
+          "model": "gpt-6.1-terra"
+        },
+        {
+          "step": 4,
+          "revision": 3,
+          "raw": {
+            "action": "select",
+            "revision": 3,
+            "reason": "修订3已按检测到的横线重排，字迹沿纸张横线分布，公式和数值可辨，墨色与照片整体协调。",
+            "expected": "交付修订3，保留两页作业在原照片上的自然书写效果。",
+            "tool": null,
+            "arguments": {}
+          },
+          "source_sha256": "f830dcfc97577307ba0565995e9fd3d8f63fd2bf591487047a8904b435aa657d",
+          "decision_id": "81b645fc-7b63-427c-b64b-0c6c3edc7f24/4",
+          "model": "gpt-6.1-terra"
+        }
+      ]
+    },
+    {
+      "paper": "public-depth",
+      "arm": "B",
+      "task_id": "a43e7381-d09b-4c1d-bb29-01453f302aa2",
+      "policy": "pilot-v1",
+      "terminal": "select",
+      "selected": 3,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "detect_guides",
+            "arguments": {},
+            "reason": "修订 2 的两节均各占两张纸，末句分别落在第二张；需先测量原纸横线，以便压缩排版时保持文字沿横线书写。",
+            "expected": "获得两节原纸横线坐标，用于调整排版并将每节完整放入一张纸。"
+          },
+          "source_sha256": "f863ea7f06e78d198d125b557900bd6aba24f7797e9fd4c15cd308abd7b7bfb5",
+          "decision_id": "a43e7381-d09b-4c1d-bb29-01453f302aa2/1",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "075a812060d9f259be8232b0e2519a4ea86b2ac29c736f8a965d70f78ee68f19",
+            "image_sha256": [
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 24169,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 272,
+              "reasoning_output_tokens": 173
+            }
+          }
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {}
+            },
+            "reason": "修订 2 的整页拼图显示两节各占两张纸，末句均落在第二张；检测到原纸有 13 条横线，与每节的 13 行内容相同。先应用实测横线坐标，检查能否让每节各占一张。",
+            "expected": "文字沿实测横线排布，并可检查两节的末行是否各自保留在第一页。"
+          },
+          "source_sha256": "51dea5b35740a6cbc3b4da252197ca1869b0ced3eaf8102411f01b59bef46e10",
+          "result_revision": 3,
+          "decision_id": "a43e7381-d09b-4c1d-bb29-01453f302aa2/2",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "e229857fe5023238d41325ff5a8d4a73bdea666eae49ed7d3a1e85ab359cb1c2",
+            "image_sha256": [
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 24772,
+              "cached_input_tokens": 13824,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 225,
+              "reasoning_output_tokens": 94
+            }
+          }
+        },
+        {
+          "step": 3,
+          "revision": 3,
+          "raw": {
+            "action": "select",
+            "revision": 3,
+            "reason": "修订 3 的整页拼图显示两节各占一张纸，共两张；两节标题、公式和正文均保留，末行分别为“末读数约为 0.677 V”和“结果低估了真实电压”。细节图中文字清楚，测量显示两页文字均覆盖实测横线且全部位于距横线四分之一行以内。",
+            "expected": "交付修订 3 的两张作业纸，保留原纸、全部内容及末行答案。"
+          },
+          "source_sha256": "a1b1792e0ac5cf4d8d21fbfd5d430c3ce81e14721fc3fcc5202c757d6a05ac8d",
+          "decision_id": "a43e7381-d09b-4c1d-bb29-01453f302aa2/3",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "cc00c5c46297fb49cc294fe0e8b5830988b0fd1ff9c616364f29f9038822ca40",
+            "image_sha256": [
+              "641942d235812ab31e2f59390bc076515b9a3ec7e9abfacbf75928decf6dcc1f",
+              "c855ea232e3557e56a940217deaa9236039772175f4755993234149492ea727f",
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 26120,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 164,
+              "reasoning_output_tokens": 29
+            }
+          }
+        }
+      ]
+    },
+    {
+      "paper": "public-depth",
+      "arm": "C",
+      "task_id": "74fe81de-143c-477d-bd1d-76a0f93ee64b",
+      "policy": "photo-pilot-v2",
+      "terminal": "select",
+      "selected": 3,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "detect_guides",
+            "arguments": {},
+            "reason": "当前修订中两节各占两张纸，末行分别落在第二张，未满足每节一张、总共两张的要求。需先获取原纸可写横线坐标，以便调整排版并保留末行。",
+            "expected": "取得两节原纸的横线位置，为将每节完整内容排入一张纸提供依据。"
+          },
+          "source_sha256": "f52ab7be2cda3d3142f6add6258eb01b2103c5bb850db216209adc5401cfd7f0",
+          "decision_id": "74fe81de-143c-477d-bd1d-76a0f93ee64b/1",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "a36a8268cd1aea8b2c3564cda6563ac5360f441f8175bcb54bd808124516a3db",
+            "image_sha256": [
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 24353,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 123,
+              "reasoning_output_tokens": 15
+            }
+          }
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {}
+            },
+            "reason": "修订 2 中两节的末行分别落在第二张纸上；已检测到原纸有 13 条横线，与每节各 13 行文字相对应。先按检测到的横线重新排版，再检查是否完整容纳及对齐。",
+            "expected": "每节内容各占一张原纸，保留末行，并沿检测到的横线书写。"
+          },
+          "source_sha256": "c4bf46e948910fd390c10198419e3c2e0b6eabbed93f53a232c521a84636eac6",
+          "result_revision": 3,
+          "decision_id": "74fe81de-143c-477d-bd1d-76a0f93ee64b/2",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "3b5b12cf0e5a9bd79a251a55cff7100b0fe0707e4dce771ac1fb2f9bd46fe663",
+            "image_sha256": [
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 24967,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 184,
+              "reasoning_output_tokens": 60
+            }
+          }
+        },
+        {
+          "step": 3,
+          "revision": 3,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "native_crop",
+            "arguments": {
+              "section": 2,
+              "page_in_section": 1,
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            "reason": "修订 3 已将两节各排在一张纸上，行线测量的 p90 偏差均约为 0.01 行距；但整页拼图和细节拼图不足以完整检查第二节各行的可读性、重叠及末行位置。",
+            "expected": "查看第二节单页原生裁剪，核对全部公式、数值及末行是否清楚且未被裁切。"
+          },
+          "source_sha256": "ad4b0838619ab4e5d5d216a21c5151c70e8dc932c28237e802d5be28f27a6d77",
+          "decision_id": "74fe81de-143c-477d-bd1d-76a0f93ee64b/3",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "4b80fea4f1283d52fb25ee7d07dad5c32a908b514d3db32ba661f527f8634684",
+            "image_sha256": [
+              "641942d235812ab31e2f59390bc076515b9a3ec7e9abfacbf75928decf6dcc1f",
+              "c855ea232e3557e56a940217deaa9236039772175f4755993234149492ea727f",
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 26306,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 237,
+              "reasoning_output_tokens": 94
+            }
+          }
+        },
+        {
+          "step": 4,
+          "revision": 3,
+          "raw": {
+            "action": "select",
+            "revision": 3,
+            "reason": "修订 3 恰好两页，每节各占一页，末行均保留。整页拼图及第二节原生裁剪显示公式和数值可辨，未见明显重叠或裁切；两节行线偏差的 p90 均约为 0.01 行距，且全部落在 0.25 行距内。修订 2 的两节末行分别溢出到额外页面，不符合交付要求。",
+            "expected": "交付修订 3 的两张原纸页面，保留两节完整文字、公式和末行答案。"
+          },
+          "source_sha256": "31c614310bc67119daecc770662db04dbe20584609b99172dc0006204f4cb559",
+          "decision_id": "74fe81de-143c-477d-bd1d-76a0f93ee64b/4",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "a017729c9eb804e90969f2b1658e2fa31b8764e306260915b6ef043ba5f6c8c9",
+            "image_sha256": [
+              "641942d235812ab31e2f59390bc076515b9a3ec7e9abfacbf75928decf6dcc1f",
+              "c855ea232e3557e56a940217deaa9236039772175f4755993234149492ea727f",
+              "115d916a9b7756aca6f27a266afebe370c0f55ea65f170ebf36c6ae64852c393",
+              "b9236d27aab3b4804213ab416e2f024582f3fee7b5ea9db6834016b83493386c",
+              "0958c8c77d7c6612209c4ed88582f71e3b0bb1618c25e2ea452404d89ca3fc9a"
+            ],
+            "usage": {
+              "input_tokens": 27656,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 173,
+              "reasoning_output_tokens": 20
+            }
+          }
+        }
+      ]
+    },
+    {
+      "paper": "public-grid",
+      "arm": "B",
+      "task_id": "95798186-0945-4d8b-ada1-ba121f9b79fe",
+      "policy": "pilot-v1",
+      "terminal": "select",
+      "selected": 3,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "detect_guides",
+            "arguments": {},
+            "reason": "整页图中两页字迹与印刷横线的间距和位置不够一致；现有测量只说明横线平直，未提供可用于对齐的具体坐标。",
+            "expected": "获得两页原纸横线坐标，以判断能否将字迹更稳定地放在可写横线上。"
+          },
+          "source_sha256": "e0cd6e3cd04bc2d7da002b2e13ac71fdee538e03475a7bac5062541c264b17f5",
+          "decision_id": "95798186-0945-4d8b-ada1-ba121f9b79fe/1",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "99a887adbbe7737f2fa859a14a5bfae44069d97ec8f79a0e1d74bba1ec2e3034",
+            "image_sha256": [
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 22611,
+              "cached_input_tokens": 13824,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 198,
+              "reasoning_output_tokens": 99
+            }
+          }
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {}
+            },
+            "reason": "修订版 2 的整页图显示第一页字迹与横线的相对位置不稳定；测量中第一页仅 37.2% 的样本落在四分之一行距内，而第二页为 100%。已取得原纸横线坐标，可先用这些坐标测试对齐。",
+            "expected": "保留原文和底纸，使第一页字迹更稳定地落在可写横线上，并检查第二页的对齐是否保持。"
+          },
+          "source_sha256": "16e2022c92054022d655d01ab6b14bd5fe9f407a9397fccfbd1680feba41de7d",
+          "result_revision": 3,
+          "decision_id": "95798186-0945-4d8b-ada1-ba121f9b79fe/2",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "531598fee4cf81bca85a4cb32123ace18038e5a4ffd7ab70260f9b9070edb962",
+            "image_sha256": [
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 23274,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 153,
+              "reasoning_output_tokens": 14
+            }
+          }
+        },
+        {
+          "step": 3,
+          "revision": 3,
+          "raw": {
+            "action": "select",
+            "revision": 3,
+            "reason": "修订版 3 的整页拼图显示，两页正文和公式均位于原纸书写区域内，未见越过栏框；第一页末段相比修订版 2 减少了单独换行，第二页内容仍完整可辨。原纸横线检测坐标已用于该修订。",
+            "expected": "交付修订版 3，保留两页原文、公式和底纸。"
+          },
+          "source_sha256": "148fe8990c67590c016043b476e08d3062c9f8ab6f579680ae1eefd3953ca981",
+          "decision_id": "95798186-0945-4d8b-ada1-ba121f9b79fe/3",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "77dcbd199b77424a0e9a79a531b125b073a883ac44300fe27e597000597f954c",
+            "image_sha256": [
+              "cf715b811cfa7435bad472ebd71aa2f2a2b849360741ebabd62d5f8bbb73dda2",
+              "cfa7db503152f2a960d4682418365d2205b08f9247f52906a44e3a67c5e028ac",
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 24835,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 204,
+              "reasoning_output_tokens": 91
+            }
+          }
+        }
+      ]
+    },
+    {
+      "paper": "public-grid",
+      "arm": "C",
+      "task_id": "6d1f1e49-c7ce-42e6-86c0-445d78c95742",
+      "policy": "photo-pilot-v2",
+      "terminal": "stop",
+      "selected": null,
+      "turns": [
+        {
+          "step": 1,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "detect_guides",
+            "arguments": {},
+            "reason": "当前修订的整页图显示两页文字基本可读，但部分字迹与横线的贴合程度需要结合原纸行线坐标判断；现有测量仅说明印刷线检测得到支持，不能确定字迹偏差分布。",
+            "expected": "获得两页原纸可写横线坐标，用于核对各区段字迹偏差及是否需要调整。"
+          },
+          "source_sha256": "31a09bbbe3488a757ec913282c9d5f4ffdb1403d19205d8d2e9fbacda2ada525",
+          "decision_id": "6d1f1e49-c7ce-42e6-86c0-445d78c95742/1",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "c47325766e01cd87a1fcd6bac5c3c8288d6a5a7797bcc239c97adccb4d3b3a1e",
+            "image_sha256": [
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 22795,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 134,
+              "reasoning_output_tokens": 21
+            }
+          }
+        },
+        {
+          "step": 2,
+          "revision": 2,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "native_crop",
+            "arguments": {
+              "section": 1,
+              "page_in_section": 1,
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            "reason": "第 1 页的 p90 行线偏差为 3.08 行距，且只有 37.2% 的字迹位于四分之一行距内；需要查看原生尺寸，核对实际错位、重叠和可读性。",
+            "expected": "获得第 1 页原生裁剪图，判断是否需要按检测到的原纸行线调整。"
+          },
+          "source_sha256": "552f17ff98cac43bdc78394967fd7148de118d3663d4071a10ede63958085061",
+          "decision_id": "6d1f1e49-c7ce-42e6-86c0-445d78c95742/2",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "2b574f9c70f4d8232ae95a3cb1802fce30eb43a0c742b8222ca8a13ed7bba955",
+            "image_sha256": [
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 23478,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 160,
+              "reasoning_output_tokens": 31
+            }
+          }
+        },
+        {
+          "step": 3,
+          "revision": 2,
+          "raw": {
+            "action": "revise",
+            "tool": "tune_handwriting",
+            "arguments": {
+              "paper_guides": "$detected",
+              "changes": {}
+            },
+            "reason": "第1页原生图中，多行字迹未稳定贴合横线；该页测得 p90 偏差为 3.08 行距，仅 37.2% 位于四分之一行距内。第2页测得 p90 为 0.014 行距，调整后也需核对是否保持对齐。",
+            "expected": "按已检测的原纸横线重新排布字迹，改善第1页对齐，同时保留两页原文、公式和底纸。"
+          },
+          "source_sha256": "6651da5ee8f2e512e35fb0b44b5175af70ba15944c1b41fa0536582a47b332f3",
+          "result_revision": 3,
+          "decision_id": "6d1f1e49-c7ce-42e6-86c0-445d78c95742/3",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "b2c7de502d0bdc6c44cf3d66f92f6331aed95bfce69df4a0ba5b3fc371547172",
+            "image_sha256": [
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc",
+              "d0d59b2f84d6b4dd51f573f86ac9176898dad84de0ff84d43a57eff340794a97"
+            ],
+            "usage": {
+              "input_tokens": 24470,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 198,
+              "reasoning_output_tokens": 50
+            }
+          }
+        },
+        {
+          "step": 4,
+          "revision": 3,
+          "raw": {
+            "action": "request_evidence",
+            "tool": "native_crop",
+            "arguments": {
+              "section": 1,
+              "page_in_section": 1,
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            "reason": "当前修订的第1页测得 p90 偏差为 3.07 行距，仅 37.2% 的字迹位于四分之一行距内；整页拼图不足以核对实际贴线、重叠和公式可读性。",
+            "expected": "获得修订 3 的第1页原生裁剪图，核查字迹与横线的关系及文字、公式是否完整，再决定交付或暂缓。"
+          },
+          "source_sha256": "1e923e5585eb6eb5371d9f032891302b113f0a75187cba6bf1ab7e6e56f97171",
+          "decision_id": "6d1f1e49-c7ce-42e6-86c0-445d78c95742/4",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "52fb3002a3efff6efa4e62ba71e812f7353d17f9f631edad95f06b40f406c418",
+            "image_sha256": [
+              "cf715b811cfa7435bad472ebd71aa2f2a2b849360741ebabd62d5f8bbb73dda2",
+              "cfa7db503152f2a960d4682418365d2205b08f9247f52906a44e3a67c5e028ac",
+              "d0d59b2f84d6b4dd51f573f86ac9176898dad84de0ff84d43a57eff340794a97",
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 26043,
+              "cached_input_tokens": 13824,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 190,
+              "reasoning_output_tokens": 45
+            }
+          }
+        },
+        {
+          "step": 5,
+          "revision": 3,
+          "raw": {
+            "action": "stop",
+            "reason": "修订 3 的第 1 页测得 p90 行线偏差为 3.07 行距，仅 37.2% 的字迹位于四分之一行距内；原生图中部分行的字迹也未稳定贴合横线。修订 2 的第 1 页同样超出阈值，现有候选版本均不满足交付规则。",
+            "expected": "暂缓交付；需要进一步调整第 1 页并重新核查行线偏差、公式和正文的可读性。"
+          },
+          "source_sha256": "bd70e8fb2108749758397477370935659c8d250f8268691d7a3135d2c13163e3",
+          "decision_id": "6d1f1e49-c7ce-42e6-86c0-445d78c95742/5",
+          "model_receipt": {
+            "provider": "Codex CLI",
+            "model": "gpt-6.1-terra",
+            "reasoning_effort": "high",
+            "prompt_sha256": "05dae243f3c2e0d9323b55558bdd0f007a9c9661550c93a448fe22fa3c578839",
+            "image_sha256": [
+              "cf715b811cfa7435bad472ebd71aa2f2a2b849360741ebabd62d5f8bbb73dda2",
+              "cfa7db503152f2a960d4682418365d2205b08f9247f52906a44e3a67c5e028ac",
+              "d0d59b2f84d6b4dd51f573f86ac9176898dad84de0ff84d43a57eff340794a97",
+              "afc12748b2d519f6ccfcf5d9c3bedf1bda580ece0a0b87e84d88c6a2aa5f41dd",
+              "566104fc46625cd0df24fa4e69099ac63092f40ad47bde8fba753f62e74ba6b7",
+              "0914c6d7101215c69d58086bd0450306206742d55200adbf17198dde20c33dbc"
+            ],
+            "usage": {
+              "input_tokens": 27049,
+              "cached_input_tokens": 19200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 168,
+              "reasoning_output_tokens": 34
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "policy": {
+    "parent_policy_id": "pilot-v1",
+    "policy_id": "photo-pilot-v2",
+    "rules": {
+      "allowed_edit_tools": [
+        "tune_handwriting",
+        "adjust_glyphs",
+        "save_section",
+        "replace_section_text"
+      ],
+      "compare_before_select": false,
+      "execution": "先生成初稿并核对各区段的原生裁剪图和可用行线坐标；仅使用已声明的参数。若所有字距局部行线均在 0.25 行距内，优先保留初稿，不为微小数值改善反复生成。",
+      "experiment": "有限预算优先用于视觉判断与坐标指标不一致、接近或超出 0.25 行距的区段；保留初稿与调整版进行盲评，记录各区段 p90 和超界比例。扩展到不同版式验证阈值，不从两张相近照片推断手写审美偏好。",
+      "max_steps": 8,
+      "review": "同时检查裁剪图中的错位、重叠和可读性，以及逐区段误差分布；0.25 行距是触发复查的界限，不单独证明视觉质量合格。",
+      "selection": "比较候选版本时，先排除视觉缺陷或超出 0.25 行距的版本；若均合格且各区段 p90 改善不足 0.01 行距，视为差异较小，优先选择较早版本。该差值是待验证的预算规则。"
+    },
+    "source_task_ids": [
+      "f0aaad6b-58de-4cdc-8626-b664c1aee62f",
+      "81b645fc-7b63-427c-b64b-0c6c3edc7f24"
+    ]
+  },
+  "validation": {
+    "conclusion": "Three held-out paper sources. Independent Terra blind assessor: usable delivered A 1/3, B 3/3, C 1/3; severe delivered 1,0,0. C alone withheld two drafts (one judged usable). B used 9 model decisions, C 13. No human timing/preference observed. Keep v2 experimental; do not promote. Verify row estimation on inputs with paragraph gaps.",
+    "origin": "host_report",
+    "task_ids": [
+      "e68fe4ed-2f7e-431d-b9cb-fba44a15d05d",
+      "6d1f1e49-c7ce-42e6-86c0-445d78c95742",
+      "74fe81de-143c-477d-bd1d-76a0f93ee64b"
+    ]
+  }
+}

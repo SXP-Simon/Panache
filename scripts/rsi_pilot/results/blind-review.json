@@ -1,0 +1,160 @@
+{
+  "rows": [
+    {
+      "case": "public-grid",
+      "split": "heldout",
+      "family": "oblique-grid",
+      "arm": "B",
+      "id": "P371628",
+      "pixels": "cf7f394bcd001f53c418b5a58abab33882d7fdace279355c85eac8db7745b029",
+      "pages": 2,
+      "decision": "deliver",
+      "verdict": "pass",
+      "severe": false,
+      "reason": "两页标题、公式及结尾可见，第1页末段电流与方向、第2页末段误差和结论可辨。文字大致贴合网格横线；第2页 1.25 跨行，读起来稍不顺畅。"
+    },
+    {
+      "case": "image-2",
+      "split": "heldout",
+      "family": "stationery-with-sidebar",
+      "arm": "A",
+      "id": "P729164",
+      "pixels": "d4ca121bbf848eb4318f75c4976243dd6b9be1388147d25285d258b30b650584",
+      "pages": 2,
+      "decision": "deliver",
+      "verdict": "rework",
+      "severe": false,
+      "reason": "第1页中下部基尔霍夫定律行和末行、第2页中部换行及下部结论行出现明显倾斜、拉伸，部分笔画进入左侧边栏线附近；应调整局部变形和左边距。标题、公式及结论大致仍可辨，故不标严重。"
+    },
+    {
+      "case": "public-grid",
+      "split": "heldout",
+      "family": "oblique-grid",
+      "arm": "A",
+      "id": "P112921",
+      "pixels": "a95e595dc36ed3fc2aecb5f5ed35df98427cc4fd8363bcfb2b475f2f1b73eaf6",
+      "pages": 2,
+      "decision": "deliver",
+      "verdict": "pass",
+      "severe": false,
+      "reason": "两页均有对应标题、公式和末段；第1页中下部 u(2) 与电流结论、第2页下部误差与结论可辨。文字大体沿横线，部分数值和单位跨行，影响流畅度但仍可读。"
+    },
+    {
+      "case": "public-grid",
+      "split": "heldout",
+      "family": "oblique-grid",
+      "arm": "C",
+      "id": "P371628",
+      "pixels": "cf7f394bcd001f53c418b5a58abab33882d7fdace279355c85eac8db7745b029",
+      "pages": 2,
+      "decision": "withhold",
+      "verdict": "pass",
+      "severe": false,
+      "reason": "两页标题、公式及结尾可见，第1页末段电流与方向、第2页末段误差和结论可辨。文字大致贴合网格横线；第2页 1.25 跨行，读起来稍不顺畅。"
+    },
+    {
+      "case": "public-depth",
+      "split": "heldout",
+      "family": "depth-gradient",
+      "arm": "B",
+      "id": "P339865",
+      "pixels": "8bb6b3adb3e4a9425a1751444366cba3f34970543dcaf482d23c08ce45376ea7",
+      "pages": 2,
+      "decision": "deliver",
+      "verdict": "pass",
+      "severe": false,
+      "reason": "恰好两页，每节各一页；第1页底部 0.677 V 和第2页底部低估真实电压的结论均保留。文字跟随纸张横线透视，底部笔画较粗但主要内容可辨。"
+    },
+    {
+      "case": "public-depth",
+      "split": "heldout",
+      "family": "depth-gradient",
+      "arm": "A",
+      "id": "P304135",
+      "pixels": "77a27b2a345595850f658d62709e55ce6c6f3b0c619a31ddfba74fd7e2082d3b",
+      "pages": 4,
+      "decision": "deliver",
+      "verdict": "rework",
+      "severe": true,
+      "reason": "明确要求恰好两张、每节一张，成稿却有四页：第1节末读数被单独放到第2页，第2节末句被单独放到第4页。末行存在但两节均跨页，须重新排成两张。"
+    },
+    {
+      "case": "image-2",
+      "split": "heldout",
+      "family": "stationery-with-sidebar",
+      "arm": "C",
+      "id": "P729164",
+      "pixels": "d4ca121bbf848eb4318f75c4976243dd6b9be1388147d25285d258b30b650584",
+      "pages": 2,
+      "decision": "withhold",
+      "verdict": "rework",
+      "severe": false,
+      "reason": "第1页中下部基尔霍夫定律行和末行、第2页中部换行及下部结论行出现明显倾斜、拉伸，部分笔画进入左侧边栏线附近；应调整局部变形和左边距。标题、公式及结论大致仍可辨，故不标严重。"
+    },
+    {
+      "case": "image-2",
+      "split": "heldout",
+      "family": "stationery-with-sidebar",
+      "arm": "B",
+      "id": "P198143",
+      "pixels": "7d439bec26f45f3822383be13b6cd0caf8e2b82c05a4653e55d65a6ba6323098",
+      "pages": 2,
+      "decision": "deliver",
+      "verdict": "pass",
+      "severe": false,
+      "reason": "第1页和第2页的正文、公式及结尾均可辨，书写大体落在虚线区；印刷标题和左侧姓名、学号、专业班级栏保持可见。第2页数字 0.625 和 0.3642 跨行，仍可拼读。"
+    },
+    {
+      "case": "public-depth",
+      "split": "heldout",
+      "family": "depth-gradient",
+      "arm": "C",
+      "id": "P339865",
+      "pixels": "8bb6b3adb3e4a9425a1751444366cba3f34970543dcaf482d23c08ce45376ea7",
+      "pages": 2,
+      "decision": "deliver",
+      "verdict": "pass",
+      "severe": false,
+      "reason": "恰好两页，每节各一页；第1页底部 0.677 V 和第2页底部低估真实电压的结论均保留。文字跟随纸张横线透视，底部笔画较粗但主要内容可辨。"
+    }
+  ],
+  "counts": {
+    "heldout": {
+      "A": {
+        "tasks": 3,
+        "families": 3,
+        "pages": 8,
+        "verdicts": {
+          "rework": 2,
+          "pass": 1
+        },
+        "delivered": 3,
+        "severe_delivered": 1,
+        "usable_delivered": 1
+      },
+      "B": {
+        "tasks": 3,
+        "families": 3,
+        "pages": 6,
+        "verdicts": {
+          "pass": 3
+        },
+        "delivered": 3,
+        "severe_delivered": 0,
+        "usable_delivered": 3
+      },
+      "C": {
+        "tasks": 3,
+        "families": 3,
+        "pages": 6,
+        "verdicts": {
+          "pass": 2,
+          "rework": 1
+        },
+        "delivered": 1,
+        "severe_delivered": 0,
+        "usable_delivered": 1
+      }
+    }
+  }
+}

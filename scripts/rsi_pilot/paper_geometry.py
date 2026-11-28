@@ -17,6 +17,9 @@ from PIL import Image, ImageDraw, ImageFilter
 
 def load_labels(paper_id):
     key = Path(paper_id).stem
+    if key in {"public-notes-v3", "public-slots-v3"}:
+        from prospective_papers import labels_for
+        return labels_for(key)
     if key == "public-depth":
         return _depth_geometry()[0]
     if key == "public-grid":
