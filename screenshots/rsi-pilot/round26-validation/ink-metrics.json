@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "paper": 0,
+      "seed": 701,
+      "denominator_pixels": 891662,
+      "base_ink_pixels": 32218,
+      "ink_dilation_8px_pixels": 185260,
+      "outside_dilation_pixels": 706402,
+      "png_sha256_by_revision": {
+        "1": "7ed20eadb371fa2208ed1de551f9ea01342f87c2c01eab408f7c720667182454",
+        "2": "7ed20eadb371fa2208ed1de551f9ea01342f87c2c01eab408f7c720667182454",
+        "3": "5c910d09e8f4ede212f6f9def5bacbba339af55ef527696286de1fdb45733a80",
+        "4": "5f4ca6f28e9725d65f573e7325aafa93d097a3be58113c19b58b6f6d00161944",
+        "5": "5df2d93c3f7681c4dd7530c007c5c126b35acc323d9ac474cd35d069f12a3566"
+      },
+      "comparisons": {
+        "explicit_zero": {
+          "changed_pixels_total": 0,
+          "changed_inside_dilation": 0,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 0,
+          "bottom_third_abs_rgb_sum": 0
+        },
+        "light100": {
+          "changed_pixels_total": 32218,
+          "changed_inside_dilation": 32218,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 471841,
+          "bottom_third_abs_rgb_sum": 140941
+        },
+        "focus_top0_bottom2": {
+          "changed_pixels_total": 86505,
+          "changed_inside_dilation": 86505,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 782703,
+          "bottom_third_abs_rgb_sum": 1468485
+        },
+        "focus_top2_bottom0": {
+          "changed_pixels_total": 117422,
+          "changed_inside_dilation": 117422,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 5202704,
+          "bottom_third_abs_rgb_sum": 520777
+        }
+      },
+      "zip": {
+        "sha256": "8095def35a6a8b55704cbda4e2efed1a529e9467347bfdebd3beab11407eb1a8",
+        "png_sha256": "5df2d93c3f7681c4dd7530c007c5c126b35acc323d9ac474cd35d069f12a3566",
+        "members": [
+          "0.png"
+        ],
+        "pixel_diff_vs_revision5": 0,
+        "receipt": {
+          "global_text_ink_zero": false,
+          "pages_with_evidence": 0,
+          "pages_with_visibility_flags": 0,
+          "pages_without_visibility_evidence": 1,
+          "unreviewed_pages": [
+            {
+              "page": 1,
+              "section": 1
+            }
+          ],
+          "zip_pixels": {
+            "different_pages": [],
+            "pages_matching_latest_review": 0,
+            "reviewed_pages_without_digest": 0
+          }
+        }
+      }
+    },
+    {
+      "paper": 1,
+      "seed": 702,
+      "denominator_pixels": 891662,
+      "base_ink_pixels": 31874,
+      "ink_dilation_8px_pixels": 182967,
+      "outside_dilation_pixels": 708695,
+      "png_sha256_by_revision": {
+        "1": "5d1e03975865183538bf58c4c907a3fb2d6fd095875a4c68207596f9099bbc2a",
+        "2": "5d1e03975865183538bf58c4c907a3fb2d6fd095875a4c68207596f9099bbc2a",
+        "3": "89f4dbada91efd78fec1661ff21cc3f695329909ccea6790042a91acad6e4be7",
+        "4": "94b7271c6360ecd32aad752256fe52743c3e32c7f26af25b04705b65cf060881",
+        "5": "6f6214c0aaba06d955b5b16e9edf459fb3e0405a309ae299dc1dfb65650ffe91"
+      },
+      "comparisons": {
+        "explicit_zero": {
+          "changed_pixels_total": 0,
+          "changed_inside_dilation": 0,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 0,
+          "bottom_third_abs_rgb_sum": 0
+        },
+        "light100": {
+          "changed_pixels_total": 31874,
+          "changed_inside_dilation": 31874,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 344001,
+          "bottom_third_abs_rgb_sum": 229808
+        },
+        "focus_top0_bottom2": {
+          "changed_pixels_total": 85514,
+          "changed_inside_dilation": 85514,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 800646,
+          "bottom_third_abs_rgb_sum": 1265371
+        },
+        "focus_top2_bottom0": {
+          "changed_pixels_total": 116289,
+          "changed_inside_dilation": 116289,
+          "changed_outside_dilation": 0,
+          "top_third_abs_rgb_sum": 5509384,
+          "bottom_third_abs_rgb_sum": 449908
+        }
+      },
+      "zip": {
+        "sha256": "e96f4160dbaf58ac1531d4ccd807e5c9a16d2c9498434f537c01a47396907863",
+        "png_sha256": "6f6214c0aaba06d955b5b16e9edf459fb3e0405a309ae299dc1dfb65650ffe91",
+        "members": [
+          "0.png"
+        ],
+        "pixel_diff_vs_revision5": 0,
+        "receipt": {
+          "global_text_ink_zero": false,
+          "pages_with_evidence": 0,
+          "pages_with_visibility_flags": 0,
+          "pages_without_visibility_evidence": 1,
+          "unreviewed_pages": [
+            {
+              "page": 1,
+              "section": 1
+            }
+          ],
+          "zip_pixels": {
+            "different_pages": [],
+            "pages_matching_latest_review": 0,
+            "reviewed_pages_without_digest": 0
+          }
+        }
+      }
+    }
+  ],
+  "failure": {
+    "error": "Photo ink lighting and focus require an original paper imported in photo mode",
+    "revision_before_after": [
+      1,
+      1
+    ],
+    "before_after_png_sha256": [
+      "f8305a6bc30e5677cf5b6ad5eee72d7ec8288e352ab0db605f1dec6eaba31b86",
+      "f8305a6bc30e5677cf5b6ad5eee72d7ec8288e352ab0db605f1dec6eaba31b86"
+    ]
+  },
+  "test_source_head": "2b2181b9b365f46de46c238ce6a0ddfb764b39a9",
+  "actor": "gpt-6.1-terra"
+}

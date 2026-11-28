@@ -1,0 +1,1237 @@
+{
+  "binary_revision": "2b2181b9b365f46de46c238ce6a0ddfb764b39a9",
+  "paper_sha256": "73668f3c666ce3a2ad0917f4348465ecf28b0fc92897ade90ebd45302c642f13",
+  "paper_grid_rules_slope_px": "-10 in 406 px; manual endpoint geometry",
+  "note": "All are generated raster inputs run through photo mode with explicit manual guides, not actual photographed user sheets. Deliberate glyph adjustments exercise the review path rather than show that default layout necessarily causes the same defects. The separate built-in grid summary is historical, superseded on table-only and equation conclusions.",
+  "cases": [
+    {
+      "case": "01_clear",
+      "input": {
+        "markdown": "| Item | Value |\n|---|---|\n| Alpha | 12 |\n| Beta | 34 |\n\nCaption Zebra",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "02b4b21f7a6f7d06190983a7524fce39f4841f2b629064e2587d641d3ab364f7",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "7715080681aa0aef5277906faa0fd635f3d5b67faddfa16b819e3ecf04600f51",
+              "byte_count": 22720
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "2cbb83c1e4df6b09e722c6f52f3720d380a88d816ae61917e3cf2339913f8088",
+              "byte_count": 23743
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "7715080681aa0aef5277906faa0fd635f3d5b67faddfa16b819e3ecf04600f51",
+              "byte_count": 22720
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 1,
+          "sha256": "e152cff81a7c7f5a4472eed5f9a8e9f841cb28be2422587ed9871c11f7f63e9f",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 1,
+          "sha256": "33e19840f111b96ed50be05f91b23b629481228912f5439c548c63e1fed42290",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item / Value; Alpha / 12; Beta / 34; Caption Zebra",
+      "observation": "Caption and bottom rule visibly separated; no hint expected."
+    },
+    {
+      "case": "02_near",
+      "input": {
+        "markdown": "| Item | Value |\n|---|---|\n| Alpha | 12 |\n| Beta | 34 |\n\nCaption Zebra",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [
+        {
+          "args": {
+            "draft_id": "c669d3cf-83a2-4706-beb2-6046a3500299",
+            "section": 1,
+            "page": 1,
+            "expected_revision": 1,
+            "ids": [
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              10,
+              11,
+              12,
+              13,
+              14
+            ],
+            "dy": -17
+          },
+          "revision": 2
+        }
+      ],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "02b4b21f7a6f7d06190983a7524fce39f4841f2b629064e2587d641d3ab364f7",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "7715080681aa0aef5277906faa0fd635f3d5b67faddfa16b819e3ecf04600f51",
+              "byte_count": 22720
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "2cbb83c1e4df6b09e722c6f52f3720d380a88d816ae61917e3cf2339913f8088",
+              "byte_count": 23743
+            }
+          ],
+          "alignment": "manual_guides"
+        },
+        {
+          "revision": 2,
+          "page_pixel_sha256": "b9a35aec9226d0656ce75c7edabd80bb591a845cb2a46355a824c37678dd379e",
+          "table_hint": {
+            "inspect": "The bottom of a table may touch the following text. Read the last row and the text in the attached native crop. Adjust spacing only if their strokes interfere.",
+            "region": [
+              [
+                9,
+                128
+              ],
+              [
+                126,
+                128
+              ],
+              [
+                126,
+                242
+              ],
+              [
+                9,
+                242
+              ]
+            ]
+          },
+          "image_count": 4,
+          "table_crop_count": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "758982ab99aec1ede65373c95a8a0a47021da4d00371164939f725a87c60d3f7",
+              "byte_count": 22456
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "698375801ac76a475cd86fe4b935057e40d1bc06d97b5896dc361908e67263cf",
+              "byte_count": 23598
+            },
+            {
+              "size": [
+                117,
+                114
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "6032e56b73b50ca961aefabb6ed20f6bc5855752eec93b7a6d7eece1f37c5451",
+              "byte_count": 5007
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "7715080681aa0aef5277906faa0fd635f3d5b67faddfa16b819e3ecf04600f51",
+              "byte_count": 22720
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "758982ab99aec1ede65373c95a8a0a47021da4d00371164939f725a87c60d3f7",
+              "byte_count": 22456
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 2,
+          "sha256": "bf1d26c821c3df8e1c6c83ebe6b6878d80ea996249a741c96c7e6e743a69da4c",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 2,
+          "sha256": "44306923f7823e5516c1d3bca9bf190a9b8a0ce789012e58fd06a3975e06c738",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item / Value; Alpha / 12; Beta / 34; Caption Zebra",
+      "observation": "Caption ascenders graze/intersect bottom border after manual dy=-17; all text legible on full PNG. Returned native crop keeps Beta and part of Caption but excludes right cell 34 and Zebra."
+    },
+    {
+      "case": "03_double_near",
+      "input": {
+        "markdown": "| Item | Value |\n|---|---|\n| Alpha | 12 |\n| Beta | 34 |\n\nCaption Zebra\n\n| Group | Score |\n|---|---|\n| A | 8 |\n| B | 9 |\n\nCaption Wren",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [
+        {
+          "args": {
+            "draft_id": "bfd2ebff-5320-4198-91a4-dae7a296a4dc",
+            "section": 1,
+            "page": 1,
+            "expected_revision": 1,
+            "ids": [
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              10,
+              11,
+              12,
+              13,
+              14,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              26,
+              27,
+              28,
+              29
+            ],
+            "dy": -25
+          },
+          "revision": 2
+        }
+      ],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "30efc3b589aee227ec4939bd9b9bb07e22f9f1e5b978062a167b2c538e50021f",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "4490ff822363ae53bcc8c580046b6bb6c2b7d43b4e0e6ee5edb4f4cd1b2d9910",
+              "byte_count": 30910
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "23dba8779a37c9697bbf0a156151848c2e2aed09134686d7a634dfe9f6e70dc8",
+              "byte_count": 31872
+            }
+          ],
+          "alignment": "manual_guides"
+        },
+        {
+          "revision": 2,
+          "page_pixel_sha256": "eda69ccbeb8a589e2315b8db81da737347cccba9d34bacf748c06e2a42568a0d",
+          "table_hint": {
+            "inspect": "The bottom of a table may touch the following text. Read the last row and the text in the attached native crop. Adjust spacing only if their strokes interfere.",
+            "region": [
+              [
+                9,
+                124
+              ],
+              [
+                126,
+                124
+              ],
+              [
+                126,
+                238
+              ],
+              [
+                9,
+                238
+              ]
+            ]
+          },
+          "image_count": 4,
+          "table_crop_count": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "db6b6e1505c47c0605bdeddb7ce6a68194b7bf9c1b1e017413316e1b39c4b80a",
+              "byte_count": 30011
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "1960e4b3ec7240631c925fd877d05763ee70b966cb23177137c3070c998200bf",
+              "byte_count": 31135
+            },
+            {
+              "size": [
+                117,
+                114
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "9262293163e9f1616e892502adff9895b993dfbf484d278e7b9ea97e3d154106",
+              "byte_count": 4774
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "4490ff822363ae53bcc8c580046b6bb6c2b7d43b4e0e6ee5edb4f4cd1b2d9910",
+              "byte_count": 30910
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "db6b6e1505c47c0605bdeddb7ce6a68194b7bf9c1b1e017413316e1b39c4b80a",
+              "byte_count": 30011
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 2,
+          "sha256": "377cebf2dd45bf0ff697eb0a21b2ec32b6f3571a85b219bc6e13869a5d60087e",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 2,
+          "sha256": "95bb77e6afc0b0cb1df5cfe6bed34b1d04cc175140ba16bcf3db792642164744",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item / Value; Alpha / 12; Beta / 34; Caption Zebra; Group / Score; A / 8; B / 9; Caption Wren",
+      "observation": "Manual dy=-25 on both captions. Both touch/overprint their bottom borders and some preceding row strokes; captions partially obscured. Only first seam yielded a hint/crop and that crop itself excludes 34 and Zebra."
+    },
+    {
+      "case": "04_equation_gap",
+      "input": {
+        "markdown": "| Item | Value |\n|---|---|\n| Alpha | 12 |\n| Beta | 34 |\n\n$$x^2+y^2=z^2$$\n\nCaption Zebra",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [
+        {
+          "args": {
+            "draft_id": "14a67a8b-1ab0-44a9-adc6-ea10452c1817",
+            "section": 1,
+            "page": 1,
+            "expected_revision": 1,
+            "ids": [
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              19,
+              20,
+              21,
+              22,
+              23
+            ],
+            "dy": -35
+          },
+          "revision": 2
+        }
+      ],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "18e3be7655d7385aac69289ec6915426eaa61454e088aa7da872f94c5a8c2abd",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "cdeff3b12d232034d5c52e9c7d6b5e918398940f96abe54958f5bfba25cb55d9",
+              "byte_count": 23921
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "e59b4714a7c9c6f03a7f204a2de3bf1c50e1aea18c2bcfe1ff5546fe2ac9c7b8",
+              "byte_count": 24979
+            }
+          ],
+          "alignment": "manual_guides"
+        },
+        {
+          "revision": 2,
+          "page_pixel_sha256": "ce3459b7b570f2e9acd0929fa14c93095b2e18370ffbc007b23bae2d3632c19c",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "33aa548fa6f593882e658eaef5802b6f2e60a55bec4d1857f9ce22dcddee4c3d",
+              "byte_count": 23649
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "7e9dd309314cc2b30b6baa0e479fe4d4eb4c79d397944f9860deb9fe3964021f",
+              "byte_count": 24757
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "cdeff3b12d232034d5c52e9c7d6b5e918398940f96abe54958f5bfba25cb55d9",
+              "byte_count": 23921
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "33aa548fa6f593882e658eaef5802b6f2e60a55bec4d1857f9ce22dcddee4c3d",
+              "byte_count": 23649
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 2,
+          "sha256": "43181504d54068088c302ab0f8ce51707cc52cf05a119fd188706815dc45d5e9",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 2,
+          "sha256": "88320c45921a5f4a8b50ef4a1eb4a55d383ab1cceb88eecab7a1ae1e6d73de37",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item / Value; Alpha / 12; Beta / 34; x²+y²=z²; Caption Zebra",
+      "observation": "Revision 1 is clear. Manual dy=-35 collides caption with equation, not with table. Zero table hints; scope boundary not a table-warning miss."
+    },
+    {
+      "case": "05_only_valid",
+      "input": {
+        "markdown": "| Item | Value |\n|---|---|\n| Alpha | 12 |\n| Beta | 34 |",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "827ac3a2f9a4908c8a5ad1697f9462b10d0e33d731b342c50cfef7ee80fdd434",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "a0327e353012f210aeb2799c43f3afc1ea466d4b8f19821b48224ec783baf164",
+              "byte_count": 20052
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "6fe3aa16987b656c15b64d91444a3b707136e2430b7957e5fe2757ea9e3fb396",
+              "byte_count": 21194
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "a0327e353012f210aeb2799c43f3afc1ea466d4b8f19821b48224ec783baf164",
+              "byte_count": 20052
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 1,
+          "sha256": "77ef48d773cc1548cbf4e90a5fc254f2f4eae7f3618fd370cc1763d8fcf7703e",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 1,
+          "sha256": "705ee6f064c6a0ad2c3684b2dd84ee423bd76e966b9a65a72f58655799a2ad31",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item / Value; Alpha / 12; Beta / 34",
+      "observation": "Standard three-hyphen delimiters: table renders with borders and legible cells, no caption needed."
+    },
+    {
+      "case": "06_only_alt",
+      "input": {
+        "markdown": "| Item | Value |\n|:--|--:|\n| Alpha | 12 |\n| Beta | 34 |",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "6e5b49c3b431adcd6a014ff2285a5b088acc279d2c388e5a292cc01b5cf21aeb",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "4b395e70af602578666db4b85e5526eff7071ff27000f943ca37b888c0ce3571",
+              "byte_count": 18881
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "6d3ed66095d4224c42d272a09e4ce3a3e64922114603412e6c692a06d25d2eb0",
+              "byte_count": 19865
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "4b395e70af602578666db4b85e5526eff7071ff27000f943ca37b888c0ce3571",
+              "byte_count": 18881
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 1,
+          "sha256": "ce8f1a2bbdadd4fbc885da0bb4a4fe64dfd5eaba2ec0f7df9619786c0658e229",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 1,
+          "sha256": "320fd0a021d07f22f5d2ea2d9250757f63dad23d4963239a74e22d6f7ddf242e",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item | Value; literal colon, dash and pipe delimiters; Alpha | 12; Beta | 34",
+      "observation": "Short two-hyphen alignment delimiter, otherwise identical to 05: renderer produces raw pipes. This does not support a table-only bug."
+    },
+    {
+      "case": "07_only_aligned_three_hyphens",
+      "input": {
+        "markdown": "| Item | Value |\n|:---|---:|\n| Alpha | 12 |\n| Beta | 34 |",
+        "paper_path": "synthetic-table-paper.png",
+        "paper_mode": "photo",
+        "paper_guides": [
+          {
+            "row": 0,
+            "left": [
+              36,
+              60
+            ],
+            "right": [
+              442,
+              50
+            ]
+          },
+          {
+            "row": 14,
+            "left": [
+              36,
+              592
+            ],
+            "right": [
+              442,
+              582
+            ]
+          }
+        ],
+        "style": {
+          "homework": true,
+          "font_size": 26,
+          "seed": 84,
+          "ink": "#6a4754"
+        }
+      },
+      "edits": [],
+      "reviews": [
+        {
+          "revision": 1,
+          "page_pixel_sha256": "827ac3a2f9a4908c8a5ad1697f9462b10d0e33d731b342c50cfef7ee80fdd434",
+          "table_hint": null,
+          "image_count": 3,
+          "table_crop_count": 0,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "ac715f87c87d113440a86c9fd713d78f89da287714231f9fbef83d739fb3a62a",
+              "byte_count": 12846
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "a0327e353012f210aeb2799c43f3afc1ea466d4b8f19821b48224ec783baf164",
+              "byte_count": 20052
+            },
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "6fe3aa16987b656c15b64d91444a3b707136e2430b7957e5fe2757ea9e3fb396",
+              "byte_count": 21194
+            }
+          ],
+          "alignment": "manual_guides"
+        }
+      ],
+      "previews": [
+        {
+          "revision": 1,
+          "images": [
+            {
+              "size": [
+                480,
+                640
+              ],
+              "type": "image",
+              "mimeType": "image/png",
+              "sha256": "a0327e353012f210aeb2799c43f3afc1ea466d4b8f19821b48224ec783baf164",
+              "byte_count": 20052
+            }
+          ]
+        }
+      ],
+      "exports": {
+        "pdf": {
+          "revision": 1,
+          "sha256": "77ef48d773cc1548cbf4e90a5fc254f2f4eae7f3618fd370cc1763d8fcf7703e",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": []
+          },
+          "pages": 1
+        },
+        "zip": {
+          "revision": 1,
+          "sha256": "705ee6f064c6a0ad2c3684b2dd84ee423bd76e966b9a65a72f58655799a2ad31",
+          "review": {
+            "global_text_ink_zero": false,
+            "pages_with_evidence": 1,
+            "pages_with_visibility_flags": 0,
+            "pages_without_visibility_evidence": 0,
+            "unreviewed_pages": [],
+            "zip_pixels": {
+              "different_pages": [],
+              "pages_matching_latest_review": 1,
+              "reviewed_pages_without_digest": 0
+            }
+          },
+          "pages": 1
+        }
+      },
+      "transcript": "Item / Value; Alpha / 12; Beta / 34",
+      "observation": "Three-hyphen alignment delimiters also render bordered cells. Thus alignment colons themselves are not the cause."
+    }
+  ],
+  "actor": "gpt-6-luna"
+}
