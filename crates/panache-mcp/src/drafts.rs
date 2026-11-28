@@ -332,6 +332,7 @@ impl Drafts {
         ",
         )?;
         crate::rsi::initialize(&tx)?;
+        crate::experience::initialize(&tx)?;
         tx.commit()?;
         observations::initialize(&mut db)?;
         Ok(drafts)

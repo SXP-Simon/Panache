@@ -5,6 +5,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 pub struct PageReview {
+    pub review_id: String,
+    pub earlier_reference: Option<Value>,
     pub visibility_flag: bool,
     pub pixel_sha256: Option<String>,
 }
@@ -189,9 +191,15 @@ impl Snapshot<'_> {
     pub fn reviewed_pages(&self) -> Result<std::collections::HashMap<(u32, usize), PageReview>> {
         let db = self.drafts.connect()?;
         let mut statement = db.prepare(
-            "SELECT section, page, COALESCE(json_extract(evidence,'$.visibility')
-                IN ('no_visible_change','very_low_contrast'), 0), pixel_sha256
-             FROM review_observations WHERE seq IN (SELECT max(seq) FROM review_observations
+            "SELECT cur.section, cur.page, COALESCE(json_extract(cur.evidence,'$.visibility')
+                IN ('no_visible_change','very_low_contrast'), 0), cur.pixel_sha256, cur.review_id,
+                prior.revision, prior.review_id
+             FROM review_observations cur LEFT JOIN review_observations prior ON prior.seq=(
+                SELECT prev.seq FROM review_observations prev
+                WHERE prev.draft=cur.draft AND prev.section=cur.section AND prev.page=cur.page
+                AND prev.revision<cur.revision AND prev.pixel_sha256 IS NOT NULL
+                ORDER BY prev.revision DESC, prev.seq DESC LIMIT 1)
+             WHERE cur.seq IN (SELECT max(seq) FROM review_observations
              WHERE draft=? AND revision=? GROUP BY section,page)",
         )?;
         Ok(statement
@@ -199,6 +207,11 @@ impl Snapshot<'_> {
                 Ok((
                     (row.get(0)?, row.get::<_, u32>(1)? as usize),
                     PageReview {
+                        review_id: row.get(4)?,
+                        earlier_reference: row
+                            .get::<_, Option<u32>>(5)?
+                            .zip(row.get::<_, Option<String>>(6)?)
+                            .map(|(revision, id)| json!({"revision":revision,"review_id":id})),
                         visibility_flag: row.get(2)?,
                         pixel_sha256: row.get(3)?,
                     },
@@ -413,6 +426,11 @@ mod tests {
         assert!(old.reviewed_pages()?[&(1, 1)].pixel_sha256.is_none());
         let rev3 = drafts.snapshot("d", Some(3))?;
         rev3.record_review(1, 1, "a", "pixels", "content", &observation)?;
+        assert!(reviewed[&(1, 1)].earlier_reference.is_none());
+        assert_eq!(
+            rev3.reviewed_pages()?[&(1, 1)].earlier_reference,
+            Some(json!({"revision":2,"review_id":upgraded["review_id"]}))
+        );
         let comparison = rev3.compare_reviews(2, 1, 1, 0, 5, None)?;
         assert_eq!(
             comparison["comparison"]["limitations"],

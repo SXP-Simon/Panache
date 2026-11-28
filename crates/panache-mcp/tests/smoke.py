@@ -340,6 +340,11 @@ async def smoke(command, arguments, out):
             assert {t.name for t in tools.tools} == {
                 "start_rsi_task",
                 "read_rsi_task",
+                "search_homework_experience",
+                "record_homework_experience",
+                "read_homework_experience",
+                "validate_homework_experience",
+                "retire_homework_experience",
                 "advance_rsi_task",
                 "read_rsi_policy",
                 "publish_rsi_policy",
