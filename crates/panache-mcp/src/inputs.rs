@@ -169,6 +169,8 @@ pub struct Save {
     /// Optional photo-space baselines overriding auto detection on import. Give 2..32 guides, first row 0, last row the last writable line; intermediate guides refine the fit.
     pub paper_guides: Option<Vec<Guide>>,
     /// Original Markdown of just this section. A new section starts on a fresh page.
+    /// In prose, put a space on both sides of `/` when it separates terms, as in `输入 / 输出` or `input / output`.
+    /// For a stacked fraction, write `1/2` or `a/b` with no spaces around `/`.
     /// For a new labeled diagram use native source, for example:
     /// \begin{circuitikz}[flowchart]
     /// \draw (0,0) node[rectangle]{B1}; \draw (0,-2) node[diamond]{B2};
