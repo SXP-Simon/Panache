@@ -94,6 +94,12 @@ pub struct Parameters {
     pub ink_opacity: u8,
     pub ink_thickness: f64,
     pub ink_softness: f64,
+    /// Projected photo only: percent of the ink color modulated by the photographed substrate.
+    #[serde(default)]
+    pub photo_ink_light: u8,
+    /// Native photo-pixel focus gradient applied to the projected ink plane.
+    #[serde(default)]
+    pub photo_ink_focus: Option<crate::export_blur::Gradient>,
     pub fill: [u8; 4],
     pub underlined: bool,
     pub background_ruled: bool,
@@ -145,6 +151,8 @@ impl Default for Parameters {
             ink_opacity: 100,
             ink_thickness: 0.,
             ink_softness: 0.,
+            photo_ink_light: 0,
+            photo_ink_focus: None,
             fill: [0, 0, 0, 255],
             underlined: false,
             background_ruled: false,
@@ -297,6 +305,13 @@ impl Parameters {
         Ok(p)
     }
     pub fn validate(&self, width: u32, height: u32, limits: &Limits) -> Result<()> {
+        if self.photo_ink_light > 100 {
+            return Err(Error::new(
+                "invalid_parameter",
+                "photo_ink_light must be 0..100",
+            ));
+        }
+        crate::export_blur::finish(None, self.photo_ink_focus)?;
         let nonnegative = [
             self.left_margin,
             self.right_margin,

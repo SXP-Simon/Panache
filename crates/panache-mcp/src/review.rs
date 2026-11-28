@@ -11,7 +11,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, Limits, Parameters, export, imaging};
 use image::{GenericImageView, Pixel, Rgba, RgbaImage, imageops};
 use rmcp::model::{CallToolResult, ContentBlock};
-use serde_json::json;
+use serde_json::{Value, json};
 
 pub fn photo_point(draft: &Snapshot<'_>, [x, y]: [f32; 2]) -> [f32; 2] {
     draft
@@ -196,6 +196,47 @@ pub fn local_ink_preview(
     }
     Ok(paper_ink::measure(sample, &paper, &finished, None, cancel)?
         .map(|e| paper_ink::report(&e, draft.id, draft.revision, section, page)))
+}
+
+// Paper measurements identify places worth inspecting, not a defect in the new ink.
+fn photo_ink_adjustment(
+    projected: bool,
+    visible_ink: bool,
+    draft: &str,
+    revision: u32,
+    review: &Value,
+) -> Option<Value> {
+    if !projected || !visible_ink {
+        return None;
+    }
+    let focus = review["paper_focus_check"]["status"] == "spatial_variation"
+        || review.get("png_finish_comparison").is_some();
+    let light = review["local_paper_ink_check"]["samples"]
+        .as_array()
+        .is_some_and(|samples| {
+            samples.iter().any(|sample| {
+                sample["paper_marks"]["supported"] == true
+                    && sample["added_writing"]["median_glyph_p90_luma_drop"].is_number()
+            })
+        });
+    if !focus && !light {
+        return None;
+    }
+    let mut hint = json!({
+        "describe_arguments":{"draft_id":draft,"revision":revision,"group":"ink"},
+        "guidance":"The paper readings locate comparisons, not faults. Use the user's request or confirm a mismatch in native crops. If the ink already fits, leave it unchanged. After any trial compare the same region at the same scale and check readable fine strokes and protected print."
+    });
+    if focus {
+        hint["focus"] = json!(
+            "If one area needs softer NEW strokes while the original print stays sharp, look up photo_ink_focus and try it in tune_handwriting changes. Inspect the softer, transition and sharp areas at native size; keep the sharp endpoint at zero. For a single word or shape, prefer a local edit. export_blur_gradient is a PNG finish and softens paper and ink together."
+        );
+    }
+    if light {
+        hint["light"] = json!(
+            "If new ink should follow the paper's local shade or tint, look up photo_ink_light and try it in tune_handwriting changes. This adjusts new pen color, not sharpness or alpha; pure black is unchanged. Darker writing or nearby shadow alone does not justify adjusting it."
+        );
+    }
+    Some(hint)
 }
 
 pub fn page(
@@ -429,6 +470,15 @@ pub fn page(
             true,
             &mut metadata,
         )?;
+        if let Some(hint) = photo_ink_adjustment(
+            draft.paper.as_ref().is_some_and(|p| p.projection.is_some()),
+            status == "inspect_visually",
+            draft.id,
+            draft.revision,
+            &metadata,
+        ) {
+            metadata["photo_ink_adjustment"] = hint;
+        }
         metadata
     };
     let mut response = reply(
@@ -459,4 +509,36 @@ pub fn page(
         ));
     }
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn photo_ink_hint_is_scoped_to_eligible_visible_evidence() {
+        let hint =
+            |projected, visible, data| photo_ink_adjustment(projected, visible, "d", 3, &data);
+        let spatial = json!({"paper_focus_check":{"status":"spatial_variation"}});
+        assert!(hint(false, true, spatial.clone()).is_none());
+        assert!(hint(true, false, spatial.clone()).is_none());
+        assert!(hint(true, true, json!({})).is_none());
+        let focus = hint(true, true, spatial).unwrap();
+        assert!(focus.get("focus").is_some() && focus.get("light").is_none());
+        assert_eq!(
+            focus["describe_arguments"],
+            json!({"draft_id":"d","revision":3,"group":"ink"})
+        );
+        let compare = json!({"local_paper_ink_check":{"samples":[{
+            "paper_marks":{"supported":true},
+            "added_writing":{"median_glyph_p90_luma_drop":52}
+        }]}});
+        let light = hint(true, true, compare).unwrap();
+        assert!(light.get("light").is_some() && light.get("focus").is_none());
+        let unsupported = json!({"local_paper_ink_check":{"samples":[{
+            "paper_marks":{"supported":false},
+            "added_writing":{"median_glyph_p90_luma_drop":52}
+        }]}});
+        assert!(hint(true, true, unsupported).is_none());
+    }
 }

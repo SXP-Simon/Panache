@@ -23,6 +23,7 @@ import export_blur
 import illustration_pen
 import illustration_ink_check
 import paper_focus
+import photo_ink_finish
 import paper_ink_check
 import font_samples
 import review_comparison
@@ -437,6 +438,7 @@ async def smoke(command, arguments, out):
             await illustration_ink_check.verify(client, Path(temp))
             await diagram_perspective.verify(client, Path(temp))
             await paper_focus.verify(client, Path(temp))
+            await photo_ink_finish.verify(client, Path(temp))
             await paper_ink_check.verify(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.

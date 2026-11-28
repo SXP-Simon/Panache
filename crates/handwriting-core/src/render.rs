@@ -312,13 +312,9 @@ pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
             None => paper,
         };
         let output = match photo {
-            Some((projection, background))
-                if r.params.transparent_background && !r.params.pdf_save =>
-            {
-                let clear = RgbaImage::new(background.width(), background.height());
-                projection.composite_into(clear, &image, cancel)?
+            Some((projection, background)) => {
+                projection.finish_ink(background, &image, &r.params, cancel)?
             }
-            Some((projection, background)) => projection.composite(background, &image, cancel)?,
             None => image,
         };
         emit(i, output)
