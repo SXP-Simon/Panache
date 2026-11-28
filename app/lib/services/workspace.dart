@@ -404,8 +404,13 @@ class Workspace extends ChangeNotifier {
       fields['fine_edit'] = 'true';
       fields['seed'] = '0';
       final fineEdits = _fineHistory.forText(text);
-      if ((!preview || pngBlurActive) && fineEdits != null) {
-        fields['fine_edits'] = jsonEncode(fineEdits.toJson());
+      if (fineEdits != null) {
+        // 普通预览由客户端合成；只传排版键，确保新旧渲染路径的底图相同。
+        fields['fine_edits'] = jsonEncode(
+          preview && !pngBlurActive
+              ? {'key': fineEdits.key, 'glyphs': const []}
+              : fineEdits.toJson(),
+        );
       }
     }
     if (background != null) {

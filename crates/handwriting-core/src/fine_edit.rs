@@ -64,6 +64,8 @@ pub struct Adjustments {
 #[derive(Serialize)]
 pub struct GlyphBounds {
     #[serde(skip)]
+    pub is_grid_table: bool,
+    #[serde(skip)]
     pub is_text: bool,
     #[serde(skip)]
     pub is_native_diagram: bool,
@@ -92,6 +94,7 @@ pub fn inspect_page(
                 tiles
                     .into_iter()
                     .map(|t| GlyphBounds {
+                        is_grid_table: t.is_grid_table,
                         id: t.id,
                         is_text: t.is_text,
                         is_native_diagram: t.is_native_diagram,
@@ -149,9 +152,26 @@ impl Adjustments {
     }
 }
 
+// 旧偏移和当时的分页绑定；继续编辑同一稿时也不能换到新坐标系。
+pub(crate) fn uses_legacy_layout(text: &str, p: &Parameters) -> bool {
+    p.fine_edit
+        && p.fine_edits
+            .as_ref()
+            .is_some_and(|edits| edits.key == layout_key(text, p, b"panache-fine-2\0"))
+}
+
 pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
+    let version: &[u8] = if uses_legacy_layout(text, p) {
+        b"panache-fine-2\0"
+    } else {
+        b"panache-fine-3\0"
+    };
+    layout_key(text, p, version)
+}
+
+fn layout_key(text: &str, p: &Parameters, version: &[u8]) -> String {
     let mut hash = Sha256::new();
-    hash.update(b"panache-fine-2\0");
+    hash.update(version);
     hash.update(text.as_bytes());
     hash.update([
         u8::from(p.english_spacing),
@@ -161,7 +181,35 @@ pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
     format!("{:x}", hash.finalize())
 }
 
+#[cfg(test)]
+mod layout_version_tests {
+    use super::*;
+
+    #[test]
+    fn layout_stays_legacy_only_with_a_matching_saved_key() {
+        let text = "旧表格作业";
+        let mut params = Parameters {
+            fine_edit: true,
+            ..Parameters::default()
+        };
+        let current = document_key(text, &params);
+        let legacy = layout_key(text, &params, b"panache-fine-2\0");
+        assert_ne!(current, legacy);
+        params.fine_edits = Some(Adjustments {
+            key: legacy.clone(),
+            glyphs: vec![],
+        });
+        assert!(uses_legacy_layout(text, &params));
+        assert_eq!(document_key(text, &params), legacy);
+        assert!(!uses_legacy_layout("新内容", &params));
+        params.fine_edits.as_mut().unwrap().key = current.clone();
+        assert!(!uses_legacy_layout(text, &params));
+        assert_eq!(document_key(text, &params), current);
+    }
+}
+
 pub(crate) struct Tile {
+    pub is_grid_table: bool,
     pub is_text: bool,
     pub is_native_diagram: bool,
     pub illustration: Option<u32>,
@@ -173,7 +221,8 @@ pub(crate) struct Tile {
     pub source: Option<[u32; 2]>,
 }
 
-pub(crate) const PAD: u32 = 4;
+/// Transparent editing border on each side of a glyph tile.
+pub const PAD: u32 = 4;
 pub(crate) const PAGE_TILE_BUDGET: usize = 32_000_000;
 
 #[derive(Debug, Serialize)]
