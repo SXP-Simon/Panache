@@ -108,3 +108,16 @@ python scripts/rsi_pilot/real_photo_episode_local.py --out "$RUN" --binary "$MCP
 三个新 Terra 会话分别收到化学、表格和流程图作业，首次调用均用题面原话查经验。化学首题缺少要逐字保留的旧命令，宿主在命中后向用户询问。补齐命令后又用新会话跑了一次，导出保留源码及 12.5% 的 PDF。纯文字负例写有“勿加公式、图或表”，仅用 BM25 返回两条无关候选，加题目标签后为空。这是词面召回，使用前仍需核对适用条件。[三份交付和验证页](https://github.com/SXP-Simon/Panache/tree/427a03c26f29ba2dea6960111ceb488d1836ad13/screenshots/rsi-pilot/bm25)
 
 复现实验可用 `experience_bm25.py`，其 `--original` 指向上一节三条提案已分别完成验证和对照的 physics-02 数据目录。配置沿用 `binary`、`worker`、`fonts`、`home`，其中 `home` 指向新的隔离目录。依次运行 `prepare`、核对输出的原生页面、`validate`、`compare`；每次加上 `--config config.json --out run`。用 `session --case chemistry|table|flow|chemistry_template` 分别运行四个宿主，再用 `report --result report.json` 汇总。每个会话复制同一个已验证的起始库。
+
+## 搜到经验后，宿主是否会跳过不适用的检查
+
+从同一个 BM25 实验库复制两份隔离环境，各开一个新 Terra 会话，只给中文作业要求。两题都要求交付时简述采用和跳过的检查，题面没有给标签、规则 ID 或检索提示。纯文字沿用上一轮的野外观察题；另一题要求核对时间和位移的两列表格、保留一句趋势说明，明确不要流程图。混排原稿特意把 3 秒的位移填成 9 米，实验底单是 7 米。
+
+| 作业 | 宿主用题面查询后实际收到的顺序 | 宿主的处理与交付验收 |
+| --- | --- | --- |
+| 上午露珠、午后云影、傍晚晚霞 | 流程图、表格 | 明确跳过这两类专项检查，核对三段的时段和成因。一页 PDF 独立读回三段，零表格、零流程图、零公式。 |
+| 小车记录，表格加一句话 | 表格、流程图、旧模板分式 | 声明按表头逐行核对，改正中间一格，跳过分支检查。PDF 无流程图，表下注释仍与末行重叠。独立读卷者能读出修后的 7 米，末行时间读不清。经验选择通过，成稿需要返工。 |
+
+修订前后原生整页仅在中间单元格的 11 × 26 像素范围内有变化。两份最终 PDF 的内嵌 RGB 都与各自导出版本的原生预览一致。盲读只给完整 PDF 渲染页和转录要求。每题各一次，无法据此估算成功率或归因于检索。[逐次调用、作者说明和盲读](results/experience-scope.json) · [完整页和混排原稿](https://github.com/SXP-Simon/Panache/tree/51450dd9ebded9e0a761f27d37fe189ebe184a11/screenshots/rsi-pilot/bm25-scope)
+
+用上一节已完成验证的配置启动 `python scripts/rsi_pilot/experience_scope.py text --config config.json --out scope-run`；另一题将 `text` 换成 `mixed`。各会话结束后，加 `--audit` 重读导出 PDF。原始调用、取件路径和图像留在各自运行目录。

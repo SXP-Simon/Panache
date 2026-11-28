@@ -247,11 +247,9 @@ def compare(cfg, root):
     )
 
 
-def session(cfg, root, name):
-    # Each host sees the same starting library, including exactly the same hidden controls.
-    session_home = root / ("home-" + name)
+def clone_home(source, session_home):
+    """Copy the committed SQLite snapshot and its existing exports for one isolated host."""
     session_home.mkdir(exist_ok=False)
-    source = Path(cfg["home"])
     with (
         sqlite3.connect(
             (source / "drafts.sqlite3").resolve().as_uri() + "?mode=ro", uri=True
@@ -260,6 +258,11 @@ def session(cfg, root, name):
     ):
         db.backup(clone)
     shutil.copytree(source / "exports", session_home / "exports")
+
+
+def session(cfg, root, name):
+    session_home = root / ("home-" + name)
+    clone_home(Path(cfg["home"]), session_home)
     prompt = CASES_ZH["chemistry" if name == "chemistry_template" else name][0]
     if name == "chemistry_template":
         prompt += r" 这次要让同学照抄的原命令是 \nicefrac{3}{24}。"
