@@ -484,6 +484,62 @@ fn fine_edit_moves_one_homework_character_and_exports_the_same_pages() {
 }
 
 #[test]
+fn saved_fine_layout_key_only_preview_matches_full_edits_geometry() {
+    use handwriting_core::fine_edit::{Adjustment, Adjustments};
+    use sha2::{Digest, Sha256};
+    let mut request = request("旧表格");
+    request.params.fine_edit = true;
+    let mut hash = Sha256::new();
+    hash.update(b"panache-fine-2\0");
+    hash.update(request.text.as_bytes());
+    hash.update([0, 0, 0]);
+    let legacy_key = format!("{:x}", hash.finalize());
+    let layers = |req: &RenderRequest| {
+        let mut result = None;
+        generation::generate(
+            req,
+            &Cancellation::default(),
+            Output::InkLayers(&mut |_, page| {
+                result = page.fine;
+                Ok(())
+            }),
+            |_| Ok(()),
+        )
+        .unwrap();
+        result.unwrap()
+    };
+    assert_ne!(layers(&request).key, legacy_key);
+    request.params.fine_edits = Some(Adjustments {
+        key: legacy_key.clone(),
+        glyphs: vec![],
+    });
+    let preview = layers(&request);
+    request
+        .params
+        .fine_edits
+        .as_mut()
+        .unwrap()
+        .glyphs
+        .push(Adjustment {
+            id: 0,
+            dx: 14,
+            dy: 12,
+            scale: 100,
+            angle: 0,
+            opacity: 100,
+            opacity_ramp: None,
+            color: None,
+            thickness: 0,
+            softness: 0,
+            warp: None,
+        });
+    let full = layers(&request);
+    assert_eq!(preview.key, legacy_key);
+    assert_eq!(full.key, preview.key);
+    assert_eq!(full.glyphs, preview.glyphs);
+}
+
+#[test]
 fn photo_camera_tags_and_manual_fallback_survive_page_exports() {
     use base64::{Engine, engine::general_purpose::STANDARD};
     use exif::{Field, In, Reader, Tag, Value, experimental::Writer};

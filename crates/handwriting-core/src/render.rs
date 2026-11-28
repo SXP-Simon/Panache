@@ -80,6 +80,7 @@ where
     x: f32,
     y: f32,
     previous_bottom: f32,
+    table_clearance: bool,
     table_edge: Vec<i32>,
     written_lines: usize,
     line: Vec<LineUnit>,
@@ -171,7 +172,7 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
                 u.x + u.glyph.left,
                 anchor.round() as i32 + u.dy + u.glyph.top,
             );
-            if u.is_grid_table {
+            if self.table_clearance && u.is_grid_table {
                 self.table_edge.resize(self.canvas.width() as usize, 0);
             }
             if self.p.fine_edit {
@@ -443,6 +444,7 @@ fn render_planes(
         x: p.left_margin,
         y: p.top_margin + p.line_spacing,
         previous_bottom: p.top_margin,
+        table_clearance: !fine_edit::uses_legacy_layout(&r.text, &r.params),
         table_edge: Vec::new(),
         written_lines: 0,
         line: Vec::new(),
@@ -715,6 +717,7 @@ mod ruled_tests {
                 x: 10.,
                 y: 10. + spacing,
                 previous_bottom: 10.,
+                table_clearance: true,
                 table_edge: Vec::new(),
                 written_lines: 0,
                 line: vec![],

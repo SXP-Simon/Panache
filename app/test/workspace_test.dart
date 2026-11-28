@@ -235,6 +235,39 @@ void main() {
     },
   );
 
+  test('fine preview sends the saved layout key without glyph edits', () async {
+    final key = 'b' * 64;
+    final storage = MemoryStorage();
+    storage.values['flutter.workspace'] = jsonEncode({
+      'text': 'draft',
+      'fineEdits': {
+        'key': key,
+        'glyphs': [
+          {
+            'id': 1,
+            'dx': 4,
+            'dy': 0,
+            'scale': 100,
+            'angle': 0,
+            'opacity': 100,
+          },
+        ],
+      },
+    });
+    final api = ControlledApi()..supportsFineEdit = true;
+    final w = Workspace(api: api, storage: storage);
+    addTearDown(w.dispose);
+    await w.initialize();
+
+    final preview = w.generate();
+    expect(jsonDecode(api.submittedFields!['fine_edits']!), {
+      'key': key,
+      'glyphs': [],
+    });
+    api.submission.complete('preview-task');
+    expect(await preview, isTrue);
+  });
+
   test(
     'cleared edits are omitted from drafts and exported with their layout key',
     () async {
