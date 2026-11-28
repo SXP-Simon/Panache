@@ -1,0 +1,70 @@
+[
+  {
+    "file": "appearance/baseline/details.png",
+    "sha256": "f0afb72dba8fc3291c28303774cf2428d0046b1c767678e105712fac2b87a5d4"
+  },
+  {
+    "file": "appearance/baseline/overview.png",
+    "sha256": "e0d6e7cf5d8786bae9839c31c98457ff856aa260dabe958d2ee0c48f1eecdcac"
+  },
+  {
+    "file": "appearance/global/details.png",
+    "sha256": "a9ca96995f9fdafc2e9fa354640034b74ed02ff21a1c9f7d0544a27afa4da6d7"
+  },
+  {
+    "file": "appearance/global/overview.png",
+    "sha256": "ea372395e81a9331907bb9ea703429b8155964fd4b8bf24eb457a5b24de83f8f"
+  },
+  {
+    "file": "appearance/local/details.png",
+    "sha256": "b244e709a168ea8ae26b1c651460b5ae087aa69692181f3467f44baeb214ee98"
+  },
+  {
+    "file": "appearance/local/overview.png",
+    "sha256": "52940029d3c72f7decc428588a367d0015286a00e38cbc5ceb5eebb57deef715"
+  },
+  {
+    "file": "appearance/near-and-far.png",
+    "sha256": "0251dc0b6bb8afdf0902c6f0646825b502025e2ee67fbfec7ca6fabadd4d73d3"
+  },
+  {
+    "file": "transfer/public-notes-v3/V2/step-1/image-1.png",
+    "sha256": "55fd1cedfb9308cf58dcc34818bf51999e9ccb6cced1e6fe5530471f7cc9c3fe"
+  },
+  {
+    "file": "transfer/public-notes-v3/V2/step-2/image-1.png",
+    "sha256": "448eb8a3fcddefb1781e1afb25e78d4fc3523e70abf25130c170ab26f157f838"
+  },
+  {
+    "file": "transfer/public-notes-v3/r2/detail.jpg",
+    "sha256": "ae194e6729160bbc478fa2461345f5dd293f2952af6a8d441ebd3a994132dd5a"
+  },
+  {
+    "file": "transfer/public-notes-v3/r2/overview.jpg",
+    "sha256": "ce2d3736a76871c2df135fe4f97b289220ddef63f55ddf45a9dc19f42824e7aa"
+  },
+  {
+    "file": "transfer/public-notes-v3/r3/detail.jpg",
+    "sha256": "d8e539e8b488f92a9e164b44f4ce50d50c7d23534fdd6ee7bd6d6ede844df533"
+  },
+  {
+    "file": "transfer/public-notes-v3/r3/overview.jpg",
+    "sha256": "22ee65a9f42d400ef7668867c2f915b13ea9a891febd2be6224ef8f4d2bab0a5"
+  },
+  {
+    "file": "transfer/public-slots-v3/V2/step-2/image-1.png",
+    "sha256": "172334f71f212d9b8b9b466613ef3674f3780eba02445512e995d5d3e3730aad"
+  },
+  {
+    "file": "transfer/public-slots-v3/V2/step-3/image-1.png",
+    "sha256": "63ce1c7a3b327ad8f3ec39719896f73444b3b31c507253f8be7bcb909ebc8026"
+  },
+  {
+    "file": "transfer/public-slots-v3/r2/detail.jpg",
+    "sha256": "3a49e9794d1a00420cffed30c89ed2ed1ca86367aab08fe20ed65891e0772320"
+  },
+  {
+    "file": "transfer/public-slots-v3/r2/overview.jpg",
+    "sha256": "90fbdae75e2150e3d89387e1b69e1730a82cd83f8e4d5386b56d137910112b2b"
+  }
+]
