@@ -237,6 +237,8 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 4. 从 `candidate_revisions` 中选择满足目标的一版，以 `select` 提交其检查证据和取舍，再以 `selected_revision` 调用 `export_handwriting`。目标无法满足时用 `stop` 记录未解问题。最后一个决策名额留给选择或停止。重连后用 `read_rsi_task` 和保存的任务 ID 读取决策、预览参数与摘要，或用 `read_section(view=review)` 查整页单据。局部裁剪可按原参数重绘；将返回图片的 Base64 字符串做 SHA-256，即可与当时的图片摘要核对。
 5. 用 `publish_rsi_policy` 引用父策略和已结束、有证据的源任务，写明下一版的执行、审阅、成稿选择、实验选择规则和预算。后续任务显式选用新版本。用 `validate_rsi_policy` 记录新版本在独立稿件上的实测结论、失败和局限；用 `read_rsi_policy` 查回这些宿主评估及对应任务。
 
+需要验收指引时，调用 `read_rsi_policy({"policy_id":"pilot-v1","include_evidence_guide":true})`。独立字段 `evidence_guide.version` 标识指引版本。按本次任务选择 `checks` 中的项目，例如按 `table_cells.calls` 读取原文并裁取指定表格，逐格核对数值。将调用参数补上实际稿号、候选版本和节页，裁区按 `region_from` 取得。每项附有证据局限和仓库来源。[验收指引](evidence-guide-v1.json)
+
 ## 验证
 
 构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF。

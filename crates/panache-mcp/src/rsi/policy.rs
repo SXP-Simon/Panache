@@ -40,6 +40,9 @@ pub struct Publish {
 pub struct PolicyQuery {
     /// Omit to list recent versions. Use the exact ID to read a pinned document.
     pub policy_id: Option<String>,
+    /// Include the versioned evidence guide alongside the list or policy document.
+    #[serde(default)]
+    pub include_evidence_guide: bool,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -82,8 +85,17 @@ pub(super) fn load(db: &Connection, id: &str) -> Result<Policy> {
 
 impl Drafts {
     pub fn read_rsi_policy(&self, input: PolicyQuery) -> Result<Value> {
+        let mut result = self.policy_and_reports(input.policy_id)?;
+        if input.include_evidence_guide {
+            result["evidence_guide"] =
+                serde_json::from_str(include_str!("../../evidence-guide-v1.json"))?;
+        }
+        Ok(result)
+    }
+
+    fn policy_and_reports(&self, policy_id: Option<String>) -> Result<Value> {
         let db = self.connect()?;
-        let Some(id) = input.policy_id else {
+        let Some(id) = policy_id else {
             let mut stmt =
                 db.prepare("SELECT id FROM rsi_policies ORDER BY rowid DESC LIMIT 50")?;
             let ids = stmt

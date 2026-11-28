@@ -339,7 +339,7 @@ impl Panache {
 
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
-        description = "List policy versions or read one immutable rule set with its source tasks and validation reports."
+        description = "List policy versions or read one immutable rule set with its source tasks and validation reports. Set include_evidence_guide=true for versioned acceptance checks and existing tool arguments."
     )]
     async fn read_rsi_policy(
         &self,

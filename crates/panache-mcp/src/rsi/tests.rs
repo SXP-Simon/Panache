@@ -106,6 +106,7 @@ fn policies_pin_rules_bound_work_and_validate_on_separate_drafts() -> Result<()>
     decide(&d, &train, 0, 1, "select", &[&reference])?;
     let seed = d.read_rsi_policy(PolicyQuery {
         policy_id: Some("pilot-v1".into()),
+        include_evidence_guide: false,
     })?;
     let mut rules = seed["rules"].clone();
     rules["max_steps"] = json!(2);
@@ -137,11 +138,68 @@ fn policies_pin_rules_bound_work_and_validate_on_separate_drafts() -> Result<()>
     validate(json!([t]))?;
     let report = d.read_rsi_policy(PolicyQuery {
         policy_id: Some("example-v2".into()),
+        include_evidence_guide: false,
     })?;
     assert_eq!(report["recent_validations"][0]["task_ids"], json!([t]));
     assert_eq!(
         d.read_rsi(TaskQuery { task_id: train })?["rules"],
         seed["rules"]
     );
+    Ok(())
+}
+
+#[test]
+fn evidence_guide_is_discoverable_and_independent_of_stored_rules() -> Result<()> {
+    let home = tempfile::tempdir()?;
+    let drafts = Drafts::open(home.path())?;
+    let read = |args| drafts.read_rsi_policy(serde_json::from_value(args)?);
+    let mut list = read(json!({"include_evidence_guide":true}))?;
+    let guide = list
+        .as_object_mut()
+        .unwrap()
+        .remove("evidence_guide")
+        .unwrap();
+    assert_eq!(list, read(json!({}))?);
+    let mut pinned = read(json!({"policy_id":"pilot-v1","include_evidence_guide":true}))?;
+    assert_eq!(
+        pinned.as_object_mut().unwrap().remove("evidence_guide"),
+        Some(guide.clone())
+    );
+    assert_eq!(
+        pinned,
+        read(json!({"policy_id":"pilot-v1","include_evidence_guide":false}))?
+    );
+    assert_eq!(guide["version"], "paper-homework/1");
+    for name in [
+        "paper_and_rulings",
+        "focus_and_contrast",
+        "pages_and_delivery",
+        "table_cells",
+        "diagram_branches",
+    ] {
+        let check = &guide["checks"][name];
+        assert!(!check["sources"].as_array().unwrap().is_empty());
+        assert!(!check["limits"].as_str().unwrap().is_empty());
+        for call in check["calls"].as_array().unwrap() {
+            let mut args = call["arguments"].clone();
+            args["draft_id"] = json!("example");
+            args["revision"] = json!(1);
+            if call.get("region_from").is_some() {
+                args["region"] = json!([[1, 1], [40, 1], [40, 20], [1, 20]]);
+            }
+            match call["tool"].as_str().unwrap() {
+                "preview_handwriting" => {
+                    serde_json::from_value::<crate::Preview>(args)?;
+                }
+                "read_section" => {
+                    serde_json::from_value::<crate::Read>(args)?;
+                }
+                "export_handwriting" => {
+                    serde_json::from_value::<crate::Export>(args)?;
+                }
+                other => panic!("Unknown guide tool {other}"),
+            }
+        }
+    }
     Ok(())
 }
