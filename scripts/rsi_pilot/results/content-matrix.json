@@ -1,0 +1,2510 @@
+{
+  "protocol_sha256": "9a776a64ba14d84a635002d96405e6019de6d4c15cc01ee21542e87e23dd0c27",
+  "terminal_protocol_sha256": "e2d77a2cf02d6b9e1308806648b06c09fb7614f8d19f3613b370849fe1ab79a6",
+  "model": "gpt-6.1-terra",
+  "binary_sha256": "ead29b1fe7698e6683494e22ab2c991f6a0ee25a2a0f827637a2fffe5df4924a",
+  "worker_sha256": "9858a3996ff49895899d153fda57586227f1fa2be139b3f61a6d895ee5c5e237",
+  "font_sha256": "990667a527a9a725607ce965e529199464e47236664137e653c96301039d05f3",
+  "paper_sha256": "c97ac505c5c874a8997cb731ce5d4181fe1ef3629e680b44aefa635ad0f825db",
+  "measurement": "Native parser run on saved prepared sections, joined to MCP page layout by node ID and checked for at least 32 levels of grayscale darkening against the known public paper. Whole-object ink verifies location and paint, not individual character legibility. Content rules are literal witnesses; the blinded visual assessment is separate.",
+  "arms": {
+    "v1": "你是 Panache 宿主的视觉复查模型。检查所有随附的真实页面、题面和当前 Markdown。判断逐项是否完成，包括数值、表格单元、图中节点、箭头方向和分支标注。仅据可见图像判断呈现，源代码不能证明标签、分式或表格已经写出来；在图像证据不足时指出不确定性。你可选择一轮修正机会。只输出 JSON，action=select、stop、replace 或 tune，reason 描述具体问题或验收依据；replace 附 markdown 整节完整替换，tune 附 changes 对象。若必须改题意内容，用 replace。不要访问文件或工具。",
+    "v2": "你是 Panache 宿主的视觉复查模型。检查所有随附的真实页面、题面和当前 Markdown。判断逐项是否完成，包括数值、表格单元、图中节点、箭头方向和分支标注。仅据可见图像判断呈现，源代码不能证明标签、分式或表格已经写出来；在图像证据不足时指出不确定性。你可选择一轮修正机会。只输出 JSON，action=select、stop、replace 或 tune，reason 描述具体问题或验收依据；replace 附 markdown 整节完整替换，tune 附 changes 对象。若必须改题意内容，用 replace。不要访问文件或工具。\nMCP 动作定义：select 表示验收该版本并交付；stop 表示仍有无法解决的问题，结束任务且不交付任何稿件。replace 或 tune 表示先产生另一个候选再复查；如果选择修改，具体写出当前稿上需要改动的证据。由你依据页面判断该采取哪一项。"
+  },
+  "cases": {
+    "text": {
+      "brief": "写一页纯文字的野外观测记录，按上午、午后、傍晚三段分别解释露珠、云影、晚霞的形成。三段包含相应时段和现象名称。每段一至两句，勿加公式、图或表。",
+      "expected": {
+        "tokens": [
+          "上午",
+          "露珠",
+          "午后",
+          "云影",
+          "傍晚",
+          "晚霞"
+        ],
+        "concepts": [
+          "condensation near cooled surfaces",
+          "clouds blocking sunlight",
+          "long optical path / scattering"
+        ]
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "164bb08800396ece607d72dbbb1a66288930a8ef71fec530924cae0f5393d567",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20356,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 159,
+          "reasoning_output_tokens": 0
+        }
+      },
+      "authored_markdown": "上午，露珠：夜间地面和草叶散热降温，使附近空气中的水汽遇冷凝结成小水滴，附着在草叶上。日出后，阳光逐渐使露珠蒸发。\n\n午后，云影：云层遮挡了部分阳光，使地面上对应的区域较暗，形成云影。随着云在风中移动，云影也随之移动。\n\n傍晚，晚霞：太阳接近地平线时，阳光穿过较厚的大气层，蓝紫色光更容易被散射，留下较多红橙色光照亮云层，形成晚霞。",
+      "author_decision_sha256": "574c44011bd9e70a76661350c8771d01a44df7727d096b0c318d028e51af0852",
+      "first": {
+        "checks": {
+          "three_observations_in_order": true,
+          "one_or_two_sentences_per_observation": true,
+          "table_count": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 0,
+          "graph": 0,
+          "fraction": 0
+        },
+        "table_checks": [],
+        "graph_checks": [],
+        "components": [],
+        "layout_glyph_count": 162,
+        "prose_glyphs_checked": 162,
+        "nonblank_prose_glyphs": 162,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 162,
+            "review_id": "149b9632-f4b7-4a6d-bb11-7314c09f000a",
+            "sha256": "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039"
+          }
+        ],
+        "prepared_sha256": "2b0b7cac96f26e594f97397e6ce31f7434e7d13fd2a7df24c05048828434cd6a"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "可见页面为一页纯文字记录，依次包含上午露珠、午后云影和傍晚晚霞三段，各段均标明时段与现象，并用一至两句解释形成过程；未见公式、图或表。页面内容与当前 Markdown 一致。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "4e1756ec1c1c6a3a7f52ba1f75f33bbb4cbf4c8f08cd91ac2ce0e4cdb22cc9b1",
+              "image_sha256": [
+                "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039"
+              ],
+              "usage": {
+                "input_tokens": 23046,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 102,
+                "reasoning_output_tokens": 23
+              }
+            }
+          }
+        ],
+        "task_id": "756e9326-fd28-4e8a-8846-5fffdf17e861",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "756e9326-fd28-4e8a-8846-5fffdf17e861/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面为一页纯文字记录，依次包含上午露珠、午后云影和傍晚晚霞三段，各段均标明时段与现象，并用一至两句解释形成过程；未见公式、图或表。页面内容与当前 Markdown 一致。",
+            "result_revision": null,
+            "review_ids": [
+              "149b9632-f4b7-4a6d-bb11-7314c09f000a"
+            ],
+            "revision": 1,
+            "task_id": "756e9326-fd28-4e8a-8846-5fffdf17e861",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v1",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 104185,
+          "sha256": "54a3da9762b6074d8aa33e5985e21cafeeefb03a3f0e5c420be4a1303e4d2cf0",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "4c76419b598733c05001b224b0ee64af7017ab44542e4c074bc290e903b6cb01",
+              "preview_sha256": "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039",
+              "mean_absolute_rgb_error": 1.6803
+            }
+          ]
+        }
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "可见页面为一页纯文字，依次包含上午的露珠、午后的云影和傍晚的晚霞；各段均标明时段与现象名称，用一至两句解释形成过程，内容与当前 Markdown 一致，未见公式、图或表。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "73e12c9e39d6ab4cfdf0c10dff903337565f5634fd7c0552ee54898e58a0b972",
+              "image_sha256": [
+                "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039"
+              ],
+              "usage": {
+                "input_tokens": 23118,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 91,
+                "reasoning_output_tokens": 13
+              }
+            }
+          }
+        ],
+        "task_id": "457c70e1-4d3f-4c1a-b344-611e17ec85fd",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "457c70e1-4d3f-4c1a-b344-611e17ec85fd/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面为一页纯文字，依次包含上午的露珠、午后的云影和傍晚的晚霞；各段均标明时段与现象名称，用一至两句解释形成过程，内容与当前 Markdown 一致，未见公式、图或表。",
+            "result_revision": null,
+            "review_ids": [
+              "149b9632-f4b7-4a6d-bb11-7314c09f000a"
+            ],
+            "revision": 1,
+            "task_id": "457c70e1-4d3f-4c1a-b344-611e17ec85fd",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 104185,
+          "sha256": "54a3da9762b6074d8aa33e5985e21cafeeefb03a3f0e5c420be4a1303e4d2cf0",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "4c76419b598733c05001b224b0ee64af7017ab44542e4c074bc290e903b6cb01",
+              "preview_sha256": "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039",
+              "mean_absolute_rgb_error": 1.6803
+            }
+          ]
+        }
+      }
+    },
+    "formula": {
+      "brief": "推导并求解并联电阻。电阻 R₁=6 Ω、R₂=3 Ω，电压 U=12 V。至少分三行展现等效电阻、总电流与功率的计算。等效电阻一步必须写成上下堆叠的分式；给出每个结果及单位。不要画图或表格。",
+      "expected": {
+        "tokens": [
+          "6",
+          "3",
+          "12",
+          "2",
+          "6",
+          "72"
+        ],
+        "concepts": [
+          "R_eq = 2 Ω",
+          "I = 6 A",
+          "P = 72 W",
+          "at least one stacked fraction",
+          "at least three calculation lines"
+        ],
+        "fractions": 1
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "2c6f7eb8e4abb80563bd03d71130b32c75001f8b55ddda51fceff88336ec8949",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20371,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 219,
+          "reasoning_output_tokens": 0
+        }
+      },
+      "authored_markdown": "## 并联电阻的计算\n\n并联电阻两端的电压相同，总电流等于各支路电流之和。由欧姆定律可得：\n\n$$\n\\frac{U}{R_{\\text{等}}}=\\frac{U}{R_1}+\\frac{U}{R_2}\n\\quad\\Rightarrow\\quad\nR_{\\text{等}}=\\frac{R_1R_2}{R_1+R_2}=\\frac{6\\times 3}{6+3}=2\\ \\Omega\n$$\n\n总电流为：\n\n$$\nI=\\frac{U}{R_{\\text{等}}}=\\frac{12}{2}=6\\ \\text{A}\n$$\n\n总功率为：\n\n$$\nP=UI=12\\times 6=72\\ \\text{W}\n$$",
+      "author_decision_sha256": "e9446ebc569fb310eebafd5a0485fa3efa5487d47dbb74c2c0ad78d2e7c07c6e",
+      "first": {
+        "checks": {
+          "resistance_2_ohms": true,
+          "current_6_amperes": true,
+          "power_72_watts": true,
+          "three_calculation_lines": true,
+          "table_count": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 0,
+          "graph": 0,
+          "fraction": 7
+        },
+        "table_checks": [],
+        "graph_checks": [],
+        "components": [
+          {
+            "denominator": "R等",
+            "id": 42,
+            "kind": "fraction",
+            "numerator": "U",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                74,
+                245,
+                38,
+                60
+              ],
+              "ink_pixels": 210,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "R1",
+            "id": 44,
+            "kind": "fraction",
+            "numerator": "U",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                130,
+                243,
+                33,
+                52
+              ],
+              "ink_pixels": 156,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "R2",
+            "id": 46,
+            "kind": "fraction",
+            "numerator": "U",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                172,
+                241,
+                34,
+                53
+              ],
+              "ink_pixels": 206,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "R1+R2",
+            "id": 53,
+            "kind": "fraction",
+            "numerator": "R1R2",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                302,
+                229,
+                68,
+                69
+              ],
+              "ink_pixels": 432,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "6+3",
+            "id": 55,
+            "kind": "fraction",
+            "numerator": "6×3",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                388,
+                241,
+                46,
+                47
+              ],
+              "ink_pixels": 242,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "R等",
+            "id": 69,
+            "kind": "fraction",
+            "numerator": "U",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                106,
+                393,
+                37,
+                60
+              ],
+              "ink_pixels": 216,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "2",
+            "id": 71,
+            "kind": "fraction",
+            "numerator": "12",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                162,
+                389,
+                34,
+                45
+              ],
+              "ink_pixels": 139,
+              "layout_kind": null
+            }
+          }
+        ],
+        "layout_glyph_count": 85,
+        "prose_glyphs_checked": 78,
+        "nonblank_prose_glyphs": 78,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 85,
+            "review_id": "5335a64b-36c0-4f5d-8989-c2e9788ab727",
+            "sha256": "4088f84f4122be31824c389fc20f41648a842c29d5f83d53e0005a8c3e87f716"
+          }
+        ],
+        "prepared_sha256": "7d3fa7621ecd533996cee08d8e1c0d8743f78b1e0cedd73cc4b5a5d17530d299"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "stop",
+              "reason": "页面可见并联电阻的推导及三行计算：等效电阻以上下堆叠分式呈现，结果为 2 Ω；总电流为 6 A；总功率为 72 W。数值和单位均正确，页面未画图或表格。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "d0da7a8efa2201fee8b2cdc2f28716f51a9c723fdfd5710fffad4a2db7ffb8dc",
+              "image_sha256": [
+                "4088f84f4122be31824c389fc20f41648a842c29d5f83d53e0005a8c3e87f716"
+              ],
+              "usage": {
+                "input_tokens": 23097,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 99,
+                "reasoning_output_tokens": 18
+              }
+            }
+          }
+        ],
+        "task_id": "aaa5b3f7-62f4-4e81-9292-30beaa52bfb2",
+        "status": "stopped",
+        "selected_revision": null,
+        "decision_steps": [
+          {
+            "action": "stop",
+            "decision_id": "aaa5b3f7-62f4-4e81-9292-30beaa52bfb2/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面可见并联电阻的推导及三行计算：等效电阻以上下堆叠分式呈现，结果为 2 Ω；总电流为 6 A；总功率为 72 W。数值和单位均正确，页面未画图或表格。",
+            "result_revision": null,
+            "review_ids": [
+              "5335a64b-36c0-4f5d-8989-c2e9788ab727"
+            ],
+            "revision": 1,
+            "task_id": "aaa5b3f7-62f4-4e81-9292-30beaa52bfb2",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": null
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "页面可见并联电阻的推导及三行计算：等效电阻以上下堆叠分式呈现，结果为 2 Ω；总电流为 6 A；总功率为 72 W。各结果和单位均已显示，页面没有图或表格。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "4d805a2cc397e3513d48668db32f5a6e17bc013413ecd6783438f19988b08079",
+              "image_sha256": [
+                "4088f84f4122be31824c389fc20f41648a842c29d5f83d53e0005a8c3e87f716"
+              ],
+              "usage": {
+                "input_tokens": 23182,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 97,
+                "reasoning_output_tokens": 16
+              }
+            }
+          }
+        ],
+        "task_id": "9a968af8-1396-4ab3-a43e-67bee58b47ce",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "9a968af8-1396-4ab3-a43e-67bee58b47ce/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面可见并联电阻的推导及三行计算：等效电阻以上下堆叠分式呈现，结果为 2 Ω；总电流为 6 A；总功率为 72 W。各结果和单位均已显示，页面没有图或表格。",
+            "result_revision": null,
+            "review_ids": [
+              "5335a64b-36c0-4f5d-8989-c2e9788ab727"
+            ],
+            "revision": 1,
+            "task_id": "9a968af8-1396-4ab3-a43e-67bee58b47ce",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 78560,
+          "sha256": "cd2d8e31691d3b9b749cfedbda82e837689becf68dcb199efa8e2da9a4d8c2ab",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "93a1400fea89249e12b22b4537bf5eb93f4f8e00f0051d733a761069f2db4595",
+              "preview_sha256": "4088f84f4122be31824c389fc20f41648a842c29d5f83d53e0005a8c3e87f716",
+              "mean_absolute_rgb_error": 0.9546
+            }
+          ]
+        }
+      }
+    },
+    "table1": {
+      "brief": "完成匀速小车记录：时间 t/s 依次是 0、2、4，位移 x/m 依次是 0、6、12。做一张带表头的两列表格，三行一一对应；表后另写平均速度公式，代数值算出速度和单位。不要附图。",
+      "expected": {
+        "tokens": [
+          "0",
+          "2",
+          "4",
+          "6",
+          "12",
+          "3"
+        ],
+        "tables": [
+          [
+            [
+              "0",
+              "0"
+            ],
+            [
+              "2",
+              "6"
+            ],
+            [
+              "4",
+              "12"
+            ]
+          ]
+        ],
+        "concepts": [
+          "two column headings identify time and distance",
+          "average speed = Δx/Δt = 3 m/s"
+        ]
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "f0ee3b7bebd513726269a7b815322a949a61a15aa61f02fd9e2cae6150679464",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20364,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 99,
+          "reasoning_output_tokens": 0
+        }
+      },
+      "authored_markdown": "| 时间 $t$/s | 位移 $x$/m |\n|---|---|\n| 0 | 0 |\n| 2 | 6 |\n| 4 | 12 |\n\n平均速度公式为：\n\n$$\\bar{v}=\\frac{\\Delta x}{\\Delta t}=\\frac{12-0}{4-0}=3\\ \\mathrm{m/s}$$",
+      "author_decision_sha256": "d33eb2731fbb6cc6f882f455028d5685fc266c62e93cfad3d6eb47fb2c70409f",
+      "first": {
+        "checks": {
+          "speed_3_m_per_s": true,
+          "distance_over_time": true,
+          "table_count": true,
+          "table_header_meaning": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 1,
+          "graph": 0,
+          "fraction": 3
+        },
+        "table_checks": [
+          {
+            "observed": [
+              [
+                "时间 (t)/(s)",
+                "位移 (x)/(m)"
+              ],
+              [
+                "0",
+                "0"
+              ],
+              [
+                "2",
+                "6"
+              ],
+              [
+                "4",
+                "12"
+              ]
+            ],
+            "expected_data": [
+              [
+                "0",
+                "0"
+              ],
+              [
+                "2",
+                "6"
+              ],
+              [
+                "4",
+                "12"
+              ]
+            ],
+            "header_present": true,
+            "row_matches": [
+              true,
+              true,
+              true
+            ],
+            "data_row_count": true
+          }
+        ],
+        "graph_checks": [],
+        "components": [
+          {
+            "id": 0,
+            "kind": "table",
+            "rows": [
+              [
+                "时间 (t)/(s)",
+                "位移 (x)/(m)"
+              ],
+              [
+                "0",
+                "0"
+              ],
+              [
+                "2",
+                "6"
+              ],
+              [
+                "4",
+                "12"
+              ]
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                73,
+                105,
+                221,
+                232
+              ],
+              "ink_pixels": 3121,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "Δt",
+            "id": 13,
+            "kind": "fraction",
+            "numerator": "Δx",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                107,
+                379,
+                44,
+                54
+              ],
+              "ink_pixels": 310,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "4-0",
+            "id": 15,
+            "kind": "fraction",
+            "numerator": "12-0",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                162,
+                384,
+                58,
+                49
+              ],
+              "ink_pixels": 316,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "s",
+            "id": 19,
+            "kind": "fraction",
+            "numerator": "m",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                260,
+                387,
+                28,
+                40
+              ],
+              "ink_pixels": 98,
+              "layout_kind": null
+            }
+          }
+        ],
+        "layout_glyph_count": 17,
+        "prose_glyphs_checked": 12,
+        "nonblank_prose_glyphs": 12,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 17,
+            "review_id": "035a7beb-0e27-48da-8742-d1b796960241",
+            "sha256": "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+          }
+        ],
+        "prepared_sha256": "5082c0d74d47d271885fca38ecad25e37686cdb4e8fceaa94c2eb2a9d2fbe2da"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "stop",
+              "reason": "可见页面中，两列表格含时间和位移表头，三行数据分别为（0，0）、（2，6）、（4，12）；表后写出了平均速度公式、代入过程和结果 3 m/s。页面未附图，符合题意。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "e02506d9122ccc65b5dd81fcfff640063529b324528060c52ad36b995ad6f9f5",
+              "image_sha256": [
+                "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+              ],
+              "usage": {
+                "input_tokens": 22986,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 119,
+                "reasoning_output_tokens": 43
+              }
+            }
+          }
+        ],
+        "task_id": "00ed9e95-3eb4-4f54-a99f-d6a02006e4ce",
+        "status": "stopped",
+        "selected_revision": null,
+        "decision_steps": [
+          {
+            "action": "stop",
+            "decision_id": "00ed9e95-3eb4-4f54-a99f-d6a02006e4ce/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面中，两列表格含时间和位移表头，三行数据分别为（0，0）、（2，6）、（4，12）；表后写出了平均速度公式、代入过程和结果 3 m/s。页面未附图，符合题意。",
+            "result_revision": null,
+            "review_ids": [
+              "035a7beb-0e27-48da-8742-d1b796960241"
+            ],
+            "revision": 1,
+            "task_id": "00ed9e95-3eb4-4f54-a99f-d6a02006e4ce",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": null
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "页面中两列表格的表头和三组数据均清晰可见且对应正确；表后单独写出了平均速度公式，代入数值并得到 3 m/s。页面没有附图，符合题面要求。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "4c93b85e4f93c599c3a1f84cf6f13a34ae15605366059ebbcae151a5b3755e39",
+              "image_sha256": [
+                "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+              ],
+              "usage": {
+                "input_tokens": 23067,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 84,
+                "reasoning_output_tokens": 18
+              }
+            }
+          }
+        ],
+        "task_id": "3fe91a45-af51-4362-94a9-f7868fc7afde",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "3fe91a45-af51-4362-94a9-f7868fc7afde/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面中两列表格的表头和三组数据均清晰可见且对应正确；表后单独写出了平均速度公式，代入数值并得到 3 m/s。页面没有附图，符合题面要求。",
+            "result_revision": null,
+            "review_ids": [
+              "035a7beb-0e27-48da-8742-d1b796960241"
+            ],
+            "revision": 1,
+            "task_id": "3fe91a45-af51-4362-94a9-f7868fc7afde",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 66487,
+          "sha256": "b09aea7fd625f2fb5e5ae53dc84d9f3b57d9f9af1283881867c2eb57ff4298fa",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "4633ca076c8852699c0063f90437b670166f04f6796b61311f7de45025405665",
+              "preview_sha256": "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3",
+              "mean_absolute_rgb_error": 0.7124
+            }
+          ]
+        }
+      }
+    },
+    "table2": {
+      "brief": "比较两种储能方案。第一张表列项目和数值：方案甲输入能量 50 J、输出能量 40 J。第二张独立的表列项目和数值：方案乙输入 80 J、输出 60 J。两表各要有表头和输入、输出两行。表外写效率公式，并分别计算两方案效率和相差的百分点。不要画图。",
+      "expected": {
+        "tokens": [
+          "甲",
+          "乙",
+          "50",
+          "40",
+          "80",
+          "60",
+          "75",
+          "5"
+        ],
+        "tables": [
+          [
+            [
+              "输入",
+              "50"
+            ],
+            [
+              "输出",
+              "40"
+            ]
+          ],
+          [
+            [
+              "输入",
+              "80"
+            ],
+            [
+              "输出",
+              "60"
+            ]
+          ]
+        ],
+        "concepts": [
+          "η = output/input",
+          "甲 80%, 乙 75%, difference 5 percentage points"
+        ]
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "6f3d4da95ccb57c24b60fefe63b99880270d4221cd40fe4e531f1bf490d316ff",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20378,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 254,
+          "reasoning_output_tokens": 23
+        }
+      },
+      "authored_markdown": "### 方案甲\n\n| 项目 | 数值 |\n|---|---:|\n| 输入能量 | 50 J |\n| 输出能量 | 40 J |\n\n### 方案乙\n\n| 项目 | 数值 |\n|---|---:|\n| 输入能量 | 80 J |\n| 输出能量 | 60 J |\n\n效率公式：\n\n$$\\eta=\\frac{\\text{输出能量}}{\\text{输入能量}}\\times 100\\%$$\n\n方案甲的效率：\n\n$$\\eta_{\\text{甲}}=\\frac{40}{50}\\times 100\\%=80\\%$$\n\n方案乙的效率：\n\n$$\\eta_{\\text{乙}}=\\frac{60}{80}\\times 100\\%=75\\%$$\n\n两方案的效率相差 $80\\%-75\\%=5$ 个百分点，方案甲的效率较高。",
+      "author_decision_sha256": "be189d6c40f43e25d4bd865d79566db931cf0ae836a5774cc8dcb200270a7601",
+      "first": {
+        "checks": {
+          "separate_efficiencies": true,
+          "input_output_efficiency": true,
+          "efficiencies_and_difference": true,
+          "table_count": true,
+          "table_header_meaning": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 2,
+          "graph": 0,
+          "fraction": 3
+        },
+        "table_checks": [
+          {
+            "observed": [
+              [
+                "项目",
+                "数值"
+              ],
+              [
+                "输入能量",
+                "50 J"
+              ],
+              [
+                "输出能量",
+                "40 J"
+              ]
+            ],
+            "expected_data": [
+              [
+                "输入",
+                "50"
+              ],
+              [
+                "输出",
+                "40"
+              ]
+            ],
+            "header_present": true,
+            "row_matches": [
+              true,
+              true
+            ],
+            "data_row_count": true
+          },
+          {
+            "observed": [
+              [
+                "项目",
+                "数值"
+              ],
+              [
+                "输入能量",
+                "80 J"
+              ],
+              [
+                "输出能量",
+                "60 J"
+              ]
+            ],
+            "expected_data": [
+              [
+                "输入",
+                "80"
+              ],
+              [
+                "输出",
+                "60"
+              ]
+            ],
+            "header_present": true,
+            "row_matches": [
+              true,
+              true
+            ],
+            "data_row_count": true
+          }
+        ],
+        "graph_checks": [],
+        "components": [
+          {
+            "id": 4,
+            "kind": "table",
+            "rows": [
+              [
+                "项目",
+                "数值"
+              ],
+              [
+                "输入能量",
+                "50 J"
+              ],
+              [
+                "输出能量",
+                "40 J"
+              ]
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                72,
+                138,
+                240,
+                166
+              ],
+              "ink_pixels": 4655,
+              "layout_kind": null
+            }
+          },
+          {
+            "id": 10,
+            "kind": "table",
+            "rows": [
+              [
+                "项目",
+                "数值"
+              ],
+              [
+                "输入能量",
+                "80 J"
+              ],
+              [
+                "输出能量",
+                "60 J"
+              ]
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                73,
+                396,
+                231,
+                154
+              ],
+              "ink_pixels": 4412,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "输入能量",
+            "id": 20,
+            "kind": "fraction",
+            "numerator": "输出能量",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                118,
+                628,
+                105,
+                55
+              ],
+              "ink_pixels": 1007,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "50",
+            "id": 38,
+            "kind": "fraction",
+            "numerator": "40",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                135,
+                731,
+                40,
+                46
+              ],
+              "ink_pixels": 212,
+              "layout_kind": null
+            }
+          },
+          {
+            "denominator": "80",
+            "id": 60,
+            "kind": "fraction",
+            "numerator": "60",
+            "raster": {
+              "page": 1,
+              "bounds": [
+                132,
+                829,
+                38,
+                47
+              ],
+              "ink_pixels": 219,
+              "layout_kind": null
+            }
+          }
+        ],
+        "layout_glyph_count": 90,
+        "prose_glyphs_checked": 85,
+        "nonblank_prose_glyphs": 85,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 90,
+            "review_id": "fb0b7b5d-d1b1-46fa-8891-3f2491f77fd2",
+            "sha256": "ba76b30ec1e719ab8ddb487d62ace811705b0cdb1e9e58408ab84bcf7dbc0448"
+          }
+        ],
+        "prepared_sha256": "e0890719b9812b6846fa4dc74de74fcb166a53c1690b7b797269245e42d2104b"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "stop",
+              "reason": "页面中两张独立表格均有表头及输入、输出两行，数值分别为 50 J、40 J 和 80 J、60 J。表外效率公式及计算结果 80%、75% 均正确，相差 5 个百分点，且已指出方案甲效率较高。页面没有画图，符合题意。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "e9161ef3ef92d488a6d6a698d9a11fe502d398e3a60dcb068ede0e0aea28460f",
+              "image_sha256": [
+                "ba76b30ec1e719ab8ddb487d62ace811705b0cdb1e9e58408ab84bcf7dbc0448"
+              ],
+              "usage": {
+                "input_tokens": 23112,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 106,
+                "reasoning_output_tokens": 15
+              }
+            }
+          }
+        ],
+        "task_id": "ab6979c6-8c45-4249-96cf-3dee7365923c",
+        "status": "stopped",
+        "selected_revision": null,
+        "decision_steps": [
+          {
+            "action": "stop",
+            "decision_id": "ab6979c6-8c45-4249-96cf-3dee7365923c/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面中两张独立表格均有表头及输入、输出两行，数值分别为 50 J、40 J 和 80 J、60 J。表外效率公式及计算结果 80%、75% 均正确，相差 5 个百分点，且已指出方案甲效率较高。页面没有画图，符合题意。",
+            "result_revision": null,
+            "review_ids": [
+              "fb0b7b5d-d1b1-46fa-8891-3f2491f77fd2"
+            ],
+            "revision": 1,
+            "task_id": "ab6979c6-8c45-4249-96cf-3dee7365923c",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": null
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "页面中两张独立表格均有表头及输入、输出两行，数值分别为甲 50 J、40 J 和乙 80 J、60 J。表外可见效率公式、甲的 80%、乙的 75%，以及相差 5 个百分点、甲效率较高的结论；页面没有图。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "3c4584c0049660f4cc837af7ccc27c02b8de327ad5643ffe3d2b1cd82f3d7bac",
+              "image_sha256": [
+                "ba76b30ec1e719ab8ddb487d62ace811705b0cdb1e9e58408ab84bcf7dbc0448"
+              ],
+              "usage": {
+                "input_tokens": 23188,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 111,
+                "reasoning_output_tokens": 21
+              }
+            }
+          }
+        ],
+        "task_id": "434d0c33-0485-450e-b0dd-75bba1b6c467",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "434d0c33-0485-450e-b0dd-75bba1b6c467/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面中两张独立表格均有表头及输入、输出两行，数值分别为甲 50 J、40 J 和乙 80 J、60 J。表外可见效率公式、甲的 80%、乙的 75%，以及相差 5 个百分点、甲效率较高的结论；页面没有图。",
+            "result_revision": null,
+            "review_ids": [
+              "fb0b7b5d-d1b1-46fa-8891-3f2491f77fd2"
+            ],
+            "revision": 1,
+            "task_id": "434d0c33-0485-450e-b0dd-75bba1b6c467",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 90640,
+          "sha256": "961ef10259e62beb9b0e9dd9d716b4388f024f2e11511c09819bdba963bed7e3",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "1c4ae2ace526b1df3e0271f941ab7b1a3d1b6607d7a812d82a24854aff5b9b45",
+              "preview_sha256": "ba76b30ec1e719ab8ddb487d62ace811705b0cdb1e9e58408ab84bcf7dbc0448",
+              "mean_absolute_rgb_error": 1.3577
+            }
+          ]
+        }
+      }
+    },
+    "flow1": {
+      "brief": "为温室控制作业画一张带箭头的流程图。用四个节点“读温度”“超温”“开风扇”“保持”，从读温度到条件节点超温，两条边分别以“是”“否”到开风扇和保持。图外一句话解释 30 ℃ 阈值。不使用表格。",
+      "expected": {
+        "tokens": [
+          "30"
+        ],
+        "graphs": [
+          {
+            "nodes": [
+              "读温度",
+              "超温",
+              "开风扇",
+              "保持"
+            ],
+            "edges": [
+              [
+                "读温度",
+                "超温",
+                ""
+              ],
+              [
+                "超温",
+                "开风扇",
+                "是"
+              ],
+              [
+                "超温",
+                "保持",
+                "否"
+              ]
+            ]
+          }
+        ],
+        "concepts": [
+          "阈值 30 ℃ and correct conditional actions"
+        ]
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "4a8c740bf2d6011e26d31a233b6a9c3b87158003ef046c71887b41341e2cae32",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20365,
+          "cached_input_tokens": 13824,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 185,
+          "reasoning_output_tokens": 0
+        }
+      },
+      "authored_markdown": "\\begin{circuitikz}[flowchart]\n\\draw (0,0) node[rectangle]{读温度};\n\\draw (0,-2) node[diamond]{超温};\n\\draw (-3,-4) node[rectangle]{开风扇};\n\\draw (3,-4) node[rectangle]{保持};\n\\draw[->] (0,0) -- (0,-2);\n\\draw[->] (0,-2) -- (-3,-4) node[midway,above left]{是};\n\\draw[->] (0,-2) -- (3,-4) node[midway,above right]{否};\n\\end{circuitikz}\n\n温度高于 30 ℃ 时判定为超温，否则不超温。",
+      "author_decision_sha256": "599c88339822e5b4026a6c9b8def62ca18dd2be13f77415f8f659671c2fbee44",
+      "first": {
+        "checks": {
+          "threshold_30_celsius": true,
+          "table_count": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 0,
+          "graph": 1,
+          "fraction": 0
+        },
+        "table_checks": [],
+        "graph_checks": [
+          {
+            "observed_nodes": [
+              "读温度",
+              "超温",
+              "开风扇",
+              "保持"
+            ],
+            "observed_directed_edges": [
+              [
+                "读温度",
+                "超温",
+                ""
+              ],
+              [
+                "超温",
+                "开风扇",
+                "是"
+              ],
+              [
+                "超温",
+                "保持",
+                "否"
+              ]
+            ],
+            "expected_nodes_present": true,
+            "conditional_diamond": true,
+            "expected_edges_match": true
+          }
+        ],
+        "components": [
+          {
+            "flowchart": true,
+            "id": 0,
+            "kind": "graph",
+            "marks": [
+              {
+                "kind": "rectangle",
+                "position": [
+                  0.0,
+                  0.0
+                ],
+                "text": "读温度"
+              },
+              {
+                "kind": "diamond",
+                "position": [
+                  0.0,
+                  -2.0
+                ],
+                "text": "超温"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  -3.0,
+                  -4.0
+                ],
+                "text": "开风扇"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  3.0,
+                  -4.0
+                ],
+                "text": "保持"
+              },
+              {
+                "kind": "above left",
+                "position": [
+                  -1.5,
+                  -3.0
+                ],
+                "text": "是"
+              },
+              {
+                "kind": "above right",
+                "position": [
+                  1.5,
+                  -3.0
+                ],
+                "text": "否"
+              }
+            ],
+            "segments": [
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  0.0
+                ],
+                "to": [
+                  0.0,
+                  -2.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  -3.0,
+                  -4.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  3.0,
+                  -4.0
+                ]
+              }
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                74,
+                78,
+                438,
+                284
+              ],
+              "ink_pixels": 5487,
+              "layout_kind": "native_diagram"
+            }
+          }
+        ],
+        "layout_glyph_count": 21,
+        "prose_glyphs_checked": 20,
+        "nonblank_prose_glyphs": 20,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 21,
+            "review_id": "b015f5b7-c11f-437b-b03a-89541d60f636",
+            "sha256": "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+          }
+        ],
+        "prepared_sha256": "2e962d0809bed02d5c0c9f04ed7dad3f83f7b9428b5aeb0133b99cc10a4173dc"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "stop",
+              "reason": "可见页面包含四个指定节点，箭头从“读温度”指向“超温”，再分别沿标注“是”“否”的分支指向“开风扇”和“保持”。图外说明温度高于 30 ℃ 时为超温，页面未使用表格，符合题面要求。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "5bbf96f3a69024699c0ee930c4d8cf1a17bbdf555d42c21367b31a2933546848",
+              "image_sha256": [
+                "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+              ],
+              "usage": {
+                "input_tokens": 23065,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 100,
+                "reasoning_output_tokens": 14
+              }
+            }
+          }
+        ],
+        "task_id": "1bb6d705-98ab-44b0-8d38-a025dfeee7e5",
+        "status": "stopped",
+        "selected_revision": null,
+        "decision_steps": [
+          {
+            "action": "stop",
+            "decision_id": "1bb6d705-98ab-44b0-8d38-a025dfeee7e5/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面包含四个指定节点，箭头从“读温度”指向“超温”，再分别沿标注“是”“否”的分支指向“开风扇”和“保持”。图外说明温度高于 30 ℃ 时为超温，页面未使用表格，符合题面要求。",
+            "result_revision": null,
+            "review_ids": [
+              "b015f5b7-c11f-437b-b03a-89541d60f636"
+            ],
+            "revision": 1,
+            "task_id": "1bb6d705-98ab-44b0-8d38-a025dfeee7e5",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": null
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "页面中可见四个指定节点、从“读温度”指向“超温”的箭头，以及分别标注“是”“否”并指向“开风扇”“保持”的分支箭头。图外说明明确温度高于 30 ℃ 判定为超温，否则不超温；未使用表格。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "0d397ef082a5be16894decbc9fec672dd5c159072874894c21cdf1e1f1d776b6",
+              "image_sha256": [
+                "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+              ],
+              "usage": {
+                "input_tokens": 23155,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 102,
+                "reasoning_output_tokens": 14
+              }
+            }
+          }
+        ],
+        "task_id": "7967e341-3d4f-42db-8809-3d35d0e8ce97",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "7967e341-3d4f-42db-8809-3d35d0e8ce97/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面中可见四个指定节点、从“读温度”指向“超温”的箭头，以及分别标注“是”“否”并指向“开风扇”“保持”的分支箭头。图外说明明确温度高于 30 ℃ 判定为超温，否则不超温；未使用表格。",
+            "result_revision": null,
+            "review_ids": [
+              "b015f5b7-c11f-437b-b03a-89541d60f636"
+            ],
+            "revision": 1,
+            "task_id": "7967e341-3d4f-42db-8809-3d35d0e8ce97",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 69977,
+          "sha256": "c14f530da759f89281ddeeae146c66a72a227cd1e124bb741e6cd97b4ee3ebe1",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "a7072c4910291135263bcd5e259d060c5e04bfd33d9988173d8b066fa693e51a",
+              "preview_sha256": "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2",
+              "mean_absolute_rgb_error": 0.8166
+            }
+          ]
+        }
+      }
+    },
+    "flow2": {
+      "brief": "画两张分开的带箭头流程图。图一用于借书：节点“查书”“有库存”“借出”“预约”，查书后判断库存，“是”通往借出，“否”通往预约。图二用于交卷：节点“验卷”“已署名”“收卷”“补签”，验卷后判断署名，“是”通往收卷，“否”通往补签。保留这些节点、每条有向连接和分支文字，另写一句话说明两流程用途。",
+      "expected": {
+        "tokens": [],
+        "graphs": [
+          {
+            "nodes": [
+              "查书",
+              "有库存",
+              "借出",
+              "预约"
+            ],
+            "edges": [
+              [
+                "查书",
+                "有库存",
+                ""
+              ],
+              [
+                "有库存",
+                "借出",
+                "是"
+              ],
+              [
+                "有库存",
+                "预约",
+                "否"
+              ]
+            ]
+          },
+          {
+            "nodes": [
+              "验卷",
+              "已署名",
+              "收卷",
+              "补签"
+            ],
+            "edges": [
+              [
+                "验卷",
+                "已署名",
+                ""
+              ],
+              [
+                "已署名",
+                "收卷",
+                "是"
+              ],
+              [
+                "已署名",
+                "补签",
+                "否"
+              ]
+            ]
+          }
+        ],
+        "concepts": [
+          "two visually separate workflows and correct branch labels"
+        ]
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "477a8165cef21ad683dc8bcc02a84d69d735fea3219e7ed3dd33077fb8c99ddf",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20406,
+          "cached_input_tokens": 19200,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 376,
+          "reasoning_output_tokens": 0
+        }
+      },
+      "authored_markdown": "图一用于借书时根据库存情况选择借出或预约；图二用于交卷时根据署名情况选择收卷或补签。\n\n**图一：借书流程**\n\n\\begin{circuitikz}[flowchart]\n\\draw (0,0) node[rectangle]{查书};\n\\draw (0,-2) node[diamond]{有库存};\n\\draw (-3,-4) node[rectangle]{借出};\n\\draw (3,-4) node[rectangle]{预约};\n\\draw[->] (0,0) -- (0,-2);\n\\draw[->] (0,-2) -- (-3,-4) node[midway,above left]{是};\n\\draw[->] (0,-2) -- (3,-4) node[midway,above right]{否};\n\\end{circuitikz}\n\n**图二：交卷流程**\n\n\\begin{circuitikz}[flowchart]\n\\draw (0,0) node[rectangle]{验卷};\n\\draw (0,-2) node[diamond]{已署名};\n\\draw (-3,-4) node[rectangle]{收卷};\n\\draw (3,-4) node[rectangle]{补签};\n\\draw[->] (0,0) -- (0,-2);\n\\draw[->] (0,-2) -- (-3,-4) node[midway,above left]{是};\n\\draw[->] (0,-2) -- (3,-4) node[midway,above right]{否};\n\\end{circuitikz}",
+      "author_decision_sha256": "88d7b58ee1f227c9ac53bc7d4b836dce18b309eaee23fa06eeb0bb2ff0bdfbed",
+      "first": {
+        "checks": {
+          "library_and_exam_purpose_in_prose": true,
+          "table_count": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 0,
+          "graph": 2,
+          "fraction": 0
+        },
+        "table_checks": [],
+        "graph_checks": [
+          {
+            "observed_nodes": [
+              "查书",
+              "有库存",
+              "借出",
+              "预约"
+            ],
+            "observed_directed_edges": [
+              [
+                "查书",
+                "有库存",
+                ""
+              ],
+              [
+                "有库存",
+                "借出",
+                "是"
+              ],
+              [
+                "有库存",
+                "预约",
+                "否"
+              ]
+            ],
+            "expected_nodes_present": true,
+            "conditional_diamond": true,
+            "expected_edges_match": true
+          },
+          {
+            "observed_nodes": [
+              "验卷",
+              "已署名",
+              "收卷",
+              "补签"
+            ],
+            "observed_directed_edges": [
+              [
+                "验卷",
+                "已署名",
+                ""
+              ],
+              [
+                "已署名",
+                "收卷",
+                "是"
+              ],
+              [
+                "已署名",
+                "补签",
+                "否"
+              ]
+            ],
+            "expected_nodes_present": true,
+            "conditional_diamond": true,
+            "expected_edges_match": true
+          }
+        ],
+        "components": [
+          {
+            "flowchart": true,
+            "id": 51,
+            "kind": "graph",
+            "marks": [
+              {
+                "kind": "rectangle",
+                "position": [
+                  0.0,
+                  0.0
+                ],
+                "text": "查书"
+              },
+              {
+                "kind": "diamond",
+                "position": [
+                  0.0,
+                  -2.0
+                ],
+                "text": "有库存"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  -3.0,
+                  -4.0
+                ],
+                "text": "借出"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  3.0,
+                  -4.0
+                ],
+                "text": "预约"
+              },
+              {
+                "kind": "above left",
+                "position": [
+                  -1.5,
+                  -3.0
+                ],
+                "text": "是"
+              },
+              {
+                "kind": "above right",
+                "position": [
+                  1.5,
+                  -3.0
+                ],
+                "text": "否"
+              }
+            ],
+            "segments": [
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  0.0
+                ],
+                "to": [
+                  0.0,
+                  -2.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  -3.0,
+                  -4.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  3.0,
+                  -4.0
+                ]
+              }
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                77,
+                233,
+                407,
+                272
+              ],
+              "ink_pixels": 4717,
+              "layout_kind": "native_diagram"
+            }
+          },
+          {
+            "flowchart": true,
+            "id": 61,
+            "kind": "graph",
+            "marks": [
+              {
+                "kind": "rectangle",
+                "position": [
+                  0.0,
+                  0.0
+                ],
+                "text": "验卷"
+              },
+              {
+                "kind": "diamond",
+                "position": [
+                  0.0,
+                  -2.0
+                ],
+                "text": "已署名"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  -3.0,
+                  -4.0
+                ],
+                "text": "收卷"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  3.0,
+                  -4.0
+                ],
+                "text": "补签"
+              },
+              {
+                "kind": "above left",
+                "position": [
+                  -1.5,
+                  -3.0
+                ],
+                "text": "是"
+              },
+              {
+                "kind": "above right",
+                "position": [
+                  1.5,
+                  -3.0
+                ],
+                "text": "否"
+              }
+            ],
+            "segments": [
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  0.0
+                ],
+                "to": [
+                  0.0,
+                  -2.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  -3.0,
+                  -4.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  3.0,
+                  -4.0
+                ]
+              }
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                73,
+                582,
+                415,
+                278
+              ],
+              "ink_pixels": 4919,
+              "layout_kind": "native_diagram"
+            }
+          }
+        ],
+        "layout_glyph_count": 58,
+        "prose_glyphs_checked": 56,
+        "nonblank_prose_glyphs": 56,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 58,
+            "review_id": "5e80ee90-ea7c-461f-a7b1-3083e07d781f",
+            "sha256": "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47"
+          }
+        ],
+        "prepared_sha256": "65135dfb662ed4af73334313c742caf6a51394324b59293a9ed8a5c2a349296b"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "可见页面包含用途说明和两张分开的流程图。图一依次呈现“查书”“有库存”，并以“是”指向“借出”、“否”指向“预约”；图二依次呈现“验卷”“已署名”，并以“是”指向“收卷”、“否”指向“补签”。各连接均有箭头，节点与分支标注完整。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "0ce368874fec3ceea95e26ed7aa2c5ce561a9ba6a11ba2c0f8d8d9422aa454cd",
+              "image_sha256": [
+                "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47"
+              ],
+              "usage": {
+                "input_tokens": 23276,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 124,
+                "reasoning_output_tokens": 17
+              }
+            }
+          }
+        ],
+        "task_id": "13ec6502-8403-4cbb-8f11-e343b4f1b2cd",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "13ec6502-8403-4cbb-8f11-e343b4f1b2cd/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面包含用途说明和两张分开的流程图。图一依次呈现“查书”“有库存”，并以“是”指向“借出”、“否”指向“预约”；图二依次呈现“验卷”“已署名”，并以“是”指向“收卷”、“否”指向“补签”。各连接均有箭头，节点与分支标注完整。",
+            "result_revision": null,
+            "review_ids": [
+              "5e80ee90-ea7c-461f-a7b1-3083e07d781f"
+            ],
+            "revision": 1,
+            "task_id": "13ec6502-8403-4cbb-8f11-e343b4f1b2cd",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v1",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 87167,
+          "sha256": "57a27e85fde740f9694ace153fdb08af79909f85a78e3fa961e5d068ed12a1df",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "36ce73c3b067057a54828398ebece03acb75b13fd771081cebf53adac5ea2620",
+              "preview_sha256": "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47",
+              "mean_absolute_rgb_error": 1.2536
+            }
+          ]
+        }
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "可见页面包含用途说明和两张分开的流程图。图一依次呈现“查书”“有库存”，并以“是”指向“借出”、“否”指向“预约”；图二依次呈现“验卷”“已署名”，并以“是”指向“收卷”、“否”指向“补签”。节点、箭头方向和分支标注均符合题意。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "819dac926680af6bcee14828b2eff973a1d8f69354979bf9112ce6a178a2e06c",
+              "image_sha256": [
+                "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47"
+              ],
+              "usage": {
+                "input_tokens": 23357,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 156,
+                "reasoning_output_tokens": 49
+              }
+            }
+          }
+        ],
+        "task_id": "b48d8615-b1b0-488d-aecb-7096ae8c3dbd",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "b48d8615-b1b0-488d-aecb-7096ae8c3dbd/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面包含用途说明和两张分开的流程图。图一依次呈现“查书”“有库存”，并以“是”指向“借出”、“否”指向“预约”；图二依次呈现“验卷”“已署名”，并以“是”指向“收卷”、“否”指向“补签”。节点、箭头方向和分支标注均符合题意。",
+            "result_revision": null,
+            "review_ids": [
+              "5e80ee90-ea7c-461f-a7b1-3083e07d781f"
+            ],
+            "revision": 1,
+            "task_id": "b48d8615-b1b0-488d-aecb-7096ae8c3dbd",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 87167,
+          "sha256": "57a27e85fde740f9694ace153fdb08af79909f85a78e3fa961e5d068ed12a1df",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "36ce73c3b067057a54828398ebece03acb75b13fd771081cebf53adac5ea2620",
+              "preview_sha256": "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47",
+              "mean_absolute_rgb_error": 1.2536
+            }
+          ]
+        }
+      }
+    },
+    "combined": {
+      "brief": "完成酸碱判别练习：用带表头的两列表格列出“样品甲 / 3”“样品乙 / 9”作为各自 pH。表外写公式 pH = −log₁₀[H⁺]。再画一张有箭头的流程图，节点用“读数”“小于7”“酸性”“非酸性”，从读数到小于7，分支“是”到酸性、“否”到非酸性。最后说明两个样品分别被分到哪一类。",
+      "expected": {
+        "tokens": [
+          "甲",
+          "乙",
+          "3",
+          "9",
+          "pH",
+          "log",
+          "H"
+        ],
+        "tables": [
+          [
+            [
+              "甲",
+              "3"
+            ],
+            [
+              "乙",
+              "9"
+            ]
+          ]
+        ],
+        "graphs": [
+          {
+            "nodes": [
+              "读数",
+              "小于7",
+              "酸性",
+              "非酸性"
+            ],
+            "edges": [
+              [
+                "读数",
+                "小于7",
+                ""
+              ],
+              [
+                "小于7",
+                "酸性",
+                "是"
+              ],
+              [
+                "小于7",
+                "非酸性",
+                "否"
+              ]
+            ]
+          }
+        ],
+        "concepts": [
+          "log base 10, negative sign, H superscript plus",
+          "甲 acidic; 乙 non-acidic"
+        ]
+      },
+      "author_receipt": {
+        "provider": "Codex CLI",
+        "model": "gpt-6.1-terra",
+        "reasoning_effort": "high",
+        "prompt_sha256": "d4fe07ec49c622ad2382c84f3ee8db1a6f7ddaba2774bca02f7b0252e3fddb94",
+        "image_sha256": [],
+        "usage": {
+          "input_tokens": 20422,
+          "cached_input_tokens": 13824,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 269,
+          "reasoning_output_tokens": 0
+        }
+      },
+      "authored_markdown": "| 样品 | pH |\n|---|---:|\n| 样品甲 | 3 |\n| 样品乙 | 9 |\n\n公式：$\\mathrm{pH}=-\\log_{10}[\\mathrm{H}^+]$\n\n\\begin{circuitikz}[flowchart]\n\\draw (0,0) node[rectangle]{读数};\n\\draw (0,-2) node[diamond]{小于7};\n\\draw (-3,-4) node[rectangle]{酸性};\n\\draw (3,-4) node[rectangle]{非酸性};\n\\draw[->] (0,0) -- (0,-2);\n\\draw[->] (0,-2) -- (-3,-4) node[midway,above left]{是};\n\\draw[->] (0,-2) -- (3,-4) node[midway,above right]{否};\n\\end{circuitikz}\n\n样品甲的 pH 为 3，小于 7，分为酸性；样品乙的 pH 为 9，不小于 7，分为非酸性。",
+      "author_decision_sha256": "0765f2f6d9c808520b967b0dfd14702c8c0f298865162cd5122e74932e7b8ee8",
+      "first": {
+        "checks": {
+          "chemical_formula": true,
+          "both_classifications": true,
+          "table_count": true,
+          "table_header_meaning": true,
+          "table_cells": true,
+          "graph_count": true,
+          "graph_semantics": true,
+          "graph_native_editable": true,
+          "min_stacked_fractions": true,
+          "components_visible_ink": true,
+          "expected_terms": true,
+          "visible_prose_glyphs": true
+        },
+        "mechanical_pass": true,
+        "counts": {
+          "table": 1,
+          "graph": 1,
+          "fraction": 0
+        },
+        "table_checks": [
+          {
+            "observed": [
+              [
+                "样品",
+                "pH"
+              ],
+              [
+                "样品甲",
+                "3"
+              ],
+              [
+                "样品乙",
+                "9"
+              ]
+            ],
+            "expected_data": [
+              [
+                "甲",
+                "3"
+              ],
+              [
+                "乙",
+                "9"
+              ]
+            ],
+            "header_present": true,
+            "row_matches": [
+              true,
+              true
+            ],
+            "data_row_count": true
+          }
+        ],
+        "graph_checks": [
+          {
+            "observed_nodes": [
+              "读数",
+              "小于7",
+              "酸性",
+              "非酸性"
+            ],
+            "observed_directed_edges": [
+              [
+                "读数",
+                "小于7",
+                ""
+              ],
+              [
+                "小于7",
+                "酸性",
+                "是"
+              ],
+              [
+                "小于7",
+                "非酸性",
+                "否"
+              ]
+            ],
+            "expected_nodes_present": true,
+            "conditional_diamond": true,
+            "expected_edges_match": true
+          }
+        ],
+        "components": [
+          {
+            "id": 0,
+            "kind": "table",
+            "rows": [
+              [
+                "样品",
+                "pH"
+              ],
+              [
+                "样品甲",
+                "3"
+              ],
+              [
+                "样品乙",
+                "9"
+              ]
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                73,
+                95,
+                156,
+                153
+              ],
+              "ink_pixels": 2762,
+              "layout_kind": null
+            }
+          },
+          {
+            "flowchart": true,
+            "id": 18,
+            "kind": "graph",
+            "marks": [
+              {
+                "kind": "rectangle",
+                "position": [
+                  0.0,
+                  0.0
+                ],
+                "text": "读数"
+              },
+              {
+                "kind": "diamond",
+                "position": [
+                  0.0,
+                  -2.0
+                ],
+                "text": "小于7"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  -3.0,
+                  -4.0
+                ],
+                "text": "酸性"
+              },
+              {
+                "kind": "rectangle",
+                "position": [
+                  3.0,
+                  -4.0
+                ],
+                "text": "非酸性"
+              },
+              {
+                "kind": "above left",
+                "position": [
+                  -1.5,
+                  -3.0
+                ],
+                "text": "是"
+              },
+              {
+                "kind": "above right",
+                "position": [
+                  1.5,
+                  -3.0
+                ],
+                "text": "否"
+              }
+            ],
+            "segments": [
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  0.0
+                ],
+                "to": [
+                  0.0,
+                  -2.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  -3.0,
+                  -4.0
+                ]
+              },
+              {
+                "arrow": true,
+                "from": [
+                  0.0,
+                  -2.0
+                ],
+                "to": [
+                  3.0,
+                  -4.0
+                ]
+              }
+            ],
+            "raster": {
+              "page": 1,
+              "bounds": [
+                74,
+                337,
+                418,
+                268
+              ],
+              "ink_pixels": 4886,
+              "layout_kind": "native_diagram"
+            }
+          }
+        ],
+        "layout_glyph_count": 53,
+        "prose_glyphs_checked": 51,
+        "nonblank_prose_glyphs": 51,
+        "pages": [
+          {
+            "page": 1,
+            "glyphs": 53,
+            "review_id": "51564251-cc7d-465f-8a7e-007b05e3b942",
+            "sha256": "bc1f45088b814262e0aaf08dda0facdc0a633759f39dd673cf0e464b3fac4370"
+          }
+        ],
+        "prepared_sha256": "26dfc42debb1f6ced5926db7236451080c680727cc10f0e33de06181af5afd6f"
+      },
+      "v1": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "stop",
+              "reason": "可见页面中，两列表格含表头，样品甲和乙的 pH 分别为 3 和 9；表外公式、流程图的四个节点、箭头方向及“是”“否”分支标注均符合题面。末尾也正确说明甲为酸性、乙为非酸性。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "c2e7e5f40472ddb08a27e8b2c166d77b2c2994bc7e4b25c6c99aafb00160d386",
+              "image_sha256": [
+                "bc1f45088b814262e0aaf08dda0facdc0a633759f39dd673cf0e464b3fac4370"
+              ],
+              "usage": {
+                "input_tokens": 23188,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 111,
+                "reasoning_output_tokens": 24
+              }
+            }
+          }
+        ],
+        "task_id": "7bc67d09-966c-4c21-97a5-683b93651b07",
+        "status": "stopped",
+        "selected_revision": null,
+        "decision_steps": [
+          {
+            "action": "stop",
+            "decision_id": "7bc67d09-966c-4c21-97a5-683b93651b07/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "可见页面中，两列表格含表头，样品甲和乙的 pH 分别为 3 和 9；表外公式、流程图的四个节点、箭头方向及“是”“否”分支标注均符合题面。末尾也正确说明甲为酸性、乙为非酸性。",
+            "result_revision": null,
+            "review_ids": [
+              "51564251-cc7d-465f-8a7e-007b05e3b942"
+            ],
+            "revision": 1,
+            "task_id": "7bc67d09-966c-4c21-97a5-683b93651b07",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": null
+      },
+      "v2": {
+        "actor_decisions": [
+          {
+            "actor": {
+              "action": "select",
+              "reason": "页面中两列表格的表头和数值完整：样品甲为 3，样品乙为 9；表外公式显示为 pH = −log₁₀[H⁺]。流程图包含四个指定节点，箭头从“读数”指向“小于7”，并分别沿标注“是”和“否”的分支指向“酸性”和“非酸性”。末尾说明也正确给出了两个样品的分类。"
+            },
+            "receipt": {
+              "provider": "Codex CLI",
+              "model": "gpt-6.1-terra",
+              "reasoning_effort": "high",
+              "prompt_sha256": "e2fc733c456e304535f57077b76739caa3f7139fd43839298fc3803e6b37a848",
+              "image_sha256": [
+                "bc1f45088b814262e0aaf08dda0facdc0a633759f39dd673cf0e464b3fac4370"
+              ],
+              "usage": {
+                "input_tokens": 23269,
+                "cached_input_tokens": 19200,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 145,
+                "reasoning_output_tokens": 26
+              }
+            }
+          }
+        ],
+        "task_id": "e48d4602-dc46-45c9-af5e-ccef69535380",
+        "status": "selected",
+        "selected_revision": 1,
+        "decision_steps": [
+          {
+            "action": "select",
+            "decision_id": "e48d4602-dc46-45c9-af5e-ccef69535380/1",
+            "expected_step": 0,
+            "instruction": null,
+            "reason": "页面中两列表格的表头和数值完整：样品甲为 3，样品乙为 9；表外公式显示为 pH = −log₁₀[H⁺]。流程图包含四个指定节点，箭头从“读数”指向“小于7”，并分别沿标注“是”和“否”的分支指向“酸性”和“非酸性”。末尾说明也正确给出了两个样品的分类。",
+            "result_revision": null,
+            "review_ids": [
+              "51564251-cc7d-465f-8a7e-007b05e3b942"
+            ],
+            "revision": 1,
+            "task_id": "e48d4602-dc46-45c9-af5e-ccef69535380",
+            "tool": null
+          }
+        ],
+        "changes": {},
+        "exported_pdf": {
+          "arm": "v2",
+          "revision": 1,
+          "source": "post_selection_export_handwriting",
+          "pdfinfo_pages": 1,
+          "bytes": 78638,
+          "sha256": "b1461c9c52760588c48fd17fcc8cfa91281a17e56d92943e6d463d5c4081d2f5",
+          "poppler_rasters": [
+            {
+              "index": 1,
+              "size": [
+                1200,
+                1650
+              ],
+              "png_sha256": "d18f0a77da9e0488b77fcb931d36aad7923b50977dd4cbdd3403d09d659d31a2",
+              "preview_sha256": "bc1f45088b814262e0aaf08dda0facdc0a633759f39dd673cf0e464b3fac4370",
+              "mean_absolute_rgb_error": 1.0439
+            }
+          ]
+        }
+      }
+    }
+  },
+  "summary": {
+    "cases": 7,
+    "first_render_mechanical_pass": 7,
+    "native_component_count": {
+      "table": 4,
+      "graph": 4,
+      "fraction": 13
+    },
+    "rendered_text_nodes": 464,
+    "arms": {
+      "v1": {
+        "selected": 2,
+        "stopped": 5,
+        "new_candidate_revisions": 0
+      },
+      "v2": {
+        "selected": 7,
+        "stopped": 0,
+        "new_candidate_revisions": 0
+      }
+    }
+  }
+}

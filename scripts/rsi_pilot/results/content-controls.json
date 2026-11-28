@@ -1,0 +1,366 @@
+{
+  "scope": "Deliberately injected negative controls, separate from naturally authored pilot cases.",
+  "blind_inputs": "User brief and full native PNG only.",
+  "runtime_sha256": "ead29b1fe7698e6683494e22ab2c991f6a0ee25a2a0f827637a2fffe5df4924a",
+  "model": "gpt-6.1-terra",
+  "cases": [
+    {
+      "case": "table1",
+      "author_source_sha256": "02d7f25a0c3bc494b4a776ca3256014e6a0229757c65c87c9011c3578866ee73",
+      "bad_source_sha256": "56b7400654b502c292d3e0998fccea5bcb600fc8a2386b5e6c5315e51bba798f",
+      "paper_sha256": "c97ac505c5c874a8997cb731ce5d4181fe1ef3629e680b44aefa635ad0f825db",
+      "base_png_sha256": "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3",
+      "initial_png_sha256": "6f4a6a950e0ccfc824824b6d3dd93c8fd50e52d7ecae73b4eda8a12322842ae4",
+      "initial_facts": {
+        "table_rows": [
+          [
+            "0",
+            "0"
+          ],
+          [
+            "2",
+            "8"
+          ],
+          [
+            "4",
+            "12"
+          ]
+        ],
+        "target_value_at_t_2": "8"
+      },
+      "initial_prepared_facts": {
+        "table_rows": [
+          [
+            "0",
+            "0"
+          ],
+          [
+            "2",
+            "8"
+          ],
+          [
+            "4",
+            "12"
+          ]
+        ],
+        "target_value_at_t_2": "8"
+      },
+      "initial_vs_correct_author_raster": {
+        "threshold_8bit": 12,
+        "changed_pixels": 86,
+        "bbox_xyxy_inclusive": [
+          229,
+          237,
+          241,
+          255
+        ]
+      },
+      "blind_initial": {
+        "action": "repair",
+        "reason": "表格中时间为 2 s 时对应的位移写成了 8 m，题面要求为 6 m。页面上的平均速度计算为 (12−0)/(4−0)=3 m/s。"
+      },
+      "repairs_attempted": 1,
+      "repair_reason": "将 2 s 对应的位移由 8 m 改为题面要求的 6 m；平均速度计算正确，保持不变。",
+      "final_revision": 2,
+      "final_sha256": "02d7f25a0c3bc494b4a776ca3256014e6a0229757c65c87c9011c3578866ee73",
+      "final_png_sha256": "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3",
+      "final_facts": {
+        "table_rows": [
+          [
+            "0",
+            "0"
+          ],
+          [
+            "2",
+            "6"
+          ],
+          [
+            "4",
+            "12"
+          ]
+        ],
+        "target_value_at_t_2": "6"
+      },
+      "final_prepared_facts": {
+        "table_rows": [
+          [
+            "0",
+            "0"
+          ],
+          [
+            "2",
+            "6"
+          ],
+          [
+            "4",
+            "12"
+          ]
+        ],
+        "target_value_at_t_2": "6"
+      },
+      "final_specific_fact_correct": true,
+      "initial_vs_final_raster": {
+        "threshold_8bit": 12,
+        "changed_pixels": 86,
+        "bbox_xyxy_inclusive": [
+          229,
+          237,
+          241,
+          255
+        ]
+      },
+      "final_vs_correct_author_raster": {
+        "threshold_8bit": 12,
+        "changed_pixels": 0,
+        "bbox_xyxy_inclusive": null
+      },
+      "blind_final": {
+        "action": "accept",
+        "reason": "页面上的两列表格表头为“时间 t/s”和“位移 x/m”，三行分别对应 0 和 0、2 和 6、4 和 12。表后写有平均速度公式 v̄=Δx/Δt=(12−0)/(4−0)=3 m/s，内容可辨认，页面没有附图。"
+      },
+      "native_disposition": {
+        "status": "selected",
+        "selected_revision": 2
+      },
+      "model_receipts": {
+        "visual-1": {
+          "model": "gpt-6.1-terra",
+          "prompt_sha256": "7fe928b755e5983ac61301c8fb4f1e5bc133b28a30208854a2749fe1a71407dd",
+          "image_sha256": [
+            "6f4a6a950e0ccfc824824b6d3dd93c8fd50e52d7ecae73b4eda8a12322842ae4"
+          ],
+          "usage": {
+            "input_tokens": 22696,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 84,
+            "reasoning_output_tokens": 23
+          }
+        },
+        "repair": {
+          "model": "gpt-6.1-terra",
+          "prompt_sha256": "fd3e37ac8f66cee375c9a2291ca0982d82c66277ad40c7bf4279938058ff4e20",
+          "image_sha256": [
+            "6f4a6a950e0ccfc824824b6d3dd93c8fd50e52d7ecae73b4eda8a12322842ae4"
+          ],
+          "usage": {
+            "input_tokens": 22808,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 135,
+            "reasoning_output_tokens": 0
+          }
+        },
+        "visual-2": {
+          "model": "gpt-6.1-terra",
+          "prompt_sha256": "7fe928b755e5983ac61301c8fb4f1e5bc133b28a30208854a2749fe1a71407dd",
+          "image_sha256": [
+            "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+          ],
+          "usage": {
+            "input_tokens": 22694,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 108,
+            "reasoning_output_tokens": 16
+          }
+        }
+      }
+    },
+    {
+      "case": "flow1",
+      "author_source_sha256": "08180fbb47ce2f872a12904ec39b3fc588d09826d027dd30c41f8bdbe50790c6",
+      "bad_source_sha256": "9d303ca41a42fca0302a367244e1ead591d81e83dedac004a6a016e5357d0af2",
+      "paper_sha256": "c97ac505c5c874a8997cb731ce5d4181fe1ef3629e680b44aefa635ad0f825db",
+      "base_png_sha256": "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2",
+      "initial_png_sha256": "2dddcb581fdfd850f74cc888fe8bbde90a04aec01aaa6dfd89c93b24ae77e070",
+      "initial_facts": {
+        "nodes": [
+          "保持",
+          "开风扇",
+          "读温度",
+          "超温"
+        ],
+        "edges": [
+          [
+            "读温度",
+            "超温",
+            ""
+          ],
+          [
+            "超温",
+            "保持",
+            "是"
+          ],
+          [
+            "超温",
+            "开风扇",
+            "否"
+          ]
+        ]
+      },
+      "initial_prepared_facts": {
+        "nodes": [
+          "保持",
+          "开风扇",
+          "读温度",
+          "超温"
+        ],
+        "edges": [
+          [
+            "读温度",
+            "超温",
+            ""
+          ],
+          [
+            "超温",
+            "保持",
+            "是"
+          ],
+          [
+            "超温",
+            "开风扇",
+            "否"
+          ]
+        ]
+      },
+      "initial_vs_correct_author_raster": {
+        "threshold_8bit": 12,
+        "changed_pixels": 402,
+        "bbox_xyxy_inclusive": [
+          167,
+          244,
+          429,
+          270
+        ]
+      },
+      "blind_initial": {
+        "action": "repair",
+        "reason": "图中“超温”的“否”分支指向“开风扇”，“是”分支指向“保持”，与题目要求相反。页外文字写明“温度高于30℃时判定为超温，否则不超温”。"
+      },
+      "repairs_attempted": 1,
+      "repair_reason": "交换了“超温”节点两条分支的标签，使“是”指向“开风扇”，“否”指向“保持”；其余内容保持不变。",
+      "final_revision": 2,
+      "final_sha256": "08180fbb47ce2f872a12904ec39b3fc588d09826d027dd30c41f8bdbe50790c6",
+      "final_png_sha256": "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2",
+      "final_facts": {
+        "nodes": [
+          "保持",
+          "开风扇",
+          "读温度",
+          "超温"
+        ],
+        "edges": [
+          [
+            "读温度",
+            "超温",
+            ""
+          ],
+          [
+            "超温",
+            "保持",
+            "否"
+          ],
+          [
+            "超温",
+            "开风扇",
+            "是"
+          ]
+        ]
+      },
+      "final_prepared_facts": {
+        "nodes": [
+          "保持",
+          "开风扇",
+          "读温度",
+          "超温"
+        ],
+        "edges": [
+          [
+            "读温度",
+            "超温",
+            ""
+          ],
+          [
+            "超温",
+            "保持",
+            "否"
+          ],
+          [
+            "超温",
+            "开风扇",
+            "是"
+          ]
+        ]
+      },
+      "final_specific_fact_correct": true,
+      "initial_vs_final_raster": {
+        "threshold_8bit": 12,
+        "changed_pixels": 402,
+        "bbox_xyxy_inclusive": [
+          167,
+          244,
+          429,
+          270
+        ]
+      },
+      "final_vs_correct_author_raster": {
+        "threshold_8bit": 12,
+        "changed_pixels": 0,
+        "bbox_xyxy_inclusive": null
+      },
+      "blind_final": {
+        "action": "accept",
+        "reason": "页面画有带箭头的流程图：“读温度”指向“超温”，标注“是”的分支指向“开风扇”，标注“否”的分支指向“保持”。图外写有“温度高于30℃时判定为超温，否则不超温”。内容可辨认，未使用表格。"
+      },
+      "native_disposition": {
+        "status": "selected",
+        "selected_revision": 2
+      },
+      "model_receipts": {
+        "visual-1": {
+          "model": "gpt-6.1-terra",
+          "prompt_sha256": "053a3dc22d8c309fcb4ca2769384a0a67e35d2e27f5766a787232471343b7f81",
+          "image_sha256": [
+            "2dddcb581fdfd850f74cc888fe8bbde90a04aec01aaa6dfd89c93b24ae77e070"
+          ],
+          "usage": {
+            "input_tokens": 22698,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 112,
+            "reasoning_output_tokens": 40
+          }
+        },
+        "repair": {
+          "model": "gpt-6.1-terra",
+          "prompt_sha256": "4be899d9071e6f182080a02acae500a6b9331584c12863f536c5be064ea53b57",
+          "image_sha256": [
+            "2dddcb581fdfd850f74cc888fe8bbde90a04aec01aaa6dfd89c93b24ae77e070"
+          ],
+          "usage": {
+            "input_tokens": 22905,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 227,
+            "reasoning_output_tokens": 0
+          }
+        },
+        "visual-2": {
+          "model": "gpt-6.1-terra",
+          "prompt_sha256": "053a3dc22d8c309fcb4ca2769384a0a67e35d2e27f5766a787232471343b7f81",
+          "image_sha256": [
+            "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+          ],
+          "usage": {
+            "input_tokens": 22703,
+            "cached_input_tokens": 19200,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 129,
+            "reasoning_output_tokens": 36
+          }
+        }
+      }
+    }
+  ]
+}

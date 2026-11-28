@@ -1,0 +1,306 @@
+{
+  "026b243f0d22": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 0,
+      "flows": 0,
+      "observed": [
+        "第1页上方，上午、露珠：夜间地面和草叶散热降温，附近空气中的水汽遇冷凝结成小水滴并附着在草叶上；日出后阳光逐渐使露珠蒸发。",
+        "第1页上方，午后、云影：云层遮挡部分阳光，使地面上对应区域较暗，形成云影；云随风移动时，云影也随之移动。",
+        "第1页上方，傍晚、晚霞：太阳接近地平线时，阳光穿过较厚的大气层，蓝紫色光更容易被散射，留下较多红橙色光照亮云层，形成晚霞。",
+        "可见内容为三段文字，未见公式、图或表。"
+      ],
+      "reason": "第1页顶部三段分别标明了上午、午后、傍晚及对应现象，每段均用一至两句解释现象，符合题目要求。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "da35b45a199f39f3c544cd955323a8256ba396da5d96d69f93fadf83b0686001",
+      "image_sha256": [
+        "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039"
+      ],
+      "usage": {
+        "input_tokens": 22761,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 425,
+        "reasoning_output_tokens": 156
+      }
+    }
+  },
+  "497808f2d09f": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 0,
+      "flows": 1,
+      "observed": {
+        "nodes": [
+          "读温度",
+          "超温",
+          "开风扇",
+          "保持"
+        ],
+        "connections": [
+          {
+            "起点": "读温度",
+            "终点": "超温"
+          },
+          {
+            "起点": "超温",
+            "标签": "是",
+            "终点": "开风扇"
+          },
+          {
+            "起点": "超温",
+            "标签": "否",
+            "终点": "保持"
+          }
+        ],
+        "text": "温度高于30℃时判定为超温，否则不超温。",
+        "inference": "未作额外推测。"
+      },
+      "reason": "第1页左上方的流程图包含四个指定节点、箭头和正确的“是”“否”分支；图下方文字解释了30 ℃阈值。页面未见表格。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "483ddc184748bc95d59e28df8f6a8e589bf9c90e7dc897fe914cb3b5bb8d204c",
+      "image_sha256": [
+        "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+      ],
+      "usage": {
+        "input_tokens": 22772,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 256,
+        "reasoning_output_tokens": 36
+      }
+    }
+  },
+  "67247a2d95e0": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 0,
+      "flows": 0,
+      "observed": [
+        "第1页顶部标题为“并联电阻的计算”。",
+        "正文说明并联电阻两端的电压相同，总电流等于各支路电流之和，并引出欧姆定律。",
+        "等效电阻计算写为 U/R等 = U/R₁ + U/R₂，继而写出 R等 = R₁R₂/(R₁+R₂) = (6×3)/(6+3) = 2 Ω；分式以上下堆叠形式呈现。",
+        "总电流计算写为 I = U/R等 = 12/2 = 6 A。",
+        "总功率计算写为 P = UI = 12×6 = 72 W。",
+        "页面未见图或表格。"
+      ],
+      "reason": "第1页上部依次展示了等效电阻、总电流和总功率的计算，算式、数值和单位均正确；等效电阻使用了上下堆叠的分式，满足题目要求。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "995a417242a069bc6855ab73773e7aa2144b5168e12cfdd020c6b59665a52d33",
+      "image_sha256": [
+        "4088f84f4122be31824c389fc20f41648a842c29d5f83d53e0005a8c3e87f716"
+      ],
+      "usage": {
+        "input_tokens": 22781,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 327,
+        "reasoning_output_tokens": 53
+      }
+    }
+  },
+  "a25eb9d4e888": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 1,
+      "flows": 0,
+      "observed": [
+        "表头为“时间 t/s”和“位移 x/m”。",
+        "三行数据依次为：0 s 对应 0 m，2 s 对应 6 m，4 s 对应 12 m。",
+        "表后写有“平均速度公式为”，并列出 v̄ = Δx/Δt = (12−0)/(4−0) = 3 m/s。",
+        "页面未见附图。"
+      ],
+      "reason": "第1页左上方的表格包含两列表头和三行对应数据；表格下方的平均速度计算、结果及单位均符合题目要求。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "3b8bedf4a911508dafef77824ad6fe721d817bc183dfb0d5268f0a94b42dfa29",
+      "image_sha256": [
+        "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+      ],
+      "usage": {
+        "input_tokens": 22771,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 211,
+        "reasoning_output_tokens": 31
+      }
+    }
+  },
+  "b1bbbb897aa4": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 1,
+      "flows": 1,
+      "observed": {
+        "tables": [
+          {
+            "表头": [
+              "样品",
+              "pH"
+            ],
+            "数据": [
+              [
+                "样品甲",
+                "3"
+              ],
+              [
+                "样品乙",
+                "9"
+              ]
+            ],
+            "单位": "未标单位；pH 为无量纲读数"
+          }
+        ],
+        "formula": "pH = −log₁₀[H⁺]",
+        "flows": [
+          {
+            "节点": [
+              "读数",
+              "小于7",
+              "酸性",
+              "非酸性"
+            ],
+            "连接": [
+              "读数 → 小于7",
+              "小于7 → 酸性，标注“是”",
+              "小于7 → 非酸性，标注“否”"
+            ]
+          }
+        ],
+        "text": "文字说明样品甲的 pH 为 3，小于 7，分为酸性；样品乙的 pH 为 9，不小于 7，分为非酸性。",
+        "inference": "无影响验收结论的推测。"
+      },
+      "reason": "第 1 页左上角的表格、表外公式、中部流程图及其下方说明均符合题目要求；读数和分类一致。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "aaf5f1beae7d792f1854f6aadad15f5a64ed1df1139249aec5f837f051ca5706",
+      "image_sha256": [
+        "bc1f45088b814262e0aaf08dda0facdc0a633759f39dd673cf0e464b3fac4370"
+      ],
+      "usage": {
+        "input_tokens": 22818,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 342,
+        "reasoning_output_tokens": 37
+      }
+    }
+  },
+  "b5cf778a5dfc": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 2,
+      "flows": 0,
+      "observed": {
+        "tables": [
+          {
+            "title": "方案甲",
+            "headers": [
+              "项目",
+              "数值"
+            ],
+            "rows": [
+              [
+                "输入能量",
+                "50 J"
+              ],
+              [
+                "输出能量",
+                "40 J"
+              ]
+            ]
+          },
+          {
+            "title": "方案乙",
+            "headers": [
+              "项目",
+              "数值"
+            ],
+            "rows": [
+              [
+                "输入能量",
+                "80 J"
+              ],
+              [
+                "输出能量",
+                "60 J"
+              ]
+            ]
+          }
+        ],
+        "formulas_and_text": [
+          "效率公式：η＝输出能量／输入能量×100%。",
+          "方案甲：40／50×100%＝80%。",
+          "方案乙：60／80×100%＝75%。",
+          "两方案效率相差80%－75%＝5个百分点，方案甲效率较高。"
+        ],
+        "flows": "未见流程图、节点或箭头。",
+        "inferences": []
+      },
+      "reason": "第1页左上方有两张独立表格，表头、数据和单位符合题目；表格下方写有正确的效率公式、两方案计算及百分点差值。页面未画图。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "92725c5a5f9c3d9c3fbf3db8178d27e16f6490af79311aa29cde91e05d9eca8c",
+      "image_sha256": [
+        "ba76b30ec1e719ab8ddb487d62ace811705b0cdb1e9e58408ab84bcf7dbc0448"
+      ],
+      "usage": {
+        "input_tokens": 22856,
+        "cached_input_tokens": 13824,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 336,
+        "reasoning_output_tokens": 35
+      }
+    }
+  },
+  "bab2399c2990": {
+    "vote": {
+      "verdict": "pass",
+      "tables": 0,
+      "flows": 2,
+      "observed": [
+        "第1页顶部说明：图一用于借书时根据库存情况选择借出或预约；图二用于交卷时根据署名情况选择收卷或补签。",
+        "图一“借书流程”：查书 → 有库存；有库存 → 借出，分支标注“是”；有库存 → 预约，分支标注“否”。",
+        "图二“交卷流程”：验卷 → 已署名；已署名 → 收卷，分支标注“是”；已署名 → 补签，分支标注“否”。"
+      ],
+      "reason": "第1页上部有两张分开的流程图。两图的节点、箭头方向和“是／否”分支文字均符合题目要求；页面顶部另有一句话说明两流程用途。"
+    },
+    "receipt": {
+      "provider": "Codex CLI",
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "high",
+      "prompt_sha256": "d2f898b511f2778af3cc2a9a371f567f68aa93f3df14faf561d3662ba24d3d87",
+      "image_sha256": [
+        "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47"
+      ],
+      "usage": {
+        "input_tokens": 22810,
+        "cached_input_tokens": 19200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 271,
+        "reasoning_output_tokens": 51
+      }
+    }
+  }
+}

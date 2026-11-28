@@ -39,3 +39,32 @@ python scripts/rsi_pilot/run_episode.py --out /tmp/panache-live --paper public-d
 - [独立视觉选票](results/blind-review.json) 按任务和成稿像素去重，保留判断理由、可交付数和严重错放数。暂缓时另审最后一个候选稿，统计实际交付时仍计为零。
 - [局部评审校准](results/review-calibration.json) 对照既有合成局部编辑的已知答案。对齐正确、文字仍可读、用户本人喜欢这种风格是三个不同的问题。
 - 图片、每轮结论和未达到预期的结果记在 [实验 PR](https://github.com/SXP-Simon/Panache/pull/70)。公开图像固定在 [pr-assets 的截图清单](https://github.com/SXP-Simon/Panache/blob/796eb2c58c1147a4e2c1cdae94c9911ae1f519f3/screenshots/rsi-pilot/index.json)。
+
+## 七道跨题材作业
+
+七个题面从纯文本延伸到分式推导、一个或两个表格、一个或两个带分支的流程图，以及表格、公式、流程图混排。作者只收到题目与支持语法的提示。保留其实际 Markdown 和工具返回的字形或图形位置，再与成稿相互核对。[题面、作者稿、单元格、节点与两组终止动作](results/content-matrix.json) · [从匿名 PNG 抄读的独立选票](results/content-blind-review.json)
+
+从仓库根目录先构建 Markdown Worker、MCP 和用来核实结构的 Rust 示例。在新的实验目录运行下列命令。实时审题需要 Terra 可用；重新调用模型可能得到不同作答。独立评审和故意注错的题另外归档。
+
+```sh
+cargo build --locked --release -p handwriting-core --example rsi_content_probe
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content freeze \
+  --binary target/release/panache-mcp --worker app/web/prepare-text-worker.js --fonts assets/font_assets
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content first
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content review-v1
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content review-v2
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content deliver
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content packets
+python scripts/rsi_pilot/content_assessment.py /tmp/panache-content/packets /tmp/panache-content-blind
+python scripts/rsi_pilot/content_matrix.py --out /tmp/panache-content results \
+  --probe target/release/examples/rsi_content_probe --report /tmp/panache-content/report.json
+```
+
+这次七份初稿均获独立模型验收通过。对同一组像素，明确交付与暂缓两个动作的含义后，真正选定稿件由 2/7 增至 7/7。另外两道已知错误题保持图表数量，分别改错一个数据格和两个分支标签。模型均指出具体错处，修正稿与正确作者稿的 PNG 指纹完全相同。[两道注错题的原始判断与版本](results/content-controls.json) · [公开展示图清单](https://github.com/SXP-Simon/Panache/blob/7acd699ad5874d436edfee23a80761e22372a5dc/screenshots/rsi-pilot/content/index.json)
+
+## 纸型、焦点与选样的补充检验
+
+- 初始三个独立留出纸型中，一次生成、任务内修订、带 v2 经验的修订实际交付且模型验收通过的任务数分别是 1、3、1。以四分之一行距为阈值时，自由段落留空可能被错判；登记表填错整行又可能完全贴线。两个意图可用同一张图测试。[同像素双题意](results/row-intent-challenge.json) · [真人意见原文](results/human-feedback.json)
+- v3 由宿主依据 v2 的错拒提出，先冻结再在两项新纸型任务上比较。两份初稿本来都合格，v2、v3 均交付且获独立模型通过，共使用 8 次、5 次模型决策。[每轮证据和模型用量](results/prospective.json)
+- 单独测试照片上方 40% 的 132 个字形时，模型建议局部柔化 0.7 px。两页下部均为零像素变化。独立模型将局部稿和原稿并列；同强度的全局柔化使近处字迹显得过软。[同尺度比较与使用的 MCP 调用](results/appearance-trial.json)
+- 既有局部编辑实验另留五道有已知答案的题。普通和细分评审提示均答对 5/5。回看这五题时，只复核一题，按变化像素最多会选到正确的移字稿，按“目标框仍有墨、模型却要求返工”的分歧会选到删错字的稿。该挑样规则属于事后分析，可用下一批失败稿检验。[逐题记录](results/review-calibration.json)
