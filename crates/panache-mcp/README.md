@@ -248,6 +248,8 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 用户要求比较稿件、试验改法或改进下一轮策略时，宿主模型负责读图、提出假设、判断并说明理由。Panache 使用现有工具生成和审阅稿件，在本机的稿件数据库中保存任务。其他提供方也可按同一 MCP 契约提交决策。
 
+实验 RSI 工具默认隐藏。需要跑多轮策略实验时，启动 MCP 前设置 `PANACHE_MCP_RSI=1`；其他值不启用。普通稿件和经验库不受影响，关闭也不会删除已存实验记录。
+
 1. 用 `save_section` 准备初稿。`read_rsi_policy({})` 列出策略版本，初始版本为 `pilot-v1`。用 `start_rsi_task` 提交稿号、起始版本、目标、策略 ID 和实际的 `decision_provider`。任务固定使用当时的规则。
 2. 用 `advance_rsi_task` 传当前 `expected_step`（初始为 0）。`request_evidence` 写明要消除的疑问。用 `preview_handwriting` 传同一 `rsi_task_id` 和明确的稿件版本，查看图像、布局或局部裁剪并取得 `evidence_id`。整页检查也可直接引用同稿同版已有的 `review_id`，其首次入档时间见 `filed_at_revision`。任务预览单据只在本任务有效，每个任务最多 64 份。设置 `PANACHE_MCP_PRESERVE_REVIEWS=1` 的连接可以查旧单、引用旧单，或省略 `rsi_task_id` 临时看图。
 3. `revise` 引用同版的 `review_ids`、理由、预期变化和一个编辑工具。调用该工具时在 `rsi_decision_id` 传回 `decisions` 末项的 `decision_id`，并使用该稿的当前版本。该工具写入新版本时，同一笔事务会把新版登记为候选。如果回执显示设置已相同且版本号未变，可以沿用当前候选继续审阅。
@@ -258,7 +260,7 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 ## 验证
 
-构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF。
+构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF；`--rsi` 另验开启模式。先构建并指定 Markdown worker，避免服务在初始化前退出。
 
 ```sh
 uv run --script crates/panache-mcp/tests/smoke.py target/release/panache-mcp --out output/pdf

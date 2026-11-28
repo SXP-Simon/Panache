@@ -310,7 +310,13 @@ async def check_rsi_preview(client, draft_id):
                revision=1, action="stop", reason="No independent crop.")
 
 
-async def smoke(command, arguments, out):
+RSI_TOOLS = {
+    "start_rsi_task", "read_rsi_task", "advance_rsi_task",
+    "read_rsi_policy", "publish_rsi_policy", "validate_rsi_policy",
+}
+
+
+async def smoke(command, arguments, out, *, rsi_enabled=False):
     with TemporaryDirectory() as temp:
         personal = Path(temp) / "my-fonts"
         personal.mkdir()
@@ -323,7 +329,7 @@ async def smoke(command, arguments, out):
             command=command,
             args=arguments,
             cwd=temp,
-            env={**os.environ, "PANACHE_MCP_HOME": temp, "PANACHE_USER_FONT_DIR": str(personal), "PATH": ""},
+            env={**os.environ, "PANACHE_MCP_HOME": temp, "PANACHE_USER_FONT_DIR": str(personal), "PANACHE_MCP_RSI": "1" if rsi_enabled else "0", "PATH": ""},
         )
         await check_zip_review_pixels(params, Path(temp), latin)
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
@@ -342,12 +348,6 @@ async def smoke(command, arguments, out):
                 "read_homework_experience",
                 "validate_homework_experience",
                 "retire_homework_experience",
-                "start_rsi_task",
-                "read_rsi_task",
-                "advance_rsi_task",
-                "read_rsi_policy",
-                "publish_rsi_policy",
-                "validate_rsi_policy",
                 "annotate_review",
                 "storage_usage",
                 "plan_cleanup",
@@ -362,7 +362,10 @@ async def smoke(command, arguments, out):
                 "replace_section_text",
                 "preview_handwriting",
                 "export_handwriting",
-            }
+            } | (RSI_TOOLS if rsi_enabled else set())
+            assert ("start_rsi_task" in info.instructions) == rsi_enabled
+            assert any("rsi_task_id" in t.inputSchema.get("properties", {}) for t in tools.tools) == rsi_enabled
+            assert any("rsi_decision_id" in t.inputSchema.get("properties", {}) for t in tools.tools) == rsi_enabled
             listed = await call(client, "list_fonts")
             guidance = listed.structuredContent["sample_guidance"]
             assert guidance in listed.content[0].text
@@ -421,7 +424,8 @@ async def smoke(command, arguments, out):
             ).structuredContent
             assert guided["paper"]["alignment"] == "manual_guides"
             gkey = {"draft_id": guided["draft_id"]}
-            await check_rsi_preview(client, guided["draft_id"])
+            if rsi_enabled:
+                await check_rsi_preview(client, guided["draft_id"])
             paper_only = png(
                 await call(client, "preview_handwriting", view="paper", **gkey)
             )
@@ -900,17 +904,20 @@ async def smoke(command, arguments, out):
         async with stdio_client(protected) as streams, ClientSession(*streams) as client:
             assert "preserves stored reviews" in (await client.initialize()).instructions
             key = {"draft_id": doc, "revision": archive["revision"]}
-            task = (await call(client, "start_rsi_task", **key, objective="Read archived evidence.",
-                               policy_id="pilot-v1", decision_provider="stdio fixture")).structuredContent
-            for name, arguments in [
-                ("preview_handwriting", {**key, "view": "image", "rsi_task_id": task["task_id"]}),
+            guarded = [
                 ("preview_handwriting", {**key, **remaining[0], "view": "review"}),
                 ("annotate_review", {**comparison_key, "review_id": reviewed_id,
                                      "origin": "model_observation", "text": "must not be stored"}),
-            ]:
+            ]
+            if rsi_enabled:
+                task = (await call(client, "start_rsi_task", **key, objective="Read archived evidence.",
+                                   policy_id="pilot-v1", decision_provider="stdio fixture")).structuredContent
+                guarded.append(("preview_handwriting", {**key, "view": "image", "rsi_task_id": task["task_id"]}))
+            for name, arguments in guarded:
                 blocked = await client.call_tool(name, arguments)
                 assert blocked.isError and "保留原有检查记录" in blocked.content[0].text
-            assert (await call(client, "read_rsi_task", task_id=task["task_id"])).structuredContent["preview_evidence"] == []
+            if rsi_enabled:
+                assert (await call(client, "read_rsi_task", task_id=task["task_id"])).structuredContent["preview_evidence"] == []
             assert png(await call(client, "preview_handwriting", **key, **remaining[0], view="image")) == original
             # PDF keeps the historical count but never claims ZIP/preview pixel equality.
             pdf_review = (await call(client, "export_handwriting", **key)).structuredContent["review"]
@@ -948,10 +955,11 @@ if __name__ == "__main__":
         "--server-arg", action="append", default=[], help="Argument for the executable"
     )
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--rsi", action="store_true", help="enable experimental RSI for this smoke run")
     args = parser.parse_args()
     entry = (
         json.loads(args.config.read_text(encoding="utf-8-sig"))["mcpServers"]["panache"]
         if args.config
         else {"command": str(args.binary.resolve()), "args": args.server_arg}
     )
-    asyncio.run(smoke(entry["command"], entry.get("args", []), args.out))
+    asyncio.run(smoke(entry["command"], entry.get("args", []), args.out, rsi_enabled=args.rsi))

@@ -25,8 +25,8 @@ use handwriting_core::{
 use inputs::*;
 use rmcp::{
     RoleServer, ServerHandler, ServiceExt,
-    handler::server::wrapper::Parameters,
-    model::{CallToolResult, ContentBlock},
+    handler::server::{router::tool::ToolRouter, tool::ToolCallContext, wrapper::Parameters},
+    model::{CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock},
     service::RequestContext,
     tool, tool_handler, tool_router,
 };
@@ -41,6 +41,7 @@ use tokio::sync::Semaphore;
 struct State {
     drafts: Drafts,
     preserve_reviews: bool,
+    rsi_enabled: bool,
     engine: Mutex<Engine>,
     paper_focus: paper::focus::Cache,
     fonts: Vec<String>,
@@ -272,8 +273,72 @@ impl Panache {
     }
 }
 
-#[tool_handler]
+const RSI_TOOLS: [&str; 6] = [
+    "start_rsi_task",
+    "read_rsi_task",
+    "advance_rsi_task",
+    "read_rsi_policy",
+    "publish_rsi_policy",
+    "validate_rsi_policy",
+];
+const RSI_ARGUMENTS: [&str; 2] = ["rsi_decision_id", "rsi_task_id"];
+const RSI_DISABLED: &str =
+    "实验 RSI 未启用；如确实需要，请在启动 Panache MCP 时设置 PANACHE_MCP_RSI=1。";
+
+impl Panache {
+    fn visible_tools(&self) -> ToolRouter<Self> {
+        let mut router = Self::tool_router();
+        if !self.0.rsi_enabled {
+            for name in RSI_TOOLS {
+                router.remove_route(name);
+            }
+            for route in router.map.values_mut() {
+                let Some(properties) = route
+                    .attr
+                    .input_schema
+                    .get("properties")
+                    .and_then(serde_json::Value::as_object)
+                else {
+                    continue;
+                };
+                if RSI_ARGUMENTS
+                    .iter()
+                    .any(|name| properties.contains_key(*name))
+                    && let Some(properties) = Arc::make_mut(&mut route.attr.input_schema)
+                        .get_mut("properties")
+                        .and_then(serde_json::Value::as_object_mut)
+                {
+                    for name in RSI_ARGUMENTS {
+                        properties.remove(name);
+                    }
+                }
+            }
+        }
+        router
+    }
+}
+
+#[tool_handler(router = self.visible_tools())]
 impl ServerHandler for Panache {
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, rmcp::ErrorData> {
+        if !self.0.rsi_enabled
+            && (RSI_TOOLS.contains(&request.name.as_ref())
+                || request
+                    .arguments
+                    .as_ref()
+                    .is_some_and(|args| RSI_ARGUMENTS.iter().any(|name| args.contains_key(*name))))
+        {
+            return Ok(CallToolResult::error(vec![ContentBlock::text(RSI_DISABLED)]).into());
+        }
+        self.visible_tools()
+            .call(ToolCallContext::new(self, request, context))
+            .await
+    }
+
     fn get_info(&self) -> rmcp::model::ServerConfig {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         let instructions = concat!(
@@ -290,7 +355,6 @@ impl ServerHandler for Panache {
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
-            "For a requested iterative policy experiment, use start_rsi_task after creating the initial draft. The host model chooses and explains each bounded action using the pinned policy and actual preview evidence. ",
             "Inspect appearance with view=image; revisit actions with read_section(view=trajectory)."
         );
         let draft_intent = "First identify the source of the work. When the user supplies text or a problem to write out and asks to see page one, they mean the first page of the new output. Call save_section first (style.homework=true for a new assignment), then preview the returned draft_id. Look up a saved draft only when the user refers to one, even if an existing draft resembles the supplied text. ";
@@ -299,12 +363,17 @@ impl ServerHandler for Panache {
         } else {
             "When correcting ordinary homework, obtain the original revision's full-page review (preview_handwriting view=review) before editing; keep its review_id and any relevant region so you can inspect the same place afterward. "
         };
+        let rsi = if self.0.rsi_enabled {
+            " For a requested iterative policy experiment, use start_rsi_task after creating the initial draft. The host model chooses and explains each bounded action using the pinned policy and actual preview evidence."
+        } else {
+            ""
+        };
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new(
                 "panache-mcp",
                 handwriting_core::app_version(),
             ))
-            .with_instructions(format!("{mode}{draft_intent}{instructions}"))
+            .with_instructions(format!("{mode}{draft_intent}{instructions}{rsi}"))
     }
 }
 
@@ -963,6 +1032,9 @@ async fn main() -> Result<()> {
     };
     let state = State {
         preserve_reviews,
+        rsi_enabled: env::var_os("PANACHE_MCP_RSI")
+            .as_deref()
+            .is_some_and(|value| value == "1"),
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
         local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes)
