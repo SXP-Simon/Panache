@@ -5,9 +5,9 @@ paper_geometry.py. Physical row numbers here are zero-based.
 """
 
 from collections import Counter, defaultdict
+from itertools import pairwise
 
 import numpy as np
-
 from paper_geometry import (
     _assigned_glyphs,
     _pitch,
@@ -95,9 +95,7 @@ def diagnose_page(
         "interior_unused_rows": interior,
         "unoccupied_leading_rows": occupied[0] if occupied else None,
         "unoccupied_trailing_rows": nrows - 1 - occupied[-1] if occupied else None,
-        "nonincreasing_line_transitions": sum(
-            b <= a for a, b in zip(ordered, ordered[1:])
-        ),
+        "nonincreasing_line_transitions": sum(b <= a for a, b in pairwise(ordered)),
         "source_row_assignments": assignments,
         "required_assignments": required,
         "nearest_raster": raster,

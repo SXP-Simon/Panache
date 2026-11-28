@@ -6,9 +6,8 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-
 from paper_geometry import load_labels, score_layout
+from PIL import Image, ImageDraw, ImageFont
 from ruling_fit import diagnose_page, page_sequence
 
 
@@ -39,8 +38,8 @@ def challenge_sheet():
             right += 1
             bottom += 1
 
-            def local_y(at):
-                return round(float(np.interp(at, xs, rows[physical])))
+            left_y = round(float(np.interp(left, xs, rows[physical])))
+            right_y = round(float(np.interp(right, xs, rows[physical])))
 
             glyphs.append(
                 {
@@ -53,7 +52,7 @@ def challenge_sheet():
                         [right, bottom],
                         [left, bottom],
                     ],
-                    "photo_baseline": [[left, local_y(left)], [right, local_y(right)]],
+                    "photo_baseline": [[left, left_y], [right, right_y]],
                 }
             )
     return labels, blank, final, glyphs

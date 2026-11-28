@@ -1,4 +1,4 @@
-"""Post-hoc optical comparison on native pixels; never an actor decision rule."""
+"""Post-hoc optical comparison on native pixels, also used in the follow-up softness trial."""
 
 import numpy as np
 from PIL import Image, ImageDraw
