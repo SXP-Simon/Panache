@@ -1,0 +1,58 @@
+[
+  {
+    "file": "text/r1/page-1.png",
+    "sha256": "4a16d484196b96cc7f61650e4f31140aa99cfb09a12abc1559b0dfbfa88a7039"
+  },
+  {
+    "file": "formula/r1/page-1.png",
+    "sha256": "4088f84f4122be31824c389fc20f41648a842c29d5f83d53e0005a8c3e87f716"
+  },
+  {
+    "file": "table1/r1/page-1.png",
+    "sha256": "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+  },
+  {
+    "file": "table2/r1/page-1.png",
+    "sha256": "ba76b30ec1e719ab8ddb487d62ace811705b0cdb1e9e58408ab84bcf7dbc0448"
+  },
+  {
+    "file": "flow1/r1/page-1.png",
+    "sha256": "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+  },
+  {
+    "file": "flow2/r1/page-1.png",
+    "sha256": "03825be90d1845d154bf26adccfd7130953f71ab07c023533f09255f8bddbb47"
+  },
+  {
+    "file": "combined/r1/page-1.png",
+    "sha256": "bc1f45088b814262e0aaf08dda0facdc0a633759f39dd673cf0e464b3fac4370"
+  },
+  {
+    "file": "controls/table1/r1.png",
+    "sha256": "6f4a6a950e0ccfc824824b6d3dd93c8fd50e52d7ecae73b4eda8a12322842ae4"
+  },
+  {
+    "file": "controls/table1/r2.png",
+    "sha256": "559b27c9184079b3069da0ef100678b92ace8d5749fd5aff97457b71db0a30a3"
+  },
+  {
+    "file": "controls/flow1/r1.png",
+    "sha256": "2dddcb581fdfd850f74cc888fe8bbde90a04aec01aaa6dfd89c93b24ae77e070"
+  },
+  {
+    "file": "controls/flow1/r2.png",
+    "sha256": "b716e365928d47d2d8f164fc7098e5b79f3be17a22d13b13dd124d41b2f1e2d2"
+  },
+  {
+    "file": "gallery.png",
+    "sha256": "061820caa1911be7a25859ca530d01c9d3dd1a707e0cb064a6a551857ca0e0e5"
+  },
+  {
+    "file": "table1-repair.png",
+    "sha256": "dc181a9e347028534f23b54220de949456bb31a0866e3c6be9c773beeb3c4a35"
+  },
+  {
+    "file": "flow1-repair.png",
+    "sha256": "f7ae4ad1b9a3787a01805c38ffd0dc0e7e59f8776500f543857050ca9aeae0c6"
+  }
+]
