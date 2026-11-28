@@ -158,6 +158,8 @@ impl CreationStyle {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Save {
+    /// Bind this edit to the pending revise decision returned by advance_rsi_task.
+    pub rsi_decision_id: Option<String>,
     /// Optional absolute path to an image file readable on the computer running Panache. Imports and aligns the paper once.
     /// A chat attachment or URL alone is not a file path. If the client cannot transfer the photo to that computer, explain this instead of guessing a path.
     /// Use with the default plain preset. All revisions share the saved image.
@@ -193,6 +195,8 @@ pub struct Save {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReplaceText {
+    /// Bind this edit to the pending revise decision returned by advance_rsi_task.
+    pub rsi_decision_id: Option<String>,
     pub draft_id: String,
     pub expected_revision: u32,
     pub section: u32,
@@ -220,6 +224,8 @@ pub struct Describe {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tune {
+    /// Bind this edit to the pending revise decision returned by advance_rsi_task.
+    pub rsi_decision_id: Option<String>,
     /// Request before/after values for up to two variation keys in changes. effective_changes omits keys whose effective value stayed the same.
     #[serde(default)]
     #[schemars(length(max = 2))]
@@ -304,7 +310,7 @@ pub struct Read {
     /// Trajectory: 1..50 matching events (default 12). Text views: 1..4000 characters (default 1000).
     pub limit: Option<u32>,
 }
-#[derive(Deserialize, JsonSchema, PartialEq)]
+#[derive(Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PreviewView {
     Review,
@@ -336,6 +342,8 @@ pub struct NaturalLine {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Nudge {
+    /// Bind this edit to the pending revise decision returned by advance_rsi_task.
+    pub rsi_decision_id: Option<String>,
     /// Optional short user feedback or observable reason to retain with this revision.
     pub note: Option<String>,
     pub draft_id: String,
@@ -382,9 +390,11 @@ pub struct Nudge {
     pub shape: Option<Shape>,
 }
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Preview {
+    /// File a replayable evidence receipt for this active task and explicit revision.
+    pub rsi_task_id: Option<String>,
     /// In image view, explicitly preview the ZIP PNG finish at the same native dimensions.
     /// Gaussian sigma in output pixels (0..2). Use 0 for the original. Add region to see a 1:1 detail.
     #[schemars(range(min = 0, max = 2))]

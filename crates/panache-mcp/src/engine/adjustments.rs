@@ -91,6 +91,9 @@ impl Engine {
             _ => None,
         };
         let mut history = json!({"page":input.page,"ids":input.ids,"place_center":input.place_center,"natural_line":input.natural_line,"target_quad":input.target_quad,"placement":placement,"dx":input.dx,"dy":input.dy,"scale":input.scale,"angle":input.angle,"shape":input.shape,"opacity":input.opacity,"opacity_ramp":input.opacity_ramp,"thickness":input.thickness,"softness":input.softness,"color":input.color,"note":input.note});
+        if let Some(id) = &input.rsi_decision_id {
+            history["rsi_decision_id"] = json!(id);
+        }
         if input.whole_drawing {
             history["whole_drawing"] = json!(true);
             history["drawing_id"] = json!(input.ids[0]);

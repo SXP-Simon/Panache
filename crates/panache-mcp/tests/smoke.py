@@ -7,6 +7,7 @@
 import argparse
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import os
@@ -277,6 +278,27 @@ async def check_zip_review_pixels(params, root, latin):
         assert "不一致" in changed.content[0].text
 
 
+async def check_rsi_preview(client, draft_id):
+    task = (await call(
+        client, "start_rsi_task", draft_id=draft_id, revision=1, objective="Check the page",
+        policy_id="pilot-v1", decision_provider="stdio smoke fixture",
+    )).structuredContent
+    key = {"task_id": task["task_id"], "revision": 1}
+    await call(client, "advance_rsi_task", **key, expected_step=0, action="request_evidence",
+               reason="Inspect native size.", instruction="Look at this title crop.")
+    crop = await call(client, "preview_handwriting", draft_id=draft_id, rsi_task_id=key["task_id"],
+                      revision=1, view="image", export_blur_px=0,
+                      region=[[20, 30], [180, 30], [180, 100], [20, 100]])
+    evidence_id = crop.structuredContent["evidence_id"]
+    receipt = (await call(client, "read_rsi_task", task_id=key["task_id"])).structuredContent["preview_evidence"][0]
+    assert receipt["evidence_id"] == evidence_id and receipt["step"] == 1
+    image = next(block for block in crop.content if block.type == "image")
+    assert receipt["images"][0]["base64_sha256"] == hashlib.sha256(image.data.encode("ascii")).hexdigest()
+    selected = (await call(client, "advance_rsi_task", **key, expected_step=1, action="select",
+                           reason="Inspected the title crop.", review_ids=[evidence_id])).structuredContent
+    assert selected["selected_revision"] == 1
+
+
 async def smoke(command, arguments, out):
     with TemporaryDirectory() as temp:
         personal = Path(temp) / "my-fonts"
@@ -304,6 +326,12 @@ async def smoke(command, arguments, out):
             assert "group=variation" in info.instructions and "group=strike" in info.instructions
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
+                "start_rsi_task",
+                "read_rsi_task",
+                "advance_rsi_task",
+                "read_rsi_policy",
+                "publish_rsi_policy",
+                "validate_rsi_policy",
                 "annotate_review",
                 "storage_usage",
                 "plan_cleanup",
@@ -377,6 +405,7 @@ async def smoke(command, arguments, out):
             ).structuredContent
             assert guided["paper"]["alignment"] == "manual_guides"
             gkey = {"draft_id": guided["draft_id"]}
+            await check_rsi_preview(client, guided["draft_id"])
             paper_only = png(
                 await call(client, "preview_handwriting", view="paper", **gkey)
             )

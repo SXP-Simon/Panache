@@ -143,7 +143,10 @@ pub fn apply(state: &State, mut input: Tune) -> Result<CallToolResult> {
             || changes.get(key) == draft.controls.get(key)
     });
     let paper = input.paper_guides.as_ref().and(draft.paper.as_ref());
-    let details = json!({"changes":input.changes,"font":font.as_ref().map(|(name,_)|name),"paper_guides":input.paper_guides,"note":input.note});
+    let mut details = json!({"changes":input.changes,"font":font.as_ref().map(|(name,_)|name),"paper_guides":input.paper_guides,"note":input.note});
+    if let Some(id) = &input.rsi_decision_id {
+        details["rsi_decision_id"] = json!(id);
+    }
     let preserve_layout = preserve_layout && paper.is_none();
     if input.preserve_local_adjustments && !preserve_layout {
         draft.require_unadjusted_layout()?;
