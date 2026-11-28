@@ -100,3 +100,11 @@ python scripts/rsi_pilot/real_photo_episode_local.py --out "$RUN" --binary "$MCP
 - 新的 Terra 会话按化学作业标签查询，只命中分式改写。它保留供照抄的旧命令，把显示行排成 3/24 × 100% = 12.5%，复核后导出。另一个模型从 PDF 内嵌页读回分数和百分数。相同标签下仍待验证或已经失败的规则均未返回。[所有会话、逐题判定和图片摘要](results/experience-cross-session.json) · [修前与交付图](https://github.com/SXP-Simon/Panache/pull/70#issuecomment-7237004841) · [验证题图板](https://github.com/SXP-Simon/Panache/blob/c3f52ad98484755cc7f8479e358b47c4c76a2202/screenshots/rsi-pilot/atomic-experience/experience-verified-examples.png)
 - 运行独立会话需要能访问所选模型的 Codex CLI。配置 JSON 含 `binary`、`worker`、`fonts`、`home` 四个绝对路径，分别指向 MCP 可执行文件、Markdown worker、字体目录和本次实验的专用数据目录。用新目录复现普通物理作业：`python scripts/rsi_pilot/experience_mixed.py --config config.json --out run`。新运行会有自己的稿件、模型判断和规则 ID。
 - 单独验证检索和撤回的存储语义可执行 `uv run --script crates/panache-mcp/tests/experience_visibility.py /path/to/panache-mcp`。该测试覆盖同一作业提出两条、独立样本验证、相同标签下的可见性、失效后跨连接隐藏，以及新会话按检查单回查原像素。它使用受控输入，宿主自主决策的实测另见逐题记录。
+
+## 中文题面的 BM25 对照
+
+同一份隔离库中有三条生效经验、三条候选和一条已被反例否决的经验。旧模板分式经验来自上面的真实跨会话实验。另两条由实验方依据错格和错分支案例拟定，分别用原生正例修订和正确边界页核对后登记。六份中文题面依次跑原话、人工选择的标签、原话加标签三种查询。报告包含完整的原话、返回顺序及四条隐藏规则的精确文本探针。[逐题查询与真实宿主回执](results/experience-bm25.json)
+
+三个新 Terra 会话分别收到化学、表格和流程图作业，首次调用均用题面原话查经验。化学首题缺少要逐字保留的旧命令，宿主在命中后向用户询问。补齐命令后又用新会话跑了一次，导出保留源码及 12.5% 的 PDF。纯文字负例写有“勿加公式、图或表”，仅用 BM25 返回两条无关候选，加题目标签后为空。这是词面召回，使用前仍需核对适用条件。[三份交付和验证页](https://github.com/SXP-Simon/Panache/tree/427a03c26f29ba2dea6960111ceb488d1836ad13/screenshots/rsi-pilot/bm25)
+
+复现实验可用 `experience_bm25.py`，其 `--original` 指向上一节三条提案已分别完成验证和对照的 physics-02 数据目录。配置沿用 `binary`、`worker`、`fonts`、`home`，其中 `home` 指向新的隔离目录。依次运行 `prepare`、核对输出的原生页面、`validate`、`compare`；每次加上 `--config config.json --out run`。用 `session --case chemistry|table|flow|chemistry_template` 分别运行四个宿主，再用 `report --result report.json` 汇总。每个会话复制同一个已验证的起始库。

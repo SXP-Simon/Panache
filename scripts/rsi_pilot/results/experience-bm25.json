@@ -1,0 +1,472 @@
+{
+  "corpus": "Isolated copy of the preceding physics library, plus two operator-authored controls whose native source, positive edit and clean boundary pages were visually checked.",
+  "controls": {
+    "table": {
+      "tags": [
+        "table"
+      ],
+      "scope": "两列表格有多个观测时刻，每一行都要对应正确的观测值。",
+      "action": "沿表头逐行核对同一时刻和位移的对应关系，单独检查中间行。",
+      "reason": "表格中即使首尾数值正确，中间行也可能错填。"
+    },
+    "flow": {
+      "tags": [
+        "flowchart"
+      ],
+      "scope": "带箭头的流程图要求用是、否两条分支连接不同的终点。",
+      "action": "从条件节点沿箭头读到两端，分别核对是、否标签和终点，保留正确分支。",
+      "reason": "节点文字可以全对，但两条分支的标签仍可能对调。"
+    }
+  },
+  "control_cases": {
+    "table": {
+      "source": {
+        "draft_id": "9affbdc6-1627-4b52-9719-847a56097692",
+        "revision": 2,
+        "export_id": "e2d17b7d-cf4d-46ae-9ca0-9f524275c4e3",
+        "reviews": [
+          {
+            "review_id": "0cd8f489-c86e-4b4f-83f3-196512f979ea",
+            "revision": 1
+          },
+          {
+            "review_id": "e0ded18f-f2d6-4e04-888f-ed1defe2d323",
+            "revision": 2
+          }
+        ]
+      },
+      "positive": {
+        "draft_id": "7df9ad49-3966-4f93-8c42-d10c40728a8b",
+        "revision": 2,
+        "export_id": "c7e9cc81-6f2e-4f88-a92d-cf176954fc73",
+        "reviews": [
+          {
+            "review_id": "c18976f0-4048-49c7-ba1e-8ca6b4ee0bff",
+            "revision": 1
+          },
+          {
+            "review_id": "43e2222f-49df-4a37-b5d2-5409312198d6",
+            "revision": 2
+          }
+        ]
+      },
+      "boundary": {
+        "draft_id": "cf69f8f8-e360-4866-8037-2c7411228f12",
+        "revision": 1,
+        "export_id": "807a2beb-8815-45aa-901f-de50d0ddec0b",
+        "reviews": [
+          {
+            "review_id": "18ec9b54-53e9-44c5-9973-3d4f69862f86",
+            "revision": 1
+          }
+        ]
+      }
+    },
+    "flow": {
+      "source": {
+        "draft_id": "1ef93824-6de2-4f24-8068-9646b364acdc",
+        "revision": 2,
+        "export_id": "3ac28165-8161-4f02-9442-0a8b34ba841f",
+        "reviews": [
+          {
+            "review_id": "2b82cc83-67df-461c-963e-ceac68f48c6b",
+            "revision": 1
+          },
+          {
+            "review_id": "7b16bd30-58fe-48c1-8e26-62fcf9bbd7fd",
+            "revision": 2
+          }
+        ]
+      },
+      "positive": {
+        "draft_id": "c05b3da2-5890-4d4a-a632-b7834d3fcd40",
+        "revision": 2,
+        "export_id": "3a5ca7f3-67e2-4e3e-90e0-cb754963c37a",
+        "reviews": [
+          {
+            "review_id": "3a1c076c-a49c-43a8-bcf2-6dcca7afab7b",
+            "revision": 1
+          },
+          {
+            "review_id": "b168b0fe-afd8-4261-9243-b2732cc75179",
+            "revision": 2
+          }
+        ]
+      },
+      "boundary": {
+        "draft_id": "6ea6ef20-dfd6-4ce6-a9ca-ddc0ab6e83a2",
+        "revision": 1,
+        "export_id": "f77711bc-e05c-4a69-8442-a6e5ce5e437b",
+        "reviews": [
+          {
+            "review_id": "4e760f27-73b5-44f7-97dc-a5f44c9f4a85",
+            "revision": 1
+          }
+        ]
+      }
+    }
+  },
+  "ids": {
+    "formula": "485fb830-e4ac-46b2-b2a1-b03f4cfbf424",
+    "table": "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+    "flow": "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+  },
+  "states": {
+    "485fb830-e4ac-46b2-b2a1-b03f4cfbf424": "active",
+    "ec6781e4-49ba-4715-a95d-646ff09f7804": "pending",
+    "e5b83e17-3054-446f-9d43-b52aafa2852e": "pending",
+    "5b335130-454f-4bba-a998-54fd6c56b6c6": "pending",
+    "0befad6d-b18f-4ea7-97ae-a54930e3e7a9": "rejected",
+    "4672a458-4ebc-4e1d-adf5-d60f0a182783": "active",
+    "37a848fc-e8c9-4ecf-9a48-cca941eff472": "active"
+  },
+  "queries": [
+    {
+      "case": "chemistry",
+      "prompt": "用旧教材做一页化学作业：24 g 盐水中有 3 g 盐。模板输入的旧分数命令要留给组员照抄，同页计算行要排成上下分数并写出百分数。请给我一页手写 PDF。",
+      "tags": [
+        "homework",
+        "formula",
+        "chemistry"
+      ],
+      "expected": [
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ],
+      "bm25": [
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ],
+      "tags_only": [
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ],
+      "combined": [
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ]
+    },
+    {
+      "case": "table",
+      "prompt": "完成匀速小车记录：时间 t/s 依次是 0、2、4，位移 x/m 依次是 0、6、12。做一张带表头的两列表格，三行一一对应；表后另写平均速度公式，代数值算出速度和单位。不要附图。 请交一页手写 PDF。",
+      "tags": [
+        "homework",
+        "table",
+        "formula"
+      ],
+      "expected": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783"
+      ],
+      "bm25": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ],
+      "tags_only": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ],
+      "combined": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ]
+    },
+    {
+      "case": "flow",
+      "prompt": "为温室控制作业画一张带箭头的流程图。用四个节点“读温度”“超温”“开风扇”“保持”，从读温度到条件节点超温，两条边分别以“是”“否”到开风扇和保持。图外一句话解释 30 ℃ 阈值。不使用表格。 请交一页手写 PDF。",
+      "tags": [
+        "homework",
+        "flowchart"
+      ],
+      "expected": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ],
+      "bm25": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783"
+      ],
+      "tags_only": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ],
+      "combined": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ]
+    },
+    {
+      "case": "two_flows",
+      "prompt": "画两张分开的带箭头流程图。图一用于借书：节点“查书”“有库存”“借出”“预约”，查书后判断库存，“是”通往借出，“否”通往预约。图二用于交卷：节点“验卷”“已署名”“收卷”“补签”，验卷后判断署名，“是”通往收卷，“否”通往补签。保留这些节点、每条有向连接和分支文字，另写一句话说明两流程用途。",
+      "tags": [
+        "homework",
+        "flowchart"
+      ],
+      "expected": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ],
+      "bm25": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ],
+      "tags_only": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ],
+      "combined": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ]
+    },
+    {
+      "case": "mixed",
+      "prompt": "完成酸碱判别练习：用带表头的两列表格列出“样品甲 / 3”“样品乙 / 9”作为各自 pH。表外写公式 pH = −log₁₀[H⁺]。再画一张有箭头的流程图，节点用“读数”“小于7”“酸性”“非酸性”，从读数到小于7，分支“是”到酸性、“否”到非酸性。最后说明两个样品分别被分到哪一类。",
+      "tags": [
+        "homework",
+        "table",
+        "flowchart",
+        "formula"
+      ],
+      "expected": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ],
+      "bm25": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783"
+      ],
+      "tags_only": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ],
+      "combined": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783"
+      ]
+    },
+    {
+      "case": "text",
+      "prompt": "写一页纯文字的野外观测记录，按上午、午后、傍晚三段分别解释露珠、云影、晚霞的形成。三段包含相应时段和现象名称。每段一至两句，勿加公式、图或表。",
+      "tags": [
+        "homework"
+      ],
+      "expected": [],
+      "bm25": [
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783"
+      ],
+      "tags_only": [],
+      "combined": []
+    }
+  ],
+  "hidden_exact_text_probes": [
+    {
+      "id": "ec6781e4-49ba-4715-a95d-646ff09f7804",
+      "status": "pending",
+      "query": "有量纲的速度计算写了数字结果，但未标出速度单位。 依据数据表为路程和时间的代入值标上各自单位，在速度结果后标出对应的路程单位除以时间单位，并逐项核对。",
+      "hits": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424",
+        "37a848fc-e8c9-4ecf-9a48-cca941eff472"
+      ]
+    },
+    {
+      "id": "e5b83e17-3054-446f-9d43-b52aafa2852e",
+      "status": "pending",
+      "query": "竖排分数的分母与纸面横线相交，当前行上方仍有空隙。 整体移动该行算式，使分子和分母落在相邻横线之间，并在原图尺寸复查间距。",
+      "hits": [
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ]
+    },
+    {
+      "id": "5b335130-454f-4bba-a998-54fd6c56b6c6",
+      "status": "pending",
+      "query": "手写页有分式时。 每次必须单独复查分母与页面右侧的边缘距离。",
+      "hits": [
+        "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ]
+    },
+    {
+      "id": "0befad6d-b18f-4ea7-97ae-a54930e3e7a9",
+      "status": "rejected",
+      "query": "所有出现 LaTeX 或分式的手写页，包括教学页、源码及展示公式。 只要最终图片里出现任何反斜线命令，例如 \\frac 或 \\badfrac，即整页退回，不区分所在区域；没有字面命令时无需因此拦截。",
+      "hits": [
+        "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+      ]
+    }
+  ],
+  "live_sessions": [
+    {
+      "case": "chemistry",
+      "prompt": "用旧教材做一页化学作业：24 g 盐水中有 3 g 盐。模板输入的旧分数命令要留给组员照抄，同页计算行要排成上下分数并写出百分数。请给我一页手写 PDF。",
+      "model": "gpt-6.1-terra",
+      "thread_ids": [
+        "01a2217b-f5b7-7650-beeb-161dbb8699dc"
+      ],
+      "binary_sha256": "7d3e85e5621f9fc401243ca0d25433bf4e1500de1c59e6e488c284dedccfde2f",
+      "other_tools": [],
+      "tool_order": [
+        "search_homework_experience"
+      ],
+      "searches": [
+        {
+          "call": 1,
+          "arguments": {
+            "query": "用旧教材做一页化学作业：24 g 盐水中有 3 g 盐。模板输入的旧分数命令要留给组员照抄，同页计算行要排成上下分数并写出百分数。请给我一页手写 PDF。"
+          },
+          "returned": [
+            "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+          ],
+          "verbatim_prompt": true,
+          "same_wording_ignoring_whitespace": true,
+          "verbatim_excerpt": true
+        }
+      ],
+      "exports": [],
+      "delivery_summary": "盐水中盐的质量分数是 **3 ÷ 24 × 100% = 12.5%**。"
+    },
+    {
+      "case": "table",
+      "prompt": "完成匀速小车记录：时间 t/s 依次是 0、2、4，位移 x/m 依次是 0、6、12。做一张带表头的两列表格，三行一一对应；表后另写平均速度公式，代数值算出速度和单位。不要附图。 请交一页手写 PDF。",
+      "model": "gpt-6.1-terra",
+      "thread_ids": [
+        "01a2217b-f5b7-7c61-831f-151ea0834f5e"
+      ],
+      "binary_sha256": "7d3e85e5621f9fc401243ca0d25433bf4e1500de1c59e6e488c284dedccfde2f",
+      "other_tools": [],
+      "tool_order": [
+        "search_homework_experience",
+        "save_section",
+        "preview_handwriting",
+        "export_handwriting"
+      ],
+      "searches": [
+        {
+          "call": 1,
+          "arguments": {
+            "query": "完成匀速小车记录：时间 t/s 依次是 0、2、4，位移 x/m 依次是 0、6、12。做一张带表头的两列表格，三行一一对应；表后另写平均速度公式，代数值算出速度和单位。不要附图。请交一页手写 PDF。"
+          },
+          "returned": [
+            "4672a458-4ebc-4e1d-adf5-d60f0a182783",
+            "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+            "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+          ],
+          "verbatim_prompt": false,
+          "same_wording_ignoring_whitespace": true,
+          "verbatim_excerpt": false
+        }
+      ],
+      "exports": [
+        {
+          "revision": 1,
+          "export_id": "64792038-e36e-4766-81ce-e6646916bccf",
+          "pdf_sha256": "734a3719bf0077764071087381fbf5a9dd6f10809b70a01f41a4b6261ab7edfb",
+          "page_pixels": [
+            794,
+            1123
+          ],
+          "image": "table-pdf.png",
+          "image_sha256": "0c8e4b1d4cbf60eeb8debd6b1be322ddd5ee7d4f16f07286ad59d05c22799fe7"
+        }
+      ],
+      "delivery_summary": "已完成一页手写 PDF，表格和计算已核对，未检查的页面数为 0。"
+    },
+    {
+      "case": "flow",
+      "prompt": "为温室控制作业画一张带箭头的流程图。用四个节点“读温度”“超温”“开风扇”“保持”，从读温度到条件节点超温，两条边分别以“是”“否”到开风扇和保持。图外一句话解释 30 ℃ 阈值。不使用表格。 请交一页手写 PDF。",
+      "model": "gpt-6.1-terra",
+      "thread_ids": [
+        "01a2217b-f5b7-7100-b2b6-339b9069556b"
+      ],
+      "binary_sha256": "7d3e85e5621f9fc401243ca0d25433bf4e1500de1c59e6e488c284dedccfde2f",
+      "other_tools": [],
+      "tool_order": [
+        "search_homework_experience",
+        "save_section",
+        "preview_handwriting",
+        "save_section",
+        "preview_handwriting",
+        "save_section",
+        "preview_handwriting",
+        "save_section",
+        "preview_handwriting",
+        "save_section",
+        "preview_handwriting",
+        "save_section",
+        "preview_handwriting",
+        "export_handwriting"
+      ],
+      "searches": [
+        {
+          "call": 1,
+          "arguments": {
+            "query": "为温室控制作业画一张带箭头的流程图。用四个节点“读温度”“超温”“开风扇”“保持”，从读温度到条件节点超温，两条边分别以“是”“否”到开风扇和保持。图外一句话解释 30 ℃ 阈值。不使用表格。请交一页手写 PDF。"
+          },
+          "returned": [
+            "37a848fc-e8c9-4ecf-9a48-cca941eff472",
+            "4672a458-4ebc-4e1d-adf5-d60f0a182783"
+          ],
+          "verbatim_prompt": false,
+          "same_wording_ignoring_whitespace": true,
+          "verbatim_excerpt": false
+        }
+      ],
+      "exports": [
+        {
+          "revision": 5,
+          "export_id": "33c8d159-e7c7-4988-9b6f-386eda4dc4b4",
+          "pdf_sha256": "a9b4080a7f2626177c76476b1ea5fa903fd62c89bf7ad646ea1a483439246bdb",
+          "page_pixels": [
+            794,
+            1123
+          ],
+          "image": "flow-pdf.png",
+          "image_sha256": "85ae0cef5dc4393146531a5524aef1e13efee7f5a571334208302ec9f5877fe3"
+        }
+      ],
+      "delivery_summary": "已导出一页手写 PDF，分支为“是→开风扇”和“否→保持”。图中“超温”用文字表示，未画菱形框。"
+    },
+    {
+      "case": "chemistry_template",
+      "prompt": "用旧教材做一页化学作业：24 g 盐水中有 3 g 盐。模板输入的旧分数命令要留给组员照抄，同页计算行要排成上下分数并写出百分数。请给我一页手写 PDF。 这次要让同学照抄的原命令是 \\nicefrac{3}{24}。",
+      "model": "gpt-6.1-terra",
+      "thread_ids": [
+        "01a2217c-ff09-7250-bc29-064604037096"
+      ],
+      "binary_sha256": "7d3e85e5621f9fc401243ca0d25433bf4e1500de1c59e6e488c284dedccfde2f",
+      "other_tools": [],
+      "tool_order": [
+        "search_homework_experience",
+        "save_section",
+        "preview_handwriting",
+        "export_handwriting"
+      ],
+      "searches": [
+        {
+          "call": 1,
+          "arguments": {
+            "query": "用旧教材做一页化学作业：24 g 盐水中有 3 g 盐。模板输入的旧分数命令要留给组员照抄，同页计算行要排成上下分数并写出百分数。请给我一页手写 PDF。 这次要让同学照抄的原命令是 \\nicefrac{3}{24}。"
+          },
+          "returned": [
+            "485fb830-e4ac-46b2-b2a1-b03f4cfbf424"
+          ],
+          "verbatim_prompt": true,
+          "same_wording_ignoring_whitespace": true,
+          "verbatim_excerpt": true
+        }
+      ],
+      "exports": [
+        {
+          "revision": 1,
+          "export_id": "f4e45e16-8ffa-4398-bbde-9f8bd7c48f97",
+          "pdf_sha256": "47348d46ddd0b24ed4a21a1c7b3c74b685fc9da5db2ddc0f932dca56d80c87ec",
+          "page_pixels": [
+            794,
+            1123
+          ],
+          "image": "chemistry_template-pdf.png",
+          "image_sha256": "356229532430812ad1f5e1672799a68b05f01020c8ff9d929e433a46a5e99485"
+        }
+      ],
+      "delivery_summary": "已生成一页手写 PDF，保留了供照抄的原命令，并写出上下分数和结果 **12.5%**。页面已检查。"
+    }
+  ],
+  "scope_review": {
+    "mixed": "The predeclared topic labels included both table and flow. The table rule is specific to observation times and displacement, so it is a lexical candidate only for a pH sample table. The flow rule directly applies.",
+    "text": "The plain observation brief says to omit formula, figures and tables. BM25 returned two active but out-of-scope rules; adding the homework-only tags returned none.",
+    "chemistry": "The first host found the legacy fraction example and requested the missing literal command. A fresh host with the command supplied exported a PDF. Four sessions span three assignments."
+  },
+  "method": "Six fixed paired queries and three ordinary assignment prompts. The additional chemistry session supplied the literal command missing in the first request. The tag baseline uses operator-selected labels. Relevance labels describe intended scope, independent of tool output."
+}
