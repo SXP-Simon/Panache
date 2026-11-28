@@ -121,3 +121,16 @@ python scripts/rsi_pilot/real_photo_episode_local.py --out "$RUN" --binary "$MCP
 修订前后原生整页仅在中间单元格的 11 × 26 像素范围内有变化。两份最终 PDF 的内嵌 RGB 都与各自导出版本的原生预览一致。盲读只给完整 PDF 渲染页和转录要求。每题各一次，无法据此估算成功率或归因于检索。[逐次调用、作者说明和盲读](results/experience-scope.json) · [完整页和混排原稿](https://github.com/SXP-Simon/Panache/tree/51450dd9ebded9e0a761f27d37fe189ebe184a11/screenshots/rsi-pilot/bm25-scope)
 
 用上一节已完成验证的配置启动 `python scripts/rsi_pilot/experience_scope.py text --config config.json --out scope-run`；另一题将 `text` 换成 `mixed`。各会话结束后，加 `--audit` 重读导出 PDF。原始调用、取件路径和图像留在各自运行目录。
+
+## 倾斜表格与表下文字
+
+用上节同一份《轨道小车观测记录》第 2 版回放。此前表末的 6 被说明文字盖住。修后说明下移 41 px，独立读卷者从整页中读出三行数据和趋势。原先可读的《匀速小车记录》含表格、标题及公式，两版导出 PDF 的文件摘要一致。野外观察题和另一份独立表格也得到相同的 PDF。
+
+四个新 Terra 会话接到相同的条件式要求，版面清楚即可原样导出。纯文字题在两个版本都只做了一次整页复查。小车速度题在旧版做了一次整页复查并导出，新版会话还主动放大了表头上方的标题，担心上边框穿过末字，暂缓导出。两次整页复查返回的三张图逐张相同，两版均未触发表下文字提示。手动将另一份表格下移 28 px 的阳性对照中，整页复查当场多返回一张原尺寸局部图，随后可直接导出。[调用和图像摘要](results/table-clearance.json) · [PDF 整页对照图](https://github.com/SXP-Simon/Panache/tree/569feb352378d23635cf795472e2e05b6e0dc2a8/screenshots/rsi-pilot/table-clearance)
+
+复现时将 `--corpus` 指向完成 BM25 会话的实验目录，将 `--scope` 指向完成上一节两题及审计的目录。分别使用对应版本的 MCP 配置运行下列命令。每次运行均复制存档，再复查和导出该版，不在原稿库上写入。
+
+```sh
+python scripts/rsi_pilot/table_clearance.py before --config before.json --corpus bm25-run --scope scope-run --out clearance-run
+python scripts/rsi_pilot/table_clearance.py after --config after.json --corpus bm25-run --scope scope-run --out clearance-run
+```
