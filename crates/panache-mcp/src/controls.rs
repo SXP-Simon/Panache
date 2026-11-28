@@ -59,6 +59,9 @@ pub fn merge(current: &Changes, patch: &Changes, fonts: &[String]) -> Result<Cha
                     && s.bytes().all(|b| (b' '..=b'~').contains(&b))
             }),
             Some("boolean") => value.is_boolean(),
+            Some("focus_gradient") => serde_json::from_value(value.clone()).is_ok_and(|gradient| {
+                handwriting_core::export_blur::finish(None, Some(gradient)).is_ok()
+            }),
             Some("choice") => spec["values"].as_array().unwrap().contains(value),
             Some("font") => fonts.iter().any(|f| value.as_str() == Some(f.as_str())),
             Some("color") => value.as_str().is_some_and(|s| {
@@ -150,6 +153,16 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
                 let mut tinted = style.clone();
                 tinted.ink = v.as_str().context("Invalid ink")?.to_owned();
                 fields["fill"] = json!(tinted.ink_rgba()?);
+            }
+            "photo_ink_light" | "photo_ink_focus"
+                if draft
+                    .paper
+                    .as_ref()
+                    .is_none_or(|paper| paper.projection.is_none()) =>
+            {
+                bail!(
+                    "Photo ink lighting and focus require an original paper imported in photo mode"
+                )
             }
             "width" | "height" if draft.paper.is_some() => {
                 bail!("Custom paper uses the dimensions of the photograph")
