@@ -187,7 +187,7 @@ fn draw_paper_pattern(paper: &mut RgbaImage, p: &Parameters, pattern: PaperPatte
 }
 
 mod rigid;
-pub(super) use rigid::paint_math_unit;
+pub(super) use rigid::{RigidPlacement, paint_math_unit};
 
 #[cfg(test)]
 mod paper_tests {

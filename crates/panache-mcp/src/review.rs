@@ -85,6 +85,7 @@ fn ruling_offset(paper: &RgbaImage, point: [f32; 2], radius: i32) -> Option<i32>
 }
 
 pub struct PageSample {
+    pub table_candidates: Vec<Bounds>,
     pub baselines: Vec<[f32; 2]>,
     pub content_sha256: String,
     pub text: Vec<TextSample>,
@@ -374,11 +375,23 @@ pub fn page(
     } else {
         "Compare writing across the occupied parts of the page with the saved paper. Check the requested position, header clearance, contrast, focus and letter size."
     };
+    // Confirm candidates on the delivered pixels. A clear horizontal separator needs no hint.
+    let table_crop = sample.table_candidates.iter().find_map(|seam| {
+        let [[l, t], _, [r, b], _] = seam.region(0., (w, h))?;
+        (t..b)
+            .all(|y| (l..r).any(|x| rgb_delta(finished[(x, y)], paper[(x, y)]) >= 8))
+            .then(|| seam.region(params.font_size.clamp(16., 96.) * 2., (w, h)))
+            .flatten()
+    });
     let metadata = {
         let mut metadata = observation;
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
+        if let Some(region) = table_crop {
+            metadata["table_clearance_check"] = json!({"region":region,
+                "inspect":"The bottom of a table may touch the following text. Read the last row and the text in the attached native crop. Adjust spacing only if their strokes interfere."});
+        }
         if let Some(e) = local_ink {
             metadata["local_paper_ink_check"] =
                 paper_ink::report(&e, draft.id, draft.revision, section, page);
@@ -432,6 +445,16 @@ pub fn page(
         response.content.push(ContentBlock::text(label));
         response.content.push(ContentBlock::image(
             STANDARD.encode(export::png(&img)?),
+            "image/png",
+        ));
+    }
+    if let Some([[l, t], _, [r, b], _]) = table_crop {
+        let crop = imageops::crop_imm(&finished, l, t, r - l, b - t).to_image();
+        response
+            .content
+            .push(ContentBlock::text("Table and following text (native size)"));
+        response.content.push(ContentBlock::image(
+            STANDARD.encode(export::png(&crop)?),
             "image/png",
         ));
     }
