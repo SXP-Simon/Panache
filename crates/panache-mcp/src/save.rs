@@ -97,9 +97,7 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
         None => None,
     };
     // Use the saved style on continuation; an unmarked legacy draft keeps its usual reply.
-    let search = if input.rsi_decision_id.is_some() {
-        None
-    } else if let Some(style) = &style {
+    let search = if let Some(style) = &style {
         experience_search(
             style,
             paper.as_ref().map(|p| &p.layout),

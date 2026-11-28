@@ -250,7 +250,6 @@ mod tests {
             baseline: 80,
             is_text: true,
             is_native_diagram: false,
-            is_grid_table: false,
             source_utf16: None,
             illustration: None,
         }

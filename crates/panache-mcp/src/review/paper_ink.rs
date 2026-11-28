@@ -342,7 +342,6 @@ mod tests {
             }
         }
         let sample = PageSample {
-            table_candidates: Vec::new(),
             baselines: vec![],
             text,
             drawings: vec![],

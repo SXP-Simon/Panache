@@ -1,25 +1,15 @@
 //! 2026-10-15：复合公式统一变换，不能把上下标、分数线、向量箭头作为独立连通域随机漂移。
 use super::*;
 use image::Pixel;
-pub(in crate::render) struct RigidPlacement<'a> {
-    pub origin: (i32, i32),
-    pub align_to_rulings: bool,
-    pub table_edge: &'a mut [i32],
-}
-
 pub(in crate::render) fn paint_math_unit(
     canvas: &mut RgbaImage,
     mask: &GrayImage,
-    placement: RigidPlacement<'_>,
+    origin: (i32, i32),
     p: &Parameters,
+    align_to_rulings: bool,
     rng: &mut ChaCha8Rng,
     cancel: &Cancellation,
 ) -> Result<()> {
-    let RigidPlacement {
-        origin,
-        align_to_rulings,
-        table_edge,
-    } = placement;
     let cx = (mask.width() - 1) as f32 / 2.;
     let cy = (mask.height() - 1) as f32 / 2.;
     let sampled_angle = normal(rng, p.perturb_theta_sigma);
@@ -79,9 +69,6 @@ pub(in crate::render) fn paint_math_unit(
     let mut paint = |x, y| {
         if let Some(p) = canvas.get_pixel_mut_checked(x, y) {
             p.blend(&fill);
-            if let Some(edge) = table_edge.get_mut(x as usize) {
-                *edge = (*edge).max(y as i32 + 1);
-            }
         }
     };
     for (x, y, pixel) in mask.enumerate_pixels() {
@@ -138,16 +125,12 @@ mod tests {
         };
         for seed in 0..8 {
             let mut canvas = RgbaImage::new(210, 190);
-            let mut table_edge = vec![0; canvas.width() as usize];
             paint_math_unit(
                 &mut canvas,
                 &mask,
-                RigidPlacement {
-                    origin: (42, 44),
-                    align_to_rulings: false,
-                    table_edge: &mut table_edge,
-                },
+                (42, 44),
                 &p,
+                false,
                 &mut ChaCha8Rng::seed_from_u64(seed),
                 &Cancellation::default(),
             )
@@ -155,13 +138,6 @@ mod tests {
             let ink = GrayImage::from_fn(canvas.width(), canvas.height(), |x, y| {
                 Luma([canvas[(x, y)][3]])
             });
-            assert_eq!(
-                table_edge.into_iter().max(),
-                ink.enumerate_pixels()
-                    .filter(|(_, _, p)| p[0] > 0)
-                    .map(|(_, y, _)| y as i32 + 1)
-                    .max()
-            );
             let labels = connected_components(&ink, Connectivity::Eight, Luma([0]));
             assert_eq!(labels.pixels().map(|p| p[0]).max(), Some(2), "seed {seed}");
         }
@@ -191,12 +167,9 @@ mod tests {
             paint_math_unit(
                 &mut canvas,
                 &mask,
-                RigidPlacement {
-                    origin: (60, 70),
-                    align_to_rulings: true,
-                    table_edge: &mut [],
-                },
+                (60, 70),
                 &p,
+                true,
                 &mut ChaCha8Rng::seed_from_u64(seed),
                 &Cancellation::default(),
             )

@@ -47,7 +47,6 @@ use ink::{blank_paper, normal, paint_math_unit, paste_mask, perturb};
 use units::{fixed_cell, keeps_grid_cell, layout_units};
 // 2026-10-15：先缓存整行，知道最高根式/最低分母后再统一落笔，避免后出现的公式撞进上一行。
 struct LineUnit {
-    is_grid_table: bool,
     is_text: bool,
     is_native_diagram: bool,
     glyph: Glyph,
@@ -80,7 +79,6 @@ where
     x: f32,
     y: f32,
     previous_bottom: f32,
-    table_edge: Vec<i32>,
     written_lines: usize,
     line: Vec<LineUnit>,
     dirty: bool,
@@ -139,7 +137,6 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
         self.x = self.p.left_margin;
         self.y = self.p.top_margin + self.p.line_spacing;
         self.previous_bottom = self.p.top_margin;
-        self.table_edge.clear();
         self.dirty = false;
         Ok(())
     }
@@ -150,12 +147,6 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
         let mut units = std::mem::take(&mut self.line);
         let mut layout = line::LineLayout::fit(&mut units, self.p, self.canvas.height());
         let mut anchor = layout.baseline(self.y, self.dirty.then_some(self.previous_bottom));
-        if !self.table_edge.is_empty() && line::intrudes_on_table(&units, anchor, &self.table_edge)
-        {
-            let bottom = self.table_edge.iter().copied().max().unwrap_or_default();
-            anchor = layout.baseline(anchor, Some(bottom as f32));
-        }
-        self.table_edge.clear();
         if layout.overflows(anchor) && self.dirty {
             self.emit_page(false)?;
             if self.stopped {
@@ -171,38 +162,17 @@ impl<F: FnMut(usize, RgbaImage, Option<PageInk>) -> Result<()>> Pages<'_, F> {
                 u.x + u.glyph.left,
                 anchor.round() as i32 + u.dy + u.glyph.top,
             );
-            if u.is_grid_table {
-                self.table_edge.resize(self.canvas.width() as usize, 0);
-            }
             if self.p.fine_edit {
                 for tile in fine::capture(u, origin, anchor.round() as i32, self.p, self.cancel)? {
-                    if tile.is_grid_table {
-                        for (x, y, _) in
-                            tile.mask.enumerate_pixels().filter(|(_, _, p)| p[0] >= 128)
-                        {
-                            if let Some(edge) =
-                                self.table_edge.get_mut((tile.x + x as i32) as usize)
-                            {
-                                *edge = (*edge).max(tile.y + y as i32 + 1);
-                            }
-                        }
-                    }
                     self.push_tile(tile)?;
                 }
             } else if u.rigid {
                 paint_math_unit(
                     self.ink_layer.as_mut().unwrap_or(&mut self.canvas),
                     &u.glyph.mask,
-                    ink::RigidPlacement {
-                        origin,
-                        align_to_rulings: u.align_to_rulings,
-                        table_edge: if u.is_grid_table {
-                            &mut self.table_edge
-                        } else {
-                            &mut []
-                        },
-                    },
+                    origin,
                     self.p,
+                    u.align_to_rulings,
                     &mut self.rng,
                     self.cancel,
                 )?;
@@ -311,9 +281,13 @@ pub(crate) fn render_output<F: FnMut(usize, RgbaImage) -> Result<()>>(
             None => paper,
         };
         let output = match photo {
-            Some((projection, background)) => {
-                projection.finish_ink(background, &image, &r.params, cancel)?
+            Some((projection, background))
+                if r.params.transparent_background && !r.params.pdf_save =>
+            {
+                let clear = RgbaImage::new(background.width(), background.height());
+                projection.composite_into(clear, &image, cancel)?
             }
+            Some((projection, background)) => projection.composite(background, &image, cancel)?,
             None => image,
         };
         emit(i, output)
@@ -439,7 +413,6 @@ fn render_planes(
         x: p.left_margin,
         y: p.top_margin + p.line_spacing,
         previous_bottom: p.top_margin,
-        table_edge: Vec::new(),
         written_lines: 0,
         line: Vec::new(),
         dirty: false,
@@ -556,7 +529,6 @@ fn render_planes(
                 pages.dirty = true;
                 pages.x = p.left_margin;
                 pages.previous_bottom = top + image.height() as f32;
-                pages.table_edge.clear();
                 pages.y = pages.previous_bottom + p.line_spacing;
             }
             node => {
@@ -597,7 +569,6 @@ fn render_planes(
                 let advance = g.step(unit, p, extra, compound);
                 pages.x = x + advance;
                 pages.line.push(LineUnit {
-                    is_grid_table: matches!(node, Node::Table(table) if table.kind == text::TableKind::Grid),
                     is_native_diagram: matches!(node, Node::Circuit(_)),
                     is_text: unit.iter().all(|node| matches!(node, Node::Char(_))),
                     glyph: g,
@@ -629,7 +600,6 @@ mod ruled_tests {
 
     fn sample_line() -> Vec<LineUnit> {
         vec![LineUnit {
-            is_grid_table: false,
             is_text: true,
             is_native_diagram: false,
             glyph: Glyph {
@@ -648,28 +618,6 @@ mod ruled_tests {
             source: None,
             fine_parts: None,
         }]
-    }
-
-    #[test]
-    fn tilted_table_clearance_preserves_border_grazes_and_uses_a_new_page_only_for_intrusion() {
-        let mut units = sample_line();
-        let params = Parameters {
-            font_size: 32.,
-            top_margin: 0.,
-            bottom_margin: 0.,
-            line_spacing: 45.,
-            ..Default::default()
-        };
-        let layout = line::LineLayout::fit(&mut units, &params, 110);
-        let baseline = 96.;
-        let mut edge = vec![0; 180];
-        edge[60..90].fill(102);
-        edge[10..18].fill(68);
-        assert!(!line::intrudes_on_table(&units, baseline, &edge));
-        assert!(!layout.overflows(baseline));
-        edge[10..18].fill(89);
-        assert!(line::intrudes_on_table(&units, baseline, &edge));
-        assert!(layout.overflows(layout.baseline(baseline, Some(102.))));
     }
 
     #[test]
@@ -711,7 +659,6 @@ mod ruled_tests {
                 x: 10.,
                 y: 10. + spacing,
                 previous_bottom: 10.,
-                table_edge: Vec::new(),
                 written_lines: 0,
                 line: vec![],
                 dirty: false,

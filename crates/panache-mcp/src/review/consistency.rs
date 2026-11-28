@@ -33,21 +33,6 @@ impl Bounds {
         b
     }
 
-    // Look for a boundary crossing within the horizontal span of a following glyph.
-    pub(crate) fn caption_seam(self, text: Self) -> Option<Self> {
-        let half = text.height() / 2.;
-        let left = self.left.max(text.left);
-        let right = self.right.min(text.right);
-        let top = (self.bottom - half).min(text.top).max(self.top);
-        let bottom = (text.top + half).max(self.bottom).min(text.bottom);
-        (right - left >= 2. && text.top <= self.bottom + 1. && bottom - top >= 2.).then_some(Self {
-            left,
-            top,
-            right,
-            bottom,
-        })
-    }
-
     fn union(self, b: Self) -> Self {
         Self {
             left: self.left.min(b.left),
@@ -502,7 +487,6 @@ mod tests {
             }
         }
         let sample = PageSample {
-            table_candidates: Vec::new(),
             baselines: vec![],
             content_sha256: String::new(),
             drawings: vec![drawing(5., 5., 40., 40.)],
@@ -540,7 +524,6 @@ mod tests {
         finished[(5, 5)] = Rgba([0, 0, 0, 255]);
         finished[(1105, 5)] = Rgba([127, 127, 127, 255]);
         let sample = PageSample {
-            table_candidates: Vec::new(),
             baselines: vec![],
             content_sha256: String::new(),
             drawings: vec![drawing(0., 0., 100., 80.)],

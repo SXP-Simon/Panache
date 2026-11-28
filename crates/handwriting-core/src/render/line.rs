@@ -103,33 +103,6 @@ impl LineLayout {
     }
 }
 
-// 2026-11-28：按栏比较表格落笔边界和下一行字形。笔尖轻触表框可以保留，
-// 一个字有三分之一以上的墨迹进入表内才重新安排该行。
-pub(super) fn intrudes_on_table(units: &[LineUnit], anchor: f32, edge: &[i32]) -> bool {
-    units.iter().filter(|u| u.glyph.ink).any(|unit| {
-        let x = unit.x + unit.glyph.left;
-        let y = anchor.round() as i32 + unit.dy + unit.glyph.top;
-        let mask = &unit.glyph.mask;
-        let left = x.clamp(0, edge.len() as i32) as usize;
-        let right = (x + mask.width() as i32).clamp(0, edge.len() as i32) as usize;
-        if !edge[left..right].iter().any(|bottom| *bottom > y) {
-            return false;
-        }
-        let mut ink = 0u64;
-        let mut inside = 0u64;
-        for (dx, dy, _) in mask.enumerate_pixels().filter(|(_, _, p)| p[0] >= 128) {
-            ink += 1;
-            if edge
-                .get((x + dx as i32) as usize)
-                .is_some_and(|bottom| *bottom > 0 && y + (dy as i32) < *bottom)
-            {
-                inside += 1;
-            }
-        }
-        ink > 0 && inside * 3 >= ink
-    })
-}
-
 fn ink_bounds(units: &[LineUnit]) -> (i32, i32) {
     units
         .iter()

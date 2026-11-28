@@ -7,7 +7,6 @@
 import argparse
 import asyncio
 import base64
-import hashlib
 import io
 import json
 import os
@@ -24,7 +23,6 @@ import export_blur
 import illustration_pen
 import illustration_ink_check
 import paper_focus
-import photo_ink_finish
 import paper_ink_check
 import font_samples
 import review_comparison
@@ -279,38 +277,6 @@ async def check_zip_review_pixels(params, root, latin):
         assert "不一致" in changed.content[0].text
 
 
-async def check_rsi_preview(client, draft_id):
-    task = (await call(
-        client, "start_rsi_task", draft_id=draft_id, revision=1, objective="Check the page",
-        policy_id="pilot-v1", decision_provider="stdio smoke fixture",
-    )).structuredContent
-    key = {"task_id": task["task_id"], "revision": 1}
-    await call(client, "advance_rsi_task", **key, expected_step=0, action="request_evidence",
-               reason="Inspect native size.", instruction="Look at this title crop.")
-    crop = await call(client, "preview_handwriting", draft_id=draft_id, rsi_task_id=key["task_id"],
-                      revision=1, view="image", export_blur_px=0,
-                      region=[[20, 30], [180, 30], [180, 100], [20, 100]])
-    evidence_id = crop.structuredContent["evidence_id"]
-    receipt = (await call(client, "read_rsi_task", task_id=key["task_id"])).structuredContent["preview_evidence"][0]
-    assert receipt["evidence_id"] == evidence_id and receipt["step"] == 1
-    image = next(block for block in crop.content if block.type == "image")
-    assert receipt["images"][0]["base64_sha256"] == hashlib.sha256(image.data.encode("ascii")).hexdigest()
-    selected = (await call(client, "advance_rsi_task", **key, expected_step=1, action="select",
-                           reason="Inspected the title crop.", review_ids=[evidence_id])).structuredContent
-    assert selected["selected_revision"] == 1
-    another = (await call(
-        client, "start_rsi_task", draft_id=draft_id, revision=1, objective="Check the same page",
-        policy_id="pilot-v1", decision_provider="stdio smoke fixture",
-    )).structuredContent
-    borrowed = await client.call_tool("advance_rsi_task", {
-        "task_id": another["task_id"], "expected_step": 0, "revision": 1, "action": "select",
-        "reason": "Attempt to reuse a different task's crop.", "review_ids": [evidence_id],
-    })
-    assert borrowed.isError
-    await call(client, "advance_rsi_task", task_id=another["task_id"], expected_step=0,
-               revision=1, action="stop", reason="No independent crop.")
-
-
 async def smoke(command, arguments, out):
     with TemporaryDirectory() as temp:
         personal = Path(temp) / "my-fonts"
@@ -338,17 +304,11 @@ async def smoke(command, arguments, out):
             assert "group=variation" in info.instructions and "group=strike" in info.instructions
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
-                "start_rsi_task",
-                "read_rsi_task",
                 "search_homework_experience",
                 "record_homework_experience",
                 "read_homework_experience",
                 "validate_homework_experience",
                 "retire_homework_experience",
-                "advance_rsi_task",
-                "read_rsi_policy",
-                "publish_rsi_policy",
-                "validate_rsi_policy",
                 "annotate_review",
                 "storage_usage",
                 "plan_cleanup",
@@ -422,7 +382,6 @@ async def smoke(command, arguments, out):
             ).structuredContent
             assert guided["paper"]["alignment"] == "manual_guides"
             gkey = {"draft_id": guided["draft_id"]}
-            await check_rsi_preview(client, guided["draft_id"])
             paper_only = png(
                 await call(client, "preview_handwriting", view="paper", **gkey)
             )
@@ -483,7 +442,6 @@ async def smoke(command, arguments, out):
             await illustration_ink_check.verify(client, Path(temp))
             await diagram_perspective.verify(client, Path(temp))
             await paper_focus.verify(client, Path(temp))
-            await photo_ink_finish.verify(client, Path(temp))
             await paper_ink_check.verify(client, Path(temp))
             comparison_key, reviewed_id, user_quote = await review_comparison.exercise(client, Path(temp), call)
             # Keep the traditional eight verse lines for a single folio.
@@ -902,17 +860,13 @@ async def smoke(command, arguments, out):
         async with stdio_client(protected) as streams, ClientSession(*streams) as client:
             assert "preserves stored reviews" in (await client.initialize()).instructions
             key = {"draft_id": doc, "revision": archive["revision"]}
-            task = (await call(client, "start_rsi_task", **key, objective="Read archived evidence.",
-                               policy_id="pilot-v1", decision_provider="stdio fixture")).structuredContent
             for name, arguments in [
-                ("preview_handwriting", {**key, "view": "image", "rsi_task_id": task["task_id"]}),
                 ("preview_handwriting", {**key, **remaining[0], "view": "review"}),
                 ("annotate_review", {**comparison_key, "review_id": reviewed_id,
                                      "origin": "model_observation", "text": "must not be stored"}),
             ]:
                 blocked = await client.call_tool(name, arguments)
                 assert blocked.isError and "保留原有检查记录" in blocked.content[0].text
-            assert (await call(client, "read_rsi_task", task_id=task["task_id"])).structuredContent["preview_evidence"] == []
             assert png(await call(client, "preview_handwriting", **key, **remaining[0], view="image")) == original
             # PDF keeps the historical count but never claims ZIP/preview pixel equality.
             pdf_review = (await call(client, "export_handwriting", **key)).structuredContent["review"]

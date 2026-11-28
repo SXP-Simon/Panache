@@ -422,19 +422,12 @@ impl Engine {
         }
         let mut drawings = Vec::new();
         let mut drawing_count = 0;
-        let mut table = None;
-        let mut table_candidates = Vec::new();
         for g in &glyphs {
             let edit = edits.get(&g.id).copied();
             let kind = drawing_kind(g);
             let layout_offset = drawing_count;
             drawing_count += usize::from(kind.is_some());
-            if !g.is_text {
-                table = None;
-            }
-            if !(g.is_text || g.is_grid_table || kind.is_some())
-                || edit.is_some_and(|v| v.hides_ink())
-            {
+            if !(g.is_text || kind.is_some()) || edit.is_some_and(|v| v.hides_ink()) {
                 continue;
             }
             let hw = f64::from(g.bounds[2]) / 2.;
@@ -443,27 +436,6 @@ impl Engine {
                 [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(|uv| glyph_point(g, edit, uv));
             let corners = paper_corners.map(|p| crate::review::photo_point(draft, p));
             let bounds = crate::review::Bounds::from_corners(corners);
-            if g.is_grid_table || table.is_some() {
-                let inset = f64::from(fine_edit::PAD);
-                let (x, y) = ((hw - inset).max(0.), (hh - inset).max(0.));
-                let ink = crate::review::Bounds::from_corners(
-                    [[-x, -y], [x, -y], [x, y], [-x, y]]
-                        .map(|uv| crate::review::photo_point(draft, glyph_point(g, edit, uv))),
-                );
-                if g.is_grid_table {
-                    table = Some((ink, g.baseline, None));
-                    continue;
-                }
-                if let Some((grid, baseline, row)) = &mut table {
-                    if g.baseline != *baseline && g.baseline == *row.get_or_insert(g.baseline) {
-                        if let Some(seam) = grid.caption_seam(ink) {
-                            table_candidates.push(seam);
-                        }
-                    } else {
-                        table = None;
-                    }
-                }
-            }
             if let Some(kind) = kind {
                 drawings.push(crate::review::Drawing {
                     id: g.id,
@@ -495,7 +467,6 @@ impl Engine {
             }
         }
         Ok(crate::review::PageSample {
-            table_candidates,
             text,
             drawings,
             baselines,

@@ -10,7 +10,6 @@ mod placement;
 mod preview;
 mod replace_text;
 mod review;
-mod rsi;
 mod save;
 mod storage;
 mod tuning;
@@ -243,11 +242,11 @@ impl Panache {
             .await,
         )
     }
-    async fn render<T: Send + 'static>(
+    async fn render(
         &self,
         ctx: RequestContext<RoleServer>,
-        work: impl FnOnce(&State, &mut Engine, &Cancellation) -> Result<T> + Send + 'static,
-    ) -> Result<T> {
+        work: impl FnOnce(&State, &mut Engine, &Cancellation) -> Result<CallToolResult> + Send + 'static,
+    ) -> Result<CallToolResult> {
         let permit = tokio::select! {
             slot=self.0.render_slot.clone().acquire_owned()=>slot?,
             _=ctx.ct.cancelled()=>anyhow::bail!("Cancelled"),
@@ -290,7 +289,6 @@ impl ServerHandler for Panache {
             "Forms, unruled paper and artwork are supported. Follow specified or delegated placement, matching field orientation and preserving printed labels. ",
             "If the intended writing area is ambiguous, ask which field to fill or leave clear. ",
             "Photo coordinates use native output pixels; local dx/dy use paper-space pixels. ",
-            "For a requested iterative policy experiment, use start_rsi_task after creating the initial draft. The host model chooses and explains each bounded action using the pinned policy and actual preview evidence. ",
             "Inspect appearance with view=image; revisit actions with read_section(view=trajectory)."
         );
         let draft_intent = "First identify the source of the work. When the user supplies text or a problem to write out and asks to see page one, they mean the first page of the new output. Call save_section first (style.homework=true for a new assignment), then preview the returned draft_id. Look up a saved draft only when the user refers to one, even if an existing draft resembles the supplied text. ";
@@ -367,72 +365,6 @@ impl Panache {
         Parameters(input): Parameters<experience::Retire>,
     ) -> CallToolResult {
         self.storage_task(move |_, drafts| drafts.retire_experience(input))
-            .await
-    }
-
-    #[tool(
-        annotations(open_world_hint = false),
-        description = "Start a bounded handwriting experiment at a saved revision. The host supplies the decision provider and interprets the pinned policy. Use only when iterative experimentation is requested."
-    )]
-    async fn start_rsi_task(&self, Parameters(input): Parameters<rsi::Start>) -> CallToolResult {
-        self.storage_task(move |_, drafts| drafts.start_rsi(input))
-            .await
-    }
-
-    #[tool(
-        annotations(read_only_hint = true, open_world_hint = false),
-        description = "Resume a task with its pinned policy, candidate revisions, preview receipts, decisions and selected revision."
-    )]
-    async fn read_rsi_task(&self, Parameters(input): Parameters<rsi::TaskQuery>) -> CallToolResult {
-        self.storage_task(move |_, drafts| drafts.read_rsi(input))
-            .await
-    }
-
-    #[tool(
-        annotations(open_world_hint = false),
-        description = "Record one host decision at expected_step. For request_evidence, call preview_handwriting with rsi_task_id. For revise, pass the returned decision_id to the chosen edit tool as rsi_decision_id. Select a reviewed candidate for export or stop with remaining uncertainty."
-    )]
-    async fn advance_rsi_task(
-        &self,
-        Parameters(input): Parameters<rsi::Advance>,
-    ) -> CallToolResult {
-        self.storage_task(move |_, drafts| drafts.advance_rsi(input))
-            .await
-    }
-
-    #[tool(
-        annotations(read_only_hint = true, open_world_hint = false),
-        description = "List policy versions or read one immutable rule set with its source tasks and validation reports. Set include_evidence_guide=true for versioned acceptance checks and existing tool arguments."
-    )]
-    async fn read_rsi_policy(
-        &self,
-        Parameters(input): Parameters<rsi::PolicyQuery>,
-    ) -> CallToolResult {
-        self.storage_task(move |_, drafts| drafts.read_rsi_policy(input))
-            .await
-    }
-
-    #[tool(
-        annotations(open_world_hint = false),
-        description = "Publish a new immutable policy from completed source tasks. Specify how to execute edits, review evidence, select candidates and choose experiments."
-    )]
-    async fn publish_rsi_policy(
-        &self,
-        Parameters(input): Parameters<rsi::Publish>,
-    ) -> CallToolResult {
-        self.storage_task(move |_, drafts| drafts.publish_rsi_policy(input))
-            .await
-    }
-
-    #[tool(
-        annotations(open_world_hint = false),
-        description = "Attach a host evaluation referencing closed tasks that tested this policy on separate drafts."
-    )]
-    async fn validate_rsi_policy(
-        &self,
-        Parameters(input): Parameters<rsi::Validate>,
-    ) -> CallToolResult {
-        self.storage_task(move |_, drafts| drafts.validate_rsi_policy(input))
             .await
     }
 
@@ -687,7 +619,7 @@ impl Panache {
         Parameters(input): Parameters<Preview>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        tool_result(self.rsi_preview(input, ctx).await)
+        tool_result(preview::run(self, input, ctx).await)
     }
 
     #[tool(

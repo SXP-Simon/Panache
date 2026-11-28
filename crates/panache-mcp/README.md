@@ -52,8 +52,6 @@ cargo build --locked --release -p panache-mcp
 
 可以先说「用这段话给我看第一页」，看过后说「字大一点」，再说「就用这一版」。客户端按同一稿件的版本号取预览和导出。查看小样使用 `preview_handwriting(view="image")`，无需创建检查单。
 
-表格下方的正文会按实际倾斜后的表框避让。整页复查发现表格末行与下方文字可能连在一起时，`preview_handwriting(view="review")` 会在同一次响应里给出 `table_clearance_check` 和原尺寸局部图。直接读末行和后面的文字即可判断是否需要调整间距。
-
 试验性的 `replace_section_text` 可按当前稿件版本替换已有节中的一整行，无需重传节内图片。整节的各块须用空行分隔，每块须为单行正文或已验证的独立内嵌图片。默认模式下，所有正文行只允许字母（含汉字）、数字和行内普通半角空格。即使只想改「春天」，另一段的「踏青真好。」也会因含句号触发下面的重试提示。
 
 旧值与新值须不同，默认各为 1–160 个字符。旧值须独占一行，并且在整节原文中只出现一次。例如，另一行的「初春天气」也含有「春天」，替换就会因匹配有歧义而被拒绝。目标节已有保存的手摆字形调整时也会拒绝。创建、追加或修改其他复杂内容可用 `save_section` 传完整原文；对已有节的小改字先尝试快捷替换，它会先检查当前正文有没有保存过手摆。
@@ -229,13 +227,6 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 使用 Windows 上的 Python 客户端脚本时，若只有终端显示的中文乱码，可以将该客户端的标准输出和终端设为 UTF-8（例如向 Python 进程传入 `PYTHONIOENCODING=utf-8`）。
 
-### 原照中的墨色与焦点
-
-原纸按 `paper_mode=photo` 导入后，已追踪的纸线或用户指定的参考线会建立纸面到照片的坐标映射。在具备这项映射的稿件上，`describe_controls(group=ink)` 提供两个仅处理新增墨迹的选项。文字、公式、表格、流程图和已描线的位图轮廓共用这层墨。两项设置可单独放入 `tune_handwriting` 的 `changes`，可传 `null` 恢复原值。调整后按同一页、同一选区复查；保留足够清楚的笔迹。
-
-- `photo_ink_light` 取 0–100。数值越大，非零墨色通道越多地随脚下的纸色相乘。纯黑墨的色值仍为零。用邻近的实际纸纹、印迹和新增笔迹比较冷暖与反差，单凭该区变暗无法判定曝光。若边缘过硬，可分别试局部透明度或焦点。
-- `photo_ink_focus` 的 `from`、`to` 各给 `x`、`y`（整张原照的 0–1 坐标）和 `sigma_px`（0–2 个原照像素）。沿两点之间逐渐变焦，外侧维持对应端点的值。用原尺寸裁图判定远近清晰度，清晰端可保留 0。柔化发生在透视投影之后，纸面照片保持原样，PDF 与可见 PNG 共用同一处理。
-
 ## 普通作业的经验检索与总结
 
 普通作业可直接用题目原话查询，例如 `search_homework_experience({"query":"保留旧教材的分数命令，计算行要排成上下分数"})`。SQLite FTS5 对每条经验的适用条件、动作、理由按 BM25 排序，三栏权重依次是 4、2、1。连续汉字按相邻双字切分，拉丁字母和数字按词处理。不同词元可以分别命中。题面中明确排除的内容也可能在字面上匹配，采用前须读返回的 `scope`。全文查询接受最多 1200 个字符，每页最多 20 条，可用 `next_offset` 翻页。
@@ -253,24 +244,19 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 - **以已经观察到的作业结果验证。** 正例需要在自然完成的修订中看到同一做法解决了问题，边界例需要看到相关且原本正确或不满足条件的内容得以保留。可用上述回执填写 `validate_homework_experience` 的交付与检查单字段，再给出 `kind`、`passed` 和具体观察。不合适或证据不足直接跳过，作业保持交付时的版本。
 - **生效条件沿用原有门禁。** 独立正例和边界例都通过才可按 BM25 或标签检索，失败或主动撤回会从普通检索撤下。宿主负责观察结论，存储层核验证据身份。保留原检查记录的连接可检索已生效经验，导出时只报告交付情况。
 
-## 多轮手写实验
-
-用户要求比较稿件、试验改法或改进下一轮策略时，宿主模型负责读图、提出假设、判断并说明理由。Panache 使用现有工具生成和审阅稿件，在本机的稿件数据库中保存任务。其他提供方也可按同一 MCP 契约提交决策。
-
-1. 用 `save_section` 准备初稿。`read_rsi_policy({})` 列出策略版本，初始版本为 `pilot-v1`。用 `start_rsi_task` 提交稿号、起始版本、目标、策略 ID 和实际的 `decision_provider`。任务固定使用当时的规则。
-2. 用 `advance_rsi_task` 传当前 `expected_step`（初始为 0）。`request_evidence` 写明要消除的疑问。用 `preview_handwriting` 传同一 `rsi_task_id` 和明确的稿件版本，查看图像、布局或局部裁剪并取得 `evidence_id`。整页检查也可直接引用同稿同版已有的 `review_id`，其首次入档时间见 `filed_at_revision`。任务预览单据只在本任务有效，每个任务最多 64 份。设置 `PANACHE_MCP_PRESERVE_REVIEWS=1` 的连接可以查旧单、引用旧单，或省略 `rsi_task_id` 临时看图。
-3. `revise` 引用同版的 `review_ids`、理由、预期变化和一个编辑工具。调用该工具时在 `rsi_decision_id` 传回 `decisions` 末项的 `decision_id`，并使用该稿的当前版本。该工具写入新版本时，同一笔事务会把新版登记为候选。如果回执显示设置已相同且版本号未变，可以沿用当前候选继续审阅。
-4. 从 `candidate_revisions` 中选择满足目标的一版，以 `select` 提交其检查证据和取舍，再以 `selected_revision` 调用 `export_handwriting`。目标无法满足时用 `stop` 记录未解问题。最后一个决策名额留给选择或停止。重连后用 `read_rsi_task` 和保存的任务 ID 读取决策、预览参数与摘要，或用 `read_section(view=review)` 查整页单据。局部裁剪可按原参数重绘；将返回图片的 Base64 字符串做 SHA-256，即可与当时的图片摘要核对。
-5. 用 `publish_rsi_policy` 引用父策略和已结束、有证据的源任务，写明下一版的执行、审阅、成稿选择、实验选择规则和预算。后续任务显式选用新版本。用 `validate_rsi_policy` 记录新版本在独立稿件上的实测结论、失败和局限；用 `read_rsi_policy` 查回这些宿主评估及对应任务。
-
-需要验收指引时，调用 `read_rsi_policy({"policy_id":"pilot-v1","include_evidence_guide":true})`，并记录响应的 `evidence_guide.version`。回放时传入 `evidence_guide_version` 可读取同一版。按任务选择 `checks` 中的项目，例如按 `formula_rendering` 从原尺寸成稿读回分式，按 `mixed_content_projection` 对照图表两端与附近纸纹，按 `focus_and_contrast` 检查不同区域的纸色和笔迹。将调用参数补上实际稿号、候选版本和节页，裁区按 `region_from` 取得。[实拍作业指引](evidence-guide-v2.json) · [首版指引](evidence-guide-v1.json)
-
 ## 验证
 
 构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF。
 
 ```sh
 uv run --script crates/panache-mcp/tests/smoke.py target/release/panache-mcp --out output/pdf
+```
+
+用独立的 stdio 会话验证经验候选的交付回执、跨会话检索和撤下。先用 `python3 scripts/build-text-worker.py` 构建 Markdown worker，再运行：
+
+```sh
+PANACHE_MARKDOWN_WORKER="$PWD/app/web/prepare-text-worker.js" PANACHE_FONT_DIR="$PWD/assets/font_assets" \
+  uv run --script crates/panache-mcp/tests/experience_visibility.py target/release/panache-mcp
 ```
 
 局部复查盲评使用合成页面。构建后运行以下命令，在新的输出目录中生成两组顺序配平的图片与任务，以及单独保存的答案和逐例统计。给评审者各发一组，待其回答后再打开 `private/key.json`。脚本另外核对源图像素。调用数和字节数只统计取复盘结果的开销，选区已提供。

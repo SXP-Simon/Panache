@@ -6,7 +6,7 @@ mod paper_ink;
 pub(crate) use consistency::{Bounds, TextSample};
 
 use crate::{controls, drafts::Snapshot, reply};
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, Limits, Parameters, export, imaging};
 use image::{GenericImageView, Pixel, Rgba, RgbaImage, imageops};
@@ -85,7 +85,6 @@ fn ruling_offset(paper: &RgbaImage, point: [f32; 2], radius: i32) -> Option<i32>
 }
 
 pub struct PageSample {
-    pub table_candidates: Vec<Bounds>,
     pub baselines: Vec<[f32; 2]>,
     pub content_sha256: String,
     pub text: Vec<TextSample>,
@@ -198,44 +197,6 @@ pub fn local_ink_preview(
         .map(|e| paper_ink::report(&e, draft.id, draft.revision, section, page)))
 }
 
-pub(crate) struct PendingPage {
-    draft_id: String,
-    revision: u32,
-    section: u32,
-    page: usize,
-    pixel_digest: String,
-    content_digest: String,
-    evidence: serde_json::Value,
-    metadata: serde_json::Map<String, serde_json::Value>,
-    pub(crate) images: Vec<ContentBlock>,
-}
-
-impl PendingPage {
-    pub(crate) fn file(self, tx: &rusqlite::Transaction<'_>) -> Result<CallToolResult> {
-        let mut metadata = crate::drafts::record_review_in(
-            tx,
-            (&self.draft_id, self.revision),
-            (self.section, self.page),
-            "paper-review/4",
-            &self.pixel_digest,
-            &self.content_digest,
-            &self.evidence,
-        )?;
-        metadata
-            .as_object_mut()
-            .context("Invalid review observation")?
-            .extend(self.metadata);
-        let mut response = reply(
-            format!(
-                "{metadata}\nOrange = estimated writing area; cyan = projected layout guides. Baseline offsets sample nearby dark ridges on unmarked paper (null = no supported sample); a decoration can also form a ridge. Transparent PNG is shown on its paper for comparison."
-            ),
-            metadata,
-        );
-        response.content.extend(self.images);
-        Ok(response)
-    }
-}
-
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
@@ -244,7 +205,7 @@ pub fn page(
     sample: &PageSample,
     focus: &crate::paper::focus::Cache,
     cancel: &Cancellation,
-) -> Result<PendingPage> {
+) -> Result<CallToolResult> {
     let params = controls::parameters(draft, section, &draft.controls)?;
     let mut finished = decode_page(png)?;
     let pixel_digest = pixel_sha256(&finished);
@@ -398,6 +359,14 @@ pub fn page(
     if let Some(value) = &local_ink {
         evidence["local_paper_ink"] = value.clone();
     }
+    let observation = draft.record_review(
+        section,
+        page,
+        "paper-review/4",
+        &pixel_digest,
+        &sample.content_sha256,
+        &evidence,
+    )?;
     let next = if peak == 0 {
         "If this page should contain text, check ink opacity/color, local edits and off-page placement. Review the new revision."
     } else if outside > 0 || draft.paper.as_ref().is_some_and(|p| !p.ruled) {
@@ -405,23 +374,11 @@ pub fn page(
     } else {
         "Compare writing across the occupied parts of the page with the saved paper. Check the requested position, header clearance, contrast, focus and letter size."
     };
-    // Confirm candidates on the delivered pixels. A clear horizontal separator needs no hint.
-    let table_crop = sample.table_candidates.iter().find_map(|seam| {
-        let [[l, t], _, [r, b], _] = seam.region(0., (w, h))?;
-        (t..b)
-            .all(|y| (l..r).any(|x| rgb_delta(finished[(x, y)], paper[(x, y)]) >= 8))
-            .then(|| seam.region(params.font_size.clamp(16., 96.) * 2., (w, h)))
-            .flatten()
-    });
     let metadata = {
-        let mut metadata = json!({});
+        let mut metadata = observation;
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
-        if let Some(region) = table_crop {
-            metadata["table_clearance_check"] = json!({"region":region,
-                "inspect":"The bottom of a table may touch the following text. Read the last row and the text in the attached native crop. Adjust spacing only if their strokes interfere."});
-        }
         if let Some(e) = local_ink {
             metadata["local_paper_ink_check"] =
                 paper_ink::report(&e, draft.id, draft.revision, section, page);
@@ -461,35 +418,22 @@ pub fn page(
         )?;
         metadata
     };
-    let mut images = Vec::new();
+    let mut response = reply(
+        format!(
+            "{metadata}\nOrange = estimated writing area; cyan = projected layout guides. Baseline offsets sample nearby dark ridges on unmarked paper (null = no supported sample); a decoration can also form a ridge. Transparent PNG is shown on its paper for comparison."
+        ),
+        metadata,
+    );
     for (label, img) in [
         ("Saved paper", thumbnail(&paper)),
         ("Finished appearance", result),
         ("Reference overlay", overlay),
     ] {
-        images.push(ContentBlock::text(label));
-        images.push(ContentBlock::image(
+        response.content.push(ContentBlock::text(label));
+        response.content.push(ContentBlock::image(
             STANDARD.encode(export::png(&img)?),
             "image/png",
         ));
     }
-    if let Some([[l, t], _, [r, b], _]) = table_crop {
-        let crop = imageops::crop_imm(&finished, l, t, r - l, b - t).to_image();
-        images.push(ContentBlock::text("Table and following text (native size)"));
-        images.push(ContentBlock::image(
-            STANDARD.encode(export::png(&crop)?),
-            "image/png",
-        ));
-    }
-    Ok(PendingPage {
-        draft_id: draft.id.to_owned(),
-        revision: draft.revision,
-        section,
-        page,
-        pixel_digest,
-        content_digest: sample.content_sha256.clone(),
-        evidence,
-        metadata: serde_json::from_value(metadata)?,
-        images,
-    })
+    Ok(response)
 }
