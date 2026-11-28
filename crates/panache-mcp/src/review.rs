@@ -6,7 +6,7 @@ mod paper_ink;
 pub(crate) use consistency::{Bounds, TextSample};
 
 use crate::{controls, drafts::Snapshot, reply};
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use handwriting_core::{Cancellation, Limits, Parameters, export, imaging};
 use image::{GenericImageView, Pixel, Rgba, RgbaImage, imageops};
@@ -197,6 +197,44 @@ pub fn local_ink_preview(
         .map(|e| paper_ink::report(&e, draft.id, draft.revision, section, page)))
 }
 
+pub(crate) struct PendingPage {
+    draft_id: String,
+    revision: u32,
+    section: u32,
+    page: usize,
+    pixel_digest: String,
+    content_digest: String,
+    evidence: serde_json::Value,
+    metadata: serde_json::Map<String, serde_json::Value>,
+    pub(crate) images: Vec<ContentBlock>,
+}
+
+impl PendingPage {
+    pub(crate) fn file(self, tx: &rusqlite::Transaction<'_>) -> Result<CallToolResult> {
+        let mut metadata = crate::drafts::record_review_in(
+            tx,
+            (&self.draft_id, self.revision),
+            (self.section, self.page),
+            "paper-review/4",
+            &self.pixel_digest,
+            &self.content_digest,
+            &self.evidence,
+        )?;
+        metadata
+            .as_object_mut()
+            .context("Invalid review observation")?
+            .extend(self.metadata);
+        let mut response = reply(
+            format!(
+                "{metadata}\nOrange = estimated writing area; cyan = projected layout guides. Baseline offsets sample nearby dark ridges on unmarked paper (null = no supported sample); a decoration can also form a ridge. Transparent PNG is shown on its paper for comparison."
+            ),
+            metadata,
+        );
+        response.content.extend(self.images);
+        Ok(response)
+    }
+}
+
 pub fn page(
     draft: &Snapshot<'_>,
     section: u32,
@@ -205,7 +243,7 @@ pub fn page(
     sample: &PageSample,
     focus: &crate::paper::focus::Cache,
     cancel: &Cancellation,
-) -> Result<CallToolResult> {
+) -> Result<PendingPage> {
     let params = controls::parameters(draft, section, &draft.controls)?;
     let mut finished = decode_page(png)?;
     let pixel_digest = pixel_sha256(&finished);
@@ -359,14 +397,6 @@ pub fn page(
     if let Some(value) = &local_ink {
         evidence["local_paper_ink"] = value.clone();
     }
-    let observation = draft.record_review(
-        section,
-        page,
-        "paper-review/4",
-        &pixel_digest,
-        &sample.content_sha256,
-        &evidence,
-    )?;
     let next = if peak == 0 {
         "If this page should contain text, check ink opacity/color, local edits and off-page placement. Review the new revision."
     } else if outside > 0 || draft.paper.as_ref().is_some_and(|p| !p.ruled) {
@@ -375,7 +405,7 @@ pub fn page(
         "Compare writing across the occupied parts of the page with the saved paper. Check the requested position, header clearance, contrast, focus and letter size."
     };
     let metadata = {
-        let mut metadata = observation;
+        let mut metadata = json!({});
         metadata["photo_size"] = json!([w, h]);
         metadata["thumbnail_size"] = json!([result.width(), result.height()]);
         metadata["next_step"] = json!(next);
@@ -418,22 +448,27 @@ pub fn page(
         )?;
         metadata
     };
-    let mut response = reply(
-        format!(
-            "{metadata}\nOrange = estimated writing area; cyan = projected layout guides. Baseline offsets sample nearby dark ridges on unmarked paper (null = no supported sample); a decoration can also form a ridge. Transparent PNG is shown on its paper for comparison."
-        ),
-        metadata,
-    );
+    let mut images = Vec::new();
     for (label, img) in [
         ("Saved paper", thumbnail(&paper)),
         ("Finished appearance", result),
         ("Reference overlay", overlay),
     ] {
-        response.content.push(ContentBlock::text(label));
-        response.content.push(ContentBlock::image(
+        images.push(ContentBlock::text(label));
+        images.push(ContentBlock::image(
             STANDARD.encode(export::png(&img)?),
             "image/png",
         ));
     }
-    Ok(response)
+    Ok(PendingPage {
+        draft_id: draft.id.to_owned(),
+        revision: draft.revision,
+        section,
+        page,
+        pixel_digest,
+        content_digest: sample.content_sha256.clone(),
+        evidence,
+        metadata: serde_json::from_value(metadata)?,
+        images,
+    })
 }

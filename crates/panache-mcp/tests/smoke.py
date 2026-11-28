@@ -7,6 +7,7 @@
 import argparse
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import os
@@ -277,7 +278,45 @@ async def check_zip_review_pixels(params, root, latin):
         assert "不一致" in changed.content[0].text
 
 
-async def smoke(command, arguments, out):
+async def check_rsi_preview(client, draft_id):
+    task = (await call(
+        client, "start_rsi_task", draft_id=draft_id, revision=1, objective="Check the page",
+        policy_id="pilot-v1", decision_provider="stdio smoke fixture",
+    )).structuredContent
+    key = {"task_id": task["task_id"], "revision": 1}
+    await call(client, "advance_rsi_task", **key, expected_step=0, action="request_evidence",
+               reason="Inspect native size.", instruction="Look at this title crop.")
+    crop = await call(client, "preview_handwriting", draft_id=draft_id, rsi_task_id=key["task_id"],
+                      revision=1, view="image", export_blur_px=0,
+                      region=[[20, 30], [180, 30], [180, 100], [20, 100]])
+    evidence_id = crop.structuredContent["evidence_id"]
+    receipt = (await call(client, "read_rsi_task", task_id=key["task_id"])).structuredContent["preview_evidence"][0]
+    assert receipt["evidence_id"] == evidence_id and receipt["step"] == 1
+    image = next(block for block in crop.content if block.type == "image")
+    assert receipt["images"][0]["base64_sha256"] == hashlib.sha256(image.data.encode("ascii")).hexdigest()
+    selected = (await call(client, "advance_rsi_task", **key, expected_step=1, action="select",
+                           reason="Inspected the title crop.", review_ids=[evidence_id])).structuredContent
+    assert selected["selected_revision"] == 1
+    another = (await call(
+        client, "start_rsi_task", draft_id=draft_id, revision=1, objective="Check the same page",
+        policy_id="pilot-v1", decision_provider="stdio smoke fixture",
+    )).structuredContent
+    borrowed = await client.call_tool("advance_rsi_task", {
+        "task_id": another["task_id"], "expected_step": 0, "revision": 1, "action": "select",
+        "reason": "Attempt to reuse a different task's crop.", "review_ids": [evidence_id],
+    })
+    assert borrowed.isError
+    await call(client, "advance_rsi_task", task_id=another["task_id"], expected_step=0,
+               revision=1, action="stop", reason="No independent crop.")
+
+
+RSI_TOOLS = {
+    "start_rsi_task", "read_rsi_task", "advance_rsi_task",
+    "read_rsi_policy", "publish_rsi_policy", "validate_rsi_policy",
+}
+
+
+async def smoke(command, arguments, out, *, rsi_enabled=False):
     with TemporaryDirectory() as temp:
         personal = Path(temp) / "my-fonts"
         personal.mkdir()
@@ -290,7 +329,7 @@ async def smoke(command, arguments, out):
             command=command,
             args=arguments,
             cwd=temp,
-            env={**os.environ, "PANACHE_MCP_HOME": temp, "PANACHE_USER_FONT_DIR": str(personal), "PATH": ""},
+            env={**os.environ, "PANACHE_MCP_HOME": temp, "PANACHE_USER_FONT_DIR": str(personal), "PANACHE_MCP_RSI": "1" if rsi_enabled else "0", "PATH": ""},
         )
         await check_zip_review_pixels(params, Path(temp), latin)
         async with stdio_client(params) as streams, ClientSession(*streams) as client:
@@ -323,7 +362,10 @@ async def smoke(command, arguments, out):
                 "replace_section_text",
                 "preview_handwriting",
                 "export_handwriting",
-            }
+            } | (RSI_TOOLS if rsi_enabled else set())
+            assert ("start_rsi_task" in info.instructions) == rsi_enabled
+            assert any("rsi_task_id" in t.inputSchema.get("properties", {}) for t in tools.tools) == rsi_enabled
+            assert any("rsi_decision_id" in t.inputSchema.get("properties", {}) for t in tools.tools) == rsi_enabled
             listed = await call(client, "list_fonts")
             guidance = listed.structuredContent["sample_guidance"]
             assert guidance in listed.content[0].text
@@ -382,6 +424,8 @@ async def smoke(command, arguments, out):
             ).structuredContent
             assert guided["paper"]["alignment"] == "manual_guides"
             gkey = {"draft_id": guided["draft_id"]}
+            if rsi_enabled:
+                await check_rsi_preview(client, guided["draft_id"])
             paper_only = png(
                 await call(client, "preview_handwriting", view="paper", **gkey)
             )
@@ -860,13 +904,20 @@ async def smoke(command, arguments, out):
         async with stdio_client(protected) as streams, ClientSession(*streams) as client:
             assert "preserves stored reviews" in (await client.initialize()).instructions
             key = {"draft_id": doc, "revision": archive["revision"]}
-            for name, arguments in [
+            guarded = [
                 ("preview_handwriting", {**key, **remaining[0], "view": "review"}),
                 ("annotate_review", {**comparison_key, "review_id": reviewed_id,
                                      "origin": "model_observation", "text": "must not be stored"}),
-            ]:
+            ]
+            if rsi_enabled:
+                task = (await call(client, "start_rsi_task", **key, objective="Read archived evidence.",
+                                   policy_id="pilot-v1", decision_provider="stdio fixture")).structuredContent
+                guarded.append(("preview_handwriting", {**key, "view": "image", "rsi_task_id": task["task_id"]}))
+            for name, arguments in guarded:
                 blocked = await client.call_tool(name, arguments)
                 assert blocked.isError and "保留原有检查记录" in blocked.content[0].text
+            if rsi_enabled:
+                assert (await call(client, "read_rsi_task", task_id=task["task_id"])).structuredContent["preview_evidence"] == []
             assert png(await call(client, "preview_handwriting", **key, **remaining[0], view="image")) == original
             # PDF keeps the historical count but never claims ZIP/preview pixel equality.
             pdf_review = (await call(client, "export_handwriting", **key)).structuredContent["review"]
@@ -904,10 +955,11 @@ if __name__ == "__main__":
         "--server-arg", action="append", default=[], help="Argument for the executable"
     )
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--rsi", action="store_true", help="enable experimental RSI for this smoke run")
     args = parser.parse_args()
     entry = (
         json.loads(args.config.read_text(encoding="utf-8-sig"))["mcpServers"]["panache"]
         if args.config
         else {"command": str(args.binary.resolve()), "args": args.server_arg}
     )
-    asyncio.run(smoke(entry["command"], entry.get("args", []), args.out))
+    asyncio.run(smoke(entry["command"], entry.get("args", []), args.out, rsi_enabled=args.rsi))

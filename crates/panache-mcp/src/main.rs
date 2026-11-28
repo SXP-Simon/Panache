@@ -10,6 +10,7 @@ mod placement;
 mod preview;
 mod replace_text;
 mod review;
+mod rsi;
 mod save;
 mod storage;
 mod tuning;
@@ -24,8 +25,8 @@ use handwriting_core::{
 use inputs::*;
 use rmcp::{
     RoleServer, ServerHandler, ServiceExt,
-    handler::server::wrapper::Parameters,
-    model::{CallToolResult, ContentBlock},
+    handler::server::{router::tool::ToolRouter, tool::ToolCallContext, wrapper::Parameters},
+    model::{CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock},
     service::RequestContext,
     tool, tool_handler, tool_router,
 };
@@ -40,6 +41,7 @@ use tokio::sync::Semaphore;
 struct State {
     drafts: Drafts,
     preserve_reviews: bool,
+    rsi_enabled: bool,
     engine: Mutex<Engine>,
     paper_focus: paper::focus::Cache,
     fonts: Vec<String>,
@@ -242,11 +244,11 @@ impl Panache {
             .await,
         )
     }
-    async fn render(
+    async fn render<T: Send + 'static>(
         &self,
         ctx: RequestContext<RoleServer>,
-        work: impl FnOnce(&State, &mut Engine, &Cancellation) -> Result<CallToolResult> + Send + 'static,
-    ) -> Result<CallToolResult> {
+        work: impl FnOnce(&State, &mut Engine, &Cancellation) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
         let permit = tokio::select! {
             slot=self.0.render_slot.clone().acquire_owned()=>slot?,
             _=ctx.ct.cancelled()=>anyhow::bail!("Cancelled"),
@@ -271,8 +273,72 @@ impl Panache {
     }
 }
 
-#[tool_handler]
+const RSI_TOOLS: [&str; 6] = [
+    "start_rsi_task",
+    "read_rsi_task",
+    "advance_rsi_task",
+    "read_rsi_policy",
+    "publish_rsi_policy",
+    "validate_rsi_policy",
+];
+const RSI_ARGUMENTS: [&str; 2] = ["rsi_decision_id", "rsi_task_id"];
+const RSI_DISABLED: &str =
+    "实验 RSI 未启用；如确实需要，请在启动 Panache MCP 时设置 PANACHE_MCP_RSI=1。";
+
+impl Panache {
+    fn visible_tools(&self) -> ToolRouter<Self> {
+        let mut router = Self::tool_router();
+        if !self.0.rsi_enabled {
+            for name in RSI_TOOLS {
+                router.remove_route(name);
+            }
+            for route in router.map.values_mut() {
+                let Some(properties) = route
+                    .attr
+                    .input_schema
+                    .get("properties")
+                    .and_then(serde_json::Value::as_object)
+                else {
+                    continue;
+                };
+                if RSI_ARGUMENTS
+                    .iter()
+                    .any(|name| properties.contains_key(*name))
+                    && let Some(properties) = Arc::make_mut(&mut route.attr.input_schema)
+                        .get_mut("properties")
+                        .and_then(serde_json::Value::as_object_mut)
+                {
+                    for name in RSI_ARGUMENTS {
+                        properties.remove(name);
+                    }
+                }
+            }
+        }
+        router
+    }
+}
+
+#[tool_handler(router = self.visible_tools())]
 impl ServerHandler for Panache {
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, rmcp::ErrorData> {
+        if !self.0.rsi_enabled
+            && (RSI_TOOLS.contains(&request.name.as_ref())
+                || request
+                    .arguments
+                    .as_ref()
+                    .is_some_and(|args| RSI_ARGUMENTS.iter().any(|name| args.contains_key(*name))))
+        {
+            return Ok(CallToolResult::error(vec![ContentBlock::text(RSI_DISABLED)]).into());
+        }
+        self.visible_tools()
+            .call(ToolCallContext::new(self, request, context))
+            .await
+    }
+
     fn get_info(&self) -> rmcp::model::ServerConfig {
         use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
         let instructions = concat!(
@@ -297,17 +363,88 @@ impl ServerHandler for Panache {
         } else {
             "When correcting ordinary homework, obtain the original revision's full-page review (preview_handwriting view=review) before editing; keep its review_id and any relevant region so you can inspect the same place afterward. "
         };
+        let rsi = if self.0.rsi_enabled {
+            " For a requested iterative policy experiment, use start_rsi_task after creating the initial draft. The host model chooses and explains each bounded action using the pinned policy and actual preview evidence."
+        } else {
+            ""
+        };
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new(
                 "panache-mcp",
                 handwriting_core::app_version(),
             ))
-            .with_instructions(format!("{mode}{draft_intent}{instructions}"))
+            .with_instructions(format!("{mode}{draft_intent}{instructions}{rsi}"))
     }
 }
 
 #[tool_router]
 impl Panache {
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Start a bounded handwriting experiment at a saved revision. The host supplies the decision provider and interprets the pinned policy. Use only when iterative experimentation is requested."
+    )]
+    async fn start_rsi_task(&self, Parameters(input): Parameters<rsi::Start>) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.start_rsi(input))
+            .await
+    }
+
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Resume a task with its pinned policy, candidate revisions, preview receipts, decisions and selected revision."
+    )]
+    async fn read_rsi_task(&self, Parameters(input): Parameters<rsi::TaskQuery>) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.read_rsi(input))
+            .await
+    }
+
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Record one host decision at expected_step. For request_evidence, call preview_handwriting with rsi_task_id. For revise, pass the returned decision_id to the chosen edit tool as rsi_decision_id. Select a reviewed candidate for export or stop with remaining uncertainty."
+    )]
+    async fn advance_rsi_task(
+        &self,
+        Parameters(input): Parameters<rsi::Advance>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.advance_rsi(input))
+            .await
+    }
+
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "List policy versions or read one immutable rule set with its source tasks and validation reports. Set include_evidence_guide=true for versioned acceptance checks and existing tool arguments."
+    )]
+    async fn read_rsi_policy(
+        &self,
+        Parameters(input): Parameters<rsi::PolicyQuery>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.read_rsi_policy(input))
+            .await
+    }
+
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Publish a new immutable policy from completed source tasks. Specify how to execute edits, review evidence, select candidates and choose experiments."
+    )]
+    async fn publish_rsi_policy(
+        &self,
+        Parameters(input): Parameters<rsi::Publish>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.publish_rsi_policy(input))
+            .await
+    }
+
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Attach a host evaluation referencing closed tasks that tested this policy on separate drafts."
+    )]
+    async fn validate_rsi_policy(
+        &self,
+        Parameters(input): Parameters<rsi::Validate>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.validate_rsi_policy(input))
+            .await
+    }
+
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
         description = "Find active, independently validated homework rules. Pass query with the actual wording of the current assignment, especially Chinese, for BM25 over conditions, actions and reasons. Optional tags narrow the match. Tags alone preserve topic search. Use [] or an unmatched query to discover vocabulary from active rules. Check the scope and refresh search just before applying a rule."
@@ -619,7 +756,7 @@ impl Panache {
         Parameters(input): Parameters<Preview>,
         ctx: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        tool_result(preview::run(self, input, ctx).await)
+        tool_result(self.rsi_preview(input, ctx).await)
     }
 
     #[tool(
@@ -895,6 +1032,9 @@ async fn main() -> Result<()> {
     };
     let state = State {
         preserve_reviews,
+        rsi_enabled: env::var_os("PANACHE_MCP_RSI")
+            .as_deref()
+            .is_some_and(|value| value == "1"),
         storage: storage::Storage::open(&home, &drafts)?,
         drafts,
         local_fonts: LocalFonts::new(engine.names.clone(), Limits::default().max_file_bytes)
