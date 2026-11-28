@@ -1,0 +1,31 @@
+{
+  "paper_sha256": "67ae41d9486dac33eddce6014f33b8ae23c647384b9196a42c5492b2c90f64ea",
+  "original_size": [
+    1440,
+    1920
+  ],
+  "candidate_png_sha256": "cc52e038932d750e247a225e5bbad37e1cda2eb8a489e12672f6d6a570f11e78",
+  "page": 1,
+  "coordinates": "Left, top, width, height in original camera pixels. Both columns use the same native crop; no rescaling or sharpening.",
+  "crops": {
+    "远处正文": [
+      315,
+      307,
+      420,
+      160
+    ],
+    "中段分式": [
+      205,
+      610,
+      420,
+      160
+    ],
+    "近处波形贴图": [
+      550,
+      1340,
+      420,
+      160
+    ]
+  },
+  "plate_sha256": "dacc6db2457a1059c7ead633ebef4985130d36a328c43f2ff1a61a7dbcb06c10"
+}
