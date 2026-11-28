@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "coordinate_system": "Original decoded image, x right, y down, zero-based pixels. Row zero is the first writable thin ruling. Heavy header and footer rules are borders.",
+  "method": "An agent inspected all originals, chose the ruling sequence and three interior columns, located the darkest sample within 5 pixels of each marked height, and visually checked overlaid taps on every ruling. These are image-derived reference marks with visual verification, not independent human ratings.",
+  "sources": {
+    "image-1": {
+      "size": [1440,1920], "sha256": "67ae41d9486dac33eddce6014f33b8ae23c647384b9196a42c5492b2c90f64ea",
+      "split": "development", "template": "nanchang-ruled", "kind": "ruled", "xs": [317,720,1123],
+      "observations": "Oblique keyboard photo. Heavy header and footer bars. The intervals grow towards the foreground, lines rise towards the right, distant printed strokes look soft. Straight chords approximate the visible local curvature.",
+      "rows": [[301,278,248],[346,318,290],[391,361,334],[436,406,378],[483,454,424],[531,503,472],[581,555,523],[634,608,577],[688,663,633],[744,720,691],[802,779,750],[862,840,811],[925,903,876],[991,968,943],[1061,1037,1013],[1133,1109,1088],[1209,1185,1167],[1289,1267,1248],[1373,1351,1335],[1461,1441,1425]]
+    },
+    "image-3": {
+      "size": [1440,1920], "sha256": "63bfcc9820d81269c1b4f21ac0121b47b128cf6a06c17cbf13eac970801a817f",
+      "split": "development", "template": "nanchang-ruled", "kind": "ruled", "xs": [317,720,1123],
+      "observations": "Tighter near-frontal crop of the same template. Thick upper/lower bars, small curved rulings, a soft shadow across the lower page. Row pitch varies less than image-1.",
+      "rows": [[290,289,288],[368,365,363],[446,443,439],[524,521,516],[603,601,593],[683,680,672],[764,759,753],[845,839,831],[925,919,912],[1008,1000,992],[1091,1080,1073],[1173,1161,1153],[1256,1243,1232],[1336,1321,1312],[1416,1402,1392],[1494,1481,1470],[1572,1560,1547],[1649,1637,1624],[1724,1713,1700],[1801,1789,1774]]
+    },
+    "image-2": {
+      "size": [1080,1440], "sha256": "2e58ef03cf1ee7a787a321f4ae6d224d96beeacc1a6fa3416f776dad8598ff1a",
+      "split": "holdout", "template": "wuhan-ruled", "kind": "ruled", "xs": [238,540,842],
+      "observations": "Different university template with faint horizontal dotted rulings, header text, a dark shadow at the bottom and an object at the right. Less slant than image-1. Local line contrast and lighting vary.",
+      "rows": [[429,428,425],[475,475,473],[521,521,521],[567,568,568],[614,614,616],[661,661,663],[708,709,710],[756,757,758],[805,806,806],[854,855,855],[904,904,904],[954,955,955],[1006,1006,1006],[1057,1058,1058],[1110,1111,1111],[1162,1165,1165],[1215,1219,1219],[1268,1274,1275]]
+    }
+  }
+}
