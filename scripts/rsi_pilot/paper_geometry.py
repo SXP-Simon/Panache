@@ -128,10 +128,12 @@ def generate_depth_paper(path):
     pos = np.clip((np.arange(h) - 125) / (960 - 125), 0, 1) * 8
     sigmas = np.linspace(2.8, 0.45, 9)
     previous = np.asarray(
-        image.filter(ImageFilter.GaussianBlur(sigmas[0])), dtype=float
+        image.filter(ImageFilter.GaussianBlur(float(sigmas[0]))), dtype=float
     )
     for k, sigma in enumerate(sigmas[1:]):
-        current = np.asarray(image.filter(ImageFilter.GaussianBlur(sigma)), dtype=float)
+        current = np.asarray(
+            image.filter(ImageFilter.GaussianBlur(float(sigma))), dtype=float
+        )
         take = (pos >= k) & ((pos < k + 1) if k < 7 else (pos <= 8))
         weight = (pos[take] - k)[:, None, None]
         result[take] = np.round(
