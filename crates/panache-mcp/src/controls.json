@@ -36,8 +36,8 @@
     "ink_opacity": {"type":"integer","min":0,"max":100,"unit":"%"},
     "ink_thickness": {"type":"number","min":-2,"max":2,"unit":"px","step":0.1},
     "ink_softness": {"type":"number","min":0,"max":2,"unit":"px","step":0.1},
-    "photo_ink_light": {"type":"integer","min":0,"max":100,"unit":"%","description":"Photo-mode paper only. At 0 use the chosen pen RGB. At 100 multiply each projected ink channel by the original paper pixel, preserving local shade and colored rulings. Pure black stays black. Compare native crops against photographed marks. For edges that appear too harsh, inspect opacity and focus; brightness alone does not establish exposure."},
-    "photo_ink_focus": {"type":"focus_gradient","description":"Photo-mode paper only. Soften only new ink (including equations, tables, graphs and illustration outlines) in photo pixels. Give from/to anchors {x,y,sigma_px}; x,y are normalized 0..1; sigma_px is 0..2. Match observed near/far focus and keep the sharp end at zero. Null removes the finish."}
+    "photo_ink_light": {"type":"integer","min":0,"max":100,"unit":"%","description":"Requires a paper projection (automatic or from paper_guides). At 0 use the chosen pen RGB. At 100 multiply each projected ink channel by the original paper pixel, preserving local shade and colored rulings. Pure black stays black. Compare native crops against photographed marks. For edges that appear too harsh, inspect opacity and focus; brightness alone does not establish exposure."},
+    "photo_ink_focus": {"type":"focus_gradient","description":"Requires a paper projection (automatic or from paper_guides). Soften only new ink (including equations, tables, graphs and illustration outlines) in photo pixels. Give from/to anchors {x,y,sigma_px}; x,y are normalized 0..1; sigma_px is 0..2. Match observed near/far focus and keep the sharp end at zero. Null removes the finish."}
   },
   "variation": {
     "line_spacing_sigma": {"type":"number","min":0,"max":100,"unit":"px"},

@@ -3,12 +3,14 @@
 import asyncio
 import base64
 import io
+import json
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
 from mcp_client import call, isolated_session
+from paper_focus import graded_paper
 from PIL import Image, ImageChops, ImageDraw
 
 
@@ -39,7 +41,73 @@ def source_sections():
     ]
 
 
+async def verify_review_guidance(client, home):
+    path = home / "photo-ink-review-graded.png"
+    graded_paper(path)
+    source = {
+        "markdown": "核对底纸和新增笔迹。 Compare the same marks before changing ink.",
+        "paper_path": str(path),
+        "style": {"font_size": 19, "ink": "#634854", "seed": 141},
+    }
+    guided = (
+        await call(
+            client,
+            "save_section",
+            **source,
+            paper_mode="photo",
+            paper_guides=[
+                {"row": 0, "left": [20, 46], "right": [620, 46]},
+                {"row": 15, "left": [20, 436], "right": [620, 436]},
+            ],
+        )
+    ).structuredContent
+    key = {"draft_id": guided["draft_id"], "revision": guided["revision"]}
+    assert guided["paper"]["alignment"] == "manual_guides"
+    assert "photo_ink_adjustment" not in guided
+    before = await call(client, "preview_handwriting", **key, view="image")
+    assert "photo_ink_adjustment" not in before.structuredContent
+
+    review = await call(client, "preview_handwriting", **key, view="review")
+    data = review.structuredContent
+    assert data["paper_focus_check"]["status"] == "spatial_variation"
+    hint = data["photo_ink_adjustment"]
+    assert hint["describe_arguments"] == {**key, "group": "ink"}
+    assert "photo_ink_focus" in hint["focus"] and "export_blur_gradient" in hint["focus"]
+    assert "photo_ink_light" in hint["light"]
+    assert "leave it unchanged" in hint["guidance"]
+    assert json.JSONDecoder().raw_decode(review.content[0].text)[0]["photo_ink_adjustment"] == hint
+    assert {"photo_ink_focus", "photo_ink_light"} <= (
+        await call(client, "describe_controls", **hint["describe_arguments"])
+    ).structuredContent["controls"].keys()
+    after = await call(client, "preview_handwriting", draft_id=key["draft_id"], view="image")
+    assert after.structuredContent["revision"] == key["revision"]
+    assert next(x.data for x in before.content if x.type == "image") == next(
+        x.data for x in after.content if x.type == "image"
+    )
+
+    # A visible imported paper and the same useful focus profile do not imply a projection.
+    flat = (await call(client, "save_section", **source, paper_mode="flatten")).structuredContent
+    assert flat["paper"]["alignment"] == "stored_canvas"
+    key = {"draft_id": flat["draft_id"], "revision": flat["revision"]}
+    review = (await call(client, "preview_handwriting", **key, view="review")).structuredContent
+    assert review["paper_focus_check"]["status"] == "spatial_variation"
+    assert "photo_ink_adjustment" not in review
+    rejected = await client.call_tool(
+        "tune_handwriting",
+        {"draft_id": key["draft_id"], "expected_revision": key["revision"], "changes": {"photo_ink_light": 35}},
+    )
+    assert rejected.isError
+    error = rejected.content[0].text
+    for detail in ("paper projection", "stored_canvas", "paper_guides"):
+        assert detail in error
+    unchanged = (
+        await call(client, "read_section", draft_id=key["draft_id"], view="source")
+    ).structuredContent
+    assert unchanged["revision"] == key["revision"]
+
+
 async def verify(client, home):
+    await verify_review_guidance(client, home)
     paper = Image.new("RGB", (480, 640), (199, 217, 224))
     pen = ImageDraw.Draw(paper)
     for y in range(60, 610, 38):

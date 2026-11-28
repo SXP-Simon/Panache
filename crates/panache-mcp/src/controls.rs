@@ -161,7 +161,7 @@ pub fn parameters(draft: &Snapshot<'_>, section: u32, changes: &Changes) -> Resu
                     .is_none_or(|paper| paper.projection.is_none()) =>
             {
                 bail!(
-                    "Photo ink lighting and focus require an original paper imported in photo mode"
+                    "Photo ink lighting and focus require an imported photo with a paper projection. paper_mode=photo alone does not create a projection for stored_canvas or unverified paper. If this effect is needed and rulings are visible, use paper_guides to build the projection, then recheck the layout."
                 )
             }
             "width" | "height" if draft.paper.is_some() => {
