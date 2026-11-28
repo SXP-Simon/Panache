@@ -155,6 +155,10 @@ def write(path, value):
     tmp.replace(path)
 
 
+class ToolError(RuntimeError):
+    """The server returned an explicit refusal. Connection loss has an unknown outcome."""
+
+
 class Server:
     """Line-oriented MCP stdio. Count on-wire JSON bytes, including base64; never log image data."""
 
@@ -216,7 +220,12 @@ class Server:
         self.p.stdin.write(body)
         self.p.stdin.flush()
         while row := self.p.stdout.readline():
-            obj = json.loads(row)
+            try:
+                obj = json.loads(row)
+            except (ValueError, UnicodeError) as error:
+                raise RuntimeError(
+                    "Invalid MCP response; the tool outcome is unknown"
+                ) from error
             if obj.get("id") == self.seq:
                 break
         else:
@@ -244,7 +253,7 @@ class Server:
                 + "\n"
             )
         if error:
-            raise RuntimeError(f"{method}/{params.get('name')}: {error}")
+            raise ToolError(f"{method}/{params.get('name')}: {error}")
         return result
 
     def call(self, name, **args):
@@ -517,7 +526,7 @@ def native_start(args):
     print(task["task_id"])
 
 
-def evidence(s, state, action, folder):
+def evidence(s, state, action, folder, revision):
     name = action.get("tool")
     params = action.get("arguments") or {}
     folder.mkdir(parents=True, exist_ok=True)
@@ -561,7 +570,7 @@ def evidence(s, state, action, folder):
         name = "preview_handwriting"
     if name not in {"preview_handwriting", "read_section", "describe_controls"}:
         raise ValueError("Unknown evidence tool")
-    key = {"draft_id": state["draft_id"], "revision": state["revision"]}
+    key = {"draft_id": state["draft_id"], "revision": revision}
     if name == "describe_controls" and not params.get("group"):
         key = {}
     if name == "preview_handwriting" and state.get("task"):
@@ -574,11 +583,30 @@ def evidence(s, state, action, folder):
     return {k: meta[k] for k in ("evidence_id", "review_id", "image_size") if k in meta}
 
 
-def deliver(server, state, arm):
-    """Export the exact selected revision; file delivery can be retried after a closed task."""
+def has_delivery(state, arm):
     rev = state["selected_revision"]
     if rev is None:
         raise ValueError("No revision selected for delivery")
+    receipt_file = arm / "export.json"
+    if receipt_file.exists():
+        receipt = read(receipt_file)
+        output = Path(receipt["path"])
+        if (
+            receipt["draft_id"] != state["draft_id"]
+            or receipt["revision"] != rev
+            or receipt["pages"] != len(state["snapshots"][str(rev)])
+        ):
+            raise ValueError("Existing export receipt belongs to another candidate")
+        if output.is_file() and digest(output.read_bytes()) == receipt["file_sha256"]:
+            return True
+    return False
+
+
+def deliver(server, state, arm):
+    """A lost export response may leave an extra PDF; manuscript edits stay single-commit."""
+    if has_delivery(state, arm):
+        return
+    rev = state["selected_revision"]
     exported = server.call(
         "export_handwriting", draft_id=state["draft_id"], revision=rev, format="pdf"
     )["structuredContent"]
@@ -591,7 +619,15 @@ def deliver(server, state, arm):
 def advance(args):
     """Dispatch a single genuine external decision; an error counts as an attempt."""
     arm = args.out / args.paper / args.arm
-    state = read(arm / "state.json")
+    pending = arm / "pending-dispatch.json"
+    recovering = pending.exists()
+    source_hash = digest(args.decision.read_bytes())
+    journal = read(pending) if recovering else None
+    if journal and journal["source_sha256"] != source_hash:
+        raise ValueError(
+            "Finish the pending decision before dispatching a different one"
+        )
+    state = journal["before"] if journal else read(arm / "state.json")
     cfg = state.get("runtime", read(args.out / "runtime.json"))
     action = read(args.decision)
     op = action["action"]
@@ -617,7 +653,26 @@ def advance(args):
         "raw": action,
         "source_sha256": digest(args.decision.read_bytes()),
     }
-    write(folder / "decision.json", applied)
+    if not recovering:
+        write(pending, {"step": step, "source_sha256": source_hash, "before": state})
+        write(folder / "decision.json", applied)
+    previous = (
+        read(folder / "decision.json") if (folder / "decision.json").exists() else {}
+    )
+    if recovering and previous.get("native_rejected") and previous.get("settled"):
+        state["decisions"].append(previous)
+        write(arm / "state.json", state)
+        pending.unlink()
+        return
+    if (
+        recovering
+        and not state.get("task")
+        and not previous.get("settled")
+        and op == "revise"
+    ):
+        raise RuntimeError(
+            "Interrupted unbound edit has an unknown outcome. Inspect its draft before replay."
+        )
     with Server(
         cfg, Path(state.get("home", arm)), "decision_dispatch", log_dir=arm
     ) as s:
@@ -645,42 +700,89 @@ def advance(args):
                 )
             if op == "revise":
                 req["tool"] = action["tool"]
-            task = s.call("advance_rsi_task", **req)["structuredContent"]
-            state["task"] = task
-            applied["decision_id"] = task["decisions"][-1]["decision_id"]
-        state["decisions"].append(applied)
-        write(arm / "state.json", state)
-        try:
-            if op == "request_evidence":
-                applied["evidence"] = evidence(s, state, action, folder)
-            elif op == "revise":
-                params = dict(action["arguments"])
-                if params.get("paper_guides") == "$detected":
-                    from paper_detector import detect_guides
-
-                    params["paper_guides"] = detect_guides(Path(state["path"]))
-                if task:
-                    params["rsi_decision_id"] = applied["decision_id"]
-                result = s.call(
-                    action["tool"],
-                    draft_id=state["draft_id"],
-                    expected_revision=rev,
-                    **params,
+            if recovering:
+                task = s.call("read_rsi_task", task_id=task["task_id"])[
+                    "structuredContent"
+                ]
+            if task["step"] == req["expected_step"]:
+                try:
+                    task = s.call("advance_rsi_task", **req)["structuredContent"]
+                except ToolError as exc:
+                    # The server explicitly refused this proposed action before it
+                    # took a native step. Let the host spend its next slot on a correction.
+                    applied.update(error=str(exc), native_rejected=True, settled=True)
+                    write(folder / "decision.json", applied)
+                    state["decisions"].append(applied)
+                    write(arm / "state.json", state)
+                    pending.unlink()
+                    print("Decision rejected:", exc)
+                    return
+            elif task["step"] != req["expected_step"] + 1 or any(
+                task["decisions"][-1].get(k) != v for k, v in req.items()
+            ):
+                raise RuntimeError(
+                    "Native task diverged from the pending host decision"
                 )
-                state["revision"] = result["structuredContent"]["revision"]
-                applied["result_revision"] = state["revision"]
-            elif op == "select":
-                state.update(disposition=op, selected_revision=rev)
-                deliver(s, state, arm)
-            elif op == "stop":
-                state.update(disposition=op, selected_revision=None)
-        except (ValueError, RuntimeError, KeyError, TypeError) as exc:
-            applied["error"] = str(exc)
-            print("Decision failed:", exc)
+            state["task"] = task
+            native = task["decisions"][-1]
+            applied["decision_id"] = native["decision_id"]
+        if recovering and previous.get("settled"):
+            applied = previous
+        elif task and native.get("result_revision") is not None:
+            applied["result_revision"] = native["result_revision"]
+        else:
+            try:
+                if op == "request_evidence":
+                    applied["evidence"] = evidence(s, state, action, folder, rev)
+                elif op == "revise":
+                    params = dict(action["arguments"])
+                    if params.get("paper_guides") == "$detected":
+                        from paper_detector import detect_guides
+
+                        params["paper_guides"] = detect_guides(Path(state["path"]))
+                    if task:
+                        params["rsi_decision_id"] = applied["decision_id"]
+                    result = s.call(
+                        action["tool"],
+                        draft_id=state["draft_id"],
+                        expected_revision=rev,
+                        **params,
+                    )
+                    applied["result_revision"] = result["structuredContent"]["revision"]
+            except (ToolError, ValueError, KeyError, TypeError) as exc:
+                applied["error"] = str(exc)
+                print("Decision failed:", exc)
+        applied["settled"] = True
         write(folder / "decision.json", applied)
+        state["decisions"].append(applied)
+        if "result_revision" in applied:
+            state["revision"] = applied["result_revision"]
+        if op in {"select", "stop"}:
+            state.update(
+                disposition=op, selected_revision=rev if op == "select" else None
+            )
+        # Recover an already frozen snapshot instead of filing duplicate page reviews.
+        disk = read(arm / "state.json")
+        if (
+            disk["draft_id"] == state["draft_id"]
+            and str(state["revision"]) in disk["snapshots"]
+        ):
+            state["snapshots"][str(state["revision"])] = disk["snapshots"][
+                str(state["revision"])
+            ]
         write(arm / "state.json", state)
-    if op == "revise" and "result_revision" in applied:
-        snapshot(cfg, arm, state)
+        if op == "select":
+            deliver(s, state, arm)
+    if "result_revision" in applied:
+        key = str(state["revision"])
+        directory = arm / f"r{key}"
+        if key not in state["snapshots"]:
+            snapshot(cfg, arm, state)
+        elif not all(
+            (directory / name).is_file() for name in ("overview.jpg", "detail.jpg")
+        ):
+            packet(directory, state["snapshots"][key])
+    pending.unlink()
     print(folder)
 
 

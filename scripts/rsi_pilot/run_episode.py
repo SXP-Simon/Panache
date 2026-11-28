@@ -8,8 +8,11 @@ outside this process. Re-running resumes at the first undispatched decision.
 
 import argparse
 import json
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import benchmark
 from codex_judge import run
@@ -130,9 +133,37 @@ def context(folder, state, compare_physical_fit=False):
 
 def solve(out, paper, arm, model, compare_physical_fit=False):
     folder = out / paper / arm
+    # Prevent another model process from archiving or dispatching an in-flight turn.
+    with closing(
+        sqlite3.connect(folder / "episode-host-lock.sqlite", timeout=0)
+    ) as lock:
+        lock.execute("BEGIN IMMEDIATE")
+        return solve_locked(out, paper, arm, model, compare_physical_fit)
+
+
+def solve_locked(out, paper, arm, model, compare_physical_fit):
+    folder = out / paper / arm
     while True:
         state = benchmark.read(folder / "state.json")
+        pending = folder / "pending-dispatch.json"
+        if pending.exists():
+            step = benchmark.read(pending)["step"]
+            decision = folder / f"turn-{step}" / "decision.json"
+            benchmark.advance(
+                SimpleNamespace(out=out, paper=paper, arm=arm, decision=decision)
+            )
+            continue
         if state.get("disposition"):
+            if state.get(
+                "selected_revision"
+            ) is not None and not benchmark.has_delivery(state, folder):
+                with benchmark.Server(
+                    state["runtime"],
+                    Path(state["home"]),
+                    "delivery_recovery",
+                    log_dir=folder,
+                ) as server:
+                    benchmark.deliver(server, state, folder)
             return
         if not state.get("task"):
             raise ValueError("Initialize the native task first.")
@@ -142,10 +173,31 @@ def solve(out, paper, arm, model, compare_physical_fit=False):
         base = folder / f"turn-{number}"
         prompt, images = context(folder, state, compare_physical_fit)
         path = base / "decision.json"
-        if not (base / "receipt.json").exists():
+        try:
+            receipt = benchmark.read(base / "receipt.json")
+            _decision = benchmark.read(path)
+        except (FileNotFoundError, ValueError):
+            receipt = None
+        if receipt is None:
+            if base.exists():
+                base.rename(folder / f"{base.name}.incomplete-{uuid4().hex}")
             prompt_file = folder / f"input-{number}.txt"
             prompt_file.write_text(prompt, encoding="utf-8")
             run(prompt_file, images, model, base)
+        receipt = benchmark.read(base / "receipt.json")
+        if (
+            (
+                "decision_sha256" in receipt
+                and receipt["decision_sha256"] != benchmark.digest(path.read_bytes())
+            )
+            or receipt["model"] != model
+            or receipt["prompt_sha256"] != benchmark.digest(prompt.encode())
+            or receipt["image_sha256"]
+            != [benchmark.digest(image.read_bytes()) for image in images]
+        ):
+            raise ValueError(
+                "Saved model decision belongs to different evidence or model"
+            )
         benchmark.advance(SimpleNamespace(out=out, paper=paper, arm=arm, decision=path))
 
 

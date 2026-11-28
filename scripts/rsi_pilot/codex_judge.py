@@ -85,6 +85,7 @@ def run(prompt_file, images, model, out):
         raise TypeError("The host expects a JSON object.")
     evidence = {
         "provider": "Codex CLI",
+        "decision_sha256": hashlib.sha256(last.read_bytes()).hexdigest(),
         "model": model,
         "reasoning_effort": "high",
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
@@ -94,9 +95,9 @@ def run(prompt_file, images, model, out):
         "usage": completed[0].get("usage", {}),
     }
     (out / "prompt.txt").write_text(prompt, encoding="utf-8")
-    (out / "receipt.json").write_text(
-        json.dumps(evidence, indent=2) + "\n", encoding="utf-8"
-    )
+    receipt_tmp = out / "receipt.json.tmp"
+    receipt_tmp.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    receipt_tmp.replace(out / "receipt.json")
     print(json.dumps(decision, ensure_ascii=False))
 
 
