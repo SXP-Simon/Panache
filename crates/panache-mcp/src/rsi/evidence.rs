@@ -20,6 +20,10 @@ impl Panache {
         let Some(task_id) = input.rsi_task_id.as_deref() else {
             return preview::run(self, input, ctx).await;
         };
+        ensure!(
+            !self.0.preserve_reviews,
+            "此连接保留原有检查记录。查看页面请省略 rsi_task_id；已有整页单据可按 review_id 引用。"
+        );
         let revision = input
             .revision
             .context("Specify the candidate revision for task evidence")?;

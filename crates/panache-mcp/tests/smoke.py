@@ -297,6 +297,17 @@ async def check_rsi_preview(client, draft_id):
     selected = (await call(client, "advance_rsi_task", **key, expected_step=1, action="select",
                            reason="Inspected the title crop.", review_ids=[evidence_id])).structuredContent
     assert selected["selected_revision"] == 1
+    another = (await call(
+        client, "start_rsi_task", draft_id=draft_id, revision=1, objective="Check the same page",
+        policy_id="pilot-v1", decision_provider="stdio smoke fixture",
+    )).structuredContent
+    borrowed = await client.call_tool("advance_rsi_task", {
+        "task_id": another["task_id"], "expected_step": 0, "revision": 1, "action": "select",
+        "reason": "Attempt to reuse a different task's crop.", "review_ids": [evidence_id],
+    })
+    assert borrowed.isError
+    await call(client, "advance_rsi_task", task_id=another["task_id"], expected_step=0,
+               revision=1, action="stop", reason="No independent crop.")
 
 
 async def smoke(command, arguments, out):
@@ -884,13 +895,17 @@ async def smoke(command, arguments, out):
         async with stdio_client(protected) as streams, ClientSession(*streams) as client:
             assert "preserves stored reviews" in (await client.initialize()).instructions
             key = {"draft_id": doc, "revision": archive["revision"]}
+            task = (await call(client, "start_rsi_task", **key, objective="Read archived evidence.",
+                               policy_id="pilot-v1", decision_provider="stdio fixture")).structuredContent
             for name, arguments in [
+                ("preview_handwriting", {**key, "view": "image", "rsi_task_id": task["task_id"]}),
                 ("preview_handwriting", {**key, **remaining[0], "view": "review"}),
                 ("annotate_review", {**comparison_key, "review_id": reviewed_id,
                                      "origin": "model_observation", "text": "must not be stored"}),
             ]:
                 blocked = await client.call_tool(name, arguments)
                 assert blocked.isError and "保留原有检查记录" in blocked.content[0].text
+            assert (await call(client, "read_rsi_task", task_id=task["task_id"])).structuredContent["preview_evidence"] == []
             assert png(await call(client, "preview_handwriting", **key, **remaining[0], view="image")) == original
             # PDF keeps the historical count but never claims ZIP/preview pixel equality.
             pdf_review = (await call(client, "export_handwriting", **key)).structuredContent["review"]
