@@ -1,6 +1,6 @@
 # Panache
 
-[English](README.md)
+[English](README.md) · [Türkçe](README.tr.md)
 
 | 浅色 | 深色 |
 | --- | --- |

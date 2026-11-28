@@ -1,6 +1,6 @@
 # Panache
 
-[简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · [Türkçe](README.tr.md)
 
 | Light | Dark |
 | --- | --- |
