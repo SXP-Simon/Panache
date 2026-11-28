@@ -96,6 +96,25 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
         }
         None => None,
     };
+    // Use the saved style on continuation; an unmarked legacy draft keeps its usual reply.
+    let search = if let Some(style) = &style {
+        experience_search(
+            style,
+            paper.as_ref().map(|p| &p.layout),
+            &prepared,
+            &input.markdown,
+        )
+    } else {
+        let previous = state
+            .drafts
+            .snapshot(input.draft_id.as_deref().expect("existing draft"), None)?;
+        experience_search(
+            &previous.style,
+            previous.paper.as_ref(),
+            &prepared,
+            &input.markdown,
+        )
+    };
     let bytes = paper.as_ref().map_or(0, |p| p.bytes.len())
         + font.as_ref().map_or(0, |(_, data)| data.len());
     let _budget = (bytes > 0)
@@ -116,7 +135,64 @@ fn prepare_and_save(state: &State, input: &Save, mut style: Option<Style>) -> Re
             "view":if state.preserve_reviews {"image"} else {"review"}});
         saved["paper_focus_check"] = report;
     }
+    if let Some(search) = search {
+        saved["experience_search"] = search;
+    }
     Ok(saved)
+}
+
+/// Compact hints from the actual paper and prepared section. The host adds task intent.
+fn experience_search(
+    style: &Style,
+    paper: Option<&paper::PaperLayout>,
+    prepared: &str,
+    markdown: &str,
+) -> Option<Value> {
+    style.homework.then(|| json!({
+        "tool":"search_homework_experience",
+        "arguments":{"tags":experience_topics(style, paper, prepared, markdown)},
+        "guidance":"用 query 传入用户的作业原话检索已验证经验，再核对适用范围。也可单用下列主题标签，或在 query 上加标签缩小范围。未命中时查看 available_tags，有贴合本题的已有词可补入重试，否则照常完成。若接下来要修订已有内容，先看修前版的具体位置，改后复核同处。"
+    }))
+}
+
+pub(super) fn experience_topics(
+    style: &Style,
+    paper: Option<&paper::PaperLayout>,
+    prepared: &str,
+    markdown: &str,
+) -> Vec<&'static str> {
+    let mut tags = vec!["homework"];
+    if let Some(paper) = paper {
+        tags.push("imported-paper");
+        if paper.photo_size.is_some() {
+            tags.push("photographed-paper");
+        }
+    }
+    if matches!(style.paper, Paper::Ruled) || paper.is_some_and(|p| p.ruled) {
+        tags.push("ruled-paper");
+    }
+    if matches!(style.paper, Paper::Grid) {
+        tags.push("grid-paper");
+    }
+    if prepared.contains('⟦') {
+        tags.push("table");
+    }
+    if prepared.contains("\\begin{circuitikz}[flowchart]") {
+        tags.push("flowchart");
+    }
+    if prepared.contains("](data:image/") {
+        tags.push("illustration");
+    }
+    if prepared.contains('=')
+        || prepared.contains(")/(")
+        || markdown.contains("$$")
+        || prepared.contains(r"\frac{")
+        || markdown.contains(r"\frac{")
+        || (markdown.contains(r"\(") && markdown.contains(r"\)"))
+    {
+        tags.push("formula");
+    }
+    tags
 }
 
 fn saved_reply(mut saved: Value) -> CallToolResult {
@@ -135,6 +211,13 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
     if let Some(focus) = saved.get("paper_focus_check") {
         message.push_str(&format!("\n底纸边缘原尺寸检查 {focus}。核对新增笔迹与原有印迹的反差时，调用 preview_handwriting {}，按 local_paper_ink_check 查看页首、过渡行与下方正文。", saved["photo_ink_preview_arguments"]));
     }
+    if let Some(search) = saved.get("experience_search") {
+        message.push_str(&format!(
+            "\n{} search_homework_experience {}",
+            search["guidance"].as_str().unwrap(),
+            search["arguments"]
+        ));
+    }
     reply(message, saved)
 }
 
@@ -142,6 +225,25 @@ fn saved_reply(mut saved: Value) -> CallToolResult {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn ordinary_homework_suggests_task_tags_and_legacy_styles_keep_their_reply() -> Result<()> {
+        let plain: Style = serde_json::from_value(json!({}))?;
+        assert!(experience_search(&plain, None, "x=2", "").is_none());
+        let homework: Style = serde_json::from_value(json!({"homework":true,"paper":"ruled"}))?;
+        let query = experience_search(&homework, None, "⟦ table ⟧\nx=2", "").unwrap();
+        let fraction = experience_search(&homework, None, "5/8", r"$$\frac{5}{8}$$").unwrap();
+        assert_eq!(
+            fraction["arguments"]["tags"],
+            json!(["homework", "ruled-paper", "formula"])
+        );
+        assert_eq!(query["tool"], "search_homework_experience");
+        assert_eq!(
+            query["arguments"]["tags"],
+            json!(["homework", "ruled-paper", "table", "formula"])
+        );
+        Ok(())
+    }
 
     #[test]
     fn illustration_pen_default_is_pinned_when_homework_is_created() -> Result<()> {

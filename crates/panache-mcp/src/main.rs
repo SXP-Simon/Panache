@@ -2,6 +2,7 @@ mod controls;
 mod delivery;
 mod drafts;
 mod engine;
+mod experience;
 mod inputs;
 mod markdown;
 mod paper;
@@ -279,6 +280,8 @@ impl ServerHandler for Panache {
             "For an undecided layout show one page with view=image. Invite a concrete change such as larger writing or lighter ink. After feedback show the revised page and export the version the user chose. ",
             "If a required area of a photo is outside the frame, or blur, occlusion or perspective prevents locating it, identify that area before drafting. ",
             "Ask for a photo clearly showing it or permission to fill only visible areas; wait before saving or trial placement. If partial work was requested, proceed there. ",
+            "For ordinary homework, search_homework_experience with query copied from the user's homework description (in its original language) before choosing how to render or check it. Use active rules only over their stated scope. If correcting an existing homework draft, inspect the reported location at its current revision before editing. Recheck that location in the revised output. When export returns experience_reflection, decide whether the evidence supports zero, one or several separately testable lessons. ",
+            "When a published homework export offers experience_validation and its matched_tags concern the work you just checked, call its read_candidate tool to check scope. If work you already observed directly tests the rule, call validate_homework_experience with the offered delivery and review references, kind, passed and a concrete observation. This check is optional for delivery and separate from deciding whether to record a new lesson. Skip unrelated or inconclusive cases and deliver the published file. Never apply a candidate to this assignment or change, re-review, or re-export the draft for validation. \x20",
             "For a school assignment, even text alone, set style.homework=true on creation; omit font unless the user specifies one. For further variation (字稍微草一点), inspect describe_controls(group=variation). For requested crossed-out mistakes (涂改痕迹), inspect group=strike. ",
             "English letters and digits follow the main font by default. Leave Latin controls unset unless the user requests a different look for them or dislikes how they appear. For a font comparison, show the labeled images from list_fonts(sample=...) on the actual draft paper and mixed text. A paper_path must be readable on the server computer. For a chat photo, use client transfer or run Panache on the computer with the photo. Ask for the missing file only if needed. ",
             "For print-and-report, export once and report review.unreviewed_pages. Look up existing receipts with read_section(view=review); full-page preview_handwriting(view=review) files a check. Last-page lookups use current pagination and cannot confirm the historical last page. Follow photo_appearance.preview_arguments for a native detail crop. ",
@@ -292,7 +295,7 @@ impl ServerHandler for Panache {
         let mode = if self.0.preserve_reviews {
             "This connection preserves stored reviews. Use view=image to inspect and export_handwriting to print. "
         } else {
-            ""
+            "When correcting ordinary homework, obtain the original revision's full-page review (preview_handwriting view=review) before editing; keep its review_id and any relevant region so you can inspect the same place afterward. "
         };
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new(
@@ -305,6 +308,66 @@ impl ServerHandler for Panache {
 
 #[tool_router]
 impl Panache {
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Find active, independently validated homework rules. Pass query with the actual wording of the current assignment, especially Chinese, for BM25 over conditions, actions and reasons. Optional tags narrow the match. Tags alone preserve topic search. Use [] or an unmatched query to discover vocabulary from active rules. Check the scope and refresh search just before applying a rule."
+    )]
+    async fn search_homework_experience(
+        &self,
+        Parameters(input): Parameters<experience::Search>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.search_experience(input))
+            .await
+    }
+
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Record zero or more individually actionable lessons after ordinary homework delivery. Cite the published export and native full-page review IDs, including a delivered-revision review for each rule. New rules enter pending validation."
+    )]
+    async fn record_homework_experience(
+        &self,
+        Parameters(input): Parameters<experience::Record>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.record_experience(input))
+            .await
+    }
+
+    #[tool(
+        annotations(read_only_hint = true, open_world_hint = false),
+        description = "Audit one known rule by ID, including pending, rejected or retired status, original evidence and independent validations. Use search_homework_experience for current task instructions."
+    )]
+    async fn read_homework_experience(
+        &self,
+        Parameters(input): Parameters<experience::Read>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.read_experience(input))
+            .await
+    }
+
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Record a host-observed positive benefit or boundary/no-harm check on an independently delivered draft with native review evidence. Both roles must pass on distinct drafts. A failed check permanently rejects the rule."
+    )]
+    async fn validate_homework_experience(
+        &self,
+        Parameters(input): Parameters<experience::Validate>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.validate_experience(input))
+            .await
+    }
+
+    #[tool(
+        annotations(open_world_hint = false),
+        description = "Permanently withdraw one rule by ID with a reason. Ordinary search stops returning the rule immediately."
+    )]
+    async fn retire_homework_experience(
+        &self,
+        Parameters(input): Parameters<experience::Retire>,
+    ) -> CallToolResult {
+        self.storage_task(move |_, drafts| drafts.retire_experience(input))
+            .await
+    }
+
     #[tool(
         annotations(read_only_hint = true, open_world_hint = false),
         description = "List groups with {}. Pass group for fields, units, ranges and choices; add draft_id for effective values (optional revision). Use layout for text spacing and geometry, paper_guides for stationery lines, variation for loose writing, strike for occasional crossed-out mistakes and typography for Latin font, scale and digits."
@@ -663,23 +726,47 @@ impl Panache {
             let reviewed_pages = draft.reviewed_pages()?;
             let mut unreviewed = Vec::new();
             let mut visibility_flags = 0;
+            let reflect = draft.style.homework && !state.preserve_reviews;
+            let mut evidence = Vec::new();
+            let topics = if reflect {
+                sections.iter().map(|section| {
+                    (section.number, save::experience_topics(&draft.style, draft.paper.as_ref(), &section.text, ""))
+                }).collect::<std::collections::BTreeMap<_,_>>()
+            } else {
+                Default::default()
+            };
+            let mut validation_pages = Vec::new();
             let mut matching = 0;
             let mut different = Vec::new();
             let params = controls::parameters(&draft, 1, &draft.controls)?;
             let zero_text_ink = params.ink_opacity == 0 || params.fill[3] == 0;
-            let (path, pages, file) = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
+            let storage::PublishedExport {id: export_id, path, pages, file} = state.storage.export(&state.drafts,draft.id,draft.revision,format, |writer| engine.export(
                 writer, &draft, sections, (format, active_finish), cancel,
                 |pages, section, page, image| {
                     match reviewed_pages.get(&(section, page)) {
                         Some(record) => {
                             visibility_flags += usize::from(record.visibility_flag);
-                            if matches!(format, Format::Zip)
-                                && let Some(saved) = &record.pixel_sha256
-                            {
-                                if review::pixel_sha256(image) == *saved {
-                                    matching += 1;
-                                } else {
-                                    different.push(json!({"section":section,"page":page}));
+                            if reflect && record.pixel_sha256.is_some() && evidence.len() < 8 {
+                                evidence.push(json!({"section":section,"page":page,
+                                    "earlier_reference":record.earlier_reference,
+                                    "reference":{"revision":draft.revision,"review_id":record.review_id}}));
+                            }
+                            let zip = matches!(format, Format::Zip);
+                            let validation_topics = topics.get(&section)
+                                .filter(|tags| tags.len() > 1 && validation_pages.len() < 8 && active_finish.is_none());
+                            if (zip || validation_topics.is_some()) && let Some(saved) = &record.pixel_sha256 {
+                                let exact = review::pixel_sha256(image) == *saved;
+                                if zip {
+                                    if exact {
+                                        matching += 1;
+                                    } else {
+                                        different.push(json!({"section":section,"page":page}));
+                                    }
+                                }
+                                if exact && let Some(tags) = validation_topics {
+                                    validation_pages.push(json!({"section":section,"page":page,"tags":tags,
+                                        "reference":{"revision":draft.revision,"review_id":record.review_id},
+                                        "earlier_reference":record.earlier_reference,"pixel_sha256":saved}));
                                 }
                             }
                         }
@@ -736,7 +823,7 @@ impl Panache {
             }
             let message = format!("已导出 **{pages} 页**（版本 {}）。该版已有 {reviewed}/{pages} 页复盘证据。{warning}{remaining}{pixel_warning}\n\n运行 Panache 的电脑上的文件：`{}`", draft.revision, path.display());
             let mut metadata = json!({
-                "draft_id": input.draft_id, "revision": draft.revision, "path": path, "pages": pages, "review": review,
+                "draft_id": input.draft_id, "revision": draft.revision, "export_id": export_id, "path": path, "pages": pages, "review": review,
             });
             if matches!(format, Format::Zip) && let Some(finish @ engine::export_blur::Finish::Gradient(_)) = finish {
                 finish.write_metadata(&mut metadata);
@@ -744,6 +831,16 @@ impl Panache {
             let mut result = reply(message, metadata);
             if input.include_file {
                 delivery::include_file(&mut result, file, &path, format);
+            }
+            if reflect {
+                delivery::append_experience_reflection(&mut result, draft.id, draft.revision, &export_id, &evidence, reviewed);
+            }
+            if warning.is_empty() && !validation_pages.is_empty() {
+                match state.drafts.validation_opportunity(draft.id, draft.revision, &export_id, &validation_pages) {
+                    Ok(Some(offer)) => delivery::append_experience_validation(&mut result, offer),
+                    Ok(None) => {}
+                    Err(error) => eprintln!("Could not find homework validation opportunity: {error}"),
+                }
             }
             Ok(result)
         }).await;

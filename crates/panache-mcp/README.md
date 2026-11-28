@@ -227,12 +227,36 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 
 使用 Windows 上的 Python 客户端脚本时，若只有终端显示的中文乱码，可以将该客户端的标准输出和终端设为 UTF-8（例如向 Python 进程传入 `PYTHONIOENCODING=utf-8`）。
 
+## 普通作业的经验检索与总结
+
+普通作业可直接用题目原话查询，例如 `search_homework_experience({"query":"保留旧教材的分数命令，计算行要排成上下分数"})`。SQLite FTS5 对每条经验的适用条件、动作、理由按 BM25 排序，三栏权重依次是 4、2、1。连续汉字按相邻双字切分，拉丁字母和数字按词处理。不同词元可以分别命中。题面中明确排除的内容也可能在字面上匹配，采用前须读返回的 `scope`。全文查询接受最多 1200 个字符，每页最多 20 条，可用 `next_offset` 翻页。
+
+原有 `search_homework_experience({"tags":["homework","table","formula"]})` 仍按标签检索；规则的所有必要标签都要被查询覆盖。也可以同时传 `query` 和非空 `tags`，先限定标签范围，再按全文相关性排序。作业以 `style.homework=true` 保存后，`experience_search` 会提示宿主使用原话及可选标签。两种检索都只展示已验证且有效的经验，返回来源检查单。未命中时可查看 `available_tags`。
+
+修订已有作业时，先用 `preview_handwriting(view="review", revision=修前版, section=节, page=页)` 查看原版受影响的位置，保存 `review_id`。改后核对同处，必要时带 `compare_revision` 和同一 `region` 对照。若交付时才补看旧版，在结论里注明事后复核。提交候选时尽量沿用建稿主题词，只选检索该做法所必需的标签，把具体条件写进 `scope`。
+
+普通作业导出后，`experience_reflection` 附上 `export_id` 和最多八个已检查页面的引用。如果同一页在之前的版本也有原生检查单，`earlier_reference` 会指向最近的已检查旧版。更多页面可通过 `read_section(view="review")` 查回。
+
+- **一条经验写一个可单独验证的动作。** 宿主填写适用标签 `tags`、具体条件 `scope`、动作 `action`、结合页面观察写出的理由 `reason`、该条自己的检查单 `reviews`。同一道题若有两个独立问题，可拆成两条，分别验证、检索和退役。拆分粒度由宿主判断。每次调用可传 0–16 条。同标签、条件和动作的重复提案复用原 ID。
+- **有修前、修后检查单时，在最终答复前提交复盘决定。** 调用 `record_homework_experience`，逐条引用本次导出和交付版检查单，可附同稿旧版。只有本题的数值或笔误可传 `rules=[]`。干净完成的作业也可以直接交付。工具返回每条的 ID 和状态；宿主可以向用户简述刚记录的做法及其待验证状态。
+- **下次用新作业的原话或主题直接搜条目。** 持有 ID 时可用 `read_homework_experience` 审计来源及逐次验证。不同会话共享同一个 Panache 数据目录时可见同一经验库。
+- **普通交付后可顺手验证。** 确认版 PDF 或 ZIP 发布后，回执可附一个 `experience_validation`。它按已复查章节的具体主题选择一条待验证经验，引用同一导出、同版整页检查单和已有的修前证据。回执只给候选 ID 和可补的证据类型，宿主按原样交付，再决定是否用 `read_homework_experience` 查看候选。没有对应主题、已有可用整页检查不足，或输出设置与检查单的像素不符时，照常交付。
+- **以已经观察到的作业结果验证。** 正例需要在自然完成的修订中看到同一做法解决了问题，边界例需要看到相关且原本正确或不满足条件的内容得以保留。可用上述回执填写 `validate_homework_experience` 的交付与检查单字段，再给出 `kind`、`passed` 和具体观察。不合适或证据不足直接跳过，作业保持交付时的版本。
+- **生效条件沿用原有门禁。** 独立正例和边界例都通过才可按 BM25 或标签检索，失败或主动撤回会从普通检索撤下。宿主负责观察结论，存储层核验证据身份。保留原检查记录的连接可检索已生效经验，导出时只报告交付情况。
+
 ## 验证
 
 构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF。
 
 ```sh
 uv run --script crates/panache-mcp/tests/smoke.py target/release/panache-mcp --out output/pdf
+```
+
+用独立的 stdio 会话验证经验候选的交付回执、跨会话检索和撤下。先用 `python3 scripts/build-text-worker.py` 构建 Markdown worker，再运行：
+
+```sh
+PANACHE_MARKDOWN_WORKER="$PWD/app/web/prepare-text-worker.js" PANACHE_FONT_DIR="$PWD/assets/font_assets" \
+  uv run --script crates/panache-mcp/tests/experience_visibility.py target/release/panache-mcp
 ```
 
 局部复查盲评使用合成页面。构建后运行以下命令，在新的输出目录中生成两组顺序配平的图片与任务，以及单独保存的答案和逐例统计。给评审者各发一组，待其回答后再打开 `private/key.json`。脚本另外核对源图像素。调用数和字节数只统计取复盘结果的开销，选区已提供。

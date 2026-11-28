@@ -44,10 +44,17 @@ fn plan_reclaims_only_selected_abandoned_writes() -> Result<()> {
     })?;
     let old = dir.path().join("exports").join("panache-old.pdf");
     fs::write(&old, b"legacy")?;
-    let (delivered, _, _) = store.export(&drafts, "draft", 1, Format::Pdf, |writer| {
+    let delivered = store.export(&drafts, "draft", 1, Format::Pdf, |writer| {
         writer.write_all(b"delivered")?;
         Ok(1)
     })?;
+    let published: (String, u32, String, bool) = db.query_row(
+        "SELECT draft,revision,format,published FROM export_files WHERE id=?",
+        [&delivered.id],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+    )?;
+    assert_eq!(published, ("draft".to_owned(), 1, "pdf".to_owned(), true));
+    let delivered = delivered.path;
     // Simulate a crash after the final rename but before recording publication.
     db.execute("UPDATE export_files SET published=0 WHERE published=1", [])?;
     let crash = || -> Result<()> {

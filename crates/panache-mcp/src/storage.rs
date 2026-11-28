@@ -20,6 +20,13 @@ use std::{
 use tempfile::Builder;
 use uuid::Uuid;
 
+pub(crate) struct PublishedExport {
+    pub id: String,
+    pub path: PathBuf,
+    pub pages: usize,
+    pub file: File,
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Usage {
@@ -201,7 +208,7 @@ impl Storage {
         revision: u32,
         format: Format,
         render: F,
-    ) -> Result<(PathBuf, usize, File)>
+    ) -> Result<PublishedExport>
     where
         F: FnOnce(&mut BudgetWriter<'_>) -> Result<usize>,
     {
@@ -243,9 +250,14 @@ impl Storage {
         };
         let result = publish();
         if result.is_err() && metadata(&path)?.is_none() {
-            db.execute("DELETE FROM export_files WHERE id=? AND published=0", [id])?;
+            db.execute("DELETE FROM export_files WHERE id=? AND published=0", [&id])?;
         }
-        result.map(|(pages, file)| (path, pages, file))
+        result.map(|(pages, file)| PublishedExport {
+            id,
+            path,
+            pages,
+            file,
+        })
     }
 
     pub fn usage(&self, drafts: &Drafts, input: Usage) -> Result<Value> {

@@ -304,6 +304,11 @@ async def smoke(command, arguments, out):
             assert "group=variation" in info.instructions and "group=strike" in info.instructions
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == {
+                "search_homework_experience",
+                "record_homework_experience",
+                "read_homework_experience",
+                "validate_homework_experience",
+                "retire_homework_experience",
                 "annotate_review",
                 "storage_usage",
                 "plan_cleanup",
