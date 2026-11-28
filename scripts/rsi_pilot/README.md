@@ -134,3 +134,9 @@ python scripts/rsi_pilot/real_photo_episode_local.py --out "$RUN" --binary "$MCP
 python scripts/rsi_pilot/table_clearance.py before --config before.json --corpus bm25-run --scope scope-run --out clearance-run
 python scripts/rsi_pilot/table_clearance.py after --config after.json --corpus bm25-run --scope scope-run --out clearance-run
 ```
+
+## 普通作业导出后验证候选
+
+`experience_opportunity.py` 的 `seed` 阶段只保存一条待验证的表头单位经验和两份新草稿。`positive` 与 `boundary` 各启动一个新会话，提示词只给草稿和底单，验证调用由宿主在看到导出回执后自行选择。各阶段都传 `--config config.json --out opportunity-run`。最后运行 `report`，复核候选首次出现的工具、验证调用、实际 PDF 及普通检索状态。
+
+这一轮边界例先通过，保留原本正确的单位，经验仍待验证。之后另一会话把单位从 s 改为 m，保留全部观测数据，提交正例后才生效。两份 PDF 均先生成，再由宿主读取候选和验证。验证结束后，实际文件的字节摘要与当时的导出附件一致。本轮只能证明一次实际触发，较早的一次运行已收到提示但选择直接交付。[调用记录](results/experience-opportunity.json) · [两份 PDF 的整页图](https://github.com/SXP-Simon/Panache/tree/501d64390964e90c96355e1f1179a28c669acc4e/screenshots/rsi-pilot/normal-validation)

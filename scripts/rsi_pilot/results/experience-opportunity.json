@@ -1,0 +1,269 @@
+{
+  "model": "gpt-6.1-terra",
+  "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee",
+  "cases": {
+    "positive": {
+      "prompt": "请用 Panache 核对我保存的《斜面小车记录》（草稿 dfddbf5a-1f57-4336-b696-be7d218d20de）。实验底单上，0、2、4 秒的位移分别是 0、5、11 米。做成一页手写 PDF，核对表头及数据，能原样交就原样交，发现写错才改。",
+      "offers": {
+        "guidance": "按原样交付已选文件。可以读取这条候选，判断本次已有记录能否独立验证它。正例要看到相同做法已经解决了问题；边界例要看到同类但原本正确或条件不适用的内容本来就应保留。只有确实观察到收益、无误伤或反例才提交，对照不足或不适用就跳过。填写 kind、passed、reason，并引用当前导出和相关检查单。无需为验证改稿、补看页面或重新导出。",
+        "matched_tags": [
+          "table"
+        ],
+        "optional": true,
+        "read_candidate": {
+          "arguments": {
+            "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee"
+          },
+          "tool": "read_homework_experience"
+        },
+        "status": "pending",
+        "validation": {
+          "evidence": {
+            "draft_id": "dfddbf5a-1f57-4336-b696-be7d218d20de",
+            "export_id": "83bf233f-78dc-4e87-9e47-e1b30e1d454c",
+            "page": 1,
+            "reviews": [
+              {
+                "review_id": "dfb26fb9-f43c-4c0e-a7b6-8ee71166ca2c",
+                "revision": 2
+              },
+              {
+                "review_id": "2b6d0973-d349-4ed8-91af-8c1114ef3b26",
+                "revision": 1
+              }
+            ],
+            "revision": 2,
+            "section": 1
+          },
+          "possible_kinds": [
+            "positive"
+          ],
+          "tool": "validate_homework_experience"
+        }
+      },
+      "calls": [
+        {
+          "tool": "read_section",
+          "view": "source",
+          "error": false
+        },
+        {
+          "tool": "search_homework_experience",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "view": "review",
+          "error": false
+        },
+        {
+          "tool": "replace_section_text",
+          "view": null,
+          "error": true
+        },
+        {
+          "tool": "read_section",
+          "view": "trajectory",
+          "error": false
+        },
+        {
+          "tool": "save_section",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "view": "review",
+          "error": false
+        },
+        {
+          "tool": "export_handwriting",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "read_homework_experience",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "validate_homework_experience",
+          "view": null,
+          "error": false
+        }
+      ],
+      "validation": [
+        {
+          "arguments": {
+            "draft_id": "dfddbf5a-1f57-4336-b696-be7d218d20de",
+            "export_id": "83bf233f-78dc-4e87-9e47-e1b30e1d454c",
+            "revision": 2,
+            "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee",
+            "kind": "positive",
+            "passed": true,
+            "reason": "原表位移单位误写为 s，用户给出的单位为米；改成 m 后三行时间和位移数据保持一致。",
+            "reviews": [
+              {
+                "review_id": "2b6d0973-d349-4ed8-91af-8c1114ef3b26",
+                "revision": 1
+              },
+              {
+                "review_id": "dfb26fb9-f43c-4c0e-a7b6-8ee71166ca2c",
+                "revision": 2
+              }
+            ]
+          },
+          "response": {
+            "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee",
+            "status": "active"
+          },
+          "error": false
+        }
+      ],
+      "searches_before_export": 1,
+      "draft_id": "dfddbf5a-1f57-4336-b696-be7d218d20de",
+      "revision": 2,
+      "pages": [
+        {
+          "size": [
+            794,
+            1123
+          ],
+          "pixels_sha256": "31d8c49689a4f69c867478fbdc75410a82192f400bafc53032f4a92e240e3a07",
+          "image_sha256": "42a4fde92da638b29dc893ec00ff85b592596cdcbb735cc73b57de0f0e95e5c6"
+        }
+      ],
+      "pdf_sha256": "0ae61bec517f3919584be3e99e1508666f7e71b142eb45401b74c2fe3abe8e49",
+      "published_file_matches_export_attachment": true
+    },
+    "boundary": {
+      "prompt": "请用 Panache 核对我保存的《直道小车记录》（草稿 161aeb1d-93bf-4cf6-a7b6-0f0defb713a0）。实验底单上，0、1、5 秒的位移分别是 0、2、10 米。做成一页手写 PDF，核对表头及数据，能原样交就原样交，发现写错才改。",
+      "offers": {
+        "guidance": "按原样交付已选文件。可以读取这条候选，判断本次已有记录能否独立验证它。正例要看到相同做法已经解决了问题；边界例要看到同类但原本正确或条件不适用的内容本来就应保留。只有确实观察到收益、无误伤或反例才提交，对照不足或不适用就跳过。填写 kind、passed、reason，并引用当前导出和相关检查单。无需为验证改稿、补看页面或重新导出。",
+        "matched_tags": [
+          "table"
+        ],
+        "optional": true,
+        "read_candidate": {
+          "arguments": {
+            "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee"
+          },
+          "tool": "read_homework_experience"
+        },
+        "status": "pending",
+        "validation": {
+          "evidence": {
+            "draft_id": "161aeb1d-93bf-4cf6-a7b6-0f0defb713a0",
+            "export_id": "ea628dcf-a354-4aa0-9698-60b64e3cf1ce",
+            "page": 1,
+            "reviews": [
+              {
+                "review_id": "400b4779-3e8c-4a2a-a6f3-f6988e8a7e2c",
+                "revision": 1
+              }
+            ],
+            "revision": 1,
+            "section": 1
+          },
+          "possible_kinds": [
+            "boundary"
+          ],
+          "tool": "validate_homework_experience"
+        }
+      },
+      "calls": [
+        {
+          "tool": "search_homework_experience",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "preview_handwriting",
+          "view": "review",
+          "error": false
+        },
+        {
+          "tool": "read_section",
+          "view": "source",
+          "error": false
+        },
+        {
+          "tool": "export_handwriting",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "read_homework_experience",
+          "view": null,
+          "error": false
+        },
+        {
+          "tool": "validate_homework_experience",
+          "view": null,
+          "error": false
+        }
+      ],
+      "validation": [
+        {
+          "arguments": {
+            "draft_id": "161aeb1d-93bf-4cf6-a7b6-0f0defb713a0",
+            "export_id": "ea628dcf-a354-4aa0-9698-60b64e3cf1ce",
+            "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee",
+            "revision": 1,
+            "kind": "boundary",
+            "passed": true,
+            "reason": "原表位移表头已为 m，时间和位移数据与用户提供的底单一致；保留原稿并导出。",
+            "reviews": [
+              {
+                "review_id": "400b4779-3e8c-4a2a-a6f3-f6988e8a7e2c",
+                "revision": 1
+              }
+            ]
+          },
+          "response": {
+            "rule_id": "c9a296fc-4df4-4781-9d2c-cbd3408b59ee",
+            "status": "pending"
+          },
+          "error": false
+        }
+      ],
+      "searches_before_export": 1,
+      "draft_id": "161aeb1d-93bf-4cf6-a7b6-0f0defb713a0",
+      "revision": 1,
+      "pages": [
+        {
+          "size": [
+            794,
+            1123
+          ],
+          "pixels_sha256": "2dde78991bbdf0ab79560af26473ac8ebae4642d0dc6434750c2a0c658171f27",
+          "image_sha256": "756d3f32f0489b0e69a0c3590b6559f0ef776b66569b7dcd68587f2f99ed05f2"
+        }
+      ],
+      "pdf_sha256": "dbb0f624bfc8eb7893178c4c9f88698ee263e30c47e18f051c4716ba2fab8bce",
+      "published_file_matches_export_attachment": true
+    }
+  },
+  "status": "active",
+  "recorded_validation_order": [
+    {
+      "kind": "boundary",
+      "passed": true,
+      "draft_id": "161aeb1d-93bf-4cf6-a7b6-0f0defb713a0"
+    },
+    {
+      "kind": "positive",
+      "passed": true,
+      "draft_id": "dfddbf5a-1f57-4336-b696-be7d218d20de"
+    }
+  ],
+  "active_search_ids": {
+    "bm25": [
+      "c9a296fc-4df4-4781-9d2c-cbd3408b59ee"
+    ],
+    "tags": [
+      "c9a296fc-4df4-4781-9d2c-cbd3408b59ee"
+    ]
+  }
+}

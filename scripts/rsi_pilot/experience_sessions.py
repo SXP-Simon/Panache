@@ -188,6 +188,7 @@ def run_case(cfg, name, out, prompt, model=MODEL):
                     "preview_handwriting",
                     "export_handwriting",
                     "record_homework_experience",
+                    "validate_homework_experience",
                     "replace_section_text",
                     "tune_handwriting",
                     "adjust_glyphs",
