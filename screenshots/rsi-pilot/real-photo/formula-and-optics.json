@@ -1,0 +1,60 @@
+{
+  "formula-controls.png": {
+    "sha256": "fa412e4b5bb586911de38ae25470902b743c6466e34dc86eef6be37e442f59c9",
+    "native_crops": [
+      {
+        "label": "正确 · 原生堆叠分式",
+        "sha256": "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a",
+        "width": 1120,
+        "height": 123
+      },
+      {
+        "label": "正确 · 时间差先化简为 2.0",
+        "sha256": "b13e3a4fa7a671cc7c94499e961edfad284aadd811b1567e5005dacf9db4282c",
+        "width": 1120,
+        "height": 123
+      },
+      {
+        "label": "退回 · 分母消失，结果仍是 0.5 s",
+        "sha256": "3738e685954469088ed56dec892a90a0d1f631bf2d42c598df7d9472fc12e5fc",
+        "width": 1120,
+        "height": 123
+      },
+      {
+        "label": "退回 · 字面命令出现在成稿",
+        "sha256": "e7268734fd48a4973c154af3554183a4b819bf6c0946950fe9c306c843293fe2",
+        "width": 1120,
+        "height": 123
+      },
+      {
+        "label": "退回 · 实际数学输入中的未知命令穿过转换器",
+        "sha256": "07d37fefa4e7b6658382689d574859b6a0e80b8afafa84358e7fb7e2647f0cb0",
+        "width": 1120,
+        "height": 123
+      }
+    ]
+  },
+  "formula-repair.png": {
+    "sha256": "acdcadb4ac02b7a49e466d48d6a08a6d6fc11dbac6f426ddcf37f6a9969c40be",
+    "native_crops": [
+      {
+        "label": "修前 · 验卷指出少了四个周期的分母",
+        "sha256": "3738e685954469088ed56dec892a90a0d1f631bf2d42c598df7d9472fc12e5fc",
+        "width": 1120,
+        "height": 123
+      },
+      {
+        "label": "修后 · 独立复读出 4，随后选中并导出",
+        "sha256": "ea208335bdde539ef21fc9d75506bcb732bcb588c1275509a05332cc39b49c2a",
+        "width": 1120,
+        "height": 123
+      }
+    ]
+  },
+  "native-before-after.png": {
+    "sha256": "99eff777965e8147caadbb27c3780026e237429195b6d728c5d8682ec9d3aac0"
+  },
+  "four-conditions-native.png": {
+    "sha256": "820b03ceb3f06a92055a269e620c2d3b160b5556ee5425dc84246505eeb18efa"
+  }
+}
