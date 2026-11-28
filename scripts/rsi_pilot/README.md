@@ -140,3 +140,9 @@ python scripts/rsi_pilot/table_clearance.py after --config after.json --corpus b
 `experience_opportunity.py` 的 `seed` 阶段只保存一条待验证的表头单位经验和两份新草稿。`positive` 与 `boundary` 各启动一个新会话，提示词只给草稿和底单，验证调用由宿主在看到导出回执后自行选择。各阶段都传 `--config config.json --out opportunity-run`。最后运行 `report`，复核候选首次出现的工具、验证调用、实际 PDF 及普通检索状态。
 
 这一轮边界例先通过，保留原本正确的单位，经验仍待验证。之后另一会话把单位从 s 改为 m，保留全部观测数据，提交正例后才生效。两份 PDF 均先生成，再由宿主读取候选和验证。验证结束后，实际文件的字节摘要与当时的导出附件一致。本轮只能证明一次实际触发，较早的一次运行已收到提示但选择直接交付。[调用记录](results/experience-opportunity.json) · [两份 PDF 的整页图](https://github.com/SXP-Simon/Panache/tree/501d64390964e90c96355e1f1179a28c669acc4e/screenshots/rsi-pilot/normal-validation)
+
+## 从新作业迁移已生效的表头单位经验
+
+从上节已经完成两种验证的库复制两份，各启动一个从空会话开始的宿主。输入只有作业题面和学生抄的表。小车下坡题底单给的是米，表头误写成秒；感应灯题的时刻和等待耗时原本都用秒。两个宿主都先用题面措辞做全文查询，都收到同一条已生效的经验。小车稿在首版只把表头里的位移单位改成 m，保留三行数据；感应灯稿保留两个 s 和全部数据，另对表下文字做了排版微调。整页 PDF 都呈现了对应单位和结论。盲读转录也得到这两个单位结果，对手写末行数字保留了一点不确定性。这组没有无经验对照，记录展示实际检索和成稿取舍，无法单独量出规则带来的收益。[原话查询、保存内容与盲读](results/experience-active-transfer.json) · [两份 PDF 整页图](https://github.com/SXP-Simon/Panache/tree/8aff740bf0320ccd20bd0bf272e561ba6ebc0df5/screenshots/rsi-pilot/active-experience-transfer)
+
+`experience_active_transfer.py` 的 `--source` 指向上节完成 `report` 的目录。用同样的 `--config`、`--source` 和空的 `--out` 目录分别跑 `transfer` 和 `control`，再分别以 `blind --case transfer`、`blind --case control` 盲读导出整页，最后用 `report` 核对查询、修改与导出。
