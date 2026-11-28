@@ -1,0 +1,1224 @@
+{
+  "pinned_commit": "2b2181b9b365f46de46c238ce6a0ddfb764b39a9",
+  "method": {
+    "case_count": 16,
+    "fresh_cohort_sessions": 4,
+    "max_mcp_calls": 12,
+    "catalog_not_counted": true,
+    "budget_instructions_not_enforced_by_harness": true,
+    "source": "Four independent local collaboration agents, actual native MCP via instrumented bridge; all prompts and draft content synthetic. One agent shares context across the four cases in a cohort. Not a Codex Cloud CLI result."
+  },
+  "frozen": {
+    "cases": {
+      "wind": {
+        "title": "河道木片外移测量",
+        "src": "# 河道木片外移测量\n\n| 时间 (s) | 位移 (s) |\n|---|---|\n| 0 | 0 |\n| 3 | 4 |\n| 8 | 12 |\n\n木片越漂越远。",
+        "task": "把已有的《河道木片外移测量》作业核对并导出 PDF。实验秒表记启动后的时间，河岸的卷尺读数每大格一米。保留所有原始读数和末句。"
+      },
+      "lamp": {
+        "title": "门灯响应记录",
+        "src": "# 门灯响应记录\n\n| 发出信号后 (s) | 灯亮持续 (s) |\n|---|---|\n| 0 | 2 |\n| 4 | 1 |\n| 9 | 3 |\n\n第三次持续最长。",
+        "task": "核对并导出《门灯响应记录》的 PDF。记录器把发出信号的时刻和灯亮持续的时长都用秒表示，保留数据、末句和原有排版；没问题就别改。"
+      },
+      "rope": {
+        "title": "绳长与平均用量",
+        "src": "# 绳长与平均用量\n\n教材让抄写的例子：`\\frac{12}{3}`\n\n实测：总长 15 m，分成 5 捆。\n\n本题计算：`\\frac{15}{5}` m。",
+        "task": "核对《绳长与平均用量》已有作业并导出 PDF：教材例子的键盘输入照录不动；自己的每捆平均用量要排出真正的上下分式，不要把计算显示成命令。其余内容保留。"
+      },
+      "story": {
+        "title": "自然观察笔记",
+        "src": "# 自然观察笔记\n\n风吹过草尖，影子慢慢移动。两只鸟先后落在树边。",
+        "task": "只查看已有的《自然观察笔记》，再导出 PDF。保留原文，不要增加分式、表格或修改文字。"
+      }
+    },
+    "fixture_expectations": {
+      "wind": "only replace 位移 (s) with 位移 (m)",
+      "lamp": "unknown edits disallowed, exact initial markdown",
+      "rope": "keep literal textbook example, own rendered fraction 15/5 and remaining text",
+      "story": "exact initial markdown"
+    },
+    "forced_query_coverage": {
+      "wind": 2,
+      "lamp": 2,
+      "rope": 2,
+      "story": 2
+    },
+    "seed_origin": "synthetic fixture, human-authored rules and validation decisions"
+  },
+  "cohorts": {
+    "cohort-a": {
+      "model": "gpt-6-luna",
+      "arm": "visible",
+      "cases": {
+        "wind": {
+          "status": "finished",
+          "calls": 10,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "homework",
+                "table"
+              ],
+              [
+                "formula",
+                "homework"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7"
+          ],
+          "selected_preview_pixel_sha256": "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7",
+          "first_page_matches_actor_preview": true,
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 9,
+              "revision": 2,
+              "sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4"
+            }
+          ],
+          "new_candidate_count": 1,
+          "selected_markdown": "# 河道木片外移测量\n\n| 时间 (s) | 位移 (m) |\n|---|---|\n| 0 | 0 |\n| 3 | 4 |\n| 8 | 12 |\n\n木片越漂越远。"
+        },
+        "lamp": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "formula",
+                "homework"
+              ],
+              [
+                "homework",
+                "table"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 门灯响应记录\n\n| 发出信号后 (s) | 灯亮持续 (s) |\n|---|---|\n| 0 | 2 |\n| 4 | 1 |\n| 9 | 3 |\n\n第三次持续最长。"
+        },
+        "rope": {
+          "status": "finished",
+          "calls": 14,
+          "errors": 3,
+          "hits": [
+            [
+              [
+                "formula",
+                "homework"
+              ],
+              [
+                "homework",
+                "table"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f"
+          ],
+          "selected_preview_pixel_sha256": "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f",
+          "first_page_matches_actor_preview": true,
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": true
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": true
+            },
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": true
+            },
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 13,
+              "revision": 2,
+              "sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69"
+            }
+          ],
+          "new_candidate_count": 1,
+          "selected_markdown": "# 绳长与平均用量\n\n教材让抄写的例子：`\\frac{12}{3}`\n\n实测：总长 15 m，分成 5 捆。\n\n本题计算：$\\frac{15}{5}$ m。"
+        },
+        "story": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "formula",
+                "homework"
+              ],
+              [
+                "homework",
+                "table"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 自然观察笔记\n\n风吹过草尖，影子慢慢移动。两只鸟先后落在树边。"
+        }
+      }
+    },
+    "cohort-b": {
+      "model": "gpt-6-luna",
+      "arm": "absent",
+      "cases": {
+        "wind": {
+          "status": "finished",
+          "calls": 8,
+          "errors": 0,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 7,
+              "revision": 2,
+              "sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4"
+            }
+          ],
+          "new_candidate_count": 1,
+          "selected_markdown": "# 河道木片外移测量\n\n| 时间 (s) | 位移 (m) |\n|---|---|\n| 0 | 0 |\n| 3 | 4 |\n| 8 | 12 |\n\n木片越漂越远。"
+        },
+        "lamp": {
+          "status": "finished",
+          "calls": 10,
+          "errors": 0,
+          "hits": [
+            []
+          ],
+          "export_count": 2,
+          "revision": 3,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 7,
+              "revision": 2,
+              "sha256": "0ecf1a63918ea3bef5dc836b108bcd86b79eecd5f5148335743553a5fb56e7fe"
+            },
+            {
+              "call": 10,
+              "revision": 3,
+              "sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 门灯响应记录\n\n| 发出信号后 (s) | 灯亮持续 (s) |\n|---|---|\n| 0 | 2 |\n| 4 | 1 |\n| 9 | 3 |\n\n第三次持续最长。",
+          "notable": "First export used changed header text; the final export restored exact text, but both files were created."
+        },
+        "rope": {
+          "status": "finished",
+          "calls": 8,
+          "errors": 0,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 7,
+              "revision": 2,
+              "sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69"
+            }
+          ],
+          "new_candidate_count": 1,
+          "selected_markdown": "# 绳长与平均用量\n\n教材让抄写的例子：`\\frac{12}{3}`\n\n实测：总长 15 m，分成 5 捆。\n\n本题计算：$\\frac{15}{5}$ m。"
+        },
+        "story": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 自然观察笔记\n\n风吹过草尖，影子慢慢移动。两只鸟先后落在树边。"
+        }
+      }
+    },
+    "cohort-c": {
+      "model": "gpt-6.1-terra",
+      "arm": "absent",
+      "cases": {
+        "wind": {
+          "status": "finished",
+          "calls": 9,
+          "errors": 1,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "replace_section_text",
+              "error": true
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 8,
+              "revision": 2,
+              "sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4"
+            }
+          ],
+          "new_candidate_count": 1,
+          "selected_markdown": "# 河道木片外移测量\n\n| 时间 (s) | 位移 (m) |\n|---|---|\n| 0 | 0 |\n| 3 | 4 |\n| 8 | 12 |\n\n木片越漂越远。"
+        },
+        "lamp": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 门灯响应记录\n\n| 发出信号后 (s) | 灯亮持续 (s) |\n|---|---|\n| 0 | 2 |\n| 4 | 1 |\n| 9 | 3 |\n\n第三次持续最长。"
+        },
+        "rope": {
+          "status": "finished",
+          "calls": 9,
+          "errors": 1,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "replace_section_text",
+              "error": true
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 8,
+              "revision": 2,
+              "sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69"
+            }
+          ],
+          "new_candidate_count": 1,
+          "selected_markdown": "# 绳长与平均用量\n\n教材让抄写的例子：`\\frac{12}{3}`\n\n实测：总长 15 m，分成 5 捆。\n\n本题计算：$\\frac{15}{5}$ m。"
+        },
+        "story": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            []
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 自然观察笔记\n\n风吹过草尖，影子慢慢移动。两只鸟先后落在树边。"
+        }
+      }
+    },
+    "cohort-d": {
+      "model": "gpt-6.1-terra",
+      "arm": "visible",
+      "cases": {
+        "wind": {
+          "status": "finished",
+          "calls": 8,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "homework",
+                "table"
+              ],
+              [
+                "formula",
+                "homework"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "9dfb0b8c2c84837d50a7daf11184c31346cc7faf6fb02cf3ad646062a95f78b7",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 7,
+              "revision": 2,
+              "sha256": "cf0124de4e62dc37fb4e6415bc8770064a8aabeed370dd46c72595c97ba74dd4"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 河道木片外移测量\n\n| 时间 (s) | 位移 (m) |\n|---|---|\n| 0 | 0 |\n| 3 | 4 |\n| 8 | 12 |\n\n木片越漂越远。"
+        },
+        "lamp": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "formula",
+                "homework"
+              ],
+              [
+                "homework",
+                "table"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "032a0449d512e762e5d5ab2bdac52dbd0861164932c45a5c0a174a3173c1cc43",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "70fafea90d5d0a5291cdf90effe7ce4f67641cda81feda523a0cc2bd2d176378"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 门灯响应记录\n\n| 发出信号后 (s) | 灯亮持续 (s) |\n|---|---|\n| 0 | 2 |\n| 4 | 1 |\n| 9 | 3 |\n\n第三次持续最长。"
+        },
+        "rope": {
+          "status": "finished",
+          "calls": 8,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "formula",
+                "homework"
+              ],
+              [
+                "homework",
+                "table"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 2,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "289feea40c99820825171e60b3a89a62418e6e5a9e4ab944c029b5c290274d2f",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "save_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            },
+            {
+              "tool": "record_homework_experience",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 7,
+              "revision": 2,
+              "sha256": "0c8fd1989f5aeca913b4beec0b85da582568f8389dc4eeb1239c7b844e7a2e69"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 绳长与平均用量\n\n教材让抄写的例子：`\\frac{12}{3}`\n\n实测：总长 15 m，分成 5 捆。\n\n本题计算：$\\frac{15}{5}$ m。"
+        },
+        "story": {
+          "status": "finished",
+          "calls": 5,
+          "errors": 0,
+          "hits": [
+            [
+              [
+                "formula",
+                "homework"
+              ],
+              [
+                "homework",
+                "table"
+              ]
+            ]
+          ],
+          "export_count": 1,
+          "revision": 1,
+          "exact_requested_revision": true,
+          "correct_draft": true,
+          "published_sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211",
+          "chosen_revision_reviewed": 1,
+          "content_scorer": true,
+          "hash_matches_receipt": true,
+          "hash_matches_attachment": null,
+          "pdf_pages": 1,
+          "pdf_embedded_pixel_sha256": [
+            "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606"
+          ],
+          "exact_revision_pdf_verification": {
+            "status": "ok",
+            "preview_rgb_sha256": "b4fe73d74c7e69e1dfe250e3a4a86dc6138f48f971d00430ec597bb3de735606",
+            "pdf_eq_exact_revision_preview": true
+          },
+          "tool_sequence": [
+            {
+              "tool": "list_drafts",
+              "error": false
+            },
+            {
+              "tool": "search_homework_experience",
+              "error": false
+            },
+            {
+              "tool": "read_section",
+              "error": false
+            },
+            {
+              "tool": "preview_handwriting",
+              "error": false
+            },
+            {
+              "tool": "export_handwriting",
+              "error": false
+            }
+          ],
+          "exports_at_call": [
+            {
+              "call": 5,
+              "revision": 1,
+              "sha256": "4b97f608cdde6d79bed5417aeb75b173484f612fa8a3bef38c17c13f3401f211"
+            }
+          ],
+          "new_candidate_count": 0,
+          "selected_markdown": "# 自然观察笔记\n\n风吹过草尖，影子慢慢移动。两只鸟先后落在树边。"
+        }
+      }
+    }
+  }
+}
