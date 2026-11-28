@@ -42,6 +42,13 @@ def source_sections():
 
 
 async def verify_review_guidance(client, home):
+    description = next(
+        tool.description for tool in (await client.list_tools()).tools
+        if tool.name == "preview_handwriting"
+    )
+    assert "only new ink on a photo, use full-page view=review" in description
+    assert "describe_arguments unchanged to describe_controls (group=ink)" in description
+    assert "PNG finish can soften both paper and ink" in description
     path = home / "photo-ink-review-graded.png"
     graded_paper(path)
     source = {
