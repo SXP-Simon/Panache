@@ -229,6 +229,7 @@ fn full_page_and_task_receipt_commit_together_at_capacity_or_after_close() -> Re
         let image = image::RgbaImage::from_pixel(240, 320, image::Rgba([color, color, color, 255]));
         let png = STANDARD.encode(handwriting_core::export::png(&image)?);
         let sample = crate::review::PageSample {
+            table_candidates: Vec::new(),
             baselines: vec![],
             text: vec![],
             drawings: vec![],

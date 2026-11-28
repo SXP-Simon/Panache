@@ -149,6 +149,7 @@ pub(super) fn tiles(
         let mut padded = GrayImage::new(mask.width() + 2 * PAD, mask.height() + 2 * PAD);
         imageops::replace(&mut padded, &mask, PAD.into(), PAD.into());
         Tile {
+            is_grid_table: false,
             is_text: false,
             is_native_diagram: false,
             id: part,

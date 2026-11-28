@@ -64,6 +64,8 @@ pub struct Adjustments {
 #[derive(Serialize)]
 pub struct GlyphBounds {
     #[serde(skip)]
+    pub is_grid_table: bool,
+    #[serde(skip)]
     pub is_text: bool,
     #[serde(skip)]
     pub is_native_diagram: bool,
@@ -92,6 +94,7 @@ pub fn inspect_page(
                 tiles
                     .into_iter()
                     .map(|t| GlyphBounds {
+                        is_grid_table: t.is_grid_table,
                         id: t.id,
                         is_text: t.is_text,
                         is_native_diagram: t.is_native_diagram,
@@ -162,6 +165,7 @@ pub(crate) fn document_key(text: &str, p: &Parameters) -> String {
 }
 
 pub(crate) struct Tile {
+    pub is_grid_table: bool,
     pub is_text: bool,
     pub is_native_diagram: bool,
     pub illustration: Option<u32>,
@@ -173,7 +177,8 @@ pub(crate) struct Tile {
     pub source: Option<[u32; 2]>,
 }
 
-pub(crate) const PAD: u32 = 4;
+/// Transparent editing border on each side of a glyph tile.
+pub const PAD: u32 = 4;
 pub(crate) const PAGE_TILE_BUDGET: usize = 32_000_000;
 
 #[derive(Debug, Serialize)]
