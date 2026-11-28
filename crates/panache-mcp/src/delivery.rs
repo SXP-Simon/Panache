@@ -66,7 +66,7 @@ pub(super) fn append_experience_reflection(
         .iter()
         .any(|page| page["earlier_reference"].is_object());
     let guidance = if compared {
-        "交付前请完成本次修订的复盘。检查单已覆盖修前和交付版同一页。根据你实际看到的差异，判断哪项做法能用于另一份作业，哪些仅是本题答案。现在调用 record_homework_experience 提交决定：每项可复用做法写一条，写明何时适用、具体动作、看到的变化，并在 reviews 引用相应的 earlier_reference 与 reference。只有个别题目的改字、或证据不足时传 rules=[]。工具确认后向用户交付；若登记了经验，可用一句话说明经验内容和待验证状态。"
+        "交付前请根据同页两版检查单复盘。先想清一件事：换掉本题的数字、文字和草稿编号后，修好这页的哪一个动作仍能帮助另一份作业？从修前实际可见的问题、修后实际变化写出适用条件与动作。调用 record_homework_experience，每个可独立验证的做法写一条，分别引用 earlier_reference 和 reference。等其他作业验证之前，候选不会指导新作业。若证据只能支持本题的具体答案或一次偶发修改，可以提交零条。在交付回复里简述本次记下的做法及待验证状态，或说明本题为何无需记经验。"
     } else if revision > 1 {
         "这次作业值得记下什么？若确实返工，先看修前和交付版同一位置的实际差异。可用 preview_handwriting(view=review, revision=交付版, compare_revision=修前版, section, page) 查两版检查单，加 region 可重看局部。缺哪一版整页单，就按明确版本查看；补看的旧版应注明是事后复核。若差异支持可复用做法，用 record_homework_experience 逐条引用两版证据。若没有可复用结论，可直接交付或传 rules=[]。"
     } else if evidence.is_empty() {
@@ -84,8 +84,7 @@ pub(super) fn append_experience_reflection(
     let mut result = json!({"guidance":guidance,"reviewed_pages":reviewed,"page_reviews":evidence});
     if !evidence.is_empty() {
         result["tool"] = json!("record_homework_experience");
-        result["arguments"] =
-            json!({"draft_id":draft,"revision":revision,"export_id":export_id,"rules":[]});
+        result["delivery"] = json!({"draft_id":draft,"revision":revision,"export_id":export_id});
     }
     let message = if compared {
         format!(
@@ -115,9 +114,10 @@ mod tests {
         let some = &reply.structured_content.as_ref().unwrap()["experience_reflection"];
         assert_eq!(some["page_reviews"], json!(samples));
         assert_eq!(
-            some["arguments"],
-            json!({"draft_id":"doc","revision":3,"export_id":"published","rules":[]})
+            some["delivery"],
+            json!({"draft_id":"doc","revision":3,"export_id":"published"})
         );
+        assert!(some.get("arguments").is_none());
         assert_eq!(some["tool"], "record_homework_experience");
     }
 
