@@ -18,7 +18,15 @@ impl Panache {
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult> {
         let Some(task_id) = input.rsi_task_id.as_deref() else {
-            return preview::run(self, input, ctx).await;
+            let prepared = preview::run(self, input, ctx).await?;
+            if let preview::Prepared::Ready(result) = prepared {
+                return Ok(result);
+            }
+            let mut db = self.0.drafts.connect()?;
+            let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let result = prepared.file(&tx)?;
+            tx.commit()?;
+            return Ok(result);
         };
         ensure!(
             !self.0.preserve_reviews,
@@ -35,14 +43,23 @@ impl Panache {
             "Preview requires an active task and its exact draft and candidate revision"
         );
         let request = serde_json::to_value(&input)?;
-        let mut result = preview::run(self, input, ctx).await?;
-        let metadata = result
-            .structured_content
-            .as_mut()
-            .context("Preview did not return evidence")?;
-        // Store replay arguments and digests of returned blocks; keep image bytes out of task history.
-        let images: Vec<_> = result
-            .content
+        let prepared = preview::run(self, input, ctx).await?;
+        self.0
+            .drafts
+            .file_task_preview(&t, revision, request, prepared)
+    }
+}
+
+impl Drafts {
+    pub(super) fn file_task_preview(
+        &self,
+        t: &Task,
+        revision: u32,
+        request: Value,
+        prepared: preview::Prepared,
+    ) -> Result<CallToolResult> {
+        let images: Vec<_> = prepared
+            .content()
             .iter()
             .filter_map(|block| match block {
                 ContentBlock::Image(img) => Some(
@@ -51,18 +68,23 @@ impl Panache {
                 _ => None,
             })
             .collect();
-        let mut receipt = json!({"task_id":t.task_id,"step":t.step,"revision":revision,"draft_id":t.draft_id,
-            "request":request,"review_id":metadata.get("review_id"),"images":images,
-            "metadata_sha256":digest(&serde_json::to_vec(metadata)?)});
-        let id = format!("preview-{}", digest(&serde_json::to_vec(&receipt)?));
-        receipt["evidence_id"] = json!(id);
-        let mut db = self.0.drafts.connect()?;
+        let mut db = self.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = task(&tx, &t.task_id)?;
         ensure!(
             current.step == t.step && current.status == "active",
             "Task advanced while rendering; review the current task"
         );
+        let mut result = prepared.file(&tx)?;
+        let metadata = result
+            .structured_content
+            .as_mut()
+            .context("Preview did not return evidence")?;
+        let mut receipt = json!({"task_id":t.task_id,"step":t.step,"revision":revision,"draft_id":t.draft_id,
+            "request":request,"review_id":metadata.get("review_id"),"images":images,
+            "metadata_sha256":digest(&serde_json::to_vec(metadata)?)});
+        let id = format!("preview-{}", digest(&serde_json::to_vec(&receipt)?));
+        receipt["evidence_id"] = json!(id);
         let count: u32 = tx.query_row(
             "SELECT count(*) FROM rsi_previews WHERE task=? AND id<>?",
             params![t.task_id, id],

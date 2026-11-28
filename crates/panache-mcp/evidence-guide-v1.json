@@ -34,7 +34,7 @@
     "table_cells": {
       "calls": [
         {"tool": "read_section", "arguments": {"view": "source", "section": 1, "limit": 4000}},
-        {"tool": "preview_handwriting", "arguments": {"view": "image"}, "region_from": "Native polygon enclosing the specific table, its header and the required row and column."}
+        {"tool": "preview_handwriting", "arguments": {"view": "image", "export_blur_px": 0}, "region_from": "Native polygon enclosing the specific table, its header and the required row and column."}
       ],
       "inspect": "For each requested table identify its title or order, column headings and row keys. Read the required values and units from their individual cells, then check the calculation outside the table against the brief. Follow next_offset for the rest of the source.",
       "limits": "A correct conclusion, matching row count or well-formed Markdown can coexist with a wrong displayed cell. Mark an unreadable cell unresolved.",
@@ -44,7 +44,7 @@
       "calls": [
         {"tool": "read_section", "arguments": {"view": "source", "section": 1, "limit": 4000}},
         {"tool": "preview_handwriting", "arguments": {"view": "layout", "drawings_only": true, "limit": 32}},
-        {"tool": "preview_handwriting", "arguments": {"view": "image"}, "region_from": "Native polygon enclosing one complete diagram with its arrows, labels and destinations."}
+        {"tool": "preview_handwriting", "arguments": {"view": "image", "export_blur_px": 0}, "region_from": "Native polygon enclosing one complete diagram with its arrows, labels and destinations."}
       ],
       "inspect": "Check each requested diagram independently. Read every named node. Follow each arrow from its source through its branch label to the destination at the arrowhead. Compare direction, label and destination with the brief.",
       "limits": "Node and diagram counts cannot identify swapped yes/no branches. A whole-drawing layout ID locates a diagram; its rendered arrows and labels supply the visual evidence.",

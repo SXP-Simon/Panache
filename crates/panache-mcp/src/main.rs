@@ -242,11 +242,11 @@ impl Panache {
             .await,
         )
     }
-    async fn render(
+    async fn render<T: Send + 'static>(
         &self,
         ctx: RequestContext<RoleServer>,
-        work: impl FnOnce(&State, &mut Engine, &Cancellation) -> Result<CallToolResult> + Send + 'static,
-    ) -> Result<CallToolResult> {
+        work: impl FnOnce(&State, &mut Engine, &Cancellation) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
         let permit = tokio::select! {
             slot=self.0.render_slot.clone().acquire_owned()=>slot?,
             _=ctx.ct.cancelled()=>anyhow::bail!("Cancelled"),

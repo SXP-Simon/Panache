@@ -37,11 +37,11 @@ pub(super) fn initialize(db: &mut Connection) -> Result<()> {
     Ok(())
 }
 
-fn by_id(db: &Connection, id: &str, draft: &Snapshot<'_>) -> Result<Value> {
+fn by_id(db: &Connection, id: &str, draft: &str, revision: u32) -> Result<Value> {
     let mut record=db.query_row("SELECT revision,section,page,algorithm,pixel_sha256,content_sha256,evidence,filed_at_revision
         FROM review_observations WHERE draft=? AND review_id=? AND revision<=?",
-        params![draft.id,id,draft.revision],|r|Ok(json!({
-            "draft_id":draft.id,"review_id":id,"origin":"measurement","revision":r.get::<_,u32>(0)?,
+        params![draft,id,revision],|r|Ok(json!({
+            "draft_id":draft,"review_id":id,"origin":"measurement","revision":r.get::<_,u32>(0)?,
             "section":r.get::<_,u32>(1)?,"page":r.get::<_,u32>(2)?,"algorithm":r.get::<_,Option<String>>(3)?,
             "pixel_sha256":r.get::<_,Option<String>>(4)?,"page_content_sha256":r.get::<_,Option<String>>(5)?,
             "evidence":r.get::<_,String>(6)?, "filed_at_revision":r.get::<_,Option<u32>>(7)?,
@@ -80,10 +80,31 @@ fn page_record(
             |row| row.get(0),
         )
         .optional()?;
-    id.map(|id| by_id(db, &id, draft)).transpose()
+    id.map(|id| by_id(db, &id, draft.id, draft.revision))
+        .transpose()
+}
+
+pub(crate) fn record_review_in(
+    tx: &rusqlite::Transaction<'_>,
+    (draft, revision): (&str, u32),
+    (section, page): (u32, usize),
+    algorithm: &str,
+    pixel: &str,
+    content: &str,
+    evidence: &Value,
+) -> Result<Value> {
+    let page = u32::try_from(page)?;
+    tx.execute("INSERT INTO review_observations(review_id,draft,revision,section,page,algorithm,pixel_sha256,content_sha256,evidence,filed_at_revision)
+            VALUES(?,?,?,?,?,?,?,?,?,(SELECT revision FROM drafts WHERE id=?)) ON CONFLICT(draft,revision,section,page,algorithm,pixel_sha256) DO NOTHING",
+            params![Uuid::new_v4().to_string(),draft,revision,section,page,algorithm,pixel,content,evidence.to_string(),draft])?;
+    let id:String=tx.query_row("SELECT review_id FROM review_observations
+            WHERE draft=? AND revision=? AND section=? AND page=? AND algorithm=? AND pixel_sha256=?",
+            params![draft,revision,section,page,algorithm,pixel],|r|r.get(0))?;
+    by_id(tx, &id, draft, revision)
 }
 
 impl Snapshot<'_> {
+    #[cfg(test)]
     pub fn record_review(
         &self,
         section: u32,
@@ -93,22 +114,23 @@ impl Snapshot<'_> {
         content: &str,
         evidence: &Value,
     ) -> Result<Value> {
-        let page = u32::try_from(page)?;
         let mut db = self.drafts.connect()?;
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute("INSERT INTO review_observations(review_id,draft,revision,section,page,algorithm,pixel_sha256,content_sha256,evidence,filed_at_revision)
-            VALUES(?,?,?,?,?,?,?,?,?,(SELECT revision FROM drafts WHERE id=?)) ON CONFLICT(draft,revision,section,page,algorithm,pixel_sha256) DO NOTHING",
-            params![Uuid::new_v4().to_string(),self.id,self.revision,section,page,algorithm,pixel,content,evidence.to_string(),self.id])?;
-        let id:String=tx.query_row("SELECT review_id FROM review_observations
-            WHERE draft=? AND revision=? AND section=? AND page=? AND algorithm=? AND pixel_sha256=?",
-            params![self.id,self.revision,section,page,algorithm,pixel],|r|r.get(0))?;
-        let record = by_id(&tx, &id, self)?;
+        let record = record_review_in(
+            &tx,
+            (self.id, self.revision),
+            (section, page),
+            algorithm,
+            pixel,
+            content,
+            evidence,
+        )?;
         tx.commit()?;
         Ok(record)
     }
 
     pub fn observation(&self, id: &str) -> Result<Value> {
-        by_id(&self.drafts.connect()?, id, self)
+        by_id(&self.drafts.connect()?, id, self.id, self.revision)
     }
 
     pub fn page_observation(
@@ -206,7 +228,8 @@ impl Snapshot<'_> {
         let tx = db.transaction()?;
         let page = u32::try_from(page)?;
         let previous = if let Some(id) = before_review_id {
-            let record = by_id(&tx, id, self).context("Cannot resolve before_review_id")?;
+            let record = by_id(&tx, id, self.id, self.revision)
+                .context("Cannot resolve before_review_id")?;
             ensure!(
                 record["revision"].as_u64() == Some(u64::from(before))
                     && record["section"].as_u64() == Some(u64::from(section))

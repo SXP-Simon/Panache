@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod list_tests;
 mod observations;
+pub(crate) use observations::record_review_in;
 mod trajectory;
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};

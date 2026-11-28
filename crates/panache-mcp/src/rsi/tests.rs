@@ -203,3 +203,67 @@ fn evidence_guide_is_discoverable_and_independent_of_stored_rules() -> Result<()
     }
     Ok(())
 }
+
+#[test]
+fn full_page_and_task_receipt_commit_together_at_capacity_or_after_close() -> Result<()> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let home = tempfile::tempdir()?;
+    let drafts = Drafts::open(home.path())?;
+    let id = create(&drafts)?;
+    let task_id = start(&drafts, &id, "pilot-v1")?;
+    let snapshot = drafts.snapshot(&id, Some(1))?;
+    let t = task(&drafts.connect()?, &task_id)?;
+    let prepared = |color| -> Result<crate::preview::Prepared> {
+        let image = image::RgbaImage::from_pixel(240, 320, image::Rgba([color, color, color, 255]));
+        let png = STANDARD.encode(handwriting_core::export::png(&image)?);
+        let sample = crate::review::PageSample {
+            baselines: vec![],
+            text: vec![],
+            drawings: vec![],
+            content_sha256: "sample".into(),
+        };
+        crate::review::page(
+            &snapshot,
+            1,
+            1,
+            &png,
+            &sample,
+            &crate::paper::focus::Cache::default(),
+            &handwriting_core::Cancellation::default(),
+        )
+        .map(crate::preview::Prepared::FullPage)
+    };
+    let request = json!({"draft_id":id,"revision":1,"view":"review","rsi_task_id":task_id});
+    let file = |page| drafts.file_task_preview(&t, 1, request.clone(), page);
+    let counts = || -> Result<(u32, u32)> {
+        Ok(drafts.connect()?.query_row("SELECT (SELECT count(*) FROM review_observations), (SELECT count(*) FROM rsi_previews)",[],|r| Ok((r.get(0)?,r.get(1)?)))?)
+    };
+    let db = drafts.connect()?;
+    for i in 0..63 {
+        db.execute(
+            "INSERT INTO rsi_previews(id,task,revision,receipt) VALUES(?,?,1,'{}')",
+            params![format!("other-{i}"), task_id],
+        )?;
+    }
+    let first = file(prepared(255)?)?.structured_content.unwrap();
+    assert_eq!(counts()?, (1, 64));
+    let replay = file(prepared(255)?)?.structured_content.unwrap();
+    assert_eq!(first, replay);
+    assert_eq!(counts()?, (1, 64));
+
+    let denied = file(prepared(240)?).unwrap_err();
+    assert!(denied.to_string().contains("preview limit"));
+    assert_eq!(counts()?, (1, 64));
+
+    let in_flight = prepared(230)?;
+    let review_id = first["review_id"].as_str().unwrap();
+    decide(&drafts, &task_id, 0, 1, "select", &[review_id])?;
+    let closed = file(in_flight).unwrap_err();
+    assert!(closed.to_string().contains("Task advanced"));
+    assert_eq!(counts()?, (1, 64));
+    assert_eq!(
+        snapshot.page_observation(1, 1, false)?["review_id"],
+        review_id
+    );
+    Ok(())
+}
