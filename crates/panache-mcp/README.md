@@ -244,6 +244,18 @@ uv run --script crates/panache-mcp/tests/last_page_provenance.py target/release/
 - **以已经观察到的作业结果验证。** 正例需要在自然完成的修订中看到同一做法解决了问题，边界例需要看到相关且原本正确或不满足条件的内容得以保留。可用上述回执填写 `validate_homework_experience` 的交付与检查单字段，再给出 `kind`、`passed` 和具体观察。不合适或证据不足直接跳过，作业保持交付时的版本。
 - **生效条件沿用原有门禁。** 独立正例和边界例都通过才可按 BM25 或标签检索，失败或主动撤回会从普通检索撤下。宿主负责观察结论，存储层核验证据身份。保留原检查记录的连接可检索已生效经验，导出时只报告交付情况。
 
+## 多轮手写实验
+
+用户要求比较稿件、试验改法或改进下一轮策略时，宿主模型负责读图、提出假设、判断并说明理由。Panache 使用现有工具生成和审阅稿件，在本机的稿件数据库中保存任务。其他提供方也可按同一 MCP 契约提交决策。
+
+1. 用 `save_section` 准备初稿。`read_rsi_policy({})` 列出策略版本，初始版本为 `pilot-v1`。用 `start_rsi_task` 提交稿号、起始版本、目标、策略 ID 和实际的 `decision_provider`。任务固定使用当时的规则。
+2. 用 `advance_rsi_task` 传当前 `expected_step`（初始为 0）。`request_evidence` 写明要消除的疑问。用 `preview_handwriting` 传同一 `rsi_task_id` 和明确的稿件版本，查看图像、布局或局部裁剪并取得 `evidence_id`。整页检查也可直接引用同稿同版已有的 `review_id`，其首次入档时间见 `filed_at_revision`。任务预览单据只在本任务有效，每个任务最多 64 份。设置 `PANACHE_MCP_PRESERVE_REVIEWS=1` 的连接可以查旧单、引用旧单，或省略 `rsi_task_id` 临时看图。
+3. `revise` 引用同版的 `review_ids`、理由、预期变化和一个编辑工具。调用该工具时在 `rsi_decision_id` 传回 `decisions` 末项的 `decision_id`，并使用该稿的当前版本。该工具写入新版本时，同一笔事务会把新版登记为候选。如果回执显示设置已相同且版本号未变，可以沿用当前候选继续审阅。
+4. 从 `candidate_revisions` 中选择满足目标的一版，以 `select` 提交其检查证据和取舍。调用 `export_handwriting` 时，将回执中的 `selected_revision` 作为 `revision` 传入。目标无法满足时用 `stop` 记录未解问题。最后一个决策名额留给选择或停止。重连后用 `read_rsi_task` 和保存的任务 ID 读取决策、预览参数与摘要，或用 `read_section(view=review)` 查整页单据。局部裁剪可按原参数重绘；将返回图片的 Base64 字符串做 SHA-256，即可与当时的图片摘要核对。
+5. 用 `publish_rsi_policy` 引用父策略和已结束、有证据的源任务，写明下一版的执行、审阅、成稿选择、实验选择规则和预算。后续任务显式选用新版本。用 `validate_rsi_policy` 记录新版本在独立稿件上的实测结论、失败和局限；用 `read_rsi_policy` 查回这些宿主评估及对应任务。
+
+需要验收指引时，调用 `read_rsi_policy({"policy_id":"pilot-v1","include_evidence_guide":true})`，并记录响应的 `evidence_guide.version`。回放时传入 `evidence_guide_version` 可读取同一版。按任务选择 `checks` 中的项目，例如按 `formula_rendering` 从原尺寸成稿读回分式，按 `mixed_content_projection` 对照图表两端与附近纸纹，按 `focus_and_contrast` 检查不同区域的纸色和笔迹。将调用参数补上实际稿号、候选版本和节页，裁区按 `region_from` 取得。[实拍作业指引](evidence-guide-v2.json) · [首版指引](evidence-guide-v1.json)
+
 ## 验证
 
 构建后可用官方 Python MCP 客户端跑一次 stdio 端到端测试。`--out` 可选，用于保留诗稿的预览和 PDF。

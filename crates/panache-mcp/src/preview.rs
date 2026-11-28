@@ -14,11 +14,32 @@ use rmcp::{
 };
 use serde_json::json;
 
+pub(crate) enum Prepared {
+    Ready(CallToolResult),
+    FullPage(review::PendingPage),
+}
+
+impl Prepared {
+    pub(crate) fn content(&self) -> &[ContentBlock] {
+        match self {
+            Self::Ready(result) => &result.content,
+            Self::FullPage(page) => &page.images,
+        }
+    }
+
+    pub(crate) fn file(self, tx: &rusqlite::Transaction<'_>) -> Result<CallToolResult> {
+        match self {
+            Self::Ready(result) => Ok(result),
+            Self::FullPage(page) => page.file(tx),
+        }
+    }
+}
+
 pub(super) async fn run(
     server: &Panache,
     input: Preview,
     ctx: RequestContext<RoleServer>,
-) -> Result<CallToolResult> {
+) -> Result<Prepared> {
     let finish = export_blur::finish(input.export_blur_px, input.export_blur_gradient)?;
     if finish.is_some() {
         ensure!(
@@ -65,7 +86,7 @@ pub(super) async fn run(
             u32::try_from(input.limit.unwrap_or(20))?,
             input.before_review_id.as_deref(),
         )?;
-        return Ok(reply(data.to_string(), data));
+        return Ok(Prepared::Ready(reply(data.to_string(), data)));
     }
     server
         .render(ctx, move |state, engine, cancel| {
@@ -80,7 +101,7 @@ fn render(
     input: &Preview,
     finish: Option<export_blur::Finish>,
     cancel: &Cancellation,
-) -> Result<CallToolResult> {
+) -> Result<Prepared> {
     let draft = state.drafts.snapshot(&input.draft_id, input.revision)?;
     ensure!(
         input.illustrations_only.is_none() || input.view == Some(PreviewView::Layout),
@@ -112,7 +133,7 @@ fn render(
                 && input.page.is_none(),
             "view=paper takes only draft_id and revision"
         );
-        return paper(&draft);
+        return paper(&draft).map(Prepared::Ready);
     }
     let number = input.section.unwrap_or(1);
     let section = state
@@ -132,7 +153,8 @@ fn render(
             "Review a single page without pagination"
         );
         if let Some(region) = &input.region {
-            return review::local::page(state, engine, &draft, section, input, region, cancel);
+            return review::local::page(state, engine, &draft, section, input, region, cancel)
+                .map(Prepared::Ready);
         }
         ensure!(
             !state.preserve_reviews,
@@ -148,11 +170,12 @@ fn render(
             &baselines,
             &state.paper_focus,
             cancel,
-        );
+        )
+        .map(Prepared::FullPage);
     }
     if input.view == Some(PreviewView::Layout) {
         let result = engine.layout(&draft, section, input, cancel)?;
-        return Ok(reply(result.to_string(), result));
+        return Ok(Prepared::Ready(reply(result.to_string(), result)));
     }
     ensure!(
         input.offset.is_none() && input.limit.is_none(),
@@ -184,7 +207,7 @@ fn render(
             STANDARD.encode(export::png(&finished)?),
             "image/png",
         ));
-        return Ok(result);
+        return Ok(Prepared::Ready(result));
     }
     let result = image(
         engine,
@@ -195,7 +218,7 @@ fn render(
         !state.preserve_reviews,
         cancel,
     )?;
-    add_paper_focus(state, &draft, number, page, result)
+    add_paper_focus(state, &draft, number, page, result).map(Prepared::Ready)
 }
 
 fn add_paper_focus(

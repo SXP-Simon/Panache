@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod list_tests;
 mod observations;
+pub(crate) use observations::record_review_in;
 mod trajectory;
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};
@@ -234,6 +235,13 @@ impl Snapshot<'_> {
             "INSERT INTO edit_notes VALUES(?,?,?)",
             params![self.id, next, details.to_string()],
         )?;
+        crate::rsi::record_edit(
+            &tx,
+            details["rsi_decision_id"].as_str(),
+            self.id,
+            next,
+            crate::rsi::EditTool::AdjustGlyphs,
+        )?;
         tx.commit()?;
         Ok(next)
     }
@@ -324,6 +332,7 @@ impl Drafts {
         ",
         )?;
         crate::experience::initialize(&tx)?;
+        crate::rsi::initialize(&tx)?;
         tx.commit()?;
         observations::initialize(&mut db)?;
         Ok(drafts)
@@ -480,6 +489,12 @@ impl Drafts {
             "UPDATE drafts SET revision=?1,chars=?2,sections=?3 WHERE id=?4",
             params![next, total, number.max(count), id],
         )?;
+        let tool = if existing_only {
+            crate::rsi::EditTool::ReplaceSectionText
+        } else {
+            crate::rsi::EditTool::SaveSection
+        };
+        crate::rsi::record_edit(&tx, input.rsi_decision_id.as_deref(), &id, next, tool)?;
         tx.commit()?;
         let mut saved = json!({"draft_id":id,"revision":next,"section":number,"sections":number.max(count),"prepared_chars":total});
         if let Some(paper) = paper {
@@ -710,6 +725,13 @@ impl Drafts {
                 params![draft.id, next, draft.layout_revision],
             )?;
         }
+        crate::rsi::record_edit(
+            &tx,
+            details["rsi_decision_id"].as_str(),
+            draft.id,
+            next,
+            crate::rsi::EditTool::TuneHandwriting,
+        )?;
         tx.commit()?;
         Ok(next)
     }

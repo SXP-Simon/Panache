@@ -42,6 +42,7 @@ pub(super) async fn run(server: &Panache, input: ReplaceText) -> Result<CallTool
             "Cannot prove only the requested plain line changed. {KEEP_SOURCE}"
         );
         let update = Save {
+            rsi_decision_id: input.rsi_decision_id,
             paper_path: None,
             paper_mode: None,
             paper_guides: None,

@@ -1,0 +1,73 @@
+{
+  "version": "paper-homework/2",
+  "use": "Choose checks that address the user's objective. Add draft_id and the exact candidate revision to every call. For page views, set the actual one-based section and page. For region_from, copy the indicated native-pixel polygon into arguments.region. Attach rsi_task_id to previews when a task-bound evidence receipt is needed.",
+  "checks": {
+    "paper_and_rulings": {
+      "calls": [
+        {"tool":"preview_handwriting","arguments":{"view":"paper"}},
+        {"tool":"preview_handwriting","arguments":{"view":"layout","offset":0,"limit":32}},
+        {"tool":"preview_handwriting","arguments":{"view":"image"}}
+      ],
+      "inspect": "Match the supplied sheet's header, margins and perspective. Compare the actual ink to visible writable rulings at the left, middle and right of occupied rows across the page. Follow next_offset for later glyphs. For explicitly assigned rows, count from the first writable ruling and verify each requested entry against its own slot.",
+      "limits": "A glyph can follow a ruling exactly and still occupy the wrong named row. Paragraph gaps may be allowed. photo_baseline describes the base layout; inspect current_photo_quad and rendered ink after local edits. Faint or obscured marks can leave placement unresolved.",
+      "sources": ["crates/panache-mcp/tool-design.md","crates/panache-mcp/src/engine.rs"]
+    },
+    "focus_and_contrast": {
+      "calls": [
+        {"tool":"preview_handwriting","arguments":{"view":"review"}},
+        {"tool":"preview_handwriting","arguments":{"view":"review"},"region_from":"A sample's preview_arguments.region in paper_focus_check or local_paper_ink_check when available; otherwise a polygon around nearby writing and a printed mark."}
+      ],
+      "inspect": "At native scale compare paper, finished ink and nearby printed marks in the upper, middle and lower occupied regions, and across a visible lateral shadow if present. Read local edge softness separately from unmarked paper brightness, paper colour and ink-to-paper contrast. Try a bounded change to new ink where the evidence supports it; compare the same labelled crops before and after. Examine thin formula strokes, diagram labels, transitions and a region that was already satisfactory. Keep the earlier candidate when the change provides no clear benefit.",
+      "limits": "A dark corner may reflect paper colour, a shadow or sensor exposure. A broad or faint printed stroke alone does not identify the optical blur of handwriting. Record clipped highlights, missing nearby reference or uncertain evidence explicitly. Present before/after crops at the same native scale. A whole-page export finish may also change original paper pixels.",
+      "sources": ["crates/panache-mcp/src/paper/focus.rs","crates/panache-mcp/src/review/paper_ink.rs"]
+    },
+    "pages_and_delivery": {
+      "calls": [
+        {"tool":"read_section","arguments":{"view":"review","section":1,"page":"last"}},
+        {"tool":"preview_handwriting","arguments":{"view":"image"}},
+        {"tool":"export_handwriting","arguments":{"format":"pdf"}}
+      ],
+      "inspect": "Repeat the last-page lookup for each requested section. Inspect the first and last required entries, occupied slots, continuation pages and any required page count. At delivery export the selected_revision and compare the returned draft, revision and actual page count with the selection and task.",
+      "limits": "Last-page lookup may repaginate in the current environment. A full-page review receipt establishes a recorded check. The final PDF and its contents provide the delivery evidence.",
+      "sources": ["crates/panache-mcp/README.md","crates/panache-mcp/src/inputs.rs"]
+    },
+    "table_cells": {
+      "calls": [
+        {"tool":"read_section","arguments":{"view":"source","section":1,"limit":4000}},
+        {"tool":"preview_handwriting","arguments":{"view":"image","export_blur_px":0},"region_from":"Native polygon enclosing the specific table, its header and the required row and column."}
+      ],
+      "inspect": "For each requested table identify its title or order, column headings and row keys. Read the required values and units from their individual cells, then check the calculation outside the table against the brief. Follow next_offset for the rest of the source.",
+      "limits": "A correct conclusion, matching row count or well-formed Markdown can coexist with a wrong displayed cell. Mark an unreadable cell unresolved.",
+      "sources": ["crates/panache-mcp/src/inputs.rs","crates/handwriting-core/src/render/glyph/table.rs"]
+    },
+    "diagram_branches": {
+      "calls": [
+        {"tool":"read_section","arguments":{"view":"source","section":1,"limit":4000}},
+        {"tool":"preview_handwriting","arguments":{"view":"layout","drawings_only":true,"limit":32}},
+        {"tool":"preview_handwriting","arguments":{"view":"image","export_blur_px":0},"region_from":"Native polygon enclosing one complete diagram with its arrows, labels and destinations."}
+      ],
+      "inspect": "Check each requested diagram independently. Read every named node. Follow each arrow from its source through its branch label to the destination at the arrowhead. Compare direction, label and destination with the brief.",
+      "limits": "Node and diagram counts cannot identify swapped yes/no branches. A whole-drawing layout ID locates a diagram; its rendered arrows and labels supply the visual evidence.",
+      "sources": ["crates/panache-mcp/tool-design.md","crates/handwriting-core/src/render/glyph/circuit/flowchart.rs"]
+    },
+    "formula_rendering": {
+      "calls": [
+        {"tool":"read_section","arguments":{"view":"source","section":1,"limit":4000}},
+        {"tool":"preview_handwriting","arguments":{"view":"image","export_blur_px":0},"region_from":"A native crop spanning the whole expression and its nearest writing lines, with a margin for descenders and detached marks."}
+      ],
+      "inspect": "Read the expression from the rendered crop before comparing it with the task and saved source. For each required fraction identify its numerator, bar and denominator. Check radical extent, indices, signs and units when present. A lost operand, clipped denominator, raw TeX command or replacement box in a required expression calls for revision. Cite the visible region and the expected and observed reading, then recheck the same crop in the candidate selected for export.",
+      "limits": "Literal TeX in a lesson on notation may be intentional. Alternative equivalent notation may satisfy the brief. If a sign is unreadable at native scale, record uncertainty instead of guessing. Correct saved source alone cannot establish that its rendering survived.",
+      "sources": ["crates/panache-mcp/src/markdown.rs","crates/handwriting-core/tests/math_layout.rs","crates/panache-mcp/src/preview.rs"]
+    },
+    "mixed_content_projection": {
+      "calls": [
+        {"tool":"preview_handwriting","arguments":{"view":"paper"}},
+        {"tool":"preview_handwriting","arguments":{"view":"layout","limit":32}},
+        {"tool":"preview_handwriting","arguments":{"view":"image","export_blur_px":0},"region_from":"A native polygon enclosing each requested object, adjacent printed rulings and its left and right ends."}
+      ],
+      "inspect": "Check body text, a displayed formula, a table, a flowchart and each attached graphic wherever requested. Compare their intended horizontal anchors with the local photographed rule at both ends. On tables check header/bottom edges and relative near/far width. On diagrams trace node boxes and labels; branch arrows may deliberately point diagonally. For an inserted graphic compare its frame or intended horizontal axis and check for an unwanted bright rectangle or halo. Follow next_offset for other objects. Record which object and location could actually be evaluated.",
+      "limits": "An equation may rise above its line, a table spans several lines and a drawing can have intentionally tilted edges. A projected layout quad describes placement. Visible pixels and adjacent paper references establish the appearance. Single-point agreement cannot establish direction or perspective.",
+      "sources": ["crates/panache-mcp/tool-design.md","crates/panache-mcp/src/review/consistency.rs","crates/panache-mcp/src/engine.rs"]
+    }
+  }
+}
